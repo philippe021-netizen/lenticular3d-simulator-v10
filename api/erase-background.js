@@ -5,30 +5,46 @@ export const config = {
 };
 
 function readBody(req) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
 
-    req.on("data", chunk => {
-      chunks.push(chunk);
-    });
+  return new Promise(
+    (resolve, reject) => {
 
-    req.on("end", () => {
-      resolve(
-        Buffer.concat(chunks)
+      const chunks = [];
+
+      req.on(
+        "data",
+        chunk => {
+          chunks.push(chunk);
+        }
       );
-    });
 
-    req.on("error", reject);
-  });
+      req.on(
+        "end",
+        () => {
+          resolve(
+            Buffer.concat(chunks)
+          );
+        }
+      );
+
+      req.on(
+        "error",
+        reject
+      );
+    }
+  );
 }
 
+
 function getKey() {
+
   return (
     process.env.STABILITY_API_KEY ||
     process.env["CLÉ_API_STABILITÉ"] ||
     process.env.CLE_API_STABILITE
   );
 }
+
 
 export default async function handler(
   req,
@@ -93,6 +109,7 @@ export default async function handler(
           method: "POST",
 
           headers: {
+
             Authorization:
               `Bearer ${key}`,
 
@@ -112,14 +129,13 @@ export default async function handler(
     if (!upstream.ok) {
 
       let message =
-        `Erase Background ${upstream.status}`;
+        `Erase ${upstream.status}`;
 
 
       try {
 
         message +=
           `: ${await upstream.text()}`;
-
       }
 
       catch {}
@@ -154,7 +170,6 @@ export default async function handler(
     return res
       .status(200)
       .send(buffer);
-
   }
 
   catch (error) {
@@ -164,7 +179,7 @@ export default async function handler(
       .json({
         error:
           error?.message ||
-          "Erreur reconstruction décor."
+          "Erreur reconstruction du fond."
       });
   }
 }
