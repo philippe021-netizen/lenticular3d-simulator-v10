@@ -21,7 +21,6 @@ let cameraRadius = 5.8;
 ========================================= */
 
 function fileToImage(file) {
-
   return new Promise((resolve, reject) => {
 
     const url = URL.createObjectURL(file);
@@ -34,6 +33,7 @@ function fileToImage(file) {
 
     image.onerror = () => {
       URL.revokeObjectURL(url);
+
       reject(
         new Error(
           "Impossible de lire la photo."
@@ -47,7 +47,6 @@ function fileToImage(file) {
 
 
 function blobToImage(blob) {
-
   return new Promise((resolve, reject) => {
 
     const url = URL.createObjectURL(blob);
@@ -60,6 +59,7 @@ function blobToImage(blob) {
 
     image.onerror = () => {
       URL.revokeObjectURL(url);
+
       reject(
         new Error(
           "Image générée illisible."
@@ -144,8 +144,11 @@ function createDepthCanvas(
   const source =
     document.createElement("canvas");
 
-  source.width = rawDepth.width;
-  source.height = rawDepth.height;
+  source.width =
+    rawDepth.width;
+
+  source.height =
+    rawDepth.height;
 
   const sourceContext =
     source.getContext("2d");
@@ -162,12 +165,20 @@ function createDepthCanvas(
     i++
   ) {
 
-    const value = rawDepth.data[i];
+    const value =
+      rawDepth.data[i];
 
-    sourceData.data[i * 4] = value;
-    sourceData.data[i * 4 + 1] = value;
-    sourceData.data[i * 4 + 2] = value;
-    sourceData.data[i * 4 + 3] = 255;
+    sourceData.data[i * 4] =
+      value;
+
+    sourceData.data[i * 4 + 1] =
+      value;
+
+    sourceData.data[i * 4 + 2] =
+      value;
+
+    sourceData.data[i * 4 + 3] =
+      255;
   }
 
   sourceContext.putImageData(
@@ -179,8 +190,11 @@ function createDepthCanvas(
   const canvas =
     document.createElement("canvas");
 
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width =
+    width;
+
+  canvas.height =
+    height;
 
   const context =
     canvas.getContext("2d");
@@ -337,8 +351,11 @@ async function estimateImageDepth(
   const canvas =
     document.createElement("canvas");
 
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width =
+    width;
+
+  canvas.height =
+    height;
 
   canvas
     .getContext("2d")
@@ -361,7 +378,6 @@ async function estimateImageDepth(
     );
 
   if (!blob) {
-
     throw new Error(
       "Impossible de préparer l’analyse de profondeur."
     );
@@ -401,7 +417,8 @@ export async function init(
     return;
   }
 
-  viewer = targetViewer;
+  viewer =
+    targetViewer;
 
   scene =
     new THREE.Scene();
@@ -503,7 +520,9 @@ export async function build(
   ] =
     await Promise.all([
 
-      fileToImage(photoFile),
+      fileToImage(
+        photoFile
+      ),
 
       blobToImage(
         cleanBackgroundBlob
@@ -518,7 +537,8 @@ export async function build(
     photo.naturalWidth /
     photo.naturalHeight;
 
-  const planeHeight = 2.75;
+  const planeHeight =
+    2.75;
 
   const planeWidth =
     planeHeight *
@@ -771,7 +791,7 @@ export async function build(
 
 
   /* =====================================
-     SUJET + SAFE EDGE
+     SUJET + PROTECTION V25
   ===================================== */
 
   const subjectTexture =
@@ -868,7 +888,11 @@ export async function build(
             ).a;
 
 
-          float alphaL =
+          /*
+            Protection à 3 px.
+          */
+
+          float alphaL3 =
             texture2D(
               uImage,
               uv -
@@ -879,7 +903,7 @@ export async function build(
             ).a;
 
 
-          float alphaR =
+          float alphaR3 =
             texture2D(
               uImage,
               uv +
@@ -890,7 +914,7 @@ export async function build(
             ).a;
 
 
-          float alphaU =
+          float alphaU3 =
             texture2D(
               uImage,
               uv +
@@ -901,7 +925,7 @@ export async function build(
             ).a;
 
 
-          float alphaD =
+          float alphaD3 =
             texture2D(
               uImage,
               uv -
@@ -912,28 +936,202 @@ export async function build(
             ).a;
 
 
-          float safeAlpha =
+          /*
+            Protection renforcée à 6 px.
+          */
+
+          float alphaL6 =
+            texture2D(
+              uImage,
+              uv -
+              vec2(
+                uTexel.x * 6.0,
+                0.0
+              )
+            ).a;
+
+
+          float alphaR6 =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                uTexel.x * 6.0,
+                0.0
+              )
+            ).a;
+
+
+          float alphaU6 =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                0.0,
+                uTexel.y * 6.0
+              )
+            ).a;
+
+
+          float alphaD6 =
+            texture2D(
+              uImage,
+              uv -
+              vec2(
+                0.0,
+                uTexel.y * 6.0
+              )
+            ).a;
+
+
+          /*
+            Diagonales à 6 px.
+            Important pour cheveux,
+            casquettes, oreilles.
+          */
+
+          float alphaUL =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                -uTexel.x * 4.5,
+                 uTexel.y * 4.5
+              )
+            ).a;
+
+
+          float alphaUR =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                 uTexel.x * 4.5,
+                 uTexel.y * 4.5
+              )
+            ).a;
+
+
+          float alphaDL =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                -uTexel.x * 4.5,
+                -uTexel.y * 4.5
+              )
+            ).a;
+
+
+          float alphaDR =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                 uTexel.x * 4.5,
+                -uTexel.y * 4.5
+              )
+            ).a;
+
+
+          float safeNear =
             min(
               alphaCenter,
               min(
                 min(
-                  alphaL,
-                  alphaR
+                  alphaL3,
+                  alphaR3
                 ),
                 min(
-                  alphaU,
-                  alphaD
+                  alphaU3,
+                  alphaD3
                 )
               )
             );
 
 
+          float safeFar =
+            min(
+              alphaCenter,
+              min(
+                min(
+                  alphaL6,
+                  alphaR6
+                ),
+                min(
+                  alphaU6,
+                  alphaD6
+                )
+              )
+            );
+
+
+          float safeDiagonal =
+            min(
+              min(
+                alphaUL,
+                alphaUR
+              ),
+              min(
+                alphaDL,
+                alphaDR
+              )
+            );
+
+
+          /*
+            Zone intérieure réellement sûre.
+          */
+
+          float safeAlpha =
+            min(
+              safeNear,
+              min(
+                safeFar,
+                safeDiagonal
+              )
+            );
+
+
+          /*
+            Transition plus progressive
+            que dans V24.
+
+            0 près des bords
+            → 1 bien à l'intérieur.
+          */
+
           float safeInside =
             smoothstep(
-              0.55,
-              0.96,
+              0.62,
+              0.985,
               safeAlpha
             );
+
+
+          /*
+            Petit deuxième facteur
+            pour éviter une cassure brutale.
+          */
+
+          float softInside =
+            smoothstep(
+              0.30,
+              0.90,
+              safeNear
+            );
+
+
+          /*
+            Combinaison :
+            les 3 premiers pixels ont
+            quasiment zéro relief,
+            les 3 suivants montent doucement.
+          */
+
+          float edgeProtection =
+            safeInside *
+            softInside;
 
 
           float depth =
@@ -955,7 +1153,7 @@ export async function build(
             *
             uDepthScale
             *
-            safeInside;
+            edgeProtection;
 
 
           gl_Position =
@@ -1067,14 +1265,21 @@ export async function build(
   );
 
 
-  backgroundMesh.position.x = 0;
-  subjectMesh.position.x = 0;
+  backgroundMesh.position.x =
+    0;
 
-  backgroundMesh.rotation.y = 0;
-  subjectMesh.rotation.y = 0;
+  subjectMesh.position.x =
+    0;
+
+  backgroundMesh.rotation.y =
+    0;
+
+  subjectMesh.rotation.y =
+    0;
 
 
-  cameraRadius = 5.8;
+  cameraRadius =
+    5.8;
 
 
   camera.position.set(
@@ -1101,14 +1306,14 @@ export async function build(
 
 
   setStatus(
-    "Simulation prête : 9 vues de production disponibles.",
+    "V25 prête : contour tête/cheveux renforcé.",
     86
   );
 }
 
 
 /* =========================================
-   POSITION CAMÉRA PAR ANGLE
+   ANGLE CAMÉRA
 ========================================= */
 
 function setAngleDegrees(
@@ -1168,7 +1373,8 @@ function setAngleDegrees(
 function setPose(value) {
 
   const degrees =
-    value * 12;
+    value *
+    12;
 
   setAngleDegrees(
     degrees
@@ -1192,7 +1398,6 @@ export function start() {
 
   const animate =
     currentTime => {
-
 
       const elapsed =
         (
@@ -1231,7 +1436,7 @@ export function start() {
 
 
 /* =========================================
-   ARRÊT TEMPORAIRE ANIMATION
+   ARRÊT ANIMATION
 ========================================= */
 
 function stopAnimation() {
@@ -1242,7 +1447,8 @@ function stopAnimation() {
       animationFrame
     );
 
-    animationFrame = 0;
+    animationFrame =
+      0;
   }
 }
 
@@ -1280,7 +1486,7 @@ function canvasToBlob() {
 
 
 /* =========================================
-   EXPORT DES 9 VUES
+   EXPORT 9 VUES
 ========================================= */
 
 export async function exportProductionViews(
@@ -1299,14 +1505,6 @@ export async function exportProductionViews(
   }
 
 
-  /*
-    9 positions de travail.
-
-    Elles pourront ensuite être
-    adaptées au véritable système
-    lenticulaire utilisé.
-  */
-
   const angles = [
     -12,
     -9,
@@ -1323,7 +1521,8 @@ export async function exportProductionViews(
   stopAnimation();
 
 
-  const views = [];
+  const views =
+    [];
 
 
   for (
@@ -1340,11 +1539,6 @@ export async function exportProductionViews(
       angle
     );
 
-
-    /*
-      On laisse le navigateur terminer
-      le rendu de la frame avant capture.
-    */
 
     await new Promise(
       resolve =>
@@ -1409,19 +1603,10 @@ export async function exportProductionViews(
   }
 
 
-  /*
-    Retour au centre.
-  */
-
   setAngleDegrees(
     0
   );
 
-
-  /*
-    Puis reprise automatique
-    de la simulation.
-  */
 
   start();
 
@@ -1431,7 +1616,7 @@ export async function exportProductionViews(
 
 
 /* =========================================
-   EXPORT D'UNE POSITION MANUELLE
+   CAPTURE ANGLE MANUEL
 ========================================= */
 
 export async function captureAngle(
