@@ -4,6 +4,12 @@ const imageInput =
 const generateBtn =
   document.getElementById("generateBtn");
 
+const exportVideoBtn =
+  document.getElementById("exportVideoBtn");
+
+const downloadVideo =
+  document.getElementById("downloadVideo");
+
 const statusBox =
   document.getElementById("status");
 
@@ -23,7 +29,12 @@ const placeholder =
 let sourceFile = null;
 let thumbUrl = null;
 let engine = null;
+let videoUrl = null;
 
+
+/* =========================================
+   STATUT
+========================================= */
 
 function setStatus(
   message,
@@ -33,6 +44,7 @@ function setStatus(
   statusBox.textContent =
     message;
 
+
   if (progress !== null) {
 
     bar.style.width =
@@ -40,6 +52,10 @@ function setStatus(
   }
 }
 
+
+/* =========================================
+   PRÉPARATION PHOTO
+========================================= */
 
 async function compressImage(
   file,
@@ -83,6 +99,7 @@ async function compressImage(
     const scale =
       Math.min(
         1,
+
         maxSide /
         Math.max(
           image.naturalWidth,
@@ -94,6 +111,7 @@ async function compressImage(
     const width =
       Math.max(
         64,
+
         Math.round(
           image.naturalWidth *
           scale
@@ -104,6 +122,7 @@ async function compressImage(
     const height =
       Math.max(
         64,
+
         Math.round(
           image.naturalHeight *
           scale
@@ -162,7 +181,8 @@ async function compressImage(
       [blob],
       "photo.jpg",
       {
-        type: "image/jpeg"
+        type:
+          "image/jpeg"
       }
     );
   }
@@ -175,6 +195,10 @@ async function compressImage(
   }
 }
 
+
+/* =========================================
+   APPELS API
+========================================= */
 
 async function postForm(
   endpoint,
@@ -218,6 +242,10 @@ async function postForm(
   return await response.blob();
 }
 
+
+/* =========================================
+   CONVERSION BLOB → IMAGE
+========================================= */
 
 function blobToImage(blob) {
 
@@ -263,6 +291,11 @@ function blobToImage(blob) {
 }
 
 
+/* =========================================
+   CRÉATION DU MASQUE
+   POUR RECONSTRUIRE LE FOND
+========================================= */
+
 async function makeEraseMask(
   subjectBlob
 ) {
@@ -303,7 +336,8 @@ async function makeEraseMask(
       canvas.getContext(
         "2d",
         {
-          willReadFrequently: true
+          willReadFrequently:
+            true
         }
       );
 
@@ -355,7 +389,8 @@ async function makeEraseMask(
       );
 
 
-    const radius = 2;
+    const radius =
+      2;
 
 
     for (
@@ -370,7 +405,8 @@ async function makeEraseMask(
         x++
       ) {
 
-        let erase = 0;
+        let erase =
+          0;
 
 
         for (
@@ -408,7 +444,8 @@ async function makeEraseMask(
 
             if (
               alpha[
-                yy * width +
+                yy *
+                width +
                 xx
               ] > 32
             ) {
@@ -481,6 +518,10 @@ async function makeEraseMask(
 }
 
 
+/* =========================================
+   CHARGEMENT MOTEUR 3D
+========================================= */
+
 async function getEngine() {
 
   if (engine) {
@@ -490,7 +531,7 @@ async function getEngine() {
 
   engine =
     await import(
-      "./engine.js?v=20"
+      "./engine.js?v=22"
     );
 
 
@@ -503,6 +544,10 @@ async function getEngine() {
 }
 
 
+/* =========================================
+   CHOIX PHOTO
+========================================= */
+
 imageInput.addEventListener(
   "change",
   () => {
@@ -514,6 +559,31 @@ imageInput.addEventListener(
 
     generateBtn.disabled =
       !sourceFile;
+
+
+    if (exportVideoBtn) {
+
+      exportVideoBtn.disabled =
+        true;
+    }
+
+
+    if (downloadVideo) {
+
+      downloadVideo.style.display =
+        "none";
+    }
+
+
+    if (videoUrl) {
+
+      URL.revokeObjectURL(
+        videoUrl
+      );
+
+      videoUrl =
+        null;
+    }
 
 
     if (thumbUrl) {
@@ -561,6 +631,10 @@ imageInput.addEventListener(
 );
 
 
+/* =========================================
+   CRÉATION SIMULATION 3D
+========================================= */
+
 generateBtn.addEventListener(
   "click",
   async () => {
@@ -572,6 +646,13 @@ generateBtn.addEventListener(
 
     generateBtn.disabled =
       true;
+
+
+    if (exportVideoBtn) {
+
+      exportVideoBtn.disabled =
+        true;
+    }
 
 
     try {
@@ -587,6 +668,10 @@ generateBtn.addEventListener(
           sourceFile
         );
 
+
+      /* ---------------------------------
+         DÉTOURAGE
+      --------------------------------- */
 
       setStatus(
         "2/5 Détourage précis du sujet…",
@@ -617,6 +702,10 @@ generateBtn.addEventListener(
           removeForm
         );
 
+
+      /* ---------------------------------
+         FOND SANS SUJET
+      --------------------------------- */
 
       setStatus(
         "3/5 Reconstruction du fond sans le sujet…",
@@ -675,8 +764,12 @@ generateBtn.addEventListener(
         );
 
 
+      /* ---------------------------------
+         CONSTRUCTION 3D
+      --------------------------------- */
+
       setStatus(
-        "4/5 Analyse du relief du sujet…",
+        "4/5 Analyse des profondeurs…",
         66
       );
 
@@ -697,6 +790,10 @@ generateBtn.addEventListener(
         "none";
 
 
+      /* ---------------------------------
+         ANIMATION
+      --------------------------------- */
+
       setStatus(
         "5/5 Mise en mouvement de la parallaxe…",
         90
@@ -706,15 +803,24 @@ generateBtn.addEventListener(
       currentEngine.start();
 
 
+      if (exportVideoBtn) {
+
+        exportVideoBtn.disabled =
+          false;
+      }
+
+
       setStatus(
-        "Aperçu V20 actif : le fond ne contient plus le sujet, donc l’angle peut être plus marqué sans double silhouette.",
+        "Aperçu 3D actif. Vous pouvez maintenant enregistrer la simulation.",
         100
       );
     }
 
     catch (error) {
 
-      console.error(error);
+      console.error(
+        error
+      );
 
 
       setStatus(
@@ -733,3 +839,396 @@ generateBtn.addEventListener(
     }
   }
 );
+
+
+/* =========================================
+   CHOIX DU FORMAT VIDÉO
+========================================= */
+
+function chooseVideoMimeType() {
+
+  if (
+    typeof MediaRecorder ===
+    "undefined"
+  ) {
+
+    return null;
+  }
+
+
+  const types = [
+
+    "video/mp4;codecs=avc1.42E01E",
+
+    "video/mp4",
+
+    "video/webm;codecs=vp9",
+
+    "video/webm;codecs=vp8",
+
+    "video/webm"
+  ];
+
+
+  for (
+    const type of types
+  ) {
+
+    try {
+
+      if (
+        MediaRecorder
+          .isTypeSupported(
+            type
+          )
+      ) {
+
+        return type;
+      }
+    }
+
+    catch {}
+  }
+
+
+  return "";
+}
+
+
+/* =========================================
+   ENREGISTREMENT VIDÉO
+========================================= */
+
+async function recordSimulation() {
+
+  const canvas =
+    viewer.querySelector(
+      "canvas"
+    );
+
+
+  if (!canvas) {
+
+    throw new Error(
+      "Canvas 3D introuvable."
+    );
+  }
+
+
+  if (
+    typeof canvas.captureStream !==
+    "function"
+  ) {
+
+    throw new Error(
+      "L’enregistrement du canvas n’est pas pris en charge sur cet appareil."
+    );
+  }
+
+
+  if (
+    typeof MediaRecorder ===
+    "undefined"
+  ) {
+
+    throw new Error(
+      "MediaRecorder n’est pas disponible sur ce navigateur."
+    );
+  }
+
+
+  /*
+    30 images/seconde
+  */
+
+  const stream =
+    canvas.captureStream(
+      30
+    );
+
+
+  const mimeType =
+    chooseVideoMimeType();
+
+
+  let recorder;
+
+
+  try {
+
+    recorder =
+      new MediaRecorder(
+        stream,
+
+        mimeType
+          ? {
+              mimeType,
+              videoBitsPerSecond:
+                6000000
+            }
+          : {
+              videoBitsPerSecond:
+                6000000
+            }
+      );
+  }
+
+  catch {
+
+    recorder =
+      new MediaRecorder(
+        stream
+      );
+  }
+
+
+  const chunks =
+    [];
+
+
+  recorder.ondataavailable =
+    event => {
+
+      if (
+        event.data &&
+        event.data.size > 0
+      ) {
+
+        chunks.push(
+          event.data
+        );
+      }
+    };
+
+
+  const completed =
+    new Promise(
+      (resolve, reject) => {
+
+        recorder.onstop =
+          resolve;
+
+
+        recorder.onerror =
+          event => {
+
+            reject(
+              event.error ||
+              new Error(
+                "Erreur pendant l’enregistrement vidéo."
+              )
+            );
+          };
+      }
+    );
+
+
+  recorder.start();
+
+
+  /*
+    6 secondes :
+    correspond à un cycle complet
+    de l’animation actuelle.
+  */
+
+  const duration =
+    6000;
+
+
+  const startTime =
+    performance.now();
+
+
+  await new Promise(
+    resolve => {
+
+      const update =
+        () => {
+
+          const elapsed =
+            performance.now() -
+            startTime;
+
+
+          const percent =
+            Math.min(
+              100,
+              Math.round(
+                elapsed /
+                duration *
+                100
+              )
+            );
+
+
+          setStatus(
+            `Enregistrement vidéo… ${percent}%`,
+            percent
+          );
+
+
+          if (
+            elapsed <
+            duration
+          ) {
+
+            requestAnimationFrame(
+              update
+            );
+          }
+
+          else {
+
+            resolve();
+          }
+        };
+
+
+      requestAnimationFrame(
+        update
+      );
+    }
+  );
+
+
+  recorder.stop();
+
+
+  await completed;
+
+
+  /*
+    Arrêt des pistes du stream
+    après capture.
+  */
+
+  stream
+    .getTracks()
+    .forEach(
+      track =>
+        track.stop()
+    );
+
+
+  const actualType =
+    recorder.mimeType ||
+    mimeType ||
+    "video/webm";
+
+
+  return new Blob(
+    chunks,
+    {
+      type:
+        actualType
+    }
+  );
+}
+
+
+/* =========================================
+   BOUTON ENREGISTREMENT
+========================================= */
+
+if (exportVideoBtn) {
+
+  exportVideoBtn.addEventListener(
+    "click",
+    async () => {
+
+      exportVideoBtn.disabled =
+        true;
+
+
+      try {
+
+        setStatus(
+          "Préparation de l’enregistrement…",
+          0
+        );
+
+
+        const videoBlob =
+          await recordSimulation();
+
+
+        if (videoUrl) {
+
+          URL.revokeObjectURL(
+            videoUrl
+          );
+        }
+
+
+        videoUrl =
+          URL.createObjectURL(
+            videoBlob
+          );
+
+
+        const isMp4 =
+          videoBlob.type.includes(
+            "mp4"
+          );
+
+
+        const extension =
+          isMp4
+            ? "mp4"
+            : "webm";
+
+
+        if (downloadVideo) {
+
+          downloadVideo.href =
+            videoUrl;
+
+
+          downloadVideo.download =
+            `simulation-lenticulaire.${extension}`;
+
+
+          downloadVideo.textContent =
+            isMp4
+              ? "Télécharger la simulation MP4"
+              : "Télécharger la simulation vidéo";
+
+
+          downloadVideo.style.display =
+            "block";
+        }
+
+
+        setStatus(
+          isMp4
+            ? "Simulation MP4 prête."
+            : "Simulation vidéo prête. Ce navigateur a utilisé le format WebM.",
+          100
+        );
+      }
+
+      catch (error) {
+
+        console.error(
+          error
+        );
+
+
+        setStatus(
+          `Erreur vidéo : ${
+            error?.message ||
+            String(error)
+          }`,
+          0
+        );
+      }
+
+      finally {
+
+        exportVideoBtn.disabled =
+          false;
+      }
+    }
+  );
+}
