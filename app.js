@@ -28,11 +28,77 @@ const viewer =
 const placeholder =
   document.getElementById("placeholder");
 
+const productStage =
+  document.getElementById("productStage");
+
+const supportLabel =
+  document.getElementById("supportLabel");
+
+const supportButtons =
+  document.querySelectorAll(
+    ".support-card"
+  );
+
 
 let sourceFile = null;
+
 let thumbUrl = null;
+
 let engine = null;
+
 let videoUrl = null;
+
+let simulationReady = false;
+
+let selectedSupport =
+  "medallion-cat";
+
+
+/* =========================================
+   SUPPORTS DISPONIBLES
+========================================= */
+
+const supports = {
+
+  "medallion-cat": {
+
+    className:
+      "support-medallion-cat",
+
+    label:
+      "Médaillon chat"
+  },
+
+
+  "medallion-dog": {
+
+    className:
+      "support-medallion-dog",
+
+    label:
+      "Médaillon chien"
+  },
+
+
+  "card": {
+
+    className:
+      "support-card-cb",
+
+    label:
+      "Carte CB"
+  },
+
+
+  "keychain": {
+
+    className:
+      "support-keychain",
+
+    label:
+      "Porte-clé rectangulaire"
+  }
+};
 
 
 /* =========================================
@@ -47,12 +113,151 @@ function setStatus(
   statusBox.textContent =
     message;
 
+
   if (progress !== null) {
 
     bar.style.width =
       `${progress}%`;
   }
 }
+
+
+/* =========================================
+   CHANGEMENT DE SUPPORT
+========================================= */
+
+function selectSupport(
+  supportName
+) {
+
+  const support =
+    supports[
+      supportName
+    ];
+
+
+  if (!support) {
+    return;
+  }
+
+
+  selectedSupport =
+    supportName;
+
+
+  /*
+    Boutons actifs
+  */
+
+  supportButtons.forEach(
+    button => {
+
+      const active =
+        button.dataset.support ===
+        supportName;
+
+
+      button.classList.toggle(
+        "active",
+        active
+      );
+    }
+  );
+
+
+  /*
+    Forme du produit
+  */
+
+  productStage.classList.remove(
+    "support-medallion-cat",
+    "support-medallion-dog",
+    "support-card-cb",
+    "support-keychain"
+  );
+
+
+  productStage.classList.add(
+    support.className
+  );
+
+
+  /*
+    Nom affiché
+  */
+
+  supportLabel.textContent =
+    support.label;
+
+
+  /*
+    Le canvas Three.js existe déjà.
+
+    On ne refait PAS Stability.
+    On demande simplement au navigateur
+    de recalculer les dimensions.
+  */
+
+  requestAnimationFrame(
+    () => {
+
+      window.dispatchEvent(
+        new Event(
+          "resize"
+        )
+      );
+
+
+      requestAnimationFrame(
+        () => {
+
+          window.dispatchEvent(
+            new Event(
+              "resize"
+            )
+          );
+        }
+      );
+    }
+  );
+
+
+  if (simulationReady) {
+
+    setStatus(
+      `${support.label} sélectionné. La simulation 3D existante est réutilisée sans nouveau calcul IA.`,
+      100
+    );
+  }
+
+  else {
+
+    setStatus(
+      `${support.label} sélectionné. Ajoutez une photo puis créez l’aperçu 3D.`,
+      0
+    );
+  }
+}
+
+
+/* =========================================
+   CLIC SUR SUPPORT
+========================================= */
+
+supportButtons.forEach(
+  button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        selectSupport(
+          button.dataset.support
+        );
+      }
+    );
+  }
+);
 
 
 /* =========================================
@@ -66,19 +271,30 @@ async function compressImage(
 ) {
 
   const url =
-    URL.createObjectURL(file);
+    URL.createObjectURL(
+      file
+    );
+
 
   try {
 
     const image =
       await new Promise(
-        (resolve, reject) => {
+        (
+          resolve,
+          reject
+        ) => {
 
           const img =
             new Image();
 
+
           img.onload =
-            () => resolve(img);
+            () =>
+              resolve(
+                img
+              );
+
 
           img.onerror =
             () =>
@@ -87,6 +303,7 @@ async function compressImage(
                   "Impossible de lire la photo."
                 )
               );
+
 
           img.src =
             url;
@@ -133,6 +350,7 @@ async function compressImage(
         "canvas"
       );
 
+
     canvas.width =
       width;
 
@@ -140,15 +358,19 @@ async function compressImage(
       height;
 
 
-    canvas
-      .getContext("2d")
-      .drawImage(
-        image,
-        0,
-        0,
-        width,
-        height
+    const context =
+      canvas.getContext(
+        "2d"
       );
+
+
+    context.drawImage(
+      image,
+      0,
+      0,
+      width,
+      height
+    );
 
 
     const blob =
@@ -190,7 +412,7 @@ async function compressImage(
 
 
 /* =========================================
-   API
+   APPELS API
 ========================================= */
 
 async function postForm(
@@ -202,8 +424,11 @@ async function postForm(
     await fetch(
       endpoint,
       {
-        method: "POST",
-        body: form
+        method:
+          "POST",
+
+        body:
+          form
       }
     );
 
@@ -216,9 +441,14 @@ async function postForm(
 
     try {
 
+      const json =
+        JSON.parse(
+          message
+        );
+
+
       message =
-        JSON.parse(message)
-          .error ||
+        json.error ||
         message;
     }
 
@@ -240,13 +470,21 @@ async function postForm(
    BLOB → IMAGE
 ========================================= */
 
-function blobToImage(blob) {
+function blobToImage(
+  blob
+) {
 
   return new Promise(
-    (resolve, reject) => {
+    (
+      resolve,
+      reject
+    ) => {
 
       const url =
-        URL.createObjectURL(blob);
+        URL.createObjectURL(
+          blob
+        );
+
 
       const image =
         new Image();
@@ -267,6 +505,7 @@ function blobToImage(blob) {
             url
           );
 
+
           reject(
             new Error(
               "Image détourée illisible."
@@ -283,7 +522,7 @@ function blobToImage(blob) {
 
 
 /* =========================================
-   MASQUE POUR FOND
+   MASQUE POUR EFFACER LE SUJET
 ========================================= */
 
 async function makeEraseMask(
@@ -304,6 +543,7 @@ async function makeEraseMask(
     const width =
       image.naturalWidth;
 
+
     const height =
       image.naturalHeight;
 
@@ -312,6 +552,7 @@ async function makeEraseMask(
       document.createElement(
         "canvas"
       );
+
 
     canvas.width =
       width;
@@ -435,7 +676,8 @@ async function makeEraseMask(
                 yy *
                 width +
                 xx
-              ] > 32
+              ] >
+              32
             ) {
 
               erase =
@@ -455,16 +697,27 @@ async function makeEraseMask(
           ) * 4;
 
 
-        output.data[index] =
+        output.data[
+          index
+        ] =
           erase;
 
-        output.data[index + 1] =
+
+        output.data[
+          index + 1
+        ] =
           erase;
 
-        output.data[index + 2] =
+
+        output.data[
+          index + 2
+        ] =
           erase;
 
-        output.data[index + 3] =
+
+        output.data[
+          index + 3
+        ] =
           255;
       }
     }
@@ -496,19 +749,20 @@ async function makeEraseMask(
 
 
 /* =========================================
-   MOTEUR
+   MOTEUR 3D
 ========================================= */
 
 async function getEngine() {
 
   if (engine) {
+
     return engine;
   }
 
 
   engine =
     await import(
-      "./engine.js?v=24"
+      "./engine.js?v=25"
     );
 
 
@@ -522,7 +776,7 @@ async function getEngine() {
 
 
 /* =========================================
-   SÉLECTION PHOTO
+   CHOIX PHOTO
 ========================================= */
 
 imageInput.addEventListener(
@@ -534,23 +788,30 @@ imageInput.addEventListener(
       null;
 
 
+    simulationReady =
+      false;
+
+
     generateBtn.disabled =
       !sourceFile;
 
 
     if (exportVideoBtn) {
+
       exportVideoBtn.disabled =
         true;
     }
 
 
     if (exportViewsBtn) {
+
       exportViewsBtn.disabled =
         true;
     }
 
 
     if (downloadVideo) {
+
       downloadVideo.style.display =
         "none";
     }
@@ -561,6 +822,7 @@ imageInput.addEventListener(
       URL.revokeObjectURL(
         videoUrl
       );
+
 
       videoUrl =
         null;
@@ -592,7 +854,7 @@ imageInput.addEventListener(
 
 
       setStatus(
-        "Photo chargée. Touchez « Créer l’aperçu 3D ».",
+        `${supports[selectedSupport].label} sélectionné. Photo chargée : lancez l’aperçu 3D.`,
         0
       );
     }
@@ -604,7 +866,7 @@ imageInput.addEventListener(
 
 
       setStatus(
-        "Chargez une photo pour commencer.",
+        "Choisissez un support puis chargez une photo.",
         0
       );
     }
@@ -613,7 +875,7 @@ imageInput.addEventListener(
 
 
 /* =========================================
-   CRÉATION SIMULATION
+   CRÉATION DE LA SIMULATION
 ========================================= */
 
 generateBtn.addEventListener(
@@ -621,6 +883,7 @@ generateBtn.addEventListener(
   async () => {
 
     if (!sourceFile) {
+
       return;
     }
 
@@ -629,19 +892,23 @@ generateBtn.addEventListener(
       true;
 
 
-    if (exportVideoBtn) {
-      exportVideoBtn.disabled =
-        true;
-    }
+    exportVideoBtn.disabled =
+      true;
 
 
-    if (exportViewsBtn) {
-      exportViewsBtn.disabled =
-        true;
-    }
+    exportViewsBtn.disabled =
+      true;
+
+
+    simulationReady =
+      false;
 
 
     try {
+
+      /*
+        1 — PHOTO
+      */
 
       setStatus(
         "1/5 Préparation de la photo…",
@@ -654,6 +921,10 @@ generateBtn.addEventListener(
           sourceFile
         );
 
+
+      /*
+        2 — DÉTOURAGE
+      */
 
       setStatus(
         "2/5 Détourage précis du sujet…",
@@ -685,6 +956,10 @@ generateBtn.addEventListener(
         );
 
 
+      /*
+        3 — FOND RECONSTRUIT
+      */
+
       setStatus(
         "3/5 Reconstruction du fond sans le sujet…",
         43
@@ -695,6 +970,14 @@ generateBtn.addEventListener(
         await makeEraseMask(
           subjectBlob
         );
+
+
+      if (!maskBlob) {
+
+        throw new Error(
+          "Création du masque impossible."
+        );
+      }
 
 
       const eraseForm =
@@ -734,6 +1017,10 @@ generateBtn.addEventListener(
         );
 
 
+      /*
+        4 — PROFONDEUR
+      */
+
       setStatus(
         "4/5 Analyse des profondeurs…",
         66
@@ -752,9 +1039,28 @@ generateBtn.addEventListener(
       );
 
 
+      /*
+        Le support choisi a pu changer
+        pendant le calcul.
+
+        On recalcule simplement
+        la taille du canvas.
+      */
+
+      window.dispatchEvent(
+        new Event(
+          "resize"
+        )
+      );
+
+
       placeholder.style.display =
         "none";
 
+
+      /*
+        5 — ANIMATION
+      */
 
       setStatus(
         "5/5 Mise en mouvement…",
@@ -765,22 +1071,20 @@ generateBtn.addEventListener(
       currentEngine.start();
 
 
-      if (exportVideoBtn) {
-
-        exportVideoBtn.disabled =
-          false;
-      }
+      simulationReady =
+        true;
 
 
-      if (exportViewsBtn) {
+      exportVideoBtn.disabled =
+        false;
 
-        exportViewsBtn.disabled =
-          false;
-      }
+
+      exportViewsBtn.disabled =
+        false;
 
 
       setStatus(
-        "Simulation prête. Vous pouvez enregistrer la vidéo ou générer les 9 vues.",
+        `Simulation prête dans le support « ${supports[selectedSupport].label} ». Vous pouvez changer de support sans nouveau calcul IA.`,
         100
       );
     }
@@ -861,14 +1165,6 @@ if (exportViewsBtn) {
             );
 
 
-        /*
-          Téléchargement successif.
-
-          Sur iPad/Safari,
-          plusieurs téléchargements peuvent
-          demander une autorisation.
-        */
-
         for (
           const view of views
         ) {
@@ -912,12 +1208,6 @@ if (exportViewsBtn) {
             10000
           );
 
-
-          /*
-            Petite pause pour éviter
-            de lancer 9 téléchargements
-            exactement en même temps.
-          */
 
           await new Promise(
             resolve =>
@@ -979,9 +1269,13 @@ function chooseVideoMimeType() {
   const types = [
 
     "video/mp4;codecs=avc1.42E01E",
+
     "video/mp4",
+
     "video/webm;codecs=vp9",
+
     "video/webm;codecs=vp8",
+
     "video/webm"
   ];
 
@@ -1012,7 +1306,7 @@ function chooseVideoMimeType() {
 
 
 /* =========================================
-   CAPTURE VIDÉO
+   ENREGISTREMENT VIDÉO
 ========================================= */
 
 async function recordSimulation() {
@@ -1071,9 +1365,11 @@ async function recordSimulation() {
     recorder =
       new MediaRecorder(
         stream,
+
         mimeType
           ? {
               mimeType,
+
               videoBitsPerSecond:
                 6000000
             }
@@ -1102,7 +1398,8 @@ async function recordSimulation() {
 
       if (
         event.data &&
-        event.data.size > 0
+        event.data.size >
+        0
       ) {
 
         chunks.push(
@@ -1114,7 +1411,10 @@ async function recordSimulation() {
 
   const completed =
     new Promise(
-      (resolve, reject) => {
+      (
+        resolve,
+        reject
+      ) => {
 
         recorder.onstop =
           resolve;
@@ -1277,25 +1577,22 @@ if (exportVideoBtn) {
             : "webm";
 
 
-        if (downloadVideo) {
-
-          downloadVideo.href =
-            videoUrl;
+        downloadVideo.href =
+          videoUrl;
 
 
-          downloadVideo.download =
-            `simulation-lenticulaire.${extension}`;
+        downloadVideo.download =
+          `simulation-${selectedSupport}.${extension}`;
 
 
-          downloadVideo.textContent =
-            isMp4
-              ? "Télécharger la simulation MP4"
-              : "Télécharger la simulation vidéo";
+        downloadVideo.textContent =
+          isMp4
+            ? "Télécharger la simulation MP4"
+            : "Télécharger la simulation vidéo";
 
 
-          downloadVideo.style.display =
-            "block";
-        }
+        downloadVideo.style.display =
+          "block";
 
 
         setStatus(
@@ -1330,3 +1627,12 @@ if (exportVideoBtn) {
     }
   );
 }
+
+
+/* =========================================
+   INITIALISATION SUPPORT
+========================================= */
+
+selectSupport(
+  selectedSupport
+);
