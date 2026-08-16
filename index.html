@@ -16,7 +16,7 @@
 
   <link
     rel="stylesheet"
-    href="./styles.css?v=26"
+    href="./styles.css?v=27"
   >
 
 </head>
@@ -50,7 +50,7 @@
 
 
       <div class="badge">
-        V26 Supports
+        V27 Master universel
       </div>
 
     </header>
@@ -62,9 +62,9 @@
       <aside class="controls">
 
 
-        <!-- =========================
-             CHOIX DU SUPPORT
-        ========================== -->
+        <!-- =========================================
+             CHOIX SUPPORT
+        ========================================== -->
 
         <div class="support-zone">
 
@@ -149,9 +149,9 @@
         </div>
 
 
-        <!-- =========================
+        <!-- =========================================
              PHOTO
-        ========================== -->
+        ========================================== -->
 
         <div class="upload-zone">
 
@@ -179,9 +179,9 @@
         >
 
 
-        <!-- =========================
+        <!-- =========================================
              ACTIONS
-        ========================== -->
+        ========================================== -->
 
         <button
           id="generateBtn"
@@ -217,9 +217,9 @@
         </a>
 
 
-        <!-- =========================
+        <!-- =========================================
              STATUT
-        ========================== -->
+        ========================================== -->
 
         <div id="status">
 
@@ -240,10 +240,13 @@
 
           La simulation est un aperçu visuel.
 
-          Le rendu lenticulaire imprimé final
-          peut varier selon le support,
-          la feuille lenticulaire
-          et les paramètres d’impression.
+          Le fond est adapté automatiquement
+          au format du support afin d’éviter
+          les zones vides lors de la rotation.
+
+          Le sujet conserve son cadrage
+          sans être zoomé pour remplir
+          artificiellement le support.
 
         </div>
 
@@ -251,9 +254,9 @@
       </aside>
 
 
-      <!-- =========================
-           ZONE DE VISUALISATION
-      ========================== -->
+      <!-- =========================================
+           PREVIEW PRODUIT
+      ========================================== -->
 
       <section class="preview-panel">
 
@@ -264,17 +267,15 @@
         >
 
 
-          <!-- =========================
-               SUPPORT PRODUIT
-          ========================== -->
-
           <div
             id="productShell"
             class="product-shell"
           >
 
 
-            <!-- Anneau médaillon / porte-clé -->
+            <!-- =====================================
+                 ANNEAU / OEILLET
+            ====================================== -->
 
             <div
               id="productRing"
@@ -288,9 +289,9 @@
             ></div>
 
 
-            <!-- =========================
-                 SIMULATION 3D
-            ========================== -->
+            <!-- =====================================
+                 VIEWER THREE.JS
+            ====================================== -->
 
             <div
               id="viewer"
@@ -309,7 +310,7 @@
 
                 <span>
                   Choisissez un support,
-                  ajoutez une photo
+                  ajoutez une photo,
                   puis lancez la simulation.
                 </span>
 
@@ -325,9 +326,9 @@
         </div>
 
 
-        <!-- =========================
+        <!-- =========================================
              NOM SUPPORT
-        ========================== -->
+        ========================================== -->
 
         <div
           id="supportLabel"
@@ -348,7 +349,7 @@
 
   <script
     type="module"
-    src="./app.js?v=26"
+    src="./app.js?v=27"
   ></script>
 
 
