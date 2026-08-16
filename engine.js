@@ -499,6 +499,11 @@ function resize() {
     width / height;
 
   camera.updateProjectionMatrix();
+
+  renderer.render(
+    scene,
+    camera
+  );
 }
 
 
@@ -533,26 +538,32 @@ export async function build(
       )
     ]);
 
+
   const imageAspect =
     photo.naturalWidth /
     photo.naturalHeight;
 
+
   const planeHeight =
     2.75;
+
 
   const planeWidth =
     planeHeight *
     imageAspect;
+
 
   const estimator =
     await getEstimator(
       setStatus
     );
 
+
   setStatus(
     "Analyse du relief du décor…",
     69
   );
+
 
   const backgroundDepth =
     await estimateImageDepth(
@@ -560,10 +571,12 @@ export async function build(
       estimator
     );
 
+
   setStatus(
     "Analyse du relief du premier plan…",
     75
   );
+
 
   const subjectDepth =
     await estimateImageDepth(
@@ -605,7 +618,7 @@ export async function build(
 
 
   /* =====================================
-     FOND
+     FOND 2.5D AVEC OVERSCAN
   ===================================== */
 
   const backgroundTexture =
@@ -629,6 +642,7 @@ export async function build(
         3
       )
     );
+
 
   backgroundDepthTexture.minFilter =
     THREE.LinearFilter;
@@ -665,6 +679,7 @@ export async function build(
       side:
         THREE.DoubleSide,
 
+
       vertexShader: `
 
         varying vec2 vUv;
@@ -677,21 +692,26 @@ export async function build(
 
           vUv = uv;
 
+
           float d =
             texture2D(
               uDepth,
               uv
             ).r;
 
+
           vec3 p =
             position;
 
+
           p.z +=
             (
-              d - 0.5
+              d -
+              0.5
             )
             *
             uDepthScale;
+
 
           gl_Position =
             projectionMatrix
@@ -704,6 +724,7 @@ export async function build(
             );
         }
       `,
+
 
       fragmentShader: `
 
@@ -719,7 +740,9 @@ export async function build(
         ) {
 
           vec3 low =
-            value * 12.92;
+            value *
+            12.92;
+
 
           vec3 high =
             1.055 *
@@ -731,6 +754,7 @@ export async function build(
             )
             -
             0.055;
+
 
           return mix(
             high,
@@ -753,10 +777,12 @@ export async function build(
               vUv
             );
 
+
           color.rgb =
             linearToSRGB(
               color.rgb
             );
+
 
           gl_FragColor =
             color;
@@ -765,12 +791,33 @@ export async function build(
     });
 
 
+  /*
+    OVERSCAN :
+    le fond est volontairement plus grand
+    que le sujet.
+
+    18 % horizontal
+    12 % vertical
+  */
+
+  const backgroundOverscanX =
+    1.18;
+
+
+  const backgroundOverscanY =
+    1.12;
+
+
   const backgroundGeometry =
     new THREE.PlaneGeometry(
-      planeWidth,
-      planeHeight,
-      180,
-      140
+      planeWidth *
+      backgroundOverscanX,
+
+      planeHeight *
+      backgroundOverscanY,
+
+      200,
+      150
     );
 
 
@@ -785,13 +832,24 @@ export async function build(
     -0.42;
 
 
+  /*
+    Léger recul supplémentaire du fond.
+  */
+
+  backgroundMesh.position.x =
+    0;
+
+  backgroundMesh.position.y =
+    0;
+
+
   scene.add(
     backgroundMesh
   );
 
 
   /* =====================================
-     SUJET + PROTECTION V25
+     SUJET V25
   ===================================== */
 
   const subjectTexture =
@@ -799,8 +857,10 @@ export async function build(
       subjectImage
     );
 
+
   subjectTexture.needsUpdate =
     true;
+
 
   subjectTexture.colorSpace =
     THREE.SRGBColorSpace;
@@ -819,6 +879,7 @@ export async function build(
 
   subjectDepthTexture.minFilter =
     THREE.LinearFilter;
+
 
   subjectDepthTexture.magFilter =
     THREE.LinearFilter;
@@ -866,6 +927,7 @@ export async function build(
       side:
         THREE.DoubleSide,
 
+
       vertexShader: `
 
         varying vec2 vUv;
@@ -887,10 +949,6 @@ export async function build(
               uv
             ).a;
 
-
-          /*
-            Protection à 3 px.
-          */
 
           float alphaL3 =
             texture2D(
@@ -936,10 +994,6 @@ export async function build(
             ).a;
 
 
-          /*
-            Protection renforcée à 6 px.
-          */
-
           float alphaL6 =
             texture2D(
               uImage,
@@ -983,12 +1037,6 @@ export async function build(
               )
             ).a;
 
-
-          /*
-            Diagonales à 6 px.
-            Important pour cheveux,
-            casquettes, oreilles.
-          */
 
           float alphaUL =
             texture2D(
@@ -1079,10 +1127,6 @@ export async function build(
             );
 
 
-          /*
-            Zone intérieure réellement sûre.
-          */
-
           float safeAlpha =
             min(
               safeNear,
@@ -1093,14 +1137,6 @@ export async function build(
             );
 
 
-          /*
-            Transition plus progressive
-            que dans V24.
-
-            0 près des bords
-            → 1 bien à l'intérieur.
-          */
-
           float safeInside =
             smoothstep(
               0.62,
@@ -1109,11 +1145,6 @@ export async function build(
             );
 
 
-          /*
-            Petit deuxième facteur
-            pour éviter une cassure brutale.
-          */
-
           float softInside =
             smoothstep(
               0.30,
@@ -1121,13 +1152,6 @@ export async function build(
               safeNear
             );
 
-
-          /*
-            Combinaison :
-            les 3 premiers pixels ont
-            quasiment zéro relief,
-            les 3 suivants montent doucement.
-          */
 
           float edgeProtection =
             safeInside *
@@ -1168,6 +1192,7 @@ export async function build(
         }
       `,
 
+
       fragmentShader: `
 
         precision highp float;
@@ -1185,6 +1210,7 @@ export async function build(
             value *
             12.92;
 
+
           vec3 high =
             1.055 *
             pow(
@@ -1195,6 +1221,7 @@ export async function build(
             )
             -
             0.055;
+
 
           return mix(
             high,
@@ -1260,19 +1287,21 @@ export async function build(
     0.18;
 
 
+  subjectMesh.position.x =
+    0;
+
+  subjectMesh.position.y =
+    0;
+
+
   scene.add(
     subjectMesh
   );
 
 
-  backgroundMesh.position.x =
-    0;
-
-  subjectMesh.position.x =
-    0;
-
   backgroundMesh.rotation.y =
     0;
+
 
   subjectMesh.rotation.y =
     0;
@@ -1306,7 +1335,7 @@ export async function build(
 
 
   setStatus(
-    "V25 prête : contour tête/cheveux renforcé.",
+    "V26 prête : fond élargi pour les supports larges.",
     86
   );
 }
@@ -1373,8 +1402,8 @@ function setAngleDegrees(
 function setPose(value) {
 
   const degrees =
-    value *
-    12;
+    value * 12;
+
 
   setAngleDegrees(
     degrees
@@ -1398,6 +1427,7 @@ export function start() {
 
   const animate =
     currentTime => {
+
 
       const elapsed =
         (
@@ -1447,6 +1477,7 @@ function stopAnimation() {
       animationFrame
     );
 
+
     animationFrame =
       0;
   }
@@ -1478,6 +1509,7 @@ function canvasToBlob() {
             );
           }
         },
+
         "image/png"
       );
     }
