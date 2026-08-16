@@ -1,6 +1,5 @@
 import * as THREE from "https://esm.sh/three@0.169.0";
 
-
 let scene;
 let camera;
 let renderer;
@@ -31,14 +30,12 @@ function fileToImage(file) {
     const image =
       new Image();
 
-
     image.onload = () => {
 
       URL.revokeObjectURL(url);
 
       resolve(image);
     };
-
 
     image.onerror = () => {
 
@@ -50,7 +47,6 @@ function fileToImage(file) {
         )
       );
     };
-
 
     image.src = url;
   });
@@ -67,14 +63,12 @@ function blobToImage(blob) {
     const image =
       new Image();
 
-
     image.onload = () => {
 
       URL.revokeObjectURL(url);
 
       resolve(image);
     };
-
 
     image.onerror = () => {
 
@@ -86,7 +80,6 @@ function blobToImage(blob) {
         )
       );
     };
-
 
     image.src = url;
   });
@@ -105,12 +98,10 @@ async function getEstimator(
     return depthEstimator;
   }
 
-
   setStatus(
     "Chargement du moteur de profondeur…",
     66
   );
-
 
   const {
     pipeline,
@@ -120,10 +111,8 @@ async function getEstimator(
       "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
     );
 
-
   env.allowLocalModels =
     false;
-
 
   depthEstimator =
     await pipeline(
@@ -133,7 +122,6 @@ async function getEstimator(
         dtype: "q4"
       }
     );
-
 
   return depthEstimator;
 }
@@ -156,20 +144,17 @@ function percentile(
           a - b
       );
 
-
   const index =
     Math.max(
       0,
       Math.min(
         sorted.length - 1,
-
         Math.floor(
           (sorted.length - 1) *
           amount
         )
       )
     );
-
 
   return sorted[index];
 }
@@ -187,26 +172,22 @@ function createDepthCanvas(
       "canvas"
     );
 
-
   source.width =
     rawDepth.width;
 
   source.height =
     rawDepth.height;
 
-
   const sourceContext =
     source.getContext(
       "2d"
     );
-
 
   const sourceData =
     sourceContext.createImageData(
       rawDepth.width,
       rawDepth.height
     );
-
 
   for (
     let i = 0;
@@ -219,27 +200,22 @@ function createDepthCanvas(
     const value =
       rawDepth.data[i];
 
-
     sourceData.data[
       i * 4
     ] = value;
-
 
     sourceData.data[
       i * 4 + 1
     ] = value;
 
-
     sourceData.data[
       i * 4 + 2
     ] = value;
-
 
     sourceData.data[
       i * 4 + 3
     ] = 255;
   }
-
 
   sourceContext.putImageData(
     sourceData,
@@ -247,12 +223,10 @@ function createDepthCanvas(
     0
   );
 
-
   const canvas =
     document.createElement(
       "canvas"
     );
-
 
   canvas.width =
     width;
@@ -260,16 +234,13 @@ function createDepthCanvas(
   canvas.height =
     height;
 
-
   const context =
     canvas.getContext(
       "2d"
     );
 
-
   context.filter =
     `blur(${softness}px)`;
-
 
   context.drawImage(
     source,
@@ -279,7 +250,6 @@ function createDepthCanvas(
     height
   );
 
-
   const imageData =
     context.getImageData(
       0,
@@ -288,12 +258,10 @@ function createDepthCanvas(
       height
     );
 
-
   const values =
     new Uint8Array(
       width * height
     );
-
 
   for (
     let i = 0;
@@ -307,13 +275,11 @@ function createDepthCanvas(
       ];
   }
 
-
   let low =
     percentile(
       values,
       0.04
     );
-
 
   let high =
     percentile(
@@ -321,13 +287,11 @@ function createDepthCanvas(
       0.96
     );
 
-
   if (high <= low) {
 
     low = 0;
     high = 255;
   }
-
 
   for (
     let i = 0;
@@ -345,7 +309,6 @@ function createDepthCanvas(
         high - low
       );
 
-
     depth =
       Math.max(
         0,
@@ -355,47 +318,39 @@ function createDepthCanvas(
         )
       );
 
-
     depth =
       Math.pow(
         depth,
         1.08
       );
 
-
     const value =
       Math.round(
         depth * 255
       );
 
-
     imageData.data[
       i * 4
     ] = value;
-
 
     imageData.data[
       i * 4 + 1
     ] = value;
 
-
     imageData.data[
       i * 4 + 2
     ] = value;
-
 
     imageData.data[
       i * 4 + 3
     ] = 255;
   }
 
-
   context.putImageData(
     imageData,
     0,
     0
   );
-
 
   return canvas;
 }
@@ -413,7 +368,6 @@ async function estimateImageDepth(
   const maxSide =
     720;
 
-
   const scale =
     Math.min(
       1,
@@ -425,7 +379,6 @@ async function estimateImageDepth(
       )
     );
 
-
   const width =
     Math.max(
       64,
@@ -435,7 +388,6 @@ async function estimateImageDepth(
         scale
       )
     );
-
 
   const height =
     Math.max(
@@ -447,19 +399,16 @@ async function estimateImageDepth(
       )
     );
 
-
   const canvas =
     document.createElement(
       "canvas"
     );
-
 
   canvas.width =
     width;
 
   canvas.height =
     height;
-
 
   canvas
     .getContext("2d")
@@ -471,7 +420,6 @@ async function estimateImageDepth(
       height
     );
 
-
   const blob =
     await new Promise(
       resolve =>
@@ -482,7 +430,6 @@ async function estimateImageDepth(
         )
     );
 
-
   if (!blob) {
 
     throw new Error(
@@ -490,12 +437,10 @@ async function estimateImageDepth(
     );
   }
 
-
   const url =
     URL.createObjectURL(
       blob
     );
-
 
   try {
 
@@ -503,7 +448,6 @@ async function estimateImageDepth(
       await estimator(
         url
       );
-
 
     return {
       result,
@@ -533,20 +477,16 @@ export async function init(
     return;
   }
 
-
   viewer =
     targetViewer;
 
-
   scene =
     new THREE.Scene();
-
 
   scene.background =
     new THREE.Color(
       0x02050a
     );
-
 
   camera =
     new THREE.PerspectiveCamera(
@@ -556,20 +496,17 @@ export async function init(
       30
     );
 
-
   camera.position.set(
     0,
     0,
     cameraRadius
   );
 
-
   renderer =
     new THREE.WebGLRenderer({
       antialias: true,
       alpha: false
     });
-
 
   renderer.setPixelRatio(
     Math.min(
@@ -578,18 +515,14 @@ export async function init(
     )
   );
 
-
   renderer.outputColorSpace =
     THREE.SRGBColorSpace;
-
 
   viewer.appendChild(
     renderer.domElement
   );
 
-
   resize();
-
 
   window.addEventListener(
     "resize",
@@ -607,16 +540,13 @@ function resize() {
     return;
   }
 
-
   const width =
     viewer.clientWidth ||
     760;
 
-
   const height =
     viewer.clientHeight ||
     500;
-
 
   renderer.setSize(
     width,
@@ -624,11 +554,9 @@ function resize() {
     false
   );
 
-
   camera.aspect =
     width /
     height;
-
 
   camera.updateProjectionMatrix();
 }
@@ -665,32 +593,26 @@ export async function build(
       )
     ]);
 
-
   const imageAspect =
     photo.naturalWidth /
     photo.naturalHeight;
 
-
   const planeHeight =
     2.75;
-
 
   const planeWidth =
     planeHeight *
     imageAspect;
-
 
   const estimator =
     await getEstimator(
       setStatus
     );
 
-
   setStatus(
     "Analyse du relief du décor…",
     69
   );
-
 
   const backgroundDepth =
     await estimateImageDepth(
@@ -698,12 +620,10 @@ export async function build(
       estimator
     );
 
-
   setStatus(
     "Analyse du relief du premier plan…",
     75
   );
-
 
   const subjectDepth =
     await estimateImageDepth(
@@ -711,20 +631,16 @@ export async function build(
       estimator
     );
 
-
   if (backgroundMesh) {
 
     scene.remove(
       backgroundMesh
     );
 
-
     backgroundMesh.geometry.dispose();
-
 
     backgroundMesh.material.dispose();
   }
-
 
   if (subjectMesh) {
 
@@ -732,9 +648,7 @@ export async function build(
       subjectMesh
     );
 
-
     subjectMesh.geometry.dispose();
-
 
     subjectMesh.material.dispose();
   }
@@ -749,14 +663,11 @@ export async function build(
       backgroundImage
     );
 
-
   backgroundTexture.needsUpdate =
     true;
 
-
   backgroundTexture.colorSpace =
     THREE.SRGBColorSpace;
-
 
   const backgroundDepthTexture =
     new THREE.CanvasTexture(
@@ -768,14 +679,11 @@ export async function build(
       )
     );
 
-
   backgroundDepthTexture.minFilter =
     THREE.LinearFilter;
 
-
   backgroundDepthTexture.magFilter =
     THREE.LinearFilter;
-
 
   const backgroundUniforms = {
 
@@ -795,7 +703,6 @@ export async function build(
     }
   };
 
-
   const backgroundMaterial =
     new THREE.ShaderMaterial({
 
@@ -814,11 +721,9 @@ export async function build(
 
         uniform float uDepthScale;
 
-
         void main() {
 
           vUv = uv;
-
 
           float d =
             texture2D(
@@ -826,10 +731,8 @@ export async function build(
               uv
             ).r;
 
-
           vec3 p =
             position;
-
 
           p.z +=
             (
@@ -839,17 +742,11 @@ export async function build(
             *
             uDepthScale;
 
-
           gl_Position =
-
             projectionMatrix
-
             *
-
             modelViewMatrix
-
             *
-
             vec4(
               p,
               1.0
@@ -867,17 +764,60 @@ export async function build(
         uniform sampler2D uImage;
 
 
+        vec3 linearToSRGB(
+          vec3 value
+        ) {
+
+          vec3 low =
+            value *
+            12.92;
+
+          vec3 high =
+            1.055
+            *
+            pow(
+              value,
+              vec3(
+                1.0 / 2.4
+              )
+            )
+            -
+            0.055;
+
+
+          return mix(
+            high,
+            low,
+            lessThanEqual(
+              value,
+              vec3(
+                0.0031308
+              )
+            )
+          );
+        }
+
+
         void main() {
 
-          gl_FragColor =
+          vec4 color =
             texture2D(
               uImage,
               vUv
             );
+
+
+          color.rgb =
+            linearToSRGB(
+              color.rgb
+            );
+
+
+          gl_FragColor =
+            color;
         }
       `
     });
-
 
   const backgroundGeometry =
     new THREE.PlaneGeometry(
@@ -887,17 +827,14 @@ export async function build(
       140
     );
 
-
   backgroundMesh =
     new THREE.Mesh(
       backgroundGeometry,
       backgroundMaterial
     );
 
-
   backgroundMesh.position.z =
     -0.30;
-
 
   scene.add(
     backgroundMesh
@@ -913,14 +850,11 @@ export async function build(
       subjectImage
     );
 
-
   subjectTexture.needsUpdate =
     true;
 
-
   subjectTexture.colorSpace =
     THREE.SRGBColorSpace;
-
 
   const subjectDepthTexture =
     new THREE.CanvasTexture(
@@ -932,14 +866,11 @@ export async function build(
       )
     );
 
-
   subjectDepthTexture.minFilter =
     THREE.LinearFilter;
 
-
   subjectDepthTexture.magFilter =
     THREE.LinearFilter;
-
 
   const subjectUniforms = {
 
@@ -958,7 +889,6 @@ export async function build(
         0.34
     }
   };
-
 
   const subjectMaterial =
     new THREE.ShaderMaterial({
@@ -991,20 +921,17 @@ export async function build(
 
           vUv = uv;
 
-
           float alpha =
             texture2D(
               uImage,
               uv
             ).a;
 
-
           float d =
             texture2D(
               uDepth,
               uv
             ).r;
-
 
           float inside =
             smoothstep(
@@ -1013,37 +940,24 @@ export async function build(
               alpha
             );
 
-
           vec3 p =
             position;
 
-
           p.z +=
-
             (
               d -
               0.5
             )
-
             *
-
             uDepthScale
-
             *
-
             inside;
 
-
           gl_Position =
-
             projectionMatrix
-
             *
-
             modelViewMatrix
-
             *
-
             vec4(
               p,
               1.0
@@ -1059,6 +973,40 @@ export async function build(
         varying vec2 vUv;
 
         uniform sampler2D uImage;
+
+
+        vec3 linearToSRGB(
+          vec3 value
+        ) {
+
+          vec3 low =
+            value *
+            12.92;
+
+          vec3 high =
+            1.055
+            *
+            pow(
+              value,
+              vec3(
+                1.0 / 2.4
+              )
+            )
+            -
+            0.055;
+
+
+          return mix(
+            high,
+            low,
+            lessThanEqual(
+              value,
+              vec3(
+                0.0031308
+              )
+            )
+          );
+        }
 
 
         void main() {
@@ -1079,12 +1027,17 @@ export async function build(
           }
 
 
+          color.rgb =
+            linearToSRGB(
+              color.rgb
+            );
+
+
           gl_FragColor =
             color;
         }
       `
     });
-
 
   const subjectGeometry =
     new THREE.PlaneGeometry(
@@ -1094,42 +1047,33 @@ export async function build(
       190
     );
 
-
   subjectMesh =
     new THREE.Mesh(
       subjectGeometry,
       subjectMaterial
     );
 
-
   subjectMesh.position.z =
     0.12;
-
 
   scene.add(
     subjectMesh
   );
 
-
   backgroundMesh.position.x =
     0;
-
 
   subjectMesh.position.x =
     0;
 
-
   backgroundMesh.rotation.y =
     0;
-
 
   subjectMesh.rotation.y =
     0;
 
-
   cameraRadius =
     5.8;
-
 
   camera.position.set(
     0,
@@ -1137,25 +1081,21 @@ export async function build(
     cameraRadius
   );
 
-
   camera.lookAt(
     0,
     0,
     0
   );
 
-
   resize();
-
 
   renderer.render(
     scene,
     camera
   );
 
-
   setStatus(
-    "V22 prête : décor et sujet possèdent leur propre profondeur.",
+    "V22 prête : relief et colorimétrie corrigés.",
     86
   );
 }
@@ -1176,10 +1116,8 @@ function setPose(
     return;
   }
 
-
   /*
-    Angle augmenté :
-    ±12 degrés.
+    Orbite ±12 degrés.
   */
 
   const maxAngle =
@@ -1187,17 +1125,9 @@ function setPose(
       12
     );
 
-
   const angle =
     value *
     maxAngle;
-
-
-  /*
-    Orbite pure :
-    rayon constant,
-    aucune translation des calques.
-  */
 
   camera.position.x =
     Math.sin(
@@ -1205,10 +1135,8 @@ function setPose(
     ) *
     cameraRadius;
 
-
   camera.position.y =
     0;
-
 
   camera.position.z =
     Math.cos(
@@ -1216,13 +1144,11 @@ function setPose(
     ) *
     cameraRadius;
 
-
   camera.lookAt(
     0,
     0,
     0
   );
-
 
   renderer.render(
     scene,
@@ -1244,51 +1170,38 @@ export function start() {
     );
   }
 
-
   animationStart =
     performance.now();
-
 
   const animate =
     currentTime => {
 
-
       const elapsed =
-
         (
           currentTime -
           animationStart
         )
-
         /
-
         6000;
 
-
       const position =
-
         Math.sin(
           elapsed *
           Math.PI *
           2
         );
 
-
       setPose(
         position
       );
 
-
       animationFrame =
-
         requestAnimationFrame(
           animate
         );
     };
 
-
   animationFrame =
-
     requestAnimationFrame(
       animate
     );
