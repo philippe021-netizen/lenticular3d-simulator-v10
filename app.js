@@ -25,12 +25,18 @@ let thumbUrl = null;
 let engine = null;
 
 
-function setStatus(message, progress = null) {
+function setStatus(
+  message,
+  progress = null
+) {
 
-  statusBox.textContent = message;
+  statusBox.textContent =
+    message;
 
   if (progress !== null) {
-    bar.style.width = `${progress}%`;
+
+    bar.style.width =
+      `${progress}%`;
   }
 }
 
@@ -44,6 +50,7 @@ async function compressImage(
   const url =
     URL.createObjectURL(file);
 
+
   try {
 
     const image =
@@ -53,8 +60,10 @@ async function compressImage(
           const img =
             new Image();
 
+
           img.onload =
             () => resolve(img);
+
 
           img.onerror =
             () =>
@@ -63,6 +72,7 @@ async function compressImage(
                   "Impossible de lire la photo."
                 )
               );
+
 
           img.src =
             url;
@@ -141,6 +151,7 @@ async function compressImage(
 
 
     if (!blob) {
+
       throw new Error(
         "Compression impossible."
       );
@@ -151,41 +162,28 @@ async function compressImage(
       [blob],
       "photo.jpg",
       {
-        type:
-          "image/jpeg"
+        type: "image/jpeg"
       }
     );
   }
 
   finally {
 
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(
+      url
+    );
   }
 }
 
 
-async function removeBackground(file) {
-
-  const form =
-    new FormData();
-
-
-  form.append(
-    "image",
-    file,
-    file.name
-  );
-
-
-  form.append(
-    "output_format",
-    "png"
-  );
-
+async function postForm(
+  endpoint,
+  form
+) {
 
   const response =
     await fetch(
-      "/api/remove-background",
+      endpoint,
       {
         method: "POST",
         body: form
@@ -201,13 +199,10 @@ async function removeBackground(file) {
 
     try {
 
-      const json =
-        JSON.parse(message);
-
       message =
-        json.error ||
+        JSON.parse(message)
+          .error ||
         message;
-
     }
 
     catch {}
@@ -224,6 +219,268 @@ async function removeBackground(file) {
 }
 
 
+function blobToImage(blob) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      const url =
+        URL.createObjectURL(blob);
+
+
+      const image =
+        new Image();
+
+
+      image.onload =
+        () =>
+          resolve({
+            image,
+            url
+          });
+
+
+      image.onerror =
+        () => {
+
+          URL.revokeObjectURL(
+            url
+          );
+
+
+          reject(
+            new Error(
+              "Image détourée illisible."
+            )
+          );
+        };
+
+
+      image.src =
+        url;
+    }
+  );
+}
+
+
+async function makeEraseMask(
+  subjectBlob
+) {
+
+  const {
+    image,
+    url
+  } =
+    await blobToImage(
+      subjectBlob
+    );
+
+
+  try {
+
+    const width =
+      image.naturalWidth;
+
+
+    const height =
+      image.naturalHeight;
+
+
+    const canvas =
+      document.createElement(
+        "canvas"
+      );
+
+
+    canvas.width =
+      width;
+
+    canvas.height =
+      height;
+
+
+    const context =
+      canvas.getContext(
+        "2d",
+        {
+          willReadFrequently: true
+        }
+      );
+
+
+    context.drawImage(
+      image,
+      0,
+      0,
+      width,
+      height
+    );
+
+
+    const imageData =
+      context.getImageData(
+        0,
+        0,
+        width,
+        height
+      );
+
+
+    const alpha =
+      new Uint8ClampedArray(
+        width *
+        height
+      );
+
+
+    for (
+      let i = 0;
+      i <
+      width *
+      height;
+      i++
+    ) {
+
+      alpha[i] =
+        imageData.data[
+          i * 4 + 3
+        ];
+    }
+
+
+    const output =
+      context.createImageData(
+        width,
+        height
+      );
+
+
+    const radius = 2;
+
+
+    for (
+      let y = 0;
+      y < height;
+      y++
+    ) {
+
+      for (
+        let x = 0;
+        x < width;
+        x++
+      ) {
+
+        let erase = 0;
+
+
+        for (
+          let yy =
+            Math.max(
+              0,
+              y - radius
+            );
+
+          yy <=
+            Math.min(
+              height - 1,
+              y + radius
+            ) &&
+          !erase;
+
+          yy++
+        ) {
+
+          for (
+            let xx =
+              Math.max(
+                0,
+                x - radius
+              );
+
+            xx <=
+              Math.min(
+                width - 1,
+                x + radius
+              );
+
+            xx++
+          ) {
+
+            if (
+              alpha[
+                yy * width +
+                xx
+              ] > 32
+            ) {
+
+              erase =
+                255;
+
+              break;
+            }
+          }
+        }
+
+
+        const index =
+          (
+            y *
+            width +
+            x
+          ) * 4;
+
+
+        output.data[
+          index
+        ] =
+          erase;
+
+
+        output.data[
+          index + 1
+        ] =
+          erase;
+
+
+        output.data[
+          index + 2
+        ] =
+          erase;
+
+
+        output.data[
+          index + 3
+        ] =
+          255;
+      }
+    }
+
+
+    context.putImageData(
+      output,
+      0,
+      0
+    );
+
+
+    return await new Promise(
+      resolve =>
+        canvas.toBlob(
+          resolve,
+          "image/png"
+        )
+    );
+  }
+
+  finally {
+
+    URL.revokeObjectURL(
+      url
+    );
+  }
+}
+
+
 async function getEngine() {
 
   if (engine) {
@@ -233,7 +490,7 @@ async function getEngine() {
 
   engine =
     await import(
-      "./engine.js?v=19"
+      "./engine.js?v=20"
     );
 
 
@@ -320,32 +577,107 @@ generateBtn.addEventListener(
     try {
 
       setStatus(
-        "1/4 Préparation de la photo…",
-        8
+        "1/5 Préparation de la photo…",
+        6
       );
 
 
-      const preparedPhoto =
+      const photo =
         await compressImage(
           sourceFile
         );
 
 
       setStatus(
-        "2/4 Détourage précis du sujet…",
-        24
+        "2/5 Détourage précis du sujet…",
+        20
+      );
+
+
+      const removeForm =
+        new FormData();
+
+
+      removeForm.append(
+        "image",
+        photo,
+        photo.name
+      );
+
+
+      removeForm.append(
+        "output_format",
+        "png"
       );
 
 
       const subjectBlob =
-        await removeBackground(
-          preparedPhoto
+        await postForm(
+          "/api/remove-background",
+          removeForm
         );
 
 
       setStatus(
-        "3/4 Analyse de profondeur interne…",
-        48
+        "3/5 Reconstruction du fond sans le sujet…",
+        43
+      );
+
+
+      const maskBlob =
+        await makeEraseMask(
+          subjectBlob
+        );
+
+
+      if (!maskBlob) {
+
+        throw new Error(
+          "Création du masque impossible."
+        );
+      }
+
+
+      const eraseForm =
+        new FormData();
+
+
+      eraseForm.append(
+        "image",
+        photo,
+        photo.name
+      );
+
+
+      eraseForm.append(
+        "mask",
+        maskBlob,
+        "mask.png"
+      );
+
+
+      eraseForm.append(
+        "grow_mask",
+        "10"
+      );
+
+
+      eraseForm.append(
+        "output_format",
+        "png"
+      );
+
+
+      const cleanBackground =
+        await postForm(
+          "/api/erase-background",
+          eraseForm
+        );
+
+
+      setStatus(
+        "4/5 Analyse du relief du sujet…",
+        66
       );
 
 
@@ -354,7 +686,8 @@ generateBtn.addEventListener(
 
 
       await currentEngine.build(
-        preparedPhoto,
+        photo,
+        cleanBackground,
         subjectBlob,
         setStatus
       );
@@ -365,7 +698,7 @@ generateBtn.addEventListener(
 
 
       setStatus(
-        "4/4 Mise en mouvement de la profondeur…",
+        "5/5 Mise en mouvement de la parallaxe…",
         90
       );
 
@@ -374,7 +707,7 @@ generateBtn.addEventListener(
 
 
       setStatus(
-        "Aperçu V19 actif : silhouette protégée, relief conservé à l’intérieur du sujet.",
+        "Aperçu V20 actif : le fond ne contient plus le sujet, donc l’angle peut être plus marqué sans double silhouette.",
         100
       );
     }
