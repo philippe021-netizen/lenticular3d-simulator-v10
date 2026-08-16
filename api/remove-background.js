@@ -13,9 +13,7 @@ function readBody(req) {
     });
 
     req.on("end", () => {
-      resolve(
-        Buffer.concat(chunks)
-      );
+      resolve(Buffer.concat(chunks));
     });
 
     req.on("error", reject);
@@ -30,13 +28,9 @@ function getKey() {
   );
 }
 
-export default async function handler(
-  req,
-  res
-) {
+export default async function handler(req, res) {
 
   if (req.method !== "POST") {
-
     return res
       .status(405)
       .json({
@@ -44,47 +38,33 @@ export default async function handler(
       });
   }
 
-
-  const key =
-    getKey();
-
+  const key = getKey();
 
   if (!key) {
-
     return res
       .status(500)
       .json({
-        error:
-          "Clé Stability AI introuvable."
+        error: "Clé Stability AI introuvable."
       });
   }
 
-
   try {
 
-    const raw =
-      await readBody(req);
-
+    const raw = await readBody(req);
 
     const contentType =
       req.headers["content-type"];
 
-
     if (
       !contentType ||
-      !contentType.includes(
-        "multipart/form-data"
-      )
+      !contentType.includes("multipart/form-data")
     ) {
-
       return res
         .status(400)
         .json({
-          error:
-            "multipart/form-data requis."
+          error: "multipart/form-data requis."
         });
     }
-
 
     const upstream =
       await fetch(
@@ -93,37 +73,26 @@ export default async function handler(
           method: "POST",
 
           headers: {
-            Authorization:
-              `Bearer ${key}`,
-
-            Accept:
-              "image/*",
-
-            "Content-Type":
-              contentType
+            Authorization: `Bearer ${key}`,
+            Accept: "image/*",
+            "Content-Type": contentType
           },
 
-          body:
-            raw
+          body: raw
         }
       );
-
 
     if (!upstream.ok) {
 
       let message =
         `Remove Background ${upstream.status}`;
 
-
       try {
-
         message +=
           `: ${await upstream.text()}`;
-
       }
 
       catch {}
-
 
       return res
         .status(upstream.status)
@@ -132,29 +101,24 @@ export default async function handler(
         });
     }
 
-
     const buffer =
       Buffer.from(
         await upstream.arrayBuffer()
       );
-
 
     res.setHeader(
       "Content-Type",
       "image/png"
     );
 
-
     res.setHeader(
       "Cache-Control",
       "no-store"
     );
 
-
     return res
       .status(200)
       .send(buffer);
-
   }
 
   catch (error) {
