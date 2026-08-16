@@ -1,102 +1,77 @@
 
 const $ = s => document.querySelector(s);
 const fileEl=$('#file'), buildBtn=$('#build'), gifBtn=$('#gif'), statusEl=$('#status'), bar=$('#bar');
-const preview=$('#sourcePreview'), viewer=$('#viewer'), download=$('#download');
-const angle=$('#angle'), frames=$('#frames'), speed=$('#speed');
-const angleOut=$('#angleOut'), framesOut=$('#framesOut'), speedOut=$('#speedOut');
+const preview=$('#sourcePreview'), viewer=$('#viewer'), download=$('#download'), dropZone=$('#dropZone');
 
-angle.max='6';
-if(Number(angle.value)>6) angle.value='5';
-angleOut.value=`±${angle.value}°`;
-angle.oninput=()=>angleOut.value=`±${angle.value}°`;
-frames.oninput=()=>framesOut.value=frames.value;
-speed.oninput=()=>speedOut.value=`${Number(speed.value).toFixed(1)} s`;
+let sourceFile=null, engine=null;
 
-let sourceFile=null, engine=null, previewRAF=null, previewStart=0;
-
-function setStatus(t,p=null){
-  statusEl.textContent=t;
+function setStatus(text,p=null){
+  statusEl.textContent=text;
   if(p!==null) bar.style.width=`${p}%`;
 }
 
-function loadSelectedFile(f){
-  if(!f) return;
-  if(!f.type || !f.type.startsWith('image/')){
+function setFile(file){
+  if(!file) return;
+  if(!file.type?.startsWith('image/')){
     setStatus('Le fichier choisi n’est pas une image compatible.',0);
     return;
   }
-  sourceFile=f;
+  sourceFile=file;
   buildBtn.disabled=false;
-  buildBtn.textContent='Calculer la parallaxe 3D';
   gifBtn.disabled=true;
   download.style.display='none';
-  if(previewRAF){cancelAnimationFrame(previewRAF);previewRAF=null;}
-
-  const url=URL.createObjectURL(f);
+  const url=URL.createObjectURL(file);
   preview.onload=()=>URL.revokeObjectURL(url);
   preview.src=url;
   preview.style.display='block';
-  setStatus('Photo chargée. Ici, on ne reconstruit plus un faux deuxième chat.',0);
+  setStatus('Photo chargée. Appuyez sur « Créer l’aperçu 3D ».',0);
 }
 
-fileEl.addEventListener('change',()=>loadSelectedFile(fileEl.files && fileEl.files[0]));
-const dropZone=$('#dropZone');
+fileEl.addEventListener('change',()=>setFile(fileEl.files?.[0]));
 ['dragenter','dragover'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();dropZone.classList.add('drag')}));
 ['dragleave','drop'].forEach(ev=>dropZone.addEventListener(ev,e=>{e.preventDefault();dropZone.classList.remove('drag')}));
-dropZone.addEventListener('drop',e=>loadSelectedFile(e.dataTransfer?.files?.[0]));
+dropZone.addEventListener('drop',e=>setFile(e.dataTransfer?.files?.[0]));
 
 async function getEngine(){
   if(engine) return engine;
-  setStatus('Chargement du moteur de parallaxe…',4);
-  engine=await import('/engine.js?v=12');
-  await engine.init3D(viewer);
+  setStatus('Chargement du moteur d’aperçu…',5);
+  engine=await import('/engine.js?v=14');
+  await engine.init(viewer);
   return engine;
 }
 
-function startPreview(){
-  if(!engine?.previewPose) return;
-  if(previewRAF) cancelAnimationFrame(previewRAF);
-  previewStart=performance.now();
-  const tick=(now)=>{
-    const t=(now-previewStart)/4800;
-    engine.previewPose(Math.sin(t*Math.PI*2)*Math.min(1,Number(angle.value)/6));
-    previewRAF=requestAnimationFrame(tick);
-  };
-  previewRAF=requestAnimationFrame(tick);
-}
-
 buildBtn.addEventListener('click',async()=>{
-  if(!sourceFile){setStatus('Choisis d’abord une photo.',0);return;}
-  buildBtn.disabled=true; gifBtn.disabled=true; download.style.display='none';
-  buildBtn.textContent='Calcul de la parallaxe…';
+  if(!sourceFile) return;
+  buildBtn.disabled=true;
+  buildBtn.textContent='Création de l’aperçu…';
+  gifBtn.disabled=true;
+  download.style.display='none';
   try{
     const e=await getEngine();
-    await e.build3D(sourceFile,setStatus);
+    await e.build(sourceFile,setStatus);
+    e.start();
     gifBtn.disabled=false;
-    buildBtn.textContent='Recalculer la parallaxe';
-    startPreview();
+    buildBtn.textContent='Recréer l’aperçu 3D';
   }catch(err){
     console.error(err);
-    setStatus(`ERREUR : ${err?.message||String(err)}`,0);
+    setStatus(`Erreur : ${err?.message || String(err)}`,0);
     buildBtn.textContent='Réessayer';
-  }finally{buildBtn.disabled=false;}
+  }finally{
+    buildBtn.disabled=false;
+  }
 });
 
 gifBtn.addEventListener('click',async()=>{
+  if(!engine) return;
+  gifBtn.disabled=true;
   try{
-    if(!engine) throw new Error('Calcule d’abord la parallaxe.');
-    if(previewRAF){cancelAnimationFrame(previewRAF);previewRAF=null;}
-    gifBtn.disabled=true;
-    const blob=await engine.exportGIF({
-      angle:Number(angle.value),
-      frames:Number(frames.value),
-      speed:Number(speed.value)
-    },setStatus);
+    const blob=await engine.exportGIF(setStatus);
     if(download.href) URL.revokeObjectURL(download.href);
     download.href=URL.createObjectURL(blob);
     download.style.display='block';
-    startPreview();
   }catch(err){
-    setStatus(`Erreur GIF : ${err?.message||String(err)}`,0);
-  }finally{gifBtn.disabled=false;}
+    setStatus(`Erreur GIF : ${err?.message || String(err)}`,0);
+  }finally{
+    gifBtn.disabled=false;
+  }
 });
