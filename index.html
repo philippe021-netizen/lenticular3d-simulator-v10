@@ -2,9 +2,10 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Simulation client 3D</title>
-  <link rel="stylesheet" href="./styles.css">
+
+  <link rel="stylesheet" href="./styles.css?v=16">
 </head>
 
 <body>
@@ -12,78 +13,159 @@
   <main class="app">
 
     <header>
-      <h1>Simulation client</h1>
-      <p>
-        Ajoutez une photo et visualisez immédiatement
-        un aperçu animé de l'effet lenticulaire.
-      </p>
+
+      <div>
+
+        <div class="eyebrow">
+          Simulation client
+        </div>
+
+        <h1>
+          Aperçu lenticulaire 3D
+        </h1>
+
+        <p>
+          Une photo, un sujet détaché du décor,
+          une parallaxe visible sans faire pivoter
+          l’image entière.
+        </p>
+
+      </div>
+
+      <div class="badge">
+        Clean Parallax V16
+      </div>
+
     </header>
 
+
     <section class="workspace">
+
 
       <aside class="controls">
 
         <div class="upload-zone">
-          <h2>Ajouter une photo</h2>
-          <p>JPG / PNG / WEBP</p>
+
+          <h2>
+            Ajouter une photo
+          </h2>
+
+          <p>
+            JPG / PNG / WEBP
+          </p>
 
           <input
             id="imageInput"
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/*"
           >
+
         </div>
 
-        <button id="generateBtn" disabled>
+
+        <img
+          id="thumb"
+          class="thumb"
+          alt="Photo choisie"
+        >
+
+
+        <button
+          id="generateBtn"
+          disabled
+        >
           Créer l’aperçu 3D
         </button>
 
-        <button id="gifBtn" disabled>
-          Créer le GIF démo
-        </button>
 
         <div id="status">
           Chargez une photo pour commencer.
         </div>
 
+
+        <div class="progress">
+          <i id="bar"></i>
+        </div>
+
+
         <div class="disclaimer">
-          Simulation visuelle destinée à présenter l’effet.
+
+          Simulation visuelle de l’effet de profondeur.
+
           Le rendu lenticulaire imprimé final peut varier.
+
         </div>
 
       </aside>
 
+
       <section class="preview-panel">
 
-        <div class="preview-stage">
 
-          <div class="depth-glow"></div>
+        <div
+          id="stage"
+          class="stage"
+        >
 
-          <div id="placeholder" class="preview-placeholder">
-            <strong>Votre aperçu 3D apparaîtra ici</strong>
+
+          <div
+            id="placeholder"
+            class="placeholder"
+          >
+
+            <strong>
+              Votre aperçu 3D apparaîtra ici
+            </strong>
+
             <span>
               Choisissez une photo puis lancez la simulation.
             </span>
+
           </div>
+
 
           <img
-            id="photoLayer"
-            alt="Aperçu lenticulaire"
+            id="backgroundLayer"
+            class="layer background-layer"
+            alt=""
           >
 
-          <div class="preview-label">
-            Aperçu automatique • mouvement gauche ↔ droite
+
+          <img
+            id="subjectLayer"
+            class="layer subject-layer"
+            alt=""
+          >
+
+
+          <div class="light"></div>
+
+          <div class="frame"></div>
+
+
+          <div class="label">
+
+            Fond reconstruit • sujet détaché •
+            parallaxe gauche ↔ droite
+
           </div>
+
 
         </div>
 
       </section>
 
+
     </section>
 
   </main>
 
-  <script src="./app.js"></script>
+
+  <script
+    type="module"
+    src="./app.js?v=16"
+  ></script>
+
 
 </body>
 </html>
