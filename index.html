@@ -1,12 +1,24 @@
 <!doctype html>
 <html lang="fr">
+
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Simulation client 3D</title>
 
-  <link rel="stylesheet" href="./styles.css?v=16">
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  >
+
+  <title>
+    Aperçu lenticulaire 3D
+  </title>
+
+  <link
+    rel="stylesheet"
+    href="./styles.css?v=17"
+  >
 </head>
+
 
 <body>
 
@@ -25,15 +37,15 @@
         </h1>
 
         <p>
-          Une photo, un sujet détaché du décor,
-          une parallaxe visible sans faire pivoter
-          l’image entière.
+          Relief 2.5D par profondeur réelle,
+          micro-caméra et remplissage des zones découvertes.
         </p>
 
       </div>
 
+
       <div class="badge">
-        Clean Parallax V16
+        Ken Burns V17
       </div>
 
     </header>
@@ -90,9 +102,10 @@
 
         <div class="disclaimer">
 
-          Simulation visuelle de l’effet de profondeur.
+          Simulation visuelle de profondeur.
 
-          Le rendu lenticulaire imprimé final peut varier.
+          Le rendu lenticulaire imprimé final
+          peut varier.
 
         </div>
 
@@ -101,12 +114,10 @@
 
       <section class="preview-panel">
 
-
         <div
-          id="stage"
-          class="stage"
+          id="viewer"
+          class="viewer"
         >
-
 
           <div
             id="placeholder"
@@ -123,33 +134,13 @@
 
           </div>
 
-
-          <img
-            id="backgroundLayer"
-            class="layer background-layer"
-            alt=""
-          >
+        </div>
 
 
-          <img
-            id="subjectLayer"
-            class="layer subject-layer"
-            alt=""
-          >
+        <div class="label">
 
-
-          <div class="light"></div>
-
-          <div class="frame"></div>
-
-
-          <div class="label">
-
-            Fond reconstruit • sujet détaché •
-            parallaxe gauche ↔ droite
-
-          </div>
-
+          Micro-caméra 2.5D • profondeur IA •
+          sans reconstruction 3D complète
 
         </div>
 
@@ -163,9 +154,9 @@
 
   <script
     type="module"
-    src="./app.js?v=16"
+    src="./app.js?v=17"
   ></script>
 
-
 </body>
+
 </html>
