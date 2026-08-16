@@ -1,5 +1,10 @@
 import * as THREE from "https://esm.sh/three@0.169.0";
 
+
+/* =========================================
+   ETAT GLOBAL
+========================================= */
+
 let scene;
 let camera;
 let renderer;
@@ -16,22 +21,53 @@ let animationStart = 0;
 let cameraRadius = 5.8;
 
 
+/*
+  Dimensions maîtres de la photo.
+
+  Elles sont conservées pour recalculer
+  automatiquement le fond selon le support.
+*/
+
+let masterPlaneWidth = 1;
+let masterPlaneHeight = 1;
+let masterImageAspect = 1;
+
+
+/*
+  V27 :
+  le fond reçoit une marge supplémentaire
+  pour rester visible à ±12°.
+*/
+
+const ORBIT_SAFETY_X = 1.24;
+const ORBIT_SAFETY_Y = 1.18;
+
+
 /* =========================================
    CHARGEMENT IMAGES
 ========================================= */
 
 function fileToImage(file) {
+
   return new Promise((resolve, reject) => {
 
-    const url = URL.createObjectURL(file);
-    const image = new Image();
+    const url =
+      URL.createObjectURL(file);
+
+    const image =
+      new Image();
+
 
     image.onload = () => {
+
       URL.revokeObjectURL(url);
+
       resolve(image);
     };
 
+
     image.onerror = () => {
+
       URL.revokeObjectURL(url);
 
       reject(
@@ -41,23 +77,34 @@ function fileToImage(file) {
       );
     };
 
-    image.src = url;
+
+    image.src =
+      url;
   });
 }
 
 
 function blobToImage(blob) {
+
   return new Promise((resolve, reject) => {
 
-    const url = URL.createObjectURL(blob);
-    const image = new Image();
+    const url =
+      URL.createObjectURL(blob);
+
+    const image =
+      new Image();
+
 
     image.onload = () => {
+
       URL.revokeObjectURL(url);
+
       resolve(image);
     };
 
+
     image.onerror = () => {
+
       URL.revokeObjectURL(url);
 
       reject(
@@ -67,7 +114,9 @@ function blobToImage(blob) {
       );
     };
 
-    image.src = url;
+
+    image.src =
+      url;
   });
 }
 
@@ -76,33 +125,44 @@ function blobToImage(blob) {
    DEPTH ANYTHING
 ========================================= */
 
-async function getEstimator(setStatus) {
+async function getEstimator(
+  setStatus
+) {
 
   if (depthEstimator) {
+
     return depthEstimator;
   }
+
 
   setStatus(
     "Chargement du moteur de profondeur…",
     66
   );
 
+
   const {
     pipeline,
     env
-  } = await import(
-    "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
-  );
+  } =
+    await import(
+      "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
+    );
 
-  env.allowLocalModels = false;
 
-  depthEstimator = await pipeline(
-    "depth-estimation",
-    "onnx-community/depth-anything-v2-small",
-    {
-      dtype: "q4"
-    }
-  );
+  env.allowLocalModels =
+    false;
+
+
+  depthEstimator =
+    await pipeline(
+      "depth-estimation",
+      "onnx-community/depth-anything-v2-small",
+      {
+        dtype: "q4"
+      }
+    );
+
 
   return depthEstimator;
 }
@@ -112,23 +172,33 @@ async function getEstimator(setStatus) {
    OUTILS DEPTH
 ========================================= */
 
-function percentile(values, amount) {
+function percentile(
+  values,
+  amount
+) {
 
   const sorted =
-    Array.from(values)
-      .sort((a, b) => a - b);
+    Array
+      .from(values)
+      .sort(
+        (a, b) =>
+          a - b
+      );
+
 
   const index =
     Math.max(
       0,
       Math.min(
         sorted.length - 1,
+
         Math.floor(
           (sorted.length - 1) *
           amount
         )
       )
     );
+
 
   return sorted[index];
 }
@@ -142,7 +212,10 @@ function createDepthCanvas(
 ) {
 
   const source =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   source.width =
     rawDepth.width;
@@ -150,8 +223,12 @@ function createDepthCanvas(
   source.height =
     rawDepth.height;
 
+
   const sourceContext =
-    source.getContext("2d");
+    source.getContext(
+      "2d"
+    );
+
 
   const sourceData =
     sourceContext.createImageData(
@@ -159,27 +236,39 @@ function createDepthCanvas(
       rawDepth.height
     );
 
+
   for (
     let i = 0;
-    i < rawDepth.width * rawDepth.height;
+    i <
+    rawDepth.width *
+    rawDepth.height;
     i++
   ) {
 
     const value =
       rawDepth.data[i];
 
-    sourceData.data[i * 4] =
-      value;
 
-    sourceData.data[i * 4 + 1] =
-      value;
+    sourceData.data[
+      i * 4
+    ] = value;
 
-    sourceData.data[i * 4 + 2] =
-      value;
 
-    sourceData.data[i * 4 + 3] =
-      255;
+    sourceData.data[
+      i * 4 + 1
+    ] = value;
+
+
+    sourceData.data[
+      i * 4 + 2
+    ] = value;
+
+
+    sourceData.data[
+      i * 4 + 3
+    ] = 255;
   }
+
 
   sourceContext.putImageData(
     sourceData,
@@ -187,8 +276,12 @@ function createDepthCanvas(
     0
   );
 
+
   const canvas =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   canvas.width =
     width;
@@ -196,11 +289,16 @@ function createDepthCanvas(
   canvas.height =
     height;
 
+
   const context =
-    canvas.getContext("2d");
+    canvas.getContext(
+      "2d"
+    );
+
 
   context.filter =
     `blur(${softness}px)`;
+
 
   context.drawImage(
     source,
@@ -210,6 +308,7 @@ function createDepthCanvas(
     height
   );
 
+
   const imageData =
     context.getImageData(
       0,
@@ -218,10 +317,13 @@ function createDepthCanvas(
       height
     );
 
+
   const values =
     new Uint8Array(
-      width * height
+      width *
+      height
     );
+
 
   for (
     let i = 0;
@@ -230,8 +332,11 @@ function createDepthCanvas(
   ) {
 
     values[i] =
-      imageData.data[i * 4];
+      imageData.data[
+        i * 4
+      ];
   }
+
 
   let low =
     percentile(
@@ -239,16 +344,20 @@ function createDepthCanvas(
       0.04
     );
 
+
   let high =
     percentile(
       values,
       0.96
     );
 
+
   if (high <= low) {
+
     low = 0;
     high = 255;
   }
+
 
   for (
     let i = 0;
@@ -266,6 +375,7 @@ function createDepthCanvas(
         high - low
       );
 
+
     depth =
       Math.max(
         0,
@@ -275,29 +385,41 @@ function createDepthCanvas(
         )
       );
 
+
     depth =
       Math.pow(
         depth,
         1.08
       );
 
+
     const value =
       Math.round(
-        depth * 255
+        depth *
+        255
       );
 
-    imageData.data[i * 4] =
-      value;
 
-    imageData.data[i * 4 + 1] =
-      value;
+    imageData.data[
+      i * 4
+    ] = value;
 
-    imageData.data[i * 4 + 2] =
-      value;
 
-    imageData.data[i * 4 + 3] =
-      255;
+    imageData.data[
+      i * 4 + 1
+    ] = value;
+
+
+    imageData.data[
+      i * 4 + 2
+    ] = value;
+
+
+    imageData.data[
+      i * 4 + 3
+    ] = 255;
   }
+
 
   context.putImageData(
     imageData,
@@ -305,12 +427,13 @@ function createDepthCanvas(
     0
   );
 
+
   return canvas;
 }
 
 
 /* =========================================
-   CALCUL DEPTH
+   ESTIMATION DEPTH
 ========================================= */
 
 async function estimateImageDepth(
@@ -318,11 +441,14 @@ async function estimateImageDepth(
   estimator
 ) {
 
-  const maxSide = 720;
+  const maxSide =
+    720;
+
 
   const scale =
     Math.min(
       1,
+
       maxSide /
       Math.max(
         image.naturalWidth,
@@ -330,32 +456,41 @@ async function estimateImageDepth(
       )
     );
 
+
   const width =
     Math.max(
       64,
+
       Math.round(
         image.naturalWidth *
         scale
       )
     );
 
+
   const height =
     Math.max(
       64,
+
       Math.round(
         image.naturalHeight *
         scale
       )
     );
 
+
   const canvas =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   canvas.width =
     width;
 
   canvas.height =
     height;
+
 
   canvas
     .getContext("2d")
@@ -367,6 +502,7 @@ async function estimateImageDepth(
       height
     );
 
+
   const blob =
     await new Promise(
       resolve =>
@@ -377,19 +513,28 @@ async function estimateImageDepth(
         )
     );
 
+
   if (!blob) {
+
     throw new Error(
       "Impossible de préparer l’analyse de profondeur."
     );
   }
 
+
   const url =
-    URL.createObjectURL(blob);
+    URL.createObjectURL(
+      blob
+    );
+
 
   try {
 
     const result =
-      await estimator(url);
+      await estimator(
+        url
+      );
+
 
     return {
       result,
@@ -400,13 +545,15 @@ async function estimateImageDepth(
 
   finally {
 
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(
+      url
+    );
   }
 }
 
 
 /* =========================================
-   INITIALISATION THREE
+   INITIALISATION THREE.JS
 ========================================= */
 
 export async function init(
@@ -414,19 +561,24 @@ export async function init(
 ) {
 
   if (renderer) {
+
     return;
   }
+
 
   viewer =
     targetViewer;
 
+
   scene =
     new THREE.Scene();
+
 
   scene.background =
     new THREE.Color(
       0x02050a
     );
+
 
   camera =
     new THREE.PerspectiveCamera(
@@ -436,11 +588,13 @@ export async function init(
       30
     );
 
+
   camera.position.set(
     0,
     0,
     cameraRadius
   );
+
 
   renderer =
     new THREE.WebGLRenderer({
@@ -449,6 +603,7 @@ export async function init(
       preserveDrawingBuffer: true
     });
 
+
   renderer.setPixelRatio(
     Math.min(
       window.devicePixelRatio,
@@ -456,14 +611,18 @@ export async function init(
     )
   );
 
+
   renderer.outputColorSpace =
     THREE.SRGBColorSpace;
+
 
   viewer.appendChild(
     renderer.domElement
   );
 
+
   resize();
+
 
   window.addEventListener(
     "resize",
@@ -472,22 +631,146 @@ export async function init(
 }
 
 
+/* =========================================
+   V27 : ADAPTATION AUTOMATIQUE DU FOND
+========================================= */
+
+function updateUniversalBackground() {
+
+  if (
+    !backgroundMesh ||
+    !viewer
+  ) {
+
+    return;
+  }
+
+
+  const viewerWidth =
+    Math.max(
+      1,
+      viewer.clientWidth
+    );
+
+
+  const viewerHeight =
+    Math.max(
+      1,
+      viewer.clientHeight
+    );
+
+
+  const viewerAspect =
+    viewerWidth /
+    viewerHeight;
+
+
+  /*
+    Rapport entre la forme du support
+    et la photo maître.
+  */
+
+  let scaleX =
+    1;
+
+
+  let scaleY =
+    1;
+
+
+  /*
+    Support plus large que la photo :
+    on étend le décor horizontalement.
+
+    Exemple :
+    carte CB.
+  */
+
+  if (
+    viewerAspect >
+    masterImageAspect
+  ) {
+
+    scaleX =
+      viewerAspect /
+      masterImageAspect;
+  }
+
+
+  /*
+    Support plus haut / carré :
+    on donne davantage de matière
+    verticalement au décor.
+  */
+
+  else {
+
+    scaleY =
+      masterImageAspect /
+      viewerAspect;
+  }
+
+
+  /*
+    Marge de sécurité pour l'orbite ±12°.
+  */
+
+  scaleX *=
+    ORBIT_SAFETY_X;
+
+
+  scaleY *=
+    ORBIT_SAFETY_Y;
+
+
+  /*
+    IMPORTANT :
+    seul le décor est agrandi.
+
+    Le sujet n'est jamais zoomé
+    pour remplir le support.
+  */
+
+  backgroundMesh.scale.set(
+    scaleX,
+    scaleY,
+    1
+  );
+
+
+  backgroundMesh.position.x =
+    0;
+
+
+  backgroundMesh.position.y =
+    0;
+}
+
+
+/* =========================================
+   RESIZE
+========================================= */
+
 function resize() {
 
   if (
     !renderer ||
     !viewer
   ) {
+
     return;
   }
+
 
   const width =
     viewer.clientWidth ||
     760;
 
+
   const height =
     viewer.clientHeight ||
     500;
+
 
   renderer.setSize(
     width,
@@ -495,15 +778,36 @@ function resize() {
     false
   );
 
+
   camera.aspect =
-    width / height;
+    width /
+    height;
+
 
   camera.updateProjectionMatrix();
 
-  renderer.render(
-    scene,
+
+  /*
+    Dès que le client change de support,
+    le viewer change de ratio.
+
+    V27 recalcule alors le fond
+    automatiquement.
+  */
+
+  updateUniversalBackground();
+
+
+  if (
+    scene &&
     camera
-  );
+  ) {
+
+    renderer.render(
+      scene,
+      camera
+    );
+  }
 }
 
 
@@ -539,18 +843,18 @@ export async function build(
     ]);
 
 
-  const imageAspect =
+  masterImageAspect =
     photo.naturalWidth /
     photo.naturalHeight;
 
 
-  const planeHeight =
+  masterPlaneHeight =
     2.75;
 
 
-  const planeWidth =
-    planeHeight *
-    imageAspect;
+  masterPlaneWidth =
+    masterPlaneHeight *
+    masterImageAspect;
 
 
   const estimator =
@@ -558,6 +862,10 @@ export async function build(
       setStatus
     );
 
+
+  /* =====================================
+     DEPTH FOND
+  ===================================== */
 
   setStatus(
     "Analyse du relief du décor…",
@@ -572,6 +880,10 @@ export async function build(
     );
 
 
+  /* =====================================
+     DEPTH SUJET
+  ===================================== */
+
   setStatus(
     "Analyse du relief du premier plan…",
     75
@@ -585,15 +897,21 @@ export async function build(
     );
 
 
+  /* =====================================
+     NETTOYAGE
+  ===================================== */
+
   if (backgroundMesh) {
 
     scene.remove(
       backgroundMesh
     );
 
+
     backgroundMesh
       .geometry
       .dispose();
+
 
     backgroundMesh
       .material
@@ -607,9 +925,11 @@ export async function build(
       subjectMesh
     );
 
+
     subjectMesh
       .geometry
       .dispose();
+
 
     subjectMesh
       .material
@@ -618,7 +938,7 @@ export async function build(
 
 
   /* =====================================
-     FOND 2.5D AVEC OVERSCAN
+     FOND V27
   ===================================== */
 
   const backgroundTexture =
@@ -626,8 +946,10 @@ export async function build(
       backgroundImage
     );
 
+
   backgroundTexture.needsUpdate =
     true;
+
 
   backgroundTexture.colorSpace =
     THREE.SRGBColorSpace;
@@ -646,6 +968,7 @@ export async function build(
 
   backgroundDepthTexture.minFilter =
     THREE.LinearFilter;
+
 
   backgroundDepthTexture.magFilter =
     THREE.LinearFilter;
@@ -791,31 +1114,10 @@ export async function build(
     });
 
 
-  /*
-    OVERSCAN :
-    le fond est volontairement plus grand
-    que le sujet.
-
-    18 % horizontal
-    12 % vertical
-  */
-
-  const backgroundOverscanX =
-    1.18;
-
-
-  const backgroundOverscanY =
-    1.12;
-
-
   const backgroundGeometry =
     new THREE.PlaneGeometry(
-      planeWidth *
-      backgroundOverscanX,
-
-      planeHeight *
-      backgroundOverscanY,
-
+      masterPlaneWidth,
+      masterPlaneHeight,
       200,
       150
     );
@@ -832,24 +1134,20 @@ export async function build(
     -0.42;
 
 
-  /*
-    Léger recul supplémentaire du fond.
-  */
-
-  backgroundMesh.position.x =
-    0;
-
-  backgroundMesh.position.y =
-    0;
-
-
   scene.add(
     backgroundMesh
   );
 
 
+  /*
+    Première adaptation au support actif.
+  */
+
+  updateUniversalBackground();
+
+
   /* =====================================
-     SUJET V25
+     SUJET V25 CONSERVÉ
   ===================================== */
 
   const subjectTexture =
@@ -935,6 +1233,7 @@ export async function build(
         uniform sampler2D uImage;
         uniform sampler2D uDepth;
         uniform vec2 uTexel;
+
         uniform float uDepthScale;
 
 
@@ -1269,8 +1568,8 @@ export async function build(
 
   const subjectGeometry =
     new THREE.PlaneGeometry(
-      planeWidth,
-      planeHeight,
+      masterPlaneWidth,
+      masterPlaneHeight,
       240,
       190
     );
@@ -1283,28 +1582,31 @@ export async function build(
     );
 
 
-  subjectMesh.position.z =
-    0.18;
+  subjectMesh.position.set(
+    0,
+    0,
+    0.18
+  );
 
 
-  subjectMesh.position.x =
-    0;
+  /*
+    IMPORTANT V27 :
+    sujet toujours échelle 1.
 
-  subjectMesh.position.y =
-    0;
+    Le changement de support
+    ne modifie pas son zoom.
+  */
+
+  subjectMesh.scale.set(
+    1,
+    1,
+    1
+  );
 
 
   scene.add(
     subjectMesh
   );
-
-
-  backgroundMesh.rotation.y =
-    0;
-
-
-  subjectMesh.rotation.y =
-    0;
 
 
   cameraRadius =
@@ -1335,7 +1637,7 @@ export async function build(
 
 
   setStatus(
-    "V26 prête : fond élargi pour les supports larges.",
+    "V27 prête : scène universelle adaptée automatiquement au support.",
     86
   );
 }
@@ -1353,6 +1655,7 @@ function setAngleDegrees(
     !backgroundMesh ||
     !subjectMesh
   ) {
+
     return;
   }
 
@@ -1399,14 +1702,13 @@ function setAngleDegrees(
    ANIMATION ±12°
 ========================================= */
 
-function setPose(value) {
-
-  const degrees =
-    value * 12;
-
+function setPose(
+  value
+) {
 
   setAngleDegrees(
-    degrees
+    value *
+    12
   );
 }
 
@@ -1498,7 +1800,9 @@ function canvasToBlob() {
 
           if (blob) {
 
-            resolve(blob);
+            resolve(
+              blob
+            );
 
           } else {
 
@@ -1693,4 +1997,14 @@ export async function captureAngle(
 
 
   return blob;
+}
+
+
+/* =========================================
+   FORCER RECALCUL SUPPORT
+========================================= */
+
+export function refreshSupport() {
+
+  resize();
 }
