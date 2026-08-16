@@ -290,7 +290,8 @@ function createDepthCanvas(
 
   const values =
     new Uint8Array(
-      width * height
+      width *
+      height
     );
 
 
@@ -364,7 +365,8 @@ function createDepthCanvas(
 
     const value =
       Math.round(
-        depth * 255
+        depth *
+        255
       );
 
 
@@ -416,7 +418,6 @@ async function estimateImageDepth(
   const scale =
     Math.min(
       1,
-
       maxSide /
       Math.max(
         image.naturalWidth,
@@ -428,7 +429,6 @@ async function estimateImageDepth(
   const width =
     Math.max(
       64,
-
       Math.round(
         image.naturalWidth *
         scale
@@ -439,7 +439,6 @@ async function estimateImageDepth(
   const height =
     Math.max(
       64,
-
       Math.round(
         image.naturalHeight *
         scale
@@ -740,7 +739,7 @@ export async function build(
 
 
   /* =========================================
-     FOND 2.5D
+     FOND
   ========================================= */
 
   const backgroundTexture =
@@ -787,10 +786,6 @@ export async function build(
       value:
         backgroundDepthTexture
     },
-
-    /*
-      Relief fond renforcé.
-    */
 
     uDepthScale: {
       value:
@@ -870,7 +865,9 @@ export async function build(
         ) {
 
           vec3 low =
-            value * 12.92;
+            value *
+            12.92;
+
 
           vec3 high =
             1.055 *
@@ -880,7 +877,8 @@ export async function build(
                 1.0 / 2.4
               )
             )
-            - 0.055;
+            -
+            0.055;
 
 
           return mix(
@@ -934,10 +932,6 @@ export async function build(
     );
 
 
-  /*
-    Fond plus éloigné.
-  */
-
   backgroundMesh.position.z =
     -0.42;
 
@@ -948,7 +942,7 @@ export async function build(
 
 
   /* =========================================
-     SUJET 2.5D
+     SUJET
   ========================================= */
 
   const subjectTexture =
@@ -997,8 +991,17 @@ export async function build(
     },
 
     /*
-      Relief sujet renforcé.
+      Taille d'un pixel dans
+      la texture alpha.
     */
+
+    uTexel: {
+      value:
+        new THREE.Vector2(
+          1 / subjectDepth.width,
+          1 / subjectDepth.height
+        )
+    },
 
     uDepthScale: {
       value:
@@ -1028,8 +1031,8 @@ export async function build(
         varying vec2 vUv;
 
         uniform sampler2D uImage;
-
         uniform sampler2D uDepth;
+        uniform vec2 uTexel;
 
         uniform float uDepthScale;
 
@@ -1039,26 +1042,104 @@ export async function build(
           vUv = uv;
 
 
-          float alpha =
+          float alphaCenter =
             texture2D(
               uImage,
               uv
             ).a;
 
 
-          float d =
+          float alphaL =
+            texture2D(
+              uImage,
+              uv -
+              vec2(
+                uTexel.x * 3.0,
+                0.0
+              )
+            ).a;
+
+
+          float alphaR =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                uTexel.x * 3.0,
+                0.0
+              )
+            ).a;
+
+
+          float alphaU =
+            texture2D(
+              uImage,
+              uv +
+              vec2(
+                0.0,
+                uTexel.y * 3.0
+              )
+            ).a;
+
+
+          float alphaD =
+            texture2D(
+              uImage,
+              uv -
+              vec2(
+                0.0,
+                uTexel.y * 3.0
+              )
+            ).a;
+
+
+          /*
+            Safe edge :
+            si un voisin à 3 pixels est transparent,
+            on considère qu'on est trop proche
+            du contour.
+          */
+
+          float safeAlpha =
+            min(
+              alphaCenter,
+              min(
+                min(
+                  alphaL,
+                  alphaR
+                ),
+                min(
+                  alphaU,
+                  alphaD
+                )
+              )
+            );
+
+
+          /*
+            Le relief monte progressivement
+            seulement bien à l'intérieur
+            du sujet.
+          */
+
+          float safeInside =
+            smoothstep(
+              0.55,
+              0.96,
+              safeAlpha
+            );
+
+
+          /*
+            Les pixels du bord restent visibles,
+            mais presque sans déplacement Z.
+          */
+
+          float depth =
             texture2D(
               uDepth,
               uv
             ).r;
-
-
-          float inside =
-            smoothstep(
-              0.18,
-              0.94,
-              alpha
-            );
 
 
           vec3 p =
@@ -1067,13 +1148,13 @@ export async function build(
 
           p.z +=
             (
-              d -
+              depth -
               0.5
             )
             *
             uDepthScale
             *
-            inside;
+            safeInside;
 
 
           gl_Position =
@@ -1179,10 +1260,6 @@ export async function build(
     );
 
 
-  /*
-    Sujet davantage en avant.
-  */
-
   subjectMesh.position.z =
     0.18;
 
@@ -1236,7 +1313,7 @@ export async function build(
 
 
   setStatus(
-    "Relief renforcé : décor et sujet davantage séparés.",
+    "Relief renforcé avec contours protégés.",
     86
   );
 }
