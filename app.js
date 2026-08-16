@@ -174,20 +174,10 @@ function startProductShellRotation() {
         );
 
 
-      /*
-        Support physique :
-        rotation moins forte que la scène interne.
-      */
-
       const shellAngle =
         position *
         6;
 
-
-      /*
-        Très légère variation visuelle
-        pour accentuer l'effet d'épaisseur.
-      */
 
       const scaleX =
         1 -
@@ -275,11 +265,6 @@ async function selectSupport(
     support.label;
 
 
-  /*
-    Le viewer change de taille selon le support.
-    On laisse le DOM finir son recalcul.
-  */
-
   await new Promise(
     resolve =>
       requestAnimationFrame(
@@ -295,12 +280,6 @@ async function selectSupport(
       )
   );
 
-
-  /*
-    Si le moteur existe déjà,
-    on lui demande de recalculer
-    le fond universel selon le support.
-  */
 
   if (
     engine &&
@@ -311,10 +290,6 @@ async function selectSupport(
     engine.refreshSupport();
   }
 
-
-  /*
-    Fallback resize navigateur.
-  */
 
   window.dispatchEvent(
     new Event(
@@ -516,7 +491,7 @@ async function compressImage(
 
 
 /* =========================================
-   APPEL API
+   API
 ========================================= */
 
 async function postForm(
@@ -626,7 +601,7 @@ function blobToImage(
 
 
 /* =========================================
-   MASQUE POUR RECONSTRUCTION DU FOND
+   MASQUE
 ========================================= */
 
 async function makeEraseMask(
@@ -1017,10 +992,6 @@ generateBtn.addEventListener(
 
     try {
 
-      /*
-        1 — Préparation photo
-      */
-
       setStatus(
         "1/5 Préparation de la photo…",
         6
@@ -1032,10 +1003,6 @@ generateBtn.addEventListener(
           sourceFile
         );
 
-
-      /*
-        2 — Détourage
-      */
 
       setStatus(
         "2/5 Détourage précis du sujet…",
@@ -1066,10 +1033,6 @@ generateBtn.addEventListener(
           removeForm
         );
 
-
-      /*
-        3 — Reconstruction du fond
-      */
 
       setStatus(
         "3/5 Reconstruction du fond sans le sujet…",
@@ -1128,10 +1091,6 @@ generateBtn.addEventListener(
         );
 
 
-      /*
-        4 — Construction 3D
-      */
-
       setStatus(
         "4/5 Analyse des profondeurs…",
         66
@@ -1150,11 +1109,6 @@ generateBtn.addEventListener(
       );
 
 
-      /*
-        Forcer une adaptation
-        au support actuellement sélectionné.
-      */
-
       if (
         typeof currentEngine.refreshSupport ===
         "function"
@@ -1167,10 +1121,6 @@ generateBtn.addEventListener(
       placeholder.style.display =
         "none";
 
-
-      /*
-        5 — Animation
-      */
 
       setStatus(
         "5/5 Mise en mouvement…",
@@ -1197,7 +1147,7 @@ generateBtn.addEventListener(
 
 
       setStatus(
-        `Simulation prête dans le support « ${supports[selectedSupport].label} ». Le fond s’adapte automatiquement au format.`,
+        `Simulation prête dans le support « ${supports[selectedSupport].label} ».`,
         100
       );
     }
@@ -1228,7 +1178,64 @@ generateBtn.addEventListener(
 
 
 /* =========================================
-   EXPORT 9 VUES
+   CHARGEMENT JSZIP
+========================================= */
+
+async function getJSZip() {
+
+  if (window.JSZip) {
+
+    return window.JSZip;
+  }
+
+
+  await new Promise(
+    (resolve, reject) => {
+
+      const script =
+        document.createElement(
+          "script"
+        );
+
+
+      script.src =
+        "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+
+
+      script.onload =
+        resolve;
+
+
+      script.onerror =
+        () =>
+          reject(
+            new Error(
+              "Impossible de charger JSZip."
+            )
+          );
+
+
+      document.head.appendChild(
+        script
+      );
+    }
+  );
+
+
+  if (!window.JSZip) {
+
+    throw new Error(
+      "JSZip n'est pas disponible."
+    );
+  }
+
+
+  return window.JSZip;
+}
+
+
+/* =========================================
+   EXPORT ZIP DES 9 VUES
 ========================================= */
 
 if (exportViewsBtn) {
@@ -1248,7 +1255,7 @@ if (exportViewsBtn) {
 
 
         setStatus(
-          "Préparation des 9 vues…",
+          "Création des 9 vues…",
           0
         );
 
@@ -1266,74 +1273,155 @@ if (exportViewsBtn) {
                   Math.round(
                     current /
                     total *
-                    100
+                    75
                   );
 
 
                 setStatus(
-                  `Création vue ${current}/${total} — angle ${angle}°`,
+                  `Vue ${current}/${total} — angle ${angle}°`,
                   percent
                 );
               }
             );
 
 
+        setStatus(
+          "Assemblage du ZIP…",
+          80
+        );
+
+
+        const JSZip =
+          await getJSZip();
+
+
+        const zip =
+          new JSZip();
+
+
+        const folder =
+          zip.folder(
+            `vues-${selectedSupport}`
+          );
+
+
         for (
-          const view of views
+          let i = 0;
+          i < views.length;
+          i++
         ) {
 
-          const url =
-            URL.createObjectURL(
-              view.blob
-            );
+          const view =
+            views[i];
 
 
-          const link =
-            document.createElement(
-              "a"
-            );
-
-
-          link.href =
-            url;
-
-
-          link.download =
-            view.filename;
-
-
-          document.body.appendChild(
-            link
+          folder.file(
+            view.filename,
+            view.blob
           );
 
 
-          link.click();
+          const percent =
+            80 +
+            Math.round(
+              (
+                (i + 1) /
+                views.length
+              ) *
+              10
+            );
 
 
-          link.remove();
-
-
-          setTimeout(
-            () =>
-              URL.revokeObjectURL(
-                url
-              ),
-            10000
-          );
-
-
-          await new Promise(
-            resolve =>
-              setTimeout(
-                resolve,
-                250
-              )
+          setStatus(
+            `Ajout au ZIP ${i + 1}/${views.length}…`,
+            percent
           );
         }
 
 
         setStatus(
-          "9 vues générées : −12° à +12°.",
+          "Compression du ZIP…",
+          92
+        );
+
+
+        const zipBlob =
+          await zip.generateAsync(
+            {
+              type:
+                "blob",
+
+              compression:
+                "DEFLATE",
+
+              compressionOptions: {
+                level: 6
+              }
+            },
+
+            metadata => {
+
+              const percent =
+                92 +
+                Math.round(
+                  metadata.percent *
+                  0.08
+                );
+
+
+              setStatus(
+                `Compression ZIP… ${Math.round(metadata.percent)}%`,
+                Math.min(
+                  100,
+                  percent
+                )
+              );
+            }
+          );
+
+
+        const url =
+          URL.createObjectURL(
+            zipBlob
+          );
+
+
+        const link =
+          document.createElement(
+            "a"
+          );
+
+
+        link.href =
+          url;
+
+
+        link.download =
+          `9-vues-${selectedSupport}.zip`;
+
+
+        document.body.appendChild(
+          link
+        );
+
+
+        link.click();
+
+
+        link.remove();
+
+
+        setTimeout(
+          () =>
+            URL.revokeObjectURL(
+              url
+            ),
+          20000
+        );
+
+
+        setStatus(
+          "ZIP prêt : les 9 vues ont été téléchargées dans un seul fichier.",
           100
         );
       }
@@ -1346,7 +1434,7 @@ if (exportViewsBtn) {
 
 
         setStatus(
-          `Erreur vues : ${
+          `Erreur ZIP : ${
             error?.message ||
             String(error)
           }`,
