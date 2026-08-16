@@ -16,7 +16,7 @@
 
   <link
     rel="stylesheet"
-    href="./styles.css?v=24"
+    href="./styles.css?v=26"
   >
 
 </head>
@@ -40,16 +40,17 @@
         </h1>
 
         <p>
-          Fond reconstruit sans le sujet,
-          profondeur 2.5D et rotation orbitale
-          pour simuler l’effet lenticulaire.
+          Choisissez votre support,
+          chargez votre photo
+          et visualisez l’effet 3D
+          directement dans le produit.
         </p>
 
       </div>
 
 
       <div class="badge">
-        Preview + vidéo + 9 vues
+        V26 Supports
       </div>
 
     </header>
@@ -61,10 +62,101 @@
       <aside class="controls">
 
 
+        <!-- =========================
+             CHOIX DU SUPPORT
+        ========================== -->
+
+        <div class="support-zone">
+
+          <h2>
+            1. Choisissez le support
+          </h2>
+
+
+          <div class="support-grid">
+
+
+            <button
+              type="button"
+              class="support-card active"
+              data-support="medallion-cat"
+            >
+
+              <span class="support-icon">
+                🐱
+              </span>
+
+              <span class="support-name">
+                Médaillon chat
+              </span>
+
+            </button>
+
+
+            <button
+              type="button"
+              class="support-card"
+              data-support="medallion-dog"
+            >
+
+              <span class="support-icon">
+                🐶
+              </span>
+
+              <span class="support-name">
+                Médaillon chien
+              </span>
+
+            </button>
+
+
+            <button
+              type="button"
+              class="support-card"
+              data-support="card"
+            >
+
+              <span class="support-icon">
+                💳
+              </span>
+
+              <span class="support-name">
+                Carte CB
+              </span>
+
+            </button>
+
+
+            <button
+              type="button"
+              class="support-card"
+              data-support="keychain"
+            >
+
+              <span class="support-icon">
+                🔑
+              </span>
+
+              <span class="support-name">
+                Porte-clé rectangulaire
+              </span>
+
+            </button>
+
+
+          </div>
+
+        </div>
+
+
+        <!-- =========================
+             PHOTO
+        ========================== -->
+
         <div class="upload-zone">
 
           <h2>
-            Ajouter une photo
+            2. Ajoutez votre photo
           </h2>
 
           <p>
@@ -86,6 +178,10 @@
           alt="Photo choisie"
         >
 
+
+        <!-- =========================
+             ACTIONS
+        ========================== -->
 
         <button
           id="generateBtn"
@@ -121,10 +217,14 @@
         </a>
 
 
+        <!-- =========================
+             STATUT
+        ========================== -->
+
         <div id="status">
 
-          Chargez une photo
-          pour commencer.
+          Choisissez un support
+          puis chargez une photo.
 
         </div>
 
@@ -139,41 +239,85 @@
         <div class="disclaimer">
 
           La simulation est un aperçu visuel.
-          Le rendu lenticulaire imprimé final
-          peut varier.
 
-          Les 9 vues exportées servent
-          de base de production et devront
-          ensuite être adaptées au support
-          lenticulaire utilisé.
+          Le rendu lenticulaire imprimé final
+          peut varier selon le support,
+          la feuille lenticulaire
+          et les paramètres d’impression.
 
         </div>
 
+
       </aside>
 
+
+      <!-- =========================
+           ZONE DE VISUALISATION
+      ========================== -->
 
       <section class="preview-panel">
 
 
         <div
-          id="viewer"
-          class="viewer"
+          id="productStage"
+          class="product-stage support-medallion-cat"
         >
 
 
+          <!-- =========================
+               SUPPORT PRODUIT
+          ========================== -->
+
           <div
-            id="placeholder"
-            class="placeholder"
+            id="productShell"
+            class="product-shell"
           >
 
-            <strong>
-              Votre aperçu 3D apparaîtra ici
-            </strong>
 
-            <span>
-              Choisissez une photo
-              puis lancez la simulation.
-            </span>
+            <!-- Anneau médaillon / porte-clé -->
+
+            <div
+              id="productRing"
+              class="product-ring"
+            ></div>
+
+
+            <div
+              id="productLug"
+              class="product-lug"
+            ></div>
+
+
+            <!-- =========================
+                 SIMULATION 3D
+            ========================== -->
+
+            <div
+              id="viewer"
+              class="viewer"
+            >
+
+
+              <div
+                id="placeholder"
+                class="placeholder"
+              >
+
+                <strong>
+                  Votre aperçu 3D apparaîtra ici
+                </strong>
+
+                <span>
+                  Choisissez un support,
+                  ajoutez une photo
+                  puis lancez la simulation.
+                </span>
+
+              </div>
+
+
+            </div>
+
 
           </div>
 
@@ -181,13 +325,15 @@
         </div>
 
 
-        <div class="label">
+        <!-- =========================
+             NOM SUPPORT
+        ========================== -->
 
-          Fond reconstruit •
-          relief 2.5D •
-          orbite ±12° •
-          export 9 vues
-
+        <div
+          id="supportLabel"
+          class="label"
+        >
+          Médaillon chat
         </div>
 
 
@@ -202,7 +348,7 @@
 
   <script
     type="module"
-    src="./app.js?v=24"
+    src="./app.js?v=26"
   ></script>
 
 
