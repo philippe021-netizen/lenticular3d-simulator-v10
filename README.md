@@ -28,3 +28,4 @@ Une photo unique ne contient pas les zones cachées. Stable Fast 3D reconstruit 
 
 ## V3
 Le serveur accepte maintenant `STABILITY_API_KEY`, `CLE_API_STABILITE` et `CLÉ_API_STABILITÉ` afin de contourner les traductions automatiques de l'interface Vercel.
+v10
