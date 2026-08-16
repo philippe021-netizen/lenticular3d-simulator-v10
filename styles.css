@@ -282,7 +282,7 @@ button:disabled {
 
 
 /* =========================================
-   PANNEAU PREVIEW
+   PREVIEW
 ========================================= */
 
 .preview-panel {
@@ -310,6 +310,9 @@ button:disabled {
   align-items: center;
   justify-content: center;
 
+  /*
+    Perspective commune aux supports.
+  */
   perspective: 1200px;
 }
 
@@ -334,16 +337,9 @@ button:disabled {
     height 0.35s ease,
     border-radius 0.35s ease;
 
-  /*
-    IMPORTANT V26 :
-    l'encadrement entier peut maintenant
-    pivoter avec la simulation.
-  */
-
   transform-style: preserve-3d;
   transform-origin: center center;
   will-change: transform;
-
   backface-visibility: visible;
 }
 
@@ -388,7 +384,7 @@ button:disabled {
 
 
 /* =========================================
-   ANNEAU ET OEILLET
+   ANNEAU / OEILLET
 ========================================= */
 
 .product-ring,
@@ -396,7 +392,6 @@ button:disabled {
   display: none;
   position: absolute;
   z-index: 5;
-
   transform-style: preserve-3d;
 }
 
@@ -408,6 +403,7 @@ button:disabled {
 
   top: -108px;
   left: 50%;
+
   transform:
     translateX(-50%)
     translateZ(6px);
@@ -441,6 +437,7 @@ button:disabled {
 
 .product-lug::after {
   content: "";
+
   position: absolute;
 
   width: 24px;
@@ -448,7 +445,8 @@ button:disabled {
 
   border-radius: 50%;
 
-  background: #09101a;
+  background:
+    #09101a;
 
   border:
     4px solid
@@ -469,8 +467,8 @@ button:disabled {
 .support-medallion-cat
 .product-shell {
 
-  width: 450px;
-  height: 450px;
+  width: 420px;
+  height: 420px;
 
   border-radius: 50%;
 
@@ -490,8 +488,8 @@ button:disabled {
 .support-medallion-cat
 .viewer {
 
-  width: 414px;
-  height: 414px;
+  width: 386px;
+  height: 386px;
 
   border-radius: 50%;
 }
@@ -514,8 +512,8 @@ button:disabled {
 .support-medallion-dog
 .product-shell {
 
-  width: 490px;
-  height: 490px;
+  width: 455px;
+  height: 455px;
 
   border-radius: 50%;
 
@@ -535,8 +533,8 @@ button:disabled {
 .support-medallion-dog
 .viewer {
 
-  width: 452px;
-  height: 452px;
+  width: 417px;
+  height: 417px;
 
   border-radius: 50%;
 }
@@ -559,8 +557,13 @@ button:disabled {
 .support-card-cb
 .product-shell {
 
+  /*
+    Ratio proche du réel :
+    85,60 / 53,98
+  */
+
   width: 570px;
-  height: 360px;
+  aspect-ratio: 85.60 / 53.98;
 
   border-radius: 28px;
 
@@ -580,8 +583,15 @@ button:disabled {
 .support-card-cb
 .viewer {
 
-  width: 560px;
-  height: 350px;
+  width:
+    calc(
+      100% - 10px
+    );
+
+  height:
+    calc(
+      100% - 10px
+    );
 
   border-radius: 24px;
 }
@@ -594,8 +604,8 @@ button:disabled {
 .support-keychain
 .product-shell {
 
-  width: 520px;
-  height: 405px;
+  width: 510px;
+  height: 395px;
 
   border-radius: 38px;
 
@@ -615,8 +625,15 @@ button:disabled {
 .support-keychain
 .viewer {
 
-  width: 486px;
-  height: 371px;
+  width:
+    calc(
+      100% - 28px
+    );
+
+  height:
+    calc(
+      100% - 28px
+    );
 
   border-radius: 28px;
 }
@@ -692,32 +709,32 @@ button:disabled {
   .support-medallion-cat
   .product-shell {
 
-    width: 360px;
-    height: 360px;
+    width: 340px;
+    height: 340px;
   }
 
 
   .support-medallion-cat
   .viewer {
 
-    width: 328px;
-    height: 328px;
+    width: 310px;
+    height: 310px;
   }
 
 
   .support-medallion-dog
   .product-shell {
 
-    width: 380px;
-    height: 380px;
+    width: 365px;
+    height: 365px;
   }
 
 
   .support-medallion-dog
   .viewer {
 
-    width: 346px;
-    height: 346px;
+    width: 333px;
+    height: 333px;
   }
 
 
@@ -729,27 +746,6 @@ button:disabled {
         94vw,
         540px
       );
-
-    height:
-      auto;
-
-    aspect-ratio:
-      85.60 / 53.98;
-  }
-
-
-  .support-card-cb
-  .viewer {
-
-    width:
-      calc(
-        100% - 10px
-      );
-
-    height:
-      calc(
-        100% - 10px
-      );
   }
 
 
@@ -759,26 +755,11 @@ button:disabled {
     width:
       min(
         92vw,
-        480px
+        470px
       );
 
     height:
-      370px;
-  }
-
-
-  .support-keychain
-  .viewer {
-
-    width:
-      calc(
-        100% - 30px
-      );
-
-    height:
-      calc(
-        100% - 30px
-      );
+      360px;
   }
 }
 
@@ -806,47 +787,50 @@ button:disabled {
   .support-medallion-cat
   .product-shell {
 
-    width: 290px;
-    height: 290px;
+    width: 285px;
+    height: 285px;
   }
 
 
   .support-medallion-cat
   .viewer {
 
-    width: 262px;
-    height: 262px;
+    width: 257px;
+    height: 257px;
   }
 
 
   .support-medallion-dog
   .product-shell {
 
-    width: 310px;
-    height: 310px;
+    width: 305px;
+    height: 305px;
   }
 
 
   .support-medallion-dog
   .viewer {
 
-    width: 280px;
-    height: 280px;
+    width: 275px;
+    height: 275px;
+  }
+
+
+  .support-card-cb
+  .product-shell {
+
+    width:
+      min(
+        92vw,
+        390px
+      );
   }
 
 
   .support-keychain
   .product-shell {
 
-    width: 330px;
-    height: 260px;
-  }
-
-
-  .support-keychain
-  .viewer {
-
-    width: 304px;
-    height: 234px;
+    width: 325px;
+    height: 250px;
   }
 }
