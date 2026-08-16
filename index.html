@@ -16,7 +16,7 @@
 
   <link
     rel="stylesheet"
-    href="./styles.css?v=20"
+    href="./styles.css?v=23"
   >
 
 </head>
@@ -41,15 +41,15 @@
 
         <p>
           Fond reconstruit sans le sujet,
-          sujet détouré au premier plan
-          et parallaxe renforcée.
+          profondeur 2.5D et rotation orbitale
+          pour simuler l’effet lenticulaire.
         </p>
 
       </div>
 
 
       <div class="badge">
-        Clean Background V20
+        Preview + vidéo
       </div>
 
     </header>
@@ -95,24 +95,44 @@
         </button>
 
 
+        <button
+          id="exportVideoBtn"
+          disabled
+        >
+          Enregistrer la simulation
+        </button>
+
+
+        <a
+          id="downloadVideo"
+          class="download-video"
+          style="display:none"
+          download="simulation-lenticulaire.mp4"
+        >
+          Télécharger la simulation
+        </a>
+
+
         <div id="status">
-          Chargez une photo pour commencer.
+
+          Chargez une photo
+          pour commencer.
+
         </div>
 
 
         <div class="progress">
+
           <i id="bar"></i>
+
         </div>
 
 
         <div class="disclaimer">
 
-          Simulation visuelle.
-
-          Le fond est reconstruit
-          derrière le sujet afin
-          d’éviter les dédoublements
-          lors du mouvement.
+          La simulation est un aperçu visuel.
+          Le rendu lenticulaire imprimé final
+          peut varier.
 
         </div>
 
@@ -150,9 +170,9 @@
 
         <div class="label">
 
-          Fond sans sujet •
-          silhouette séparée •
-          parallaxe renforcée
+          Fond reconstruit •
+          relief 2.5D •
+          orbite gauche ↔ droite
 
         </div>
 
@@ -168,7 +188,7 @@
 
   <script
     type="module"
-    src="./app.js?v=20"
+    src="./app.js?v=23"
   ></script>
 
 
