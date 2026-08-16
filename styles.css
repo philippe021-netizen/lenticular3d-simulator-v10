@@ -45,7 +45,7 @@ header h1 {
 header p {
   margin: 0;
   color: #a8b6ca;
-  max-width: 720px;
+  max-width: 760px;
   line-height: 1.45;
 }
 
@@ -124,13 +124,12 @@ button {
   font-weight: 700;
   cursor: pointer;
   color: #ffffff;
-  background: linear-gradient(
-    135deg,
-    #1675df,
-    #38a1ff
-  );
-  box-shadow:
-    0 8px 28px rgba(25, 125, 235, 0.25);
+  background:
+    linear-gradient(
+      135deg,
+      #1675df,
+      #38a1ff
+    );
 }
 
 button:disabled {
