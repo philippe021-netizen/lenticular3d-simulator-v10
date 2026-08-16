@@ -1,6 +1,5 @@
 {
-  "name": "lenticular3d-simulator-v10",
+  "name": "lenticular-client-preview-v14",
   "version": "1.0.0",
-  "private": true,
-  "type": "module"
+  "private": true
 }
