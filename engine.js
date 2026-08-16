@@ -16,99 +16,69 @@ let animationStart = 0;
 
 
 function fileToImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
 
-  return new Promise(
-    (resolve, reject) => {
+    const image = new Image();
 
-      const url =
-        URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
 
-      const image =
-        new Image();
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
 
+      reject(
+        new Error(
+          "Impossible de lire la photo."
+        )
+      );
+    };
 
-      image.onload = () => {
-
-        URL.revokeObjectURL(url);
-
-        resolve(image);
-      };
-
-
-      image.onerror = () => {
-
-        URL.revokeObjectURL(url);
-
-        reject(
-          new Error(
-            "Impossible de lire la photo."
-          )
-        );
-      };
-
-
-      image.src = url;
-    }
-  );
+    image.src = url;
+  });
 }
 
 
 
-async function getEstimator(
-  setStatus
-) {
-
+async function getEstimator(setStatus) {
   if (depthEstimator) {
     return depthEstimator;
   }
-
 
   setStatus(
     "Chargement du moteur de profondeur…",
     10
   );
 
-
   const {
     pipeline,
     env
-  } =
-    await import(
-      "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
-    );
+  } = await import(
+    "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
+  );
 
+  env.allowLocalModels = false;
 
-  env.allowLocalModels =
-    false;
-
-
-  depthEstimator =
-    await pipeline(
-      "depth-estimation",
-      "onnx-community/depth-anything-v2-small",
-      {
-        dtype: "q4"
-      }
-    );
-
+  depthEstimator = await pipeline(
+    "depth-estimation",
+    "onnx-community/depth-anything-v2-small",
+    {
+      dtype: "q4"
+    }
+  );
 
   return depthEstimator;
 }
 
 
 
-function percentile(
-  values,
-  amount
-) {
-
+function percentile(values, amount) {
   const sorted =
-    Array.from(values)
-      .sort(
-        (a, b) =>
-          a - b
-      );
-
+    Array.from(values).sort(
+      (a, b) => a - b
+    );
 
   const index =
     Math.max(
@@ -122,7 +92,6 @@ function percentile(
       )
     );
 
-
   return sorted[index];
 }
 
@@ -133,12 +102,8 @@ function createDepthCanvas(
   width,
   height
 ) {
-
   const source =
-    document.createElement(
-      "canvas"
-    );
-
+    document.createElement("canvas");
 
   source.width =
     rawDepth.width;
@@ -146,17 +111,14 @@ function createDepthCanvas(
   source.height =
     rawDepth.height;
 
-
   const sourceContext =
     source.getContext("2d");
-
 
   const sourceData =
     sourceContext.createImageData(
       rawDepth.width,
       rawDepth.height
     );
-
 
   for (
     let i = 0;
@@ -165,31 +127,25 @@ function createDepthCanvas(
     rawDepth.height;
     i++
   ) {
-
     const value =
       rawDepth.data[i];
-
 
     sourceData.data[
       i * 4
     ] = value;
 
-
     sourceData.data[
       i * 4 + 1
     ] = value;
-
 
     sourceData.data[
       i * 4 + 2
     ] = value;
 
-
     sourceData.data[
       i * 4 + 3
     ] = 255;
   }
-
 
   sourceContext.putImageData(
     sourceData,
@@ -197,29 +153,17 @@ function createDepthCanvas(
     0
   );
 
-
   const canvas =
-    document.createElement(
-      "canvas"
-    );
+    document.createElement("canvas");
 
-
-  canvas.width =
-    width;
-
-  canvas.height =
-    height;
-
+  canvas.width = width;
+  canvas.height = height;
 
   const context =
-    canvas.getContext(
-      "2d"
-    );
-
+    canvas.getContext("2d");
 
   context.filter =
     "blur(2.5px)";
-
 
   context.drawImage(
     source,
@@ -229,7 +173,6 @@ function createDepthCanvas(
     height
   );
 
-
   const imageData =
     context.getImageData(
       0,
@@ -238,27 +181,22 @@ function createDepthCanvas(
       height
     );
 
-
   const values =
     new Uint8Array(
       width *
       height
     );
 
-
   for (
     let i = 0;
     i < values.length;
     i++
   ) {
-
     values[i] =
       imageData.data[
         i * 4
       ];
   }
-
-
 
   let low =
     percentile(
@@ -266,21 +204,16 @@ function createDepthCanvas(
       0.04
     );
 
-
   let high =
     percentile(
       values,
       0.96
     );
 
-
   if (high <= low) {
-
     low = 0;
     high = 255;
   }
-
-
 
   function average(
     x0,
@@ -288,10 +221,8 @@ function createDepthCanvas(
     x1,
     y1
   ) {
-
     let sum = 0;
     let count = 0;
-
 
     for (
       let y =
@@ -302,7 +233,6 @@ function createDepthCanvas(
 
       y += 7
     ) {
-
       for (
         let x =
           Math.floor(x0);
@@ -312,7 +242,6 @@ function createDepthCanvas(
 
         x += 7
       ) {
-
         sum +=
           values[
             y *
@@ -320,11 +249,9 @@ function createDepthCanvas(
             x
           ];
 
-
         count++;
       }
     }
-
 
     return (
       sum /
@@ -335,8 +262,6 @@ function createDepthCanvas(
     );
   }
 
-
-
   const center =
     average(
       width * 0.25,
@@ -344,7 +269,6 @@ function createDepthCanvas(
       width * 0.75,
       height * 0.90
     );
-
 
   const border =
     (
@@ -377,18 +301,14 @@ function createDepthCanvas(
       )
     ) / 4;
 
-
   const invert =
     center < border;
-
-
 
   for (
     let i = 0;
     i < values.length;
     i++
   ) {
-
     let depth =
       (
         values[i] -
@@ -399,7 +319,6 @@ function createDepthCanvas(
         high - low
       );
 
-
     depth =
       Math.max(
         0,
@@ -409,13 +328,10 @@ function createDepthCanvas(
         )
       );
 
-
     if (invert) {
-
       depth =
         1 - depth;
     }
-
 
     depth =
       Math.pow(
@@ -423,40 +339,33 @@ function createDepthCanvas(
         1.1
       );
 
-
     const value =
       Math.round(
         depth * 255
       );
 
-
     imageData.data[
       i * 4
     ] = value;
-
 
     imageData.data[
       i * 4 + 1
     ] = value;
 
-
     imageData.data[
       i * 4 + 2
     ] = value;
-
 
     imageData.data[
       i * 4 + 3
     ] = 255;
   }
 
-
   context.putImageData(
     imageData,
     0,
     0
   );
-
 
   return canvas;
 }
@@ -466,25 +375,20 @@ function createDepthCanvas(
 export async function init(
   targetViewer
 ) {
-
   if (renderer) {
     return;
   }
 
-
   viewer =
     targetViewer;
 
-
   scene =
     new THREE.Scene();
-
 
   scene.background =
     new THREE.Color(
       0x02050a
     );
-
 
   camera =
     new THREE.PerspectiveCamera(
@@ -494,20 +398,17 @@ export async function init(
       20
     );
 
-
   camera.position.set(
     0,
     0,
-    4.8
+    5.6
   );
-
 
   renderer =
     new THREE.WebGLRenderer({
       antialias: true,
       preserveDrawingBuffer: true
     });
-
 
   renderer.setPixelRatio(
     Math.min(
@@ -516,18 +417,14 @@ export async function init(
     )
   );
 
-
   renderer.outputColorSpace =
     THREE.SRGBColorSpace;
-
 
   viewer.appendChild(
     renderer.domElement
   );
 
-
   resize();
-
 
   window.addEventListener(
     "resize",
@@ -538,7 +435,6 @@ export async function init(
 
 
 function resize() {
-
   if (
     !renderer ||
     !viewer
@@ -546,16 +442,13 @@ function resize() {
     return;
   }
 
-
   const width =
     viewer.clientWidth ||
     760;
 
-
   const height =
     viewer.clientHeight ||
     500;
-
 
   renderer.setSize(
     width,
@@ -563,11 +456,9 @@ function resize() {
     false
   );
 
-
   camera.aspect =
     width /
     height;
-
 
   camera.updateProjectionMatrix();
 }
@@ -578,40 +469,32 @@ export async function build(
   file,
   setStatus
 ) {
-
   setStatus(
     "1/3 Lecture de la photo…",
     8
   );
-
 
   const image =
     await fileToImage(
       file
     );
 
-
   imageAspect =
     image.naturalWidth /
     image.naturalHeight;
-
-
 
   setStatus(
     "2/3 Estimation de profondeur…",
     25
   );
 
-
   const estimator =
     await getEstimator(
       setStatus
     );
 
-
   const maxSide =
     720;
-
 
   const scale =
     Math.min(
@@ -623,7 +506,6 @@ export async function build(
       )
     );
 
-
   const width =
     Math.max(
       64,
@@ -632,7 +514,6 @@ export async function build(
         scale
       )
     );
-
 
   const height =
     Math.max(
@@ -643,19 +524,16 @@ export async function build(
       )
     );
 
-
   const temporaryCanvas =
     document.createElement(
       "canvas"
     );
-
 
   temporaryCanvas.width =
     width;
 
   temporaryCanvas.height =
     height;
-
 
   temporaryCanvas
     .getContext("2d")
@@ -667,7 +545,6 @@ export async function build(
       height
     );
 
-
   const blob =
     await new Promise(
       resolve =>
@@ -678,18 +555,14 @@ export async function build(
         )
     );
 
-
   const url =
     URL.createObjectURL(
       blob
     );
 
-
   let result;
 
-
   try {
-
     result =
       await estimator(
         url
@@ -697,22 +570,17 @@ export async function build(
   }
 
   finally {
-
     URL.revokeObjectURL(
       url
     );
   }
-
-
 
   setStatus(
     "3/3 Construction de la scène 2.5D…",
     72
   );
 
-
   if (mesh) {
-
     scene.remove(mesh);
 
     mesh.geometry.dispose();
@@ -720,22 +588,16 @@ export async function build(
     mesh.material.dispose();
   }
 
-
-
   const imageTexture =
     new THREE.Texture(
       image
     );
 
-
   imageTexture.needsUpdate =
     true;
 
-
   imageTexture.colorSpace =
     THREE.SRGBColorSpace;
-
-
 
   const depthTexture =
     new THREE.CanvasTexture(
@@ -746,18 +608,13 @@ export async function build(
       )
     );
 
-
   depthTexture.minFilter =
     THREE.LinearFilter;
-
 
   depthTexture.magFilter =
     THREE.LinearFilter;
 
-
-
   uniforms = {
-
     uImage: {
       value:
         imageTexture
@@ -780,19 +637,15 @@ export async function build(
 
     uRelief: {
       value:
-        0.12
+        0.14
     }
   };
 
-
-
   const material =
     new THREE.ShaderMaterial({
-
       uniforms,
 
       vertexShader: `
-
         varying vec2 vUv;
 
         uniform sampler2D uDepth;
@@ -800,11 +653,9 @@ export async function build(
         uniform float uDepthScale;
         uniform float uRelief;
 
-
         void main() {
 
           vUv = uv;
-
 
           float depth =
             texture2D(
@@ -812,10 +663,8 @@ export async function build(
               uv
             ).r;
 
-
           vec3 position3D =
             position;
-
 
           position3D.z +=
             (
@@ -824,7 +673,6 @@ export async function build(
             ) *
             uDepthScale;
 
-
           position3D.x +=
             uView *
             (
@@ -832,7 +680,6 @@ export async function build(
               0.45
             ) *
             uRelief;
-
 
           gl_Position =
             projectionMatrix *
@@ -845,13 +692,11 @@ export async function build(
       `,
 
       fragmentShader: `
-
         precision highp float;
 
         varying vec2 vUv;
 
         uniform sampler2D uImage;
-
 
         void main() {
 
@@ -867,17 +712,12 @@ export async function build(
         THREE.DoubleSide
     });
 
-
-
   const planeHeight =
     2.6;
-
 
   const planeWidth =
     planeHeight *
     imageAspect;
-
-
 
   const geometry =
     new THREE.PlaneGeometry(
@@ -887,43 +727,21 @@ export async function build(
       180
     );
 
-
-
   mesh =
     new THREE.Mesh(
       geometry,
       material
     );
 
-
   scene.add(
     mesh
   );
 
-
-
-  const verticalFov =
-    THREE.MathUtils.degToRad(
-      camera.fov
-    );
-
-
-  const cameraDistance =
-    (
-      planeHeight / 2
-    ) /
-    Math.tan(
-      verticalFov / 2
-    );
-
-
   camera.position.set(
     0,
     0,
-    cameraDistance *
-    1.15
+    5.6
   );
-
 
   camera.lookAt(
     0,
@@ -931,67 +749,58 @@ export async function build(
     0
   );
 
-
   resize();
-
 
   renderer.render(
     scene,
     camera
   );
 
-
   setStatus(
-    "Aperçu 2.5D prêt : le changement de point de vue dépend maintenant de la profondeur.",
+    "Aperçu 2.5D prêt : caméra fixe en profondeur, mouvement horizontal uniquement.",
     100
   );
 }
 
 
 
-function setPose(
-  value
-) {
+function setPose(value) {
 
   if (!uniforms) {
     return;
   }
 
+  /*
+    La profondeur interne bouge
+    légèrement selon la carte de profondeur.
+  */
 
   uniforms.uView.value =
     value;
 
+  /*
+    IMPORTANT :
+    pas de zoom,
+    pas d'avance/recul caméra.
+  */
 
-  const distance =
-    camera.position.length();
-
-
-  const angle =
-    value *
-    0.045;
-
+  const fixedZ =
+    5.6;
 
   camera.position.x =
-    Math.sin(
-      angle
-    ) *
-    distance *
-    0.35;
+    value * 0.10;
 
+  camera.position.y =
+    0;
 
   camera.position.z =
-    Math.cos(
-      angle
-    ) *
-    distance;
-
+    fixedZ;
 
   camera.lookAt(
     0,
     0,
     0
   );
-
 
   renderer.render(
     scene,
@@ -1004,16 +813,13 @@ function setPose(
 export function start() {
 
   if (animationFrame) {
-
     cancelAnimationFrame(
       animationFrame
     );
   }
 
-
   animationStart =
     performance.now();
-
 
   const animate =
     currentTime => {
@@ -1025,7 +831,6 @@ export function start() {
         ) /
         5200;
 
-
       const position =
         Math.sin(
           elapsed *
@@ -1033,18 +838,15 @@ export function start() {
           2
         );
 
-
       setPose(
         position
       );
-
 
       animationFrame =
         requestAnimationFrame(
           animate
         );
     };
-
 
   animationFrame =
     requestAnimationFrame(
