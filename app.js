@@ -44,17 +44,70 @@ const supportButtons =
 
 
 let sourceFile = null;
-
 let thumbUrl = null;
-
 let engine = null;
-
 let videoUrl = null;
 
 let simulationReady = false;
 
 let selectedSupport =
   "medallion-cat";
+
+
+/* =========================================
+   SUPPORTS
+========================================= */
+
+const supports = {
+
+  "medallion-cat": {
+    className:
+      "support-medallion-cat",
+    label:
+      "Médaillon chat"
+  },
+
+  "medallion-dog": {
+    className:
+      "support-medallion-dog",
+    label:
+      "Médaillon chien"
+  },
+
+  "card": {
+    className:
+      "support-card-cb",
+    label:
+      "Carte CB"
+  },
+
+  "keychain": {
+    className:
+      "support-keychain",
+    label:
+      "Porte-clé rectangulaire"
+  }
+};
+
+
+/* =========================================
+   STATUT
+========================================= */
+
+function setStatus(
+  message,
+  progress = null
+) {
+
+  statusBox.textContent =
+    message;
+
+  if (progress !== null) {
+
+    bar.style.width =
+      `${progress}%`;
+  }
+}
 
 
 /* =========================================
@@ -104,7 +157,6 @@ function startProductShellRotation() {
   const animateShell =
     currentTime => {
 
-
       const elapsed =
         (
           currentTime -
@@ -123,12 +175,8 @@ function startProductShellRotation() {
 
 
       /*
-        La simulation interne
-        tourne à ±12°.
-
-        Le support physique tourne
-        volontairement moins :
-        ±6°.
+        Support physique :
+        rotation moins forte que la scène interne.
       */
 
       const shellAngle =
@@ -137,8 +185,8 @@ function startProductShellRotation() {
 
 
       /*
-        Petite variation d'épaisseur
-        purement visuelle.
+        Très légère variation visuelle
+        pour accentuer l'effet d'épaisseur.
       */
 
       const scaleX =
@@ -172,78 +220,10 @@ function startProductShellRotation() {
 
 
 /* =========================================
-   SUPPORTS DISPONIBLES
-========================================= */
-
-const supports = {
-
-  "medallion-cat": {
-
-    className:
-      "support-medallion-cat",
-
-    label:
-      "Médaillon chat"
-  },
-
-
-  "medallion-dog": {
-
-    className:
-      "support-medallion-dog",
-
-    label:
-      "Médaillon chien"
-  },
-
-
-  "card": {
-
-    className:
-      "support-card-cb",
-
-    label:
-      "Carte CB"
-  },
-
-
-  "keychain": {
-
-    className:
-      "support-keychain",
-
-    label:
-      "Porte-clé rectangulaire"
-  }
-};
-
-
-/* =========================================
-   STATUT
-========================================= */
-
-function setStatus(
-  message,
-  progress = null
-) {
-
-  statusBox.textContent =
-    message;
-
-
-  if (progress !== null) {
-
-    bar.style.width =
-      `${progress}%`;
-  }
-}
-
-
-/* =========================================
    CHANGEMENT DE SUPPORT
 ========================================= */
 
-function selectSupport(
+async function selectSupport(
   supportName
 ) {
 
@@ -295,36 +275,55 @@ function selectSupport(
     support.label;
 
 
-  requestAnimationFrame(
-    () => {
+  /*
+    Le viewer change de taille selon le support.
+    On laisse le DOM finir son recalcul.
+  */
 
-      window.dispatchEvent(
-        new Event(
-          "resize"
-        )
-      );
-
-
+  await new Promise(
+    resolve =>
       requestAnimationFrame(
-        () => {
+        resolve
+      )
+  );
 
-          window.dispatchEvent(
-            new Event(
-              "resize"
-            )
-          );
-        }
-      );
-    }
+
+  await new Promise(
+    resolve =>
+      requestAnimationFrame(
+        resolve
+      )
+  );
+
+
+  /*
+    Si le moteur existe déjà,
+    on lui demande de recalculer
+    le fond universel selon le support.
+  */
+
+  if (
+    engine &&
+    typeof engine.refreshSupport ===
+    "function"
+  ) {
+
+    engine.refreshSupport();
+  }
+
+
+  /*
+    Fallback resize navigateur.
+  */
+
+  window.dispatchEvent(
+    new Event(
+      "resize"
+    )
   );
 
 
   if (simulationReady) {
-
-    /*
-      La rotation continue
-      avec le nouveau support.
-    */
 
     startProductShellRotation();
 
@@ -419,6 +418,7 @@ async function compressImage(
     const scale =
       Math.min(
         1,
+
         maxSide /
         Math.max(
           image.naturalWidth,
@@ -430,6 +430,7 @@ async function compressImage(
     const width =
       Math.max(
         64,
+
         Math.round(
           image.naturalWidth *
           scale
@@ -440,6 +441,7 @@ async function compressImage(
     const height =
       Math.max(
         64,
+
         Math.round(
           image.naturalHeight *
           scale
@@ -514,7 +516,7 @@ async function compressImage(
 
 
 /* =========================================
-   APPELS API
+   APPEL API
 ========================================= */
 
 async function postForm(
@@ -624,7 +626,7 @@ function blobToImage(
 
 
 /* =========================================
-   MASQUE
+   MASQUE POUR RECONSTRUCTION DU FOND
 ========================================= */
 
 async function makeEraseMask(
@@ -796,7 +798,8 @@ async function makeEraseMask(
             y *
             width +
             x
-          ) * 4;
+          ) *
+          4;
 
 
         output.data[
@@ -851,7 +854,7 @@ async function makeEraseMask(
 
 
 /* =========================================
-   MOTEUR
+   MOTEUR V27
 ========================================= */
 
 async function getEngine() {
@@ -864,7 +867,7 @@ async function getEngine() {
 
   engine =
     await import(
-      "./engine.js?v=26"
+      "./engine.js?v=27"
     );
 
 
@@ -1014,6 +1017,10 @@ generateBtn.addEventListener(
 
     try {
 
+      /*
+        1 — Préparation photo
+      */
+
       setStatus(
         "1/5 Préparation de la photo…",
         6
@@ -1025,6 +1032,10 @@ generateBtn.addEventListener(
           sourceFile
         );
 
+
+      /*
+        2 — Détourage
+      */
 
       setStatus(
         "2/5 Détourage précis du sujet…",
@@ -1055,6 +1066,10 @@ generateBtn.addEventListener(
           removeForm
         );
 
+
+      /*
+        3 — Reconstruction du fond
+      */
 
       setStatus(
         "3/5 Reconstruction du fond sans le sujet…",
@@ -1113,6 +1128,10 @@ generateBtn.addEventListener(
         );
 
 
+      /*
+        4 — Construction 3D
+      */
+
       setStatus(
         "4/5 Analyse des profondeurs…",
         66
@@ -1131,16 +1150,27 @@ generateBtn.addEventListener(
       );
 
 
-      window.dispatchEvent(
-        new Event(
-          "resize"
-        )
-      );
+      /*
+        Forcer une adaptation
+        au support actuellement sélectionné.
+      */
+
+      if (
+        typeof currentEngine.refreshSupport ===
+        "function"
+      ) {
+
+        currentEngine.refreshSupport();
+      }
 
 
       placeholder.style.display =
         "none";
 
+
+      /*
+        5 — Animation
+      */
 
       setStatus(
         "5/5 Mise en mouvement…",
@@ -1150,11 +1180,6 @@ generateBtn.addEventListener(
 
       currentEngine.start();
 
-
-      /*
-        Le support entier commence
-        à pivoter en même temps.
-      */
 
       startProductShellRotation();
 
@@ -1172,7 +1197,7 @@ generateBtn.addEventListener(
 
 
       setStatus(
-        `Simulation prête dans le support « ${supports[selectedSupport].label} ». Le support pivote maintenant avec l’image.`,
+        `Simulation prête dans le support « ${supports[selectedSupport].label} ». Le fond s’adapte automatiquement au format.`,
         100
       );
     }
