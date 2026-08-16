@@ -1,10 +1,106 @@
-Simulation client
-Aperçu lenticulaire 3D
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aperçu lenticulaire 3D</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
 
-Ajoutez une photo. La visionneuse crée automatiquement un aperçu 3D fluide en quelques secondes.
+<body>
 
-Preview V14
-Choisir une photo JPG, PNG ou WEBP    Photo source  Créer l’aperçu 3D  Créer le GIF démo
-Chargez une photo pour commencer.
-Simulation visuelle de l’effet lenticulaire. Le rendu imprimé final peut varier.
-Aperçu automatique • profondeur renforcée • mouvement doux
+  <main class="app">
+
+    <header>
+      <h1>Simulation client</h1>
+      <p>
+        Ajoutez une photo. La visionneuse crée automatiquement
+        un aperçu 3D animé de l'effet lenticulaire.
+      </p>
+    </header>
+
+    <section class="workspace">
+
+      <aside class="controls">
+
+        <div class="upload-zone">
+          <h2>Ajouter une photo</h2>
+          <p>JPG / PNG / WEBP</p>
+
+          <input
+            id="imageInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+          >
+        </div>
+
+        <div class="preview-small">
+          <img
+            id="sourcePreview"
+            alt="Photo sélectionnée"
+            style="display:none;"
+          >
+        </div>
+
+        <button id="createButton" type="button" disabled>
+          Créer l’aperçu 3D
+        </button>
+
+        <button id="gifButton" type="button" disabled>
+          Créer le GIF démo
+        </button>
+
+        <div id="status">
+          Chargez une photo pour commencer.
+        </div>
+
+        <div class="info-box">
+          <strong>Aperçu lenticulaire</strong>
+          <p>
+            Simulation visuelle destinée à donner une idée
+            immédiate du relief et du mouvement.
+          </p>
+          <p>
+            Le résultat imprimé final peut varier.
+          </p>
+        </div>
+
+      </aside>
+
+      <section class="viewer">
+
+        <div id="viewerStage">
+
+          <div id="depthScene">
+
+            <div id="backgroundLayer"></div>
+
+            <div id="middleLayer"></div>
+
+            <div id="subjectLayer"></div>
+
+          </div>
+
+          <div id="emptyMessage">
+            <strong>Votre aperçu 3D apparaîtra ici</strong>
+            <span>
+              Ajoutez une photo puis lancez la simulation.
+            </span>
+          </div>
+
+        </div>
+
+        <div class="viewer-caption">
+          Aperçu automatique • profondeur renforcée • mouvement doux
+        </div>
+
+      </section>
+
+    </section>
+
+  </main>
+
+  <script src="./app.js"></script>
+
+</body>
+</html>
