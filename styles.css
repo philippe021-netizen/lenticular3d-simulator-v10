@@ -124,8 +124,14 @@ button {
   font-weight: 700;
   cursor: pointer;
   color: #ffffff;
-  background: linear-gradient(135deg, #1675df, #38a1ff);
-  box-shadow: 0 8px 28px rgba(25, 125, 235, 0.25);
+  background:
+    linear-gradient(
+      135deg,
+      #1675df,
+      #38a1ff
+    );
+  box-shadow:
+    0 8px 28px rgba(25, 125, 235, 0.25);
 }
 
 button:disabled {
@@ -179,7 +185,8 @@ button:disabled {
       #101c30 0,
       #03060c 70%
     );
-  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 20px 70px rgba(0, 0, 0, 0.35);
 }
 
 .stage {
@@ -187,6 +194,7 @@ button:disabled {
   width: 100%;
   height: 660px;
   overflow: hidden;
+  perspective: 1400px;
 }
 
 .placeholder {
@@ -215,8 +223,8 @@ button:disabled {
   top: 50%;
   width: auto;
   height: auto;
-  max-width: 86%;
-  max-height: 84%;
+  max-width: 88%;
+  max-height: 86%;
   object-fit: contain;
   opacity: 0;
   transform-origin: center center;
@@ -229,59 +237,102 @@ button:disabled {
 
 .background-layer {
   z-index: 1;
-  filter: contrast(1.02) saturate(1.02);
+  filter:
+    contrast(1.02)
+    saturate(1.02);
 }
 
 .subject-layer {
   z-index: 3;
   filter:
     drop-shadow(
-      0 24px 30px rgba(0, 0, 0, 0.38)
+      0 18px 24px rgba(0, 0, 0, 0.28)
     );
 }
 
+/*
+  IMPORTANT :
+  aucun pivot de la photo.
+  Le fond bouge très peu.
+  Le sujet bouge un peu plus.
+*/
+
 .background-layer.animate {
   animation:
-    bgParallax 5.2s ease-in-out infinite alternate;
+    backgroundParallax
+    5.6s
+    ease-in-out
+    infinite
+    alternate;
 }
 
 .subject-layer.animate {
   animation:
-    subjectParallax 5.2s ease-in-out infinite alternate;
+    subjectParallax
+    5.6s
+    ease-in-out
+    infinite
+    alternate;
 }
 
-@keyframes bgParallax {
+@keyframes backgroundParallax {
+
   0% {
     transform:
-      translate(-49.1%, -50%)
-      scale(1.045);
-  }
-
-  100% {
-    transform:
-      translate(-50.9%, -50%)
-      scale(1.045);
-  }
-}
-
-@keyframes subjectParallax {
-  0% {
-    transform:
-      translate(-54.4%, -50%)
-      scale(1.060);
+      translate(-49.6%, -50%)
+      scale(1.030);
   }
 
   50% {
     transform:
       translate(-50%, -50%)
-      scale(1.045);
+      scale(1.025);
   }
 
   100% {
     transform:
-      translate(-45.6%, -50%)
-      scale(1.060);
+      translate(-50.4%, -50%)
+      scale(1.030);
   }
+}
+
+@keyframes subjectParallax {
+
+  0% {
+    transform:
+      translate(-52.1%, -50%)
+      scale(1.045);
+  }
+
+  50% {
+    transform:
+      translate(-50%, -50%)
+      scale(1.035);
+  }
+
+  100% {
+    transform:
+      translate(-47.9%, -50%)
+      scale(1.045);
+  }
+}
+
+/*
+  Petit décalage d'ombre :
+  donne une sensation de sujet plus proche,
+  sans faire "sticker".
+*/
+
+.subject-layer.ready {
+  transition:
+    filter 0.3s ease;
+}
+
+.subject-layer.animate {
+  filter:
+    drop-shadow(
+      0 22px 28px rgba(0, 0, 0, 0.34)
+    );
 }
 
 .light {
@@ -290,13 +341,14 @@ button:disabled {
   top: 50%;
   width: 55%;
   height: 70%;
-  transform: translate(-50%, -50%);
+  transform:
+    translate(-50%, -50%);
   border-radius: 50%;
   background:
     radial-gradient(
       ellipse,
-      rgba(56, 143, 255, 0.13),
-      rgba(17, 74, 148, 0.04) 50%,
+      rgba(56, 143, 255, 0.11),
+      rgba(17, 74, 148, 0.035) 50%,
       transparent 72%
     );
   filter: blur(30px);
@@ -308,9 +360,13 @@ button:disabled {
   position: absolute;
   inset: 7%;
   border-radius: 18px;
-  border: 1px solid rgba(98, 174, 255, 0.32);
+  border:
+    1px solid
+    rgba(98, 174, 255, 0.28);
   box-shadow:
-    0 0 70px rgba(47, 125, 255, 0.10) inset;
+    0 0 70px
+    rgba(47, 125, 255, 0.08)
+    inset;
   z-index: 6;
   pointer-events: none;
 }
@@ -322,8 +378,11 @@ button:disabled {
   z-index: 7;
   padding: 9px 12px;
   border-radius: 10px;
-  background: rgba(3, 8, 16, 0.76);
-  border: 1px solid rgba(75, 119, 177, 0.45);
+  background:
+    rgba(3, 8, 16, 0.76);
+  border:
+    1px solid
+    rgba(75, 119, 177, 0.45);
   color: #dcecff;
   font-size: 13px;
   backdrop-filter: blur(10px);
