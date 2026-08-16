@@ -1,124 +1,139 @@
 import * as THREE from "https://esm.sh/three@0.169.0";
 
-
 let scene;
 let camera;
 let renderer;
 let viewer;
-let mesh;
+
+let subjectMesh = null;
+let backgroundMesh = null;
 
 let depthEstimator = null;
-let uniforms = null;
 
-let imageAspect = 1.5;
+let subjectUniforms = null;
 
 let animationFrame = 0;
 let animationStart = 0;
 
 
+/* =========================
+   CHARGEMENT IMAGE
+========================= */
 
 function fileToImage(file) {
 
-  return new Promise(
-    (resolve, reject) => {
+  return new Promise((resolve, reject) => {
 
-      const url =
-        URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
 
-      const image =
-        new Image();
+    const image = new Image();
 
+    image.onload = () => {
 
-      image.onload = () => {
+      URL.revokeObjectURL(url);
 
-        URL.revokeObjectURL(url);
+      resolve(image);
+    };
 
-        resolve(image);
-      };
+    image.onerror = () => {
 
+      URL.revokeObjectURL(url);
 
-      image.onerror = () => {
+      reject(
+        new Error(
+          "Impossible de lire la photo."
+        )
+      );
+    };
 
-        URL.revokeObjectURL(url);
-
-        reject(
-          new Error(
-            "Impossible de lire la photo."
-          )
-        );
-      };
-
-
-      image.src = url;
-    }
-  );
+    image.src = url;
+  });
 }
 
 
+function blobToImage(blob) {
 
-async function getEstimator(
-  setStatus
-) {
+  return new Promise((resolve, reject) => {
+
+    const url = URL.createObjectURL(blob);
+
+    const image = new Image();
+
+    image.onload = () => {
+
+      URL.revokeObjectURL(url);
+
+      resolve(image);
+    };
+
+    image.onerror = () => {
+
+      URL.revokeObjectURL(url);
+
+      reject(
+        new Error(
+          "Impossible de lire le sujet détouré."
+        )
+      );
+    };
+
+    image.src = url;
+  });
+}
+
+
+/* =========================
+   DEPTH ANYTHING
+========================= */
+
+async function getEstimator(setStatus) {
 
   if (depthEstimator) {
     return depthEstimator;
   }
 
-
   setStatus(
     "Chargement du moteur de profondeur…",
-    10
+    40
   );
-
 
   const {
     pipeline,
     env
-  } =
-    await import(
-      "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
-    );
+  } = await import(
+    "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
+  );
 
+  env.allowLocalModels = false;
 
-  env.allowLocalModels =
-    false;
-
-
-  depthEstimator =
-    await pipeline(
-      "depth-estimation",
-      "onnx-community/depth-anything-v2-small",
-      {
-        dtype: "q4"
-      }
-    );
-
+  depthEstimator = await pipeline(
+    "depth-estimation",
+    "onnx-community/depth-anything-v2-small",
+    {
+      dtype: "q4"
+    }
+  );
 
   return depthEstimator;
 }
 
 
+/* =========================
+   DEPTH MAP
+========================= */
 
-function percentile(
-  values,
-  amount
-) {
+function percentile(values, amount) {
 
   const sorted =
-    Array
-      .from(values)
-      .sort(
-        (a, b) =>
-          a - b
-      );
-
+    Array.from(values).sort(
+      (a, b) => a - b
+    );
 
   const index =
     Math.max(
       0,
       Math.min(
         sorted.length - 1,
-
         Math.floor(
           (sorted.length - 1) *
           amount
@@ -126,10 +141,8 @@ function percentile(
       )
     );
 
-
   return sorted[index];
 }
-
 
 
 function createDepthCanvas(
@@ -139,10 +152,7 @@ function createDepthCanvas(
 ) {
 
   const source =
-    document.createElement(
-      "canvas"
-    );
-
+    document.createElement("canvas");
 
   source.width =
     rawDepth.width;
@@ -150,12 +160,8 @@ function createDepthCanvas(
   source.height =
     rawDepth.height;
 
-
   const sourceContext =
-    source.getContext(
-      "2d"
-    );
-
+    source.getContext("2d");
 
   const sourceData =
     sourceContext.createImageData(
@@ -175,25 +181,17 @@ function createDepthCanvas(
     const value =
       rawDepth.data[i];
 
+    sourceData.data[i * 4] =
+      value;
 
-    sourceData.data[
-      i * 4
-    ] = value;
+    sourceData.data[i * 4 + 1] =
+      value;
 
+    sourceData.data[i * 4 + 2] =
+      value;
 
-    sourceData.data[
-      i * 4 + 1
-    ] = value;
-
-
-    sourceData.data[
-      i * 4 + 2
-    ] = value;
-
-
-    sourceData.data[
-      i * 4 + 3
-    ] = 255;
+    sourceData.data[i * 4 + 3] =
+      255;
   }
 
 
@@ -204,12 +202,8 @@ function createDepthCanvas(
   );
 
 
-
   const canvas =
-    document.createElement(
-      "canvas"
-    );
-
+    document.createElement("canvas");
 
   canvas.width =
     width;
@@ -217,20 +211,17 @@ function createDepthCanvas(
   canvas.height =
     height;
 
-
   const context =
-    canvas.getContext(
-      "2d"
-    );
+    canvas.getContext("2d");
 
 
   /*
-    Lissage léger de la profondeur uniquement.
-    La photo elle-même reste parfaitement nette.
+    On lisse légèrement la profondeur,
+    pas la photographie.
   */
 
   context.filter =
-    "blur(3px)";
+    "blur(2px)";
 
 
   context.drawImage(
@@ -253,8 +244,7 @@ function createDepthCanvas(
 
   const values =
     new Uint8Array(
-      width *
-      height
+      width * height
     );
 
 
@@ -271,13 +261,11 @@ function createDepthCanvas(
   }
 
 
-
   let low =
     percentile(
       values,
       0.04
     );
-
 
   let high =
     percentile(
@@ -289,111 +277,8 @@ function createDepthCanvas(
   if (high <= low) {
 
     low = 0;
-
     high = 255;
   }
-
-
-
-  function average(
-    x0,
-    y0,
-    x1,
-    y1
-  ) {
-
-    let sum = 0;
-    let count = 0;
-
-
-    for (
-      let y =
-        Math.floor(y0);
-
-      y <
-        Math.floor(y1);
-
-      y += 7
-    ) {
-
-      for (
-        let x =
-          Math.floor(x0);
-
-        x <
-          Math.floor(x1);
-
-        x += 7
-      ) {
-
-        sum +=
-          values[
-            y *
-            width +
-            x
-          ];
-
-
-        count++;
-      }
-    }
-
-
-    return (
-      sum /
-      Math.max(
-        1,
-        count
-      )
-    );
-  }
-
-
-
-  const center =
-    average(
-      width * 0.25,
-      height * 0.12,
-      width * 0.75,
-      height * 0.90
-    );
-
-
-  const border =
-    (
-      average(
-        0,
-        0,
-        width,
-        height * 0.12
-      ) +
-
-      average(
-        0,
-        height * 0.88,
-        width,
-        height
-      ) +
-
-      average(
-        0,
-        0,
-        width * 0.12,
-        height
-      ) +
-
-      average(
-        width * 0.88,
-        0,
-        width,
-        height
-      )
-    ) / 4;
-
-
-  const invert =
-    center < border;
-
 
 
   for (
@@ -423,52 +308,30 @@ function createDepthCanvas(
       );
 
 
-    if (invert) {
-
-      depth =
-        1 - depth;
-    }
-
-
-    /*
-      Courbe moins agressive que V17.
-
-      On conserve les différences importantes
-      sans amplifier les petits écarts parasites.
-    */
-
     depth =
       Math.pow(
         depth,
-        1.18
+        1.08
       );
 
 
     const value =
       Math.round(
-        depth *
-        255
+        depth * 255
       );
 
 
-    imageData.data[
-      i * 4
-    ] = value;
+    imageData.data[i * 4] =
+      value;
 
+    imageData.data[i * 4 + 1] =
+      value;
 
-    imageData.data[
-      i * 4 + 1
-    ] = value;
+    imageData.data[i * 4 + 2] =
+      value;
 
-
-    imageData.data[
-      i * 4 + 2
-    ] = value;
-
-
-    imageData.data[
-      i * 4 + 3
-    ] = 255;
+    imageData.data[i * 4 + 3] =
+      255;
   }
 
 
@@ -483,6 +346,9 @@ function createDepthCanvas(
 }
 
 
+/* =========================
+   INITIALISATION THREE.JS
+========================= */
 
 export async function init(
   targetViewer
@@ -516,11 +382,6 @@ export async function init(
     );
 
 
-  /*
-    Distance fixe :
-    aucun zoom avant/arrière.
-  */
-
   camera.position.set(
     0,
     0,
@@ -531,7 +392,7 @@ export async function init(
   renderer =
     new THREE.WebGLRenderer({
       antialias: true,
-      preserveDrawingBuffer: true
+      alpha: false
     });
 
 
@@ -562,7 +423,6 @@ export async function init(
 }
 
 
-
 function resize() {
 
   if (
@@ -591,58 +451,46 @@ function resize() {
 
 
   camera.aspect =
-    width /
-    height;
+    width / height;
 
 
   camera.updateProjectionMatrix();
 }
 
 
+/* =========================
+   CONSTRUCTION V19
+========================= */
 
 export async function build(
-  file,
+  photoFile,
+  subjectBlob,
   setStatus
 ) {
 
-  setStatus(
-    "1/3 Lecture de la photo…",
-    8
-  );
-
-
   const image =
     await fileToImage(
-      file
+      photoFile
     );
 
 
-  imageAspect =
+  const subjectImage =
+    await blobToImage(
+      subjectBlob
+    );
+
+
+  const imageAspect =
     image.naturalWidth /
     image.naturalHeight;
 
 
-
-  setStatus(
-    "2/3 Analyse de profondeur et des contours…",
-    25
-  );
-
-
-  const estimator =
-    await getEstimator(
-      setStatus
-    );
-
-
-  const maxSide =
-    720;
+  const maxSide = 720;
 
 
   const scale =
     Math.min(
       1,
-
       maxSide /
       Math.max(
         image.naturalWidth,
@@ -654,7 +502,6 @@ export async function build(
   const width =
     Math.max(
       64,
-
       Math.round(
         image.naturalWidth *
         scale
@@ -665,7 +512,6 @@ export async function build(
   const height =
     Math.max(
       64,
-
       Math.round(
         image.naturalHeight *
         scale
@@ -673,20 +519,32 @@ export async function build(
     );
 
 
-  const temporaryCanvas =
+  setStatus(
+    "Analyse de la profondeur interne…",
+    52
+  );
+
+
+  const estimator =
+    await getEstimator(
+      setStatus
+    );
+
+
+  const tempCanvas =
     document.createElement(
       "canvas"
     );
 
 
-  temporaryCanvas.width =
+  tempCanvas.width =
     width;
 
-  temporaryCanvas.height =
+  tempCanvas.height =
     height;
 
 
-  temporaryCanvas
+  tempCanvas
     .getContext("2d")
     .drawImage(
       image,
@@ -697,91 +555,128 @@ export async function build(
     );
 
 
-  const blob =
+  const depthBlob =
     await new Promise(
       resolve =>
-        temporaryCanvas.toBlob(
+        tempCanvas.toBlob(
           resolve,
           "image/jpeg",
-          0.92
+          0.9
         )
     );
 
 
-  if (!blob) {
+  if (!depthBlob) {
 
     throw new Error(
-      "Impossible de préparer la photo."
+      "Impossible de préparer l'analyse de profondeur."
     );
   }
 
 
-  const url =
+  const depthURL =
     URL.createObjectURL(
-      blob
+      depthBlob
     );
 
 
-  let result;
+  let depthResult;
 
 
   try {
 
-    result =
+    depthResult =
       await estimator(
-        url
+        depthURL
       );
   }
 
   finally {
 
     URL.revokeObjectURL(
-      url
+      depthURL
     );
   }
-
 
 
   setStatus(
-    "3/3 Construction du relief anti-dédoublement…",
-    72
+    "Protection de la silhouette…",
+    68
   );
 
 
-  if (mesh) {
+  /*
+    Nettoyage ancienne scène
+  */
+
+  if (subjectMesh) {
 
     scene.remove(
-      mesh
+      subjectMesh
     );
 
+    subjectMesh.geometry.dispose();
 
-    mesh.geometry.dispose();
-
-
-    mesh.material.dispose();
+    subjectMesh.material.dispose();
   }
 
 
+  if (backgroundMesh) {
 
-  const imageTexture =
+    scene.remove(
+      backgroundMesh
+    );
+
+    backgroundMesh.geometry.dispose();
+
+    backgroundMesh.material.dispose();
+  }
+
+
+  /*
+    Texture photo originale
+  */
+
+  const backgroundTexture =
     new THREE.Texture(
       image
     );
 
 
-  imageTexture.needsUpdate =
+  backgroundTexture.needsUpdate =
     true;
 
 
-  imageTexture.colorSpace =
+  backgroundTexture.colorSpace =
     THREE.SRGBColorSpace;
 
 
+  /*
+    Texture sujet détouré
+  */
+
+  const subjectTexture =
+    new THREE.Texture(
+      subjectImage
+    );
+
+
+  subjectTexture.needsUpdate =
+    true;
+
+
+  subjectTexture.colorSpace =
+    THREE.SRGBColorSpace;
+
+
+  /*
+    Depth texture
+  */
 
   const depthTexture =
     new THREE.CanvasTexture(
       createDepthCanvas(
-        result.depth,
+        depthResult.depth,
         width,
         height
       )
@@ -796,32 +691,80 @@ export async function build(
     THREE.LinearFilter;
 
 
+  /*
+    Dimensions scène
+  */
 
-  uniforms = {
+  const planeHeight =
+    2.72;
+
+
+  const planeWidth =
+    planeHeight *
+    imageAspect;
+
+
+  /*
+    =========================
+    FOND
+    =========================
+
+    La photo originale reste derrière.
+
+    Elle bouge extrêmement peu.
+  */
+
+  const backgroundGeometry =
+    new THREE.PlaneGeometry(
+      planeWidth,
+      planeHeight,
+      1,
+      1
+    );
+
+
+  const backgroundMaterial =
+    new THREE.MeshBasicMaterial({
+      map:
+        backgroundTexture,
+
+      side:
+        THREE.DoubleSide
+    });
+
+
+  backgroundMesh =
+    new THREE.Mesh(
+      backgroundGeometry,
+      backgroundMaterial
+    );
+
+
+  backgroundMesh.position.z =
+    -0.12;
+
+
+  scene.add(
+    backgroundMesh
+  );
+
+
+  /*
+    =========================
+    SUJET
+    =========================
+  */
+
+  subjectUniforms = {
 
     uImage: {
       value:
-        imageTexture
+        subjectTexture
     },
 
     uDepth: {
       value:
         depthTexture
-    },
-
-    /*
-      Taille d'un pixel dans la depth map.
-
-      Permet de comparer la profondeur
-      autour de chaque point.
-    */
-
-    uTexel: {
-      value:
-        new THREE.Vector2(
-          1 / width,
-          1 / height
-        )
     },
 
     uView: {
@@ -830,48 +773,47 @@ export async function build(
     },
 
     /*
-      Relief légèrement réduit
-      par rapport à V17.
+      Relief interne volontairement modéré.
     */
 
     uDepthScale: {
       value:
-        0.42
+        0.24
     },
 
-    /*
-      Parallaxe interne.
-
-      Suffisante pour voir la profondeur,
-      mais moins agressive.
-    */
-
-    uRelief: {
+    uParallax: {
       value:
-        0.095
+        0.055
     }
   };
 
 
-
-  const material =
+  const subjectMaterial =
     new THREE.ShaderMaterial({
 
-      uniforms,
+      uniforms:
+        subjectUniforms,
+
+      transparent:
+        true,
+
+      depthWrite:
+        true,
+
+      side:
+        THREE.DoubleSide,
+
 
       vertexShader: `
 
         varying vec2 vUv;
 
+        uniform sampler2D uImage;
         uniform sampler2D uDepth;
 
-        uniform vec2 uTexel;
-
         uniform float uView;
-
         uniform float uDepthScale;
-
-        uniform float uRelief;
+        uniform float uParallax;
 
 
         void main() {
@@ -879,132 +821,59 @@ export async function build(
           vUv = uv;
 
 
-          float centerDepth =
+          /*
+            Alpha du sujet détouré.
+          */
+
+          float alpha =
+            texture2D(
+              uImage,
+              uv
+            ).a;
+
+
+          /*
+            Profondeur locale.
+          */
+
+          float depth =
             texture2D(
               uDepth,
               uv
             ).r;
 
 
-          float depthLeft =
-            texture2D(
-              uDepth,
-              uv -
-              vec2(
-                uTexel.x,
-                0.0
-              )
-            ).r;
-
-
-          float depthRight =
-            texture2D(
-              uDepth,
-              uv +
-              vec2(
-                uTexel.x,
-                0.0
-              )
-            ).r;
-
-
-          float depthUp =
-            texture2D(
-              uDepth,
-              uv +
-              vec2(
-                0.0,
-                uTexel.y
-              )
-            ).r;
-
-
-          float depthDown =
-            texture2D(
-              uDepth,
-              uv -
-              vec2(
-                0.0,
-                uTexel.y
-              )
-            ).r;
-
-
-          /*
-            Mesure de rupture de profondeur.
-
-            Plus cette valeur est forte,
-            plus on est proche d'une silhouette
-            ou d'un bord d'objet.
-          */
-
-          float edgeStrength =
-
-            abs(
-              depthRight -
-              depthLeft
-            )
-
-            +
-
-            abs(
-              depthUp -
-              depthDown
-            );
-
-
-          /*
-            Protection anti-ghosting.
-
-            Dans les zones homogènes :
-            protection ≈ 1.
-
-            Sur les silhouettes :
-            protection diminue fortement.
-          */
-
-          float protection =
-
-            1.0 -
-
-            smoothstep(
-              0.045,
-              0.16,
-              edgeStrength
-            );
-
-
-          /*
-            On ne bloque jamais totalement
-            le relief.
-
-            Même le bord conserve
-            environ 22 % du mouvement.
-          */
-
-          protection =
-            mix(
-              0.22,
-              1.0,
-              protection
-            );
-
-
-          vec3 position3D =
+          vec3 p =
             position;
 
 
           /*
-            Relief en profondeur.
+            Le relief est appliqué
+            à l'intérieur du sujet.
 
-            Réduit automatiquement
-            aux frontières.
+            Aux zones transparentes,
+            aucun déplacement utile.
           */
 
-          position3D.z +=
+          float inside =
+            smoothstep(
+              0.15,
+              0.85,
+              alpha
+            );
+
+
+          /*
+            Relief Z interne.
+
+            Beaucoup moins agressif
+            que V17/V18.
+          */
+
+          p.z +=
 
             (
-              centerDepth -
+              depth -
               0.5
             )
 
@@ -1014,35 +883,34 @@ export async function build(
 
             *
 
-            protection;
+            inside;
 
 
           /*
-            Déplacement horizontal
-            dépendant de la profondeur.
+            Micro-parallaxe interne.
 
-            Lui aussi est réduit
-            sur les contours sensibles.
+            Elle dépend de la profondeur,
+            mais reste très courte.
           */
 
-          position3D.x +=
+          p.x +=
 
             uView
 
             *
 
             (
-              centerDepth -
-              0.47
+              depth -
+              0.5
             )
 
             *
 
-            uRelief
+            uParallax
 
             *
 
-            protection;
+            inside;
 
 
           gl_Position =
@@ -1056,7 +924,7 @@ export async function build(
             *
 
             vec4(
-              position3D,
+              p,
               1.0
             );
         }
@@ -1067,83 +935,67 @@ export async function build(
 
         precision highp float;
 
-
         varying vec2 vUv;
-
 
         uniform sampler2D uImage;
 
 
         void main() {
 
-
-          /*
-            Image originale intacte.
-
-            Aucun flou,
-            aucun morphing,
-            aucune seconde texture.
-          */
-
-
-          gl_FragColor =
-
+          vec4 color =
             texture2D(
               uImage,
               vUv
             );
+
+
+          /*
+            Les pixels hors sujet
+            disparaissent réellement.
+          */
+
+          if (
+            color.a < 0.03
+          ) {
+
+            discard;
+          }
+
+
+          gl_FragColor =
+            color;
         }
-      `,
-
-
-      side:
-        THREE.DoubleSide
+      `
     });
 
 
-
-  const planeHeight =
-    2.72;
-
-
-  const planeWidth =
-    planeHeight *
-    imageAspect;
-
-
-
-  /*
-    Grille dense.
-
-    Plus dense que nécessaire pour conserver
-    des transitions progressives.
-  */
-
-  const geometry =
+  const subjectGeometry =
     new THREE.PlaneGeometry(
       planeWidth,
       planeHeight,
-      240,
-      190
+      220,
+      180
     );
 
 
-
-  mesh =
+  subjectMesh =
     new THREE.Mesh(
-      geometry,
-      material
+      subjectGeometry,
+      subjectMaterial
     );
+
+
+  subjectMesh.position.z =
+    0.04;
 
 
   scene.add(
-    mesh
+    subjectMesh
   );
 
 
-
   /*
-    Caméra fixe en profondeur.
+    Caméra totalement fixe en Z.
   */
 
   camera.position.set(
@@ -1170,39 +1022,64 @@ export async function build(
 
 
   setStatus(
-    "Aperçu V18 prêt : relief conservé, contours protégés contre le dédoublement.",
-    100
+    "Silhouette protégée. Relief interne prêt.",
+    82
   );
 }
 
 
+/* =========================
+   ANIMATION
+========================= */
 
-function setPose(
-  value
-) {
+function setPose(value) {
 
-  if (!uniforms) {
+  if (!subjectUniforms) {
     return;
   }
 
 
   /*
-    Parallaxe interne
-    via la profondeur.
+    Relief interne du sujet.
   */
 
-  uniforms.uView.value =
+  subjectUniforms.uView.value =
     value;
 
 
   /*
-    Caméra :
-    aucun mouvement en Z,
-    donc aucun zoom.
+    Fond :
+    mouvement minuscule.
+  */
+
+  if (backgroundMesh) {
+
+    backgroundMesh.position.x =
+      value * -0.006;
+  }
+
+
+  /*
+    Sujet :
+    petit déplacement global
+    + parallaxe interne.
+
+    Très inférieur aux premières versions.
+  */
+
+  if (subjectMesh) {
+
+    subjectMesh.position.x =
+      value * 0.014;
+  }
+
+
+  /*
+    AUCUN zoom.
   */
 
   camera.position.x =
-    value * 0.055;
+    value * 0.018;
 
 
   camera.position.y =
@@ -1213,14 +1090,8 @@ function setPose(
     5.6;
 
 
-  /*
-    Très légère visée horizontale.
-
-    Le centre de la scène reste quasiment fixe.
-  */
-
   camera.lookAt(
-    value * 0.012,
+    0,
     0,
     0
   );
@@ -1231,7 +1102,6 @@ function setPose(
     camera
   );
 }
-
 
 
 export function start() {
@@ -1263,11 +1133,6 @@ export function start() {
 
         5600;
 
-
-      /*
-        Mouvement sinusoïdal :
-        ralentissement naturel aux extrêmes.
-      */
 
       const position =
 
