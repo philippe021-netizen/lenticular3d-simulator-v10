@@ -1,15 +1,15 @@
 import * as THREE from "https://esm.sh/three@0.169.0";
 
+
 let scene;
 let camera;
 let renderer;
 let viewer;
 
-let subjectMesh = null;
 let backgroundMesh = null;
+let subjectMesh = null;
 
 let depthEstimator = null;
-
 let subjectUniforms = null;
 
 let animationFrame = 0;
@@ -17,68 +17,86 @@ let animationStart = 0;
 
 
 /* =========================
-   CHARGEMENT IMAGE
+   CHARGEMENT DES IMAGES
 ========================= */
 
 function fileToImage(file) {
 
-  return new Promise((resolve, reject) => {
+  return new Promise(
+    (resolve, reject) => {
 
-    const url = URL.createObjectURL(file);
+      const url =
+        URL.createObjectURL(file);
 
-    const image = new Image();
 
-    image.onload = () => {
+      const image =
+        new Image();
 
-      URL.revokeObjectURL(url);
 
-      resolve(image);
-    };
+      image.onload = () => {
 
-    image.onerror = () => {
+        URL.revokeObjectURL(url);
 
-      URL.revokeObjectURL(url);
+        resolve(image);
+      };
 
-      reject(
-        new Error(
-          "Impossible de lire la photo."
-        )
-      );
-    };
 
-    image.src = url;
-  });
+      image.onerror = () => {
+
+        URL.revokeObjectURL(url);
+
+        reject(
+          new Error(
+            "Impossible de lire la photo."
+          )
+        );
+      };
+
+
+      image.src =
+        url;
+    }
+  );
 }
 
 
 function blobToImage(blob) {
 
-  return new Promise((resolve, reject) => {
+  return new Promise(
+    (resolve, reject) => {
 
-    const url = URL.createObjectURL(blob);
+      const url =
+        URL.createObjectURL(blob);
 
-    const image = new Image();
 
-    image.onload = () => {
+      const image =
+        new Image();
 
-      URL.revokeObjectURL(url);
 
-      resolve(image);
-    };
+      image.onload = () => {
 
-    image.onerror = () => {
+        URL.revokeObjectURL(url);
 
-      URL.revokeObjectURL(url);
+        resolve(image);
+      };
 
-      reject(
-        new Error(
-          "Impossible de lire le sujet détouré."
-        )
-      );
-    };
 
-    image.src = url;
-  });
+      image.onerror = () => {
+
+        URL.revokeObjectURL(url);
+
+        reject(
+          new Error(
+            "Image générée illisible."
+          )
+        );
+      };
+
+
+      image.src =
+        url;
+    }
+  );
 }
 
 
@@ -86,48 +104,65 @@ function blobToImage(blob) {
    DEPTH ANYTHING
 ========================= */
 
-async function getEstimator(setStatus) {
+async function getEstimator(
+  setStatus
+) {
 
   if (depthEstimator) {
     return depthEstimator;
   }
 
+
   setStatus(
     "Chargement du moteur de profondeur…",
-    40
+    68
   );
+
 
   const {
     pipeline,
     env
-  } = await import(
-    "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
-  );
+  } =
+    await import(
+      "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm"
+    );
 
-  env.allowLocalModels = false;
 
-  depthEstimator = await pipeline(
-    "depth-estimation",
-    "onnx-community/depth-anything-v2-small",
-    {
-      dtype: "q4"
-    }
-  );
+  env.allowLocalModels =
+    false;
+
+
+  depthEstimator =
+    await pipeline(
+      "depth-estimation",
+      "onnx-community/depth-anything-v2-small",
+      {
+        dtype: "q4"
+      }
+    );
+
 
   return depthEstimator;
 }
 
 
 /* =========================
-   DEPTH MAP
+   OUTILS DE PROFONDEUR
 ========================= */
 
-function percentile(values, amount) {
+function percentile(
+  values,
+  amount
+) {
 
   const sorted =
-    Array.from(values).sort(
-      (a, b) => a - b
-    );
+    Array
+      .from(values)
+      .sort(
+        (a, b) =>
+          a - b
+      );
+
 
   const index =
     Math.max(
@@ -141,6 +176,7 @@ function percentile(values, amount) {
       )
     );
 
+
   return sorted[index];
 }
 
@@ -152,7 +188,10 @@ function createDepthCanvas(
 ) {
 
   const source =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   source.width =
     rawDepth.width;
@@ -160,8 +199,12 @@ function createDepthCanvas(
   source.height =
     rawDepth.height;
 
+
   const sourceContext =
-    source.getContext("2d");
+    source.getContext(
+      "2d"
+    );
+
 
   const sourceData =
     sourceContext.createImageData(
@@ -181,17 +224,25 @@ function createDepthCanvas(
     const value =
       rawDepth.data[i];
 
-    sourceData.data[i * 4] =
-      value;
 
-    sourceData.data[i * 4 + 1] =
-      value;
+    sourceData.data[
+      i * 4
+    ] = value;
 
-    sourceData.data[i * 4 + 2] =
-      value;
 
-    sourceData.data[i * 4 + 3] =
-      255;
+    sourceData.data[
+      i * 4 + 1
+    ] = value;
+
+
+    sourceData.data[
+      i * 4 + 2
+    ] = value;
+
+
+    sourceData.data[
+      i * 4 + 3
+    ] = 255;
   }
 
 
@@ -203,7 +254,10 @@ function createDepthCanvas(
 
 
   const canvas =
-    document.createElement("canvas");
+    document.createElement(
+      "canvas"
+    );
+
 
   canvas.width =
     width;
@@ -211,14 +265,12 @@ function createDepthCanvas(
   canvas.height =
     height;
 
+
   const context =
-    canvas.getContext("2d");
+    canvas.getContext(
+      "2d"
+    );
 
-
-  /*
-    On lisse légèrement la profondeur,
-    pas la photographie.
-  */
 
   context.filter =
     "blur(2px)";
@@ -244,7 +296,8 @@ function createDepthCanvas(
 
   const values =
     new Uint8Array(
-      width * height
+      width *
+      height
     );
 
 
@@ -266,6 +319,7 @@ function createDepthCanvas(
       values,
       0.04
     );
+
 
   let high =
     percentile(
@@ -311,27 +365,35 @@ function createDepthCanvas(
     depth =
       Math.pow(
         depth,
-        1.08
+        1.06
       );
 
 
     const value =
       Math.round(
-        depth * 255
+        depth *
+        255
       );
 
 
-    imageData.data[i * 4] =
-      value;
+    imageData.data[
+      i * 4
+    ] = value;
 
-    imageData.data[i * 4 + 1] =
-      value;
 
-    imageData.data[i * 4 + 2] =
-      value;
+    imageData.data[
+      i * 4 + 1
+    ] = value;
 
-    imageData.data[i * 4 + 3] =
-      255;
+
+    imageData.data[
+      i * 4 + 2
+    ] = value;
+
+
+    imageData.data[
+      i * 4 + 3
+    ] = 255;
   }
 
 
@@ -385,7 +447,7 @@ export async function init(
   camera.position.set(
     0,
     0,
-    5.6
+    5.7
   );
 
 
@@ -451,7 +513,8 @@ function resize() {
 
 
   camera.aspect =
-    width / height;
+    width /
+    height;
 
 
   camera.updateProjectionMatrix();
@@ -459,33 +522,64 @@ function resize() {
 
 
 /* =========================
-   CONSTRUCTION V19
+   CONSTRUCTION V20
 ========================= */
 
 export async function build(
   photoFile,
+  cleanBackgroundBlob,
   subjectBlob,
   setStatus
 ) {
 
-  const image =
-    await fileToImage(
-      photoFile
-    );
+  const [
+    photo,
+    cleanBackground,
+    subject
+  ] =
+    await Promise.all([
+      fileToImage(
+        photoFile
+      ),
 
+      blobToImage(
+        cleanBackgroundBlob
+      ),
 
-  const subjectImage =
-    await blobToImage(
-      subjectBlob
-    );
+      blobToImage(
+        subjectBlob
+      )
+    ]);
 
 
   const imageAspect =
-    image.naturalWidth /
-    image.naturalHeight;
+    photo.naturalWidth /
+    photo.naturalHeight;
 
 
-  const maxSide = 720;
+  const planeHeight =
+    2.75;
+
+
+  const planeWidth =
+    planeHeight *
+    imageAspect;
+
+
+  setStatus(
+    "Analyse de la profondeur du sujet…",
+    70
+  );
+
+
+  const estimator =
+    await getEstimator(
+      setStatus
+    );
+
+
+  const maxSide =
+    720;
 
 
   const scale =
@@ -493,8 +587,8 @@ export async function build(
       1,
       maxSide /
       Math.max(
-        image.naturalWidth,
-        image.naturalHeight
+        photo.naturalWidth,
+        photo.naturalHeight
       )
     );
 
@@ -503,7 +597,7 @@ export async function build(
     Math.max(
       64,
       Math.round(
-        image.naturalWidth *
+        photo.naturalWidth *
         scale
       )
     );
@@ -513,21 +607,9 @@ export async function build(
     Math.max(
       64,
       Math.round(
-        image.naturalHeight *
+        photo.naturalHeight *
         scale
       )
-    );
-
-
-  setStatus(
-    "Analyse de la profondeur interne…",
-    52
-  );
-
-
-  const estimator =
-    await getEstimator(
-      setStatus
     );
 
 
@@ -547,7 +629,7 @@ export async function build(
   tempCanvas
     .getContext("2d")
     .drawImage(
-      image,
+      photo,
       0,
       0,
       width,
@@ -569,7 +651,7 @@ export async function build(
   if (!depthBlob) {
 
     throw new Error(
-      "Impossible de préparer l'analyse de profondeur."
+      "Impossible de préparer l’analyse de profondeur."
     );
   }
 
@@ -599,27 +681,9 @@ export async function build(
   }
 
 
-  setStatus(
-    "Protection de la silhouette…",
-    68
-  );
-
-
-  /*
-    Nettoyage ancienne scène
-  */
-
-  if (subjectMesh) {
-
-    scene.remove(
-      subjectMesh
-    );
-
-    subjectMesh.geometry.dispose();
-
-    subjectMesh.material.dispose();
-  }
-
+  /* =========================
+     NETTOYAGE ANCIENNE SCÈNE
+  ========================= */
 
   if (backgroundMesh) {
 
@@ -627,19 +691,35 @@ export async function build(
       backgroundMesh
     );
 
+
     backgroundMesh.geometry.dispose();
+
 
     backgroundMesh.material.dispose();
   }
 
 
-  /*
-    Texture photo originale
-  */
+  if (subjectMesh) {
+
+    scene.remove(
+      subjectMesh
+    );
+
+
+    subjectMesh.geometry.dispose();
+
+
+    subjectMesh.material.dispose();
+  }
+
+
+  /* =========================
+     FOND RECONSTRUIT
+  ========================= */
 
   const backgroundTexture =
     new THREE.Texture(
-      image
+      cleanBackground
     );
 
 
@@ -651,13 +731,46 @@ export async function build(
     THREE.SRGBColorSpace;
 
 
+  backgroundMesh =
+    new THREE.Mesh(
+      new THREE.PlaneGeometry(
+        planeWidth,
+        planeHeight,
+        1,
+        1
+      ),
+
+      new THREE.MeshBasicMaterial({
+        map:
+          backgroundTexture,
+
+        side:
+          THREE.DoubleSide
+      })
+    );
+
+
   /*
-    Texture sujet détouré
+    Le fond est physiquement
+    un peu plus loin.
   */
+
+  backgroundMesh.position.z =
+    -0.24;
+
+
+  scene.add(
+    backgroundMesh
+  );
+
+
+  /* =========================
+     SUJET DÉTOURÉ
+  ========================= */
 
   const subjectTexture =
     new THREE.Texture(
-      subjectImage
+      subject
     );
 
 
@@ -668,10 +781,6 @@ export async function build(
   subjectTexture.colorSpace =
     THREE.SRGBColorSpace;
 
-
-  /*
-    Depth texture
-  */
 
   const depthTexture =
     new THREE.CanvasTexture(
@@ -691,70 +800,6 @@ export async function build(
     THREE.LinearFilter;
 
 
-  /*
-    Dimensions scène
-  */
-
-  const planeHeight =
-    2.72;
-
-
-  const planeWidth =
-    planeHeight *
-    imageAspect;
-
-
-  /*
-    =========================
-    FOND
-    =========================
-
-    La photo originale reste derrière.
-
-    Elle bouge extrêmement peu.
-  */
-
-  const backgroundGeometry =
-    new THREE.PlaneGeometry(
-      planeWidth,
-      planeHeight,
-      1,
-      1
-    );
-
-
-  const backgroundMaterial =
-    new THREE.MeshBasicMaterial({
-      map:
-        backgroundTexture,
-
-      side:
-        THREE.DoubleSide
-    });
-
-
-  backgroundMesh =
-    new THREE.Mesh(
-      backgroundGeometry,
-      backgroundMaterial
-    );
-
-
-  backgroundMesh.position.z =
-    -0.12;
-
-
-  scene.add(
-    backgroundMesh
-  );
-
-
-  /*
-    =========================
-    SUJET
-    =========================
-  */
-
   subjectUniforms = {
 
     uImage: {
@@ -773,17 +818,24 @@ export async function build(
     },
 
     /*
-      Relief interne volontairement modéré.
+      Relief interne.
+
+      Modéré pour éviter
+      les déformations de visage.
     */
 
     uDepthScale: {
       value:
-        0.24
+        0.20
     },
+
+    /*
+      Parallaxe interne du sujet.
+    */
 
     uParallax: {
       value:
-        0.055
+        0.050
     }
   };
 
@@ -821,20 +873,12 @@ export async function build(
           vUv = uv;
 
 
-          /*
-            Alpha du sujet détouré.
-          */
-
           float alpha =
             texture2D(
               uImage,
               uv
             ).a;
 
-
-          /*
-            Profondeur locale.
-          */
 
           float depth =
             texture2D(
@@ -843,31 +887,29 @@ export async function build(
             ).r;
 
 
+          /*
+            Protection de la silhouette.
+
+            Le déplacement 3D
+            n'agit vraiment qu'à
+            l'intérieur du sujet.
+          */
+
+          float inside =
+            smoothstep(
+              0.20,
+              0.92,
+              alpha
+            );
+
+
           vec3 p =
             position;
 
 
           /*
-            Le relief est appliqué
-            à l'intérieur du sujet.
-
-            Aux zones transparentes,
-            aucun déplacement utile.
-          */
-
-          float inside =
-            smoothstep(
-              0.15,
-              0.85,
-              alpha
-            );
-
-
-          /*
-            Relief Z interne.
-
-            Beaucoup moins agressif
-            que V17/V18.
+            Relief avant/arrière
+            uniquement à l'intérieur.
           */
 
           p.z +=
@@ -889,8 +931,9 @@ export async function build(
           /*
             Micro-parallaxe interne.
 
-            Elle dépend de la profondeur,
-            mais reste très courte.
+            La silhouette ne se dédouble plus
+            puisque le fond derrière elle
+            est maintenant reconstruit.
           */
 
           p.x +=
@@ -935,7 +978,9 @@ export async function build(
 
         precision highp float;
 
+
         varying vec2 vUv;
+
 
         uniform sampler2D uImage;
 
@@ -950,12 +995,13 @@ export async function build(
 
 
           /*
-            Les pixels hors sujet
-            disparaissent réellement.
+            Tout ce qui est transparent
+            disparaît réellement.
           */
 
           if (
-            color.a < 0.03
+            color.a <
+            0.025
           ) {
 
             discard;
@@ -985,8 +1031,12 @@ export async function build(
     );
 
 
+  /*
+    Sujet devant le décor.
+  */
+
   subjectMesh.position.z =
-    0.04;
+    0.10;
 
 
   scene.add(
@@ -994,14 +1044,14 @@ export async function build(
   );
 
 
-  /*
-    Caméra totalement fixe en Z.
-  */
+  /* =========================
+     CAMÉRA
+  ========================= */
 
   camera.position.set(
     0,
     0,
-    5.6
+    5.7
   );
 
 
@@ -1022,8 +1072,8 @@ export async function build(
 
 
   setStatus(
-    "Silhouette protégée. Relief interne prêt.",
-    82
+    "Fond propre et sujet séparé : scène prête.",
+    84
   );
 }
 
@@ -1032,7 +1082,9 @@ export async function build(
    ANIMATION
 ========================= */
 
-function setPose(value) {
+function setPose(
+  value
+) {
 
   if (!subjectUniforms) {
     return;
@@ -1048,38 +1100,44 @@ function setPose(value) {
 
 
   /*
-    Fond :
-    mouvement minuscule.
+    Le fond bouge légèrement
+    dans le sens opposé.
   */
 
   if (backgroundMesh) {
 
     backgroundMesh.position.x =
-      value * -0.006;
+      -value *
+      0.022;
   }
 
 
   /*
-    Sujet :
-    petit déplacement global
-    + parallaxe interne.
+    Le sujet bouge davantage.
 
-    Très inférieur aux premières versions.
+    Maintenant c'est possible,
+    car son ancienne silhouette
+    n'existe plus dans le fond.
   */
 
   if (subjectMesh) {
 
     subjectMesh.position.x =
-      value * 0.014;
+      value *
+      0.075;
   }
 
 
   /*
-    AUCUN zoom.
+    Caméra :
+    déplacement latéral seulement.
+
+    Aucun zoom.
   */
 
   camera.position.x =
-    value * 0.018;
+    value *
+    0.045;
 
 
   camera.position.y =
@@ -1087,7 +1145,7 @@ function setPose(value) {
 
 
   camera.position.z =
-    5.6;
+    5.7;
 
 
   camera.lookAt(
