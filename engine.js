@@ -356,12 +356,6 @@ function createDepthCanvas(
       );
 
 
-    /*
-      Courbe douce :
-      évite de transformer chaque détail
-      en bosse exagérée.
-    */
-
     depth =
       Math.pow(
         depth,
@@ -692,12 +686,6 @@ export async function build(
     );
 
 
-  /*
-    ==========================
-    DEPTH DU FOND
-    ==========================
-  */
-
   setStatus(
     "Analyse du relief du décor…",
     69
@@ -711,12 +699,6 @@ export async function build(
     );
 
 
-  /*
-    ==========================
-    DEPTH DU SUJET
-    ==========================
-  */
-
   setStatus(
     "Analyse du relief du premier plan…",
     75
@@ -729,10 +711,6 @@ export async function build(
       estimator
     );
 
-
-  /*
-    Nettoyage scène précédente
-  */
 
   if (backgroundMesh) {
 
@@ -811,11 +789,6 @@ export async function build(
         backgroundDepthTexture
     },
 
-    /*
-      Le décor possède du relief,
-      mais moins que le premier plan.
-    */
-
     uDepthScale: {
       value:
         0.20
@@ -857,13 +830,6 @@ export async function build(
           vec3 p =
             position;
 
-
-          /*
-            Le fond n'est plus plat.
-
-            Les bâtiments, arbres, sol,
-            horizon participent au relief.
-          */
 
           p.z +=
             (
@@ -913,10 +879,6 @@ export async function build(
     });
 
 
-  /*
-    Grille dense du décor.
-  */
-
   const backgroundGeometry =
     new THREE.PlaneGeometry(
       planeWidth,
@@ -932,10 +894,6 @@ export async function build(
       backgroundMaterial
     );
 
-
-  /*
-    Fond réellement derrière.
-  */
 
   backgroundMesh.position.z =
     -0.30;
@@ -995,11 +953,6 @@ export async function build(
         subjectDepthTexture
     },
 
-    /*
-      Le premier plan reçoit
-      davantage de relief que le fond.
-    */
-
     uDepthScale: {
       value:
         0.34
@@ -1052,11 +1005,6 @@ export async function build(
               uv
             ).r;
 
-
-          /*
-            La géométrie n'agit presque pas
-            à la frontière transparente.
-          */
 
           float inside =
             smoothstep(
@@ -1154,10 +1102,6 @@ export async function build(
     );
 
 
-  /*
-    Sujet devant le décor.
-  */
-
   subjectMesh.position.z =
     0.12;
 
@@ -1166,13 +1110,6 @@ export async function build(
     subjectMesh
   );
 
-
-  /*
-    IMPORTANT :
-
-    aucune couche ne bougera
-    pendant l'animation.
-  */
 
   backgroundMesh.position.x =
     0;
@@ -1189,10 +1126,6 @@ export async function build(
   subjectMesh.rotation.y =
     0;
 
-
-  /*
-    Caméra initiale.
-  */
 
   cameraRadius =
     5.8;
@@ -1245,17 +1178,13 @@ function setPose(
 
 
   /*
-    Angle maximal.
-
-    ±4 degrés environ.
-
-    On pourra l'augmenter ensuite
-    si le fond reconstruit tient bien.
+    Angle augmenté :
+    ±7 degrés.
   */
 
   const maxAngle =
     THREE.MathUtils.degToRad(
-      4
+      7
     );
 
 
@@ -1265,10 +1194,9 @@ function setPose(
 
 
   /*
-    Orbite autour de l'axe vertical.
-
-    Rayon constant :
-    pas de zoom avant/arrière.
+    Orbite pure :
+    rayon constant,
+    aucune translation des calques.
   */
 
   camera.position.x =
@@ -1289,21 +1217,12 @@ function setPose(
     cameraRadius;
 
 
-  /*
-    La caméra regarde toujours
-    le centre de la scène.
-  */
-
   camera.lookAt(
     0,
     0,
     0
   );
 
-
-  /*
-    Fond et sujet RESTENT IMMOBILES.
-  */
 
   renderer.render(
     scene,
@@ -1345,11 +1264,6 @@ export function start() {
 
         6000;
 
-
-      /*
-        Mouvement très doux,
-        aller-retour.
-      */
 
       const position =
 
