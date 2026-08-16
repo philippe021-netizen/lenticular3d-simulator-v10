@@ -522,7 +522,7 @@ function resize() {
 
 
 /* =========================
-   CONSTRUCTION V20
+   CONSTRUCTION V21
 ========================= */
 
 export async function build(
@@ -681,10 +681,6 @@ export async function build(
   }
 
 
-  /* =========================
-     NETTOYAGE ANCIENNE SCÈNE
-  ========================= */
-
   if (backgroundMesh) {
 
     scene.remove(
@@ -750,11 +746,6 @@ export async function build(
     );
 
 
-  /*
-    Le fond est physiquement
-    un peu plus loin.
-  */
-
   backgroundMesh.position.z =
     -0.24;
 
@@ -817,25 +808,14 @@ export async function build(
         0
     },
 
-    /*
-      Relief interne.
-
-      Modéré pour éviter
-      les déformations de visage.
-    */
-
     uDepthScale: {
       value:
-        0.20
+        0.22
     },
-
-    /*
-      Parallaxe interne du sujet.
-    */
 
     uParallax: {
       value:
-        0.050
+        0.085
     }
   };
 
@@ -888,17 +868,15 @@ export async function build(
 
 
           /*
-            Protection de la silhouette.
-
-            Le déplacement 3D
-            n'agit vraiment qu'à
-            l'intérieur du sujet.
+            Le contour est protégé :
+            la profondeur agit surtout
+            à l'intérieur du sujet.
           */
 
           float inside =
             smoothstep(
-              0.20,
-              0.92,
+              0.18,
+              0.94,
               alpha
             );
 
@@ -908,8 +886,7 @@ export async function build(
 
 
           /*
-            Relief avant/arrière
-            uniquement à l'intérieur.
+            Relief interne en Z.
           */
 
           p.z +=
@@ -929,11 +906,11 @@ export async function build(
 
 
           /*
-            Micro-parallaxe interne.
+            Le changement de point de vue
+            se fait maintenant ici.
 
-            La silhouette ne se dédouble plus
-            puisque le fond derrière elle
-            est maintenant reconstruit.
+            Aucun déplacement global
+            du calque sujet.
           */
 
           p.x +=
@@ -994,11 +971,6 @@ export async function build(
             );
 
 
-          /*
-            Tout ce qui est transparent
-            disparaît réellement.
-          */
-
           if (
             color.a <
             0.025
@@ -1019,8 +991,8 @@ export async function build(
     new THREE.PlaneGeometry(
       planeWidth,
       planeHeight,
-      220,
-      180
+      240,
+      190
     );
 
 
@@ -1032,11 +1004,15 @@ export async function build(
 
 
   /*
-    Sujet devant le décor.
+    Le sujet reste toujours
+    à la même position globale.
   */
 
-  subjectMesh.position.z =
-    0.10;
+  subjectMesh.position.set(
+    0,
+    0,
+    0.10
+  );
 
 
   scene.add(
@@ -1072,7 +1048,7 @@ export async function build(
 
 
   setStatus(
-    "Fond propre et sujet séparé : scène prête.",
+    "V21 prête : sujet fixe, changement de perspective interne.",
     84
   );
 }
@@ -1092,7 +1068,8 @@ function setPose(
 
 
   /*
-    Relief interne du sujet.
+    C'est ici que se crée
+    le changement de perspective.
   */
 
   subjectUniforms.uView.value =
@@ -1100,44 +1077,41 @@ function setPose(
 
 
   /*
-    Le fond bouge légèrement
-    dans le sens opposé.
+    Fond presque fixe.
+
+    Juste un déplacement minuscule
+    pour renforcer la séparation.
   */
 
   if (backgroundMesh) {
 
     backgroundMesh.position.x =
       -value *
-      0.022;
+      0.008;
   }
 
 
   /*
-    Le sujet bouge davantage.
-
-    Maintenant c'est possible,
-    car son ancienne silhouette
-    n'existe plus dans le fond.
+    Sujet :
+    AUCUN déplacement global.
   */
 
   if (subjectMesh) {
 
     subjectMesh.position.x =
-      value *
-      0.075;
+      0;
   }
 
 
   /*
-    Caméra :
-    déplacement latéral seulement.
+    Caméra latérale très faible.
 
     Aucun zoom.
   */
 
   camera.position.x =
     value *
-    0.045;
+    0.025;
 
 
   camera.position.y =
