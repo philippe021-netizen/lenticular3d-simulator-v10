@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aperçu lenticulaire 3D</title>
+  <title>Simulation client 3D</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 
@@ -14,8 +14,8 @@
     <header>
       <h1>Simulation client</h1>
       <p>
-        Ajoutez une photo. La visionneuse crée automatiquement
-        un aperçu 3D animé de l'effet lenticulaire.
+        Ajoutez une photo et visualisez immédiatement
+        un aperçu animé de l'effet lenticulaire.
       </p>
     </header>
 
@@ -34,19 +34,11 @@
           >
         </div>
 
-        <div class="preview-small">
-          <img
-            id="sourcePreview"
-            alt="Photo sélectionnée"
-            style="display:none;"
-          >
-        </div>
-
-        <button id="createButton" type="button" disabled>
+        <button id="generateBtn" disabled>
           Créer l’aperçu 3D
         </button>
 
-        <button id="gifButton" type="button" disabled>
+        <button id="gifBtn" disabled>
           Créer le GIF démo
         </button>
 
@@ -54,44 +46,35 @@
           Chargez une photo pour commencer.
         </div>
 
-        <div class="info-box">
-          <strong>Aperçu lenticulaire</strong>
-          <p>
-            Simulation visuelle destinée à donner une idée
-            immédiate du relief et du mouvement.
-          </p>
-          <p>
-            Le résultat imprimé final peut varier.
-          </p>
+        <div class="disclaimer">
+          Simulation visuelle destinée à présenter l’effet.
+          Le rendu lenticulaire imprimé final peut varier.
         </div>
 
       </aside>
 
-      <section class="viewer">
+      <section class="preview-panel">
 
-        <div id="viewerStage">
+        <div class="preview-stage">
 
-          <div id="depthScene">
+          <div class="depth-glow"></div>
 
-            <div id="backgroundLayer"></div>
-
-            <div id="middleLayer"></div>
-
-            <div id="subjectLayer"></div>
-
-          </div>
-
-          <div id="emptyMessage">
+          <div id="placeholder" class="preview-placeholder">
             <strong>Votre aperçu 3D apparaîtra ici</strong>
             <span>
-              Ajoutez une photo puis lancez la simulation.
+              Choisissez une photo puis lancez la simulation.
             </span>
           </div>
 
-        </div>
+          <img
+            id="photoLayer"
+            alt="Aperçu lenticulaire"
+          >
 
-        <div class="viewer-caption">
-          Aperçu automatique • profondeur renforcée • mouvement doux
+          <div class="preview-label">
+            Aperçu automatique • mouvement gauche ↔ droite
+          </div>
+
         </div>
 
       </section>
