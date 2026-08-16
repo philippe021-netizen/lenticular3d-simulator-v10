@@ -113,15 +113,19 @@ input[type="file"] {
   border: 1px solid #243957;
 }
 
-button {
+button,
+.download-video {
   width: 100%;
   min-height: 50px;
-  border: 0;
   border-radius: 13px;
   margin-top: 14px;
   padding: 12px 16px;
   font-size: 16px;
   font-weight: 700;
+}
+
+button {
+  border: 0;
   cursor: pointer;
   color: #ffffff;
   background:
@@ -135,6 +139,26 @@ button {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+#exportVideoBtn {
+  background: #11213a;
+  border: 1px solid #2d4d78;
+  color: #eaf4ff;
+}
+
+.download-video {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: #ffffff;
+  background:
+    linear-gradient(
+      135deg,
+      #0f8f5c,
+      #23c47e
+    );
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
 #status {
@@ -235,7 +259,6 @@ button:disabled {
 }
 
 @media (max-width: 820px) {
-
   header {
     align-items: flex-start;
     flex-direction: column;
