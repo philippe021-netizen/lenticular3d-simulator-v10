@@ -1179,12 +1179,12 @@ function setPose(
 
   /*
     Angle augmenté :
-    ±10 degrés.
+    ±12 degrés.
   */
 
   const maxAngle =
     THREE.MathUtils.degToRad(
-      10
+      12
     );
 
 
