@@ -31,6 +31,9 @@ const placeholder =
 const productStage =
   document.getElementById("productStage");
 
+const productShell =
+  document.getElementById("productShell");
+
 const supportLabel =
   document.getElementById("supportLabel");
 
@@ -52,6 +55,120 @@ let simulationReady = false;
 
 let selectedSupport =
   "medallion-cat";
+
+
+/* =========================================
+   ROTATION DU SUPPORT
+========================================= */
+
+let shellAnimationFrame = 0;
+
+let shellAnimationStart = 0;
+
+
+function stopProductShellRotation() {
+
+  if (shellAnimationFrame) {
+
+    cancelAnimationFrame(
+      shellAnimationFrame
+    );
+
+    shellAnimationFrame =
+      0;
+  }
+
+
+  if (productShell) {
+
+    productShell.style.transform =
+      "";
+  }
+}
+
+
+function startProductShellRotation() {
+
+  if (!productShell) {
+    return;
+  }
+
+
+  stopProductShellRotation();
+
+
+  shellAnimationStart =
+    performance.now();
+
+
+  const animateShell =
+    currentTime => {
+
+
+      const elapsed =
+        (
+          currentTime -
+          shellAnimationStart
+        )
+        /
+        6000;
+
+
+      const position =
+        Math.sin(
+          elapsed *
+          Math.PI *
+          2
+        );
+
+
+      /*
+        La simulation interne
+        tourne à ±12°.
+
+        Le support physique tourne
+        volontairement moins :
+        ±6°.
+      */
+
+      const shellAngle =
+        position *
+        6;
+
+
+      /*
+        Petite variation d'épaisseur
+        purement visuelle.
+      */
+
+      const scaleX =
+        1 -
+        Math.abs(
+          position
+        ) *
+        0.018;
+
+
+      productShell.style.transform =
+        `
+          perspective(1200px)
+          rotateY(${shellAngle}deg)
+          scaleX(${scaleX})
+        `;
+
+
+      shellAnimationFrame =
+        requestAnimationFrame(
+          animateShell
+        );
+    };
+
+
+  shellAnimationFrame =
+    requestAnimationFrame(
+      animateShell
+    );
+}
 
 
 /* =========================================
@@ -145,10 +262,6 @@ function selectSupport(
     supportName;
 
 
-  /*
-    Boutons actifs
-  */
-
   supportButtons.forEach(
     button => {
 
@@ -165,10 +278,6 @@ function selectSupport(
   );
 
 
-  /*
-    Forme du produit
-  */
-
   productStage.classList.remove(
     "support-medallion-cat",
     "support-medallion-dog",
@@ -182,21 +291,9 @@ function selectSupport(
   );
 
 
-  /*
-    Nom affiché
-  */
-
   supportLabel.textContent =
     support.label;
 
-
-  /*
-    Le canvas Three.js existe déjà.
-
-    On ne refait PAS Stability.
-    On demande simplement au navigateur
-    de recalculer les dimensions.
-  */
 
   requestAnimationFrame(
     () => {
@@ -224,8 +321,16 @@ function selectSupport(
 
   if (simulationReady) {
 
+    /*
+      La rotation continue
+      avec le nouveau support.
+    */
+
+    startProductShellRotation();
+
+
     setStatus(
-      `${support.label} sélectionné. La simulation 3D existante est réutilisée sans nouveau calcul IA.`,
+      `${support.label} sélectionné. La simulation existante est réutilisée sans nouveau calcul IA.`,
       100
     );
   }
@@ -241,7 +346,7 @@ function selectSupport(
 
 
 /* =========================================
-   CLIC SUR SUPPORT
+   CLIC SUPPORT
 ========================================= */
 
 supportButtons.forEach(
@@ -314,7 +419,6 @@ async function compressImage(
     const scale =
       Math.min(
         1,
-
         maxSide /
         Math.max(
           image.naturalWidth,
@@ -326,7 +430,6 @@ async function compressImage(
     const width =
       Math.max(
         64,
-
         Math.round(
           image.naturalWidth *
           scale
@@ -337,7 +440,6 @@ async function compressImage(
     const height =
       Math.max(
         64,
-
         Math.round(
           image.naturalHeight *
           scale
@@ -522,7 +624,7 @@ function blobToImage(
 
 
 /* =========================================
-   MASQUE POUR EFFACER LE SUJET
+   MASQUE
 ========================================= */
 
 async function makeEraseMask(
@@ -749,7 +851,7 @@ async function makeEraseMask(
 
 
 /* =========================================
-   MOTEUR 3D
+   MOTEUR
 ========================================= */
 
 async function getEngine() {
@@ -762,7 +864,7 @@ async function getEngine() {
 
   engine =
     await import(
-      "./engine.js?v=25"
+      "./engine.js?v=26"
     );
 
 
@@ -790,6 +892,9 @@ imageInput.addEventListener(
 
     simulationReady =
       false;
+
+
+    stopProductShellRotation();
 
 
     generateBtn.disabled =
@@ -875,7 +980,7 @@ imageInput.addEventListener(
 
 
 /* =========================================
-   CRÉATION DE LA SIMULATION
+   CRÉATION SIMULATION
 ========================================= */
 
 generateBtn.addEventListener(
@@ -904,11 +1009,10 @@ generateBtn.addEventListener(
       false;
 
 
-    try {
+    stopProductShellRotation();
 
-      /*
-        1 — PHOTO
-      */
+
+    try {
 
       setStatus(
         "1/5 Préparation de la photo…",
@@ -921,10 +1025,6 @@ generateBtn.addEventListener(
           sourceFile
         );
 
-
-      /*
-        2 — DÉTOURAGE
-      */
 
       setStatus(
         "2/5 Détourage précis du sujet…",
@@ -955,10 +1055,6 @@ generateBtn.addEventListener(
           removeForm
         );
 
-
-      /*
-        3 — FOND RECONSTRUIT
-      */
 
       setStatus(
         "3/5 Reconstruction du fond sans le sujet…",
@@ -1017,10 +1113,6 @@ generateBtn.addEventListener(
         );
 
 
-      /*
-        4 — PROFONDEUR
-      */
-
       setStatus(
         "4/5 Analyse des profondeurs…",
         66
@@ -1039,14 +1131,6 @@ generateBtn.addEventListener(
       );
 
 
-      /*
-        Le support choisi a pu changer
-        pendant le calcul.
-
-        On recalcule simplement
-        la taille du canvas.
-      */
-
       window.dispatchEvent(
         new Event(
           "resize"
@@ -1058,10 +1142,6 @@ generateBtn.addEventListener(
         "none";
 
 
-      /*
-        5 — ANIMATION
-      */
-
       setStatus(
         "5/5 Mise en mouvement…",
         90
@@ -1069,6 +1149,14 @@ generateBtn.addEventListener(
 
 
       currentEngine.start();
+
+
+      /*
+        Le support entier commence
+        à pivoter en même temps.
+      */
+
+      startProductShellRotation();
 
 
       simulationReady =
@@ -1084,7 +1172,7 @@ generateBtn.addEventListener(
 
 
       setStatus(
-        `Simulation prête dans le support « ${supports[selectedSupport].label} ». Vous pouvez changer de support sans nouveau calcul IA.`,
+        `Simulation prête dans le support « ${supports[selectedSupport].label} ». Le support pivote maintenant avec l’image.`,
         100
       );
     }
@@ -1630,7 +1718,7 @@ if (exportVideoBtn) {
 
 
 /* =========================================
-   INITIALISATION SUPPORT
+   INITIALISATION
 ========================================= */
 
 selectSupport(
