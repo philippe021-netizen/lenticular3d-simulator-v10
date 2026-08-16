@@ -2,6 +2,7 @@
 <html lang="fr">
 
 <head>
+
   <meta charset="utf-8">
 
   <meta
@@ -15,14 +16,16 @@
 
   <link
     rel="stylesheet"
-    href="./styles.css?v=17"
+    href="./styles.css?v=20"
   >
+
 </head>
 
 
 <body>
 
   <main class="app">
+
 
     <header>
 
@@ -37,15 +40,16 @@
         </h1>
 
         <p>
-          Relief 2.5D par profondeur réelle,
-          micro-caméra et remplissage des zones découvertes.
+          Fond reconstruit sans le sujet,
+          sujet détouré au premier plan
+          et parallaxe renforcée.
         </p>
 
       </div>
 
 
       <div class="badge">
-        Ken Burns V17
+        Clean Background V20
       </div>
 
     </header>
@@ -55,6 +59,7 @@
 
 
       <aside class="controls">
+
 
         <div class="upload-zone">
 
@@ -102,10 +107,12 @@
 
         <div class="disclaimer">
 
-          Simulation visuelle de profondeur.
+          Simulation visuelle.
 
-          Le rendu lenticulaire imprimé final
-          peut varier.
+          Le fond est reconstruit
+          derrière le sujet afin
+          d’éviter les dédoublements
+          lors du mouvement.
 
         </div>
 
@@ -114,10 +121,12 @@
 
       <section class="preview-panel">
 
+
         <div
           id="viewer"
           class="viewer"
         >
+
 
           <div
             id="placeholder"
@@ -129,33 +138,39 @@
             </strong>
 
             <span>
-              Choisissez une photo puis lancez la simulation.
+              Choisissez une photo
+              puis lancez la simulation.
             </span>
 
           </div>
+
 
         </div>
 
 
         <div class="label">
 
-          Micro-caméra 2.5D • profondeur IA •
-          sans reconstruction 3D complète
+          Fond sans sujet •
+          silhouette séparée •
+          parallaxe renforcée
 
         </div>
+
 
       </section>
 
 
     </section>
 
+
   </main>
 
 
   <script
     type="module"
-    src="./app.js?v=17"
+    src="./app.js?v=20"
   ></script>
+
 
 </body>
 
