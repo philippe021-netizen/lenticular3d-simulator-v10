@@ -1,795 +1,76 @@
-<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>LentiPrint Lab v11.7</title>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
-<style>
-:root{
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  color:#151515;
-  background:#f5f5f3
-}
-
-*{
-  box-sizing:border-box
-}
-
-body{
-  margin:0
-}
-
-.wrap{
-  max-width:1100px;
-  margin:auto;
-  padding:22px
-}
-
-.top{
-  display:flex;
-  gap:14px;
-  align-items:center;
-  justify-content:space-between;
-  margin-bottom:18px
-}
-
-.badge{
-  font-size:12px;
-  padding:6px 9px;
-  border-radius:999px;
-  background:#111;
-  color:#fff
-}
-
-.card{
-  background:#fff;
-  border:1px solid #ddd;
-  border-radius:18px;
-  padding:18px;
-  margin:14px 0;
-  box-shadow:0 1px 8px #0000000a
-}
-
-h1{
-  font-size:25px;
-  margin:0
-}
-
-h2{
-  font-size:18px;
-  margin:0 0 12px
-}
-
-.row{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:14px
-}
-
-.field{
-  display:flex;
-  flex-direction:column;
-  gap:7px
-}
-
-label{
-  font-size:13px;
-  font-weight:650
-}
-
-input,
-textarea,
-select,
-button{
-  font:inherit
-}
-
-input,
-textarea,
-select{
-  border:1px solid #ccc;
-  border-radius:11px;
-  padding:11px;
-  background:#fff
-}
-
-textarea{
-  min-height:110px;
-  resize:vertical
-}
-
-.actions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-top:14px
-}
-
-button{
-  border:0;
-  border-radius:12px;
-  padding:11px 15px;
-  background:#111;
-  color:#fff;
-  font-weight:700;
-  cursor:pointer
-}
-
-button.secondary{
-  background:#ececec;
-  color:#111
-}
-
-button:disabled{
-  opacity:.45;
-  cursor:not-allowed
-}
-
-.status{
-  padding:11px;
-  border-radius:12px;
-  background:#f3f3f3;
-  font-size:13px;
-  white-space:pre-wrap
-}
-
-.preview{
-  display:grid;
-  grid-template-columns:360px 1fr;
-  gap:16px;
-  align-items:start
-}
-
-video{
-  display:block;
-  width:100%;
-  border-radius:14px;
-  background:#111
-}
-
-.frames{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:10px
-}
-
-.frame{
-  border:1px solid #ddd;
-  border-radius:12px;
-  padding:7px;
-  background:#fafafa
-}
-
-.frame img{
-  width:100%;
-  aspect-ratio:1/1;
-  object-fit:cover;
-  border-radius:9px
-}
-
-.meta{
-  font-size:11px;
-  color:#666;
-  margin-top:6px
-}
-
-.quality{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  font-size:12px
-}
-
-.dot{
-  width:9px;
-  height:9px;
-  border-radius:50%;
-  background:#999
-}
-
-.good{
-  background:#159947
-}
-
-.warn{
-  background:#e09b00
-}
-
-.bad{
-  background:#c62929
-}
-
-/* ===== Timeline unique ===== */
-
-.trimBox{
-  margin-top:14px;
-  padding:14px;
-  border:1px solid #ddd;
-  border-radius:14px;
-  background:#fafafa
-}
-
-.trimTitle{
-  font-weight:750;
-  font-size:14px;
-  margin-bottom:8px
-}
-
-.trimHelp{
-  font-size:12px;
-  color:#666;
-  line-height:1.4;
-  margin-bottom:14px
-}
-
-.timeline{
-  position:relative;
-  height:54px;
-  margin:12px 4px 6px;
-  touch-action:none;
-  user-select:none
-}
-
-.timelineTrack{
-  position:absolute;
-  left:0;
-  right:0;
-  top:20px;
-  height:12px;
-  border-radius:999px;
-  background:#d7dbe1;
-  overflow:visible
-}
-
-.timelinePlayed{
-  position:absolute;
-  left:0;
-  top:0;
-  height:100%;
-  width:0;
-  border-radius:999px;
-  background:#aab3bf;
-  pointer-events:none
-}
-
-.selection{
-  position:absolute;
-  top:-7px;
-  height:26px;
-  border-radius:10px;
-  background:#111;
-  cursor:grab;
-  touch-action:none;
-  box-shadow:0 2px 6px #0003
-}
-
-.selection.dragging{
-  cursor:grabbing
-}
-
-.handle{
-  position:absolute;
-  top:-5px;
-  width:24px;
-  height:36px;
-  border-radius:9px;
-  background:#fff;
-  border:2px solid #111;
-  box-shadow:0 1px 5px #0002;
-  touch-action:none
-}
-
-.handle.left{
-  left:-12px;
-  cursor:ew-resize
-}
-
-.handle.right{
-  right:-12px;
-  cursor:ew-resize
-}
-
-.timeBubble{
-  position:absolute;
-  top:-28px;
-  transform:translateX(-50%);
-  background:#111;
-  color:#fff;
-  font-size:11px;
-  font-weight:700;
-  padding:4px 6px;
-  border-radius:7px;
-  white-space:nowrap
-}
-
-#bubbleStart{
-  left:0
-}
-
-#bubbleEnd{
-  left:100%
-}
-
-.playhead{
-  position:absolute;
-  top:-6px;
-  width:3px;
-  height:24px;
-  background:#f33;
-  border-radius:3px;
-  pointer-events:none;
-  display:none
-}
-
-.timelineTicks{
-  display:flex;
-  justify-content:space-between;
-  font-size:11px;
-  color:#777;
-  margin-top:2px
-}
-
-.selectionInfo{
-  margin-top:12px;
-  padding:10px;
-  border-radius:10px;
-  background:#fff;
-  border:1px solid #e0e0e0;
-  font-weight:700;
-  font-size:13px
-}
-
-@media(max-width:760px){
-
-  .row,
-  .preview{
-    grid-template-columns:1fr
-  }
-
-  .frames{
-    grid-template-columns:repeat(3,1fr)
-  }
-
-  .wrap{
-    padding:12px
-  }
-
-  h1{
-    font-size:21px
-  }
-}
-
-</style>
-</head>
-
-<body>
-
-<div class="wrap">
-
-<div class="top">
-
-  <div>
-    <h1>LentiPrint Lab</h1>
-    <div>
-      Vidéo → zone de recherche 1 à 5 s → meilleure micro-séquence → 9 vues
-    </div>
-  </div>
-
-  <span class="badge">v11.7</span>
-
-</div>
-
-<div class="card">
-
-<h2>1. Source</h2>
-
-<div class="row">
-
-  <div class="field">
-    <label>Photo source pour PixVerse</label>
-    <input
-      id="image"
-      type="file"
-      accept="image/png,image/jpeg,image/webp"
-    >
-  </div>
-
-  <div class="field">
-
-    <label>Action PixVerse</label>
-
-    <select id="preset">
-      <option value="bark">Chien — petit aboiement</option>
-      <option value="blink">Chat — clignement naturel</option>
-      <option value="smile">Personne — léger sourire</option>
-      <option value="kiss">Couple — baiser léger</option>
-      <option value="dance">Personne — mini mouvement de danse</option>
-      <option value="custom">Personnalisé</option>
-    </select>
-
-  </div>
-
-</div>
-
-<div
-  class="field"
-  style="margin-top:12px"
->
-
-  <label>Prompt PixVerse</label>
-
-  <textarea id="prompt"></textarea>
-
-</div>
-
-<div class="actions">
-
-  <button id="generate">
-    Créer la micro-vidéo PixVerse
-  </button>
-
-  <button
-    id="loadVideo"
-    class="secondary"
-  >
-    Charger une vidéo existante
-  </button>
-
-  <input
-    id="videoFile"
-    type="file"
-    accept="video/*"
-    hidden
-  >
-
-</div>
-
-<div
-  id="status"
-  class="status"
-  style="margin-top:12px"
->
-Prêt.
-</div>
-
-</div>
-
-<div class="card">
-
-<h2>2. Vidéo et sélection</h2>
-
-<div class="preview">
-
-<div>
-
-  <video
-    id="video"
-    controls
-    playsinline
-    preload="auto"
-  ></video>
-
-  <div
-    id="videoInfo"
-    class="meta"
-  ></div>
-
-  <div
-    id="trimControls"
-    class="trimBox"
-    hidden
-  >
-
-    <div class="trimTitle">
-      Choisir le passage utile
-    </div>
-
-    <div class="trimHelp">
-      Fais glisser la zone noire pour la déplacer dans la vidéo.
-      Tire les poignées gauche/droite pour régler la durée entre 1 et 5 secondes.
-    </div>
-
-    <div
-      id="timeline"
-      class="timeline"
-    >
-
-      <div
-        id="timelineTrack"
-        class="timelineTrack"
-      >
-
-        <div
-          id="timelinePlayed"
-          class="timelinePlayed"
-        ></div>
-
-        <div
-          id="selection"
-          class="selection"
-        >
-
-          <div
-            id="bubbleStart"
-            class="timeBubble"
-          >
-            0.00 s
-          </div>
-
-          <div
-            id="bubbleEnd"
-            class="timeBubble"
-          >
-            5.00 s
-          </div>
-
-          <div
-            id="handleLeft"
-            class="handle left"
-          ></div>
-
-          <div
-            id="handleRight"
-            class="handle right"
-          ></div>
-
-          <div
-            id="playhead"
-            class="playhead"
-          ></div>
-
-        </div>
-
-      </div>
-
-    </div>
-    
-        <div class="timelineTicks">
-      <span>0 s</span>
-      <span id="totalDuration">0 s</span>
-    </div>
-
-    <div id="selectionInfo" class="selectionInfo">
-      Sélection : 0.00 s → 5.00 s · durée 5.00 s
-    </div>
-
-    <div class="actions">
-      <button id="previewTrim" class="secondary" type="button">
-        ▶ Lire la sélection en boucle
-      </button>
-    </div>
-
-  </div>
-
-  <div class="actions">
-    <button id="extract" disabled>
-      Extraire les 9 vues
-    </button>
-  </div>
-
-</div>
-
-<div>
-  <div id="frames" class="frames"></div>
-</div>
-
-</div>
-</div>
-
-<div class="card">
-
-<h2>3. Export production</h2>
-
-<div class="row">
-
-  <div class="field">
-
-    <label>Format de sortie</label>
-
-    <select id="size">
-      <option value="772">
-        772 × 772 — médaillon test
-      </option>
-
-      <option value="1024">
-        1024 × 1024 — haute définition
-      </option>
-
-      <option value="original">
-        Format carré résolution vidéo
-      </option>
-    </select>
-
-  </div>
-
-  <div class="field">
-
-    <label>Sens de lecture</label>
-
-    <select id="direction">
-      <option value="normal">1 → 9</option>
-      <option value="reverse">9 → 1</option>
-    </select>
-
-  </div>
-
-</div>
-
-<div class="actions">
-
-  <button id="download" disabled>
-    Télécharger ZIP — 9 vues
-  </button>
-
-</div>
-
-<div
-  class="quality"
-  style="margin-top:12px"
->
-
-  <span
-    id="qualityDot"
-    class="dot"
-  ></span>
-
-  <span id="qualityText">
-    Pas encore analysé.
-  </span>
-
-</div>
-
-</div>
-
-</div>
-
-<script type="module">
-
-const $ = s => document.querySelector(s);
-
-const image = $('#image');
-const preset = $('#preset');
-const prompt = $('#prompt');
-const status = $('#status');
-
-const video = $('#video');
-const videoInfo = $('#videoInfo');
-
-const generate = $('#generate');
-const loadVideo = $('#loadVideo');
-const videoFile = $('#videoFile');
-
-const trimControls = $('#trimControls');
-const timelineTrack = $('#timelineTrack');
-const selection = $('#selection');
-
-const handleLeft = $('#handleLeft');
-const handleRight = $('#handleRight');
-
-const bubbleStart = $('#bubbleStart');
-const bubbleEnd = $('#bubbleEnd');
-
-const selectionInfo = $('#selectionInfo');
-const totalDuration = $('#totalDuration');
-
-const previewTrim = $('#previewTrim');
-const playhead = $('#playhead');
-const timelinePlayed = $('#timelinePlayed');
-
-const extract = $('#extract');
-const framesEl = $('#frames');
-const download = $('#download');
-
-const MIN_CLIP = 1;
-const MAX_CLIP = 5;
-
-let objectUrl = null;
-
-let frameData = [];
-
-let clipStart = 0;
-let clipEnd = 5;
-
-let dragMode = null;
-
-let pointerStartX = 0;
-
-let startClipAtPointer = 0;
-let endClipAtPointer = 0;
-
-let trimLoopActive = false;
-let loopRAF = null;
-
-const prompts = {
-
-  bark:
-  'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
-
-  blink:
-  'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
-
-  smile:
-  'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
-
-  kiss:
-  'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
-
-  dance:
-  'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
-
+const $=s=>document.querySelector(s);
+
+const image=$('#image'),preset=$('#preset'),prompt=$('#prompt'),status=$('#status');
+const video=$('#video'),videoInfo=$('#videoInfo');
+const generate=$('#generate'),loadVideo=$('#loadVideo'),videoFile=$('#videoFile');
+const trimControls=$('#trimControls'),timelineTrack=$('#timelineTrack'),selection=$('#selection');
+const handleLeft=$('#handleLeft'),handleRight=$('#handleRight');
+const bubbleStart=$('#bubbleStart'),bubbleEnd=$('#bubbleEnd');
+const selectionInfo=$('#selectionInfo'),totalDuration=$('#totalDuration');
+const previewTrim=$('#previewTrim'),playhead=$('#playhead'),timelinePlayed=$('#timelinePlayed');
+const extract=$('#extract'),framesEl=$('#frames'),download=$('#download');
+
+const MIN_CLIP=1;
+const MAX_CLIP=5;
+
+let objectUrl=null;
+let frameData=[];
+let clipStart=0;
+let clipEnd=5;
+let dragMode=null;
+let pointerStartX=0;
+let startClipAtPointer=0;
+let endClipAtPointer=0;
+let trimLoopActive=false;
+let loopRAF=null;
+
+const prompts={
+  bark:'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
+  blink:'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
+  smile:'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
+  kiss:'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
+  dance:'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
   custom:''
-
 };
 
 function setPrompt(){
-
-  if(preset.value !== 'custom'){
-    prompt.value = prompts[preset.value];
-  }
-
+  if(preset.value!=='custom')prompt.value=prompts[preset.value]
 }
 
-preset.addEventListener(
-  'change',
-  setPrompt
-);
-
+preset.addEventListener('change',setPrompt);
 setPrompt();
 
 function log(t){
-
-  status.textContent = t;
-
+  status.textContent=t
 }
 
 function sleep(ms){
-
-  return new Promise(
-    r => setTimeout(r,ms)
-  );
-
+  return new Promise(r=>setTimeout(r,ms))
 }
 
 function stopLoop(){
-
-  trimLoopActive = false;
+  trimLoopActive=false;
 
   if(loopRAF){
-
     cancelAnimationFrame(loopRAF);
-
-    loopRAF = null;
-
+    loopRAF=null;
   }
 
-  previewTrim.textContent =
-    '▶ Lire la sélection en boucle';
-
-  playhead.style.display = 'none';
-
+  previewTrim.textContent='▶ Lire la sélection en boucle';
+  playhead.style.display='none';
 }
 
 function clearFrames(){
+  frameData=[];
+  framesEl.innerHTML='';
+  download.disabled=true;
 
-  frameData = [];
-
-  framesEl.innerHTML = '';
-
-  download.disabled = true;
-
-  $('#qualityDot').className = 'dot';
-
-  $('#qualityText').textContent =
-    'Pas encore analysé.';
-
+  $('#qualityDot').className='dot';
+  $('#qualityText').textContent='Pas encore analysé.';
 }
 
 function clearVideo(){
-
   stopLoop();
-
   clearFrames();
 
   try{
@@ -803,351 +84,236 @@ function clearVideo(){
   }catch(_){}
 
   if(objectUrl){
-
     try{
       URL.revokeObjectURL(objectUrl);
     }catch(_){}
 
-    objectUrl = null;
-
+    objectUrl=null;
   }
 
-  trimControls.hidden = true;
-
-  extract.disabled = true;
-
-  videoInfo.textContent = '';
-
+  trimControls.hidden=true;
+  extract.disabled=true;
+  videoInfo.textContent='';
 }
 
 function waitForMetadata(v){
+  return new Promise((resolve,reject)=>{
 
-  return new Promise(
-    (resolve,reject)=>{
-
-      if(
-        Number.isFinite(v.duration) &&
-        v.duration > 0
-      ){
-
-        resolve();
-
-        return;
-
-      }
-
-      const ok = ()=>{
-
-        cleanup();
-
-        resolve();
-
-      };
-
-      const fail = ()=>{
-
-        cleanup();
-
-        reject(
-          new Error(
-            'Impossible de lire les informations de cette vidéo.'
-          )
-        );
-
-      };
-
-      const cleanup = ()=>{
-
-        v.removeEventListener(
-          'loadedmetadata',
-          ok
-        );
-
-        v.removeEventListener(
-          'error',
-          fail
-        );
-
-      };
-
-      v.addEventListener(
-        'loadedmetadata',
-        ok,
-        {once:true}
-      );
-
-      v.addEventListener(
-        'error',
-        fail,
-        {once:true}
-      );
-
+    if(Number.isFinite(v.duration)&&v.duration>0){
+      resolve();
+      return;
     }
-  );
 
+    const ok=()=>{
+      cleanup();
+      resolve();
+    };
+
+    const fail=()=>{
+      cleanup();
+      reject(
+        new Error(
+          'Impossible de lire les informations de cette vidéo.'
+        )
+      );
+    };
+
+    const cleanup=()=>{
+      v.removeEventListener('loadedmetadata',ok);
+      v.removeEventListener('error',fail);
+    };
+
+    v.addEventListener('loadedmetadata',ok,{once:true});
+    v.addEventListener('error',fail,{once:true});
+  });
 }
 
-function waitForVideoFrame(
-  v,
-  timeout = 15000
-){
+function waitForVideoFrame(v,timeout=15000){
+  return new Promise((resolve,reject)=>{
 
-  return new Promise(
-    (resolve,reject)=>{
+    let done=false;
 
-      let done = false;
+    const check=()=>{
+      if(done)return;
 
-      const check = ()=>{
-
-        if(done)return;
-
-        if(
-          v.readyState >= 2 &&
-          v.videoWidth > 0 &&
-          v.videoHeight > 0
-        ){
-
-          done = true;
-
-          cleanup();
-
-          resolve();
-
-        }
-
-      };
-
-      const fail = ()=>{
-
-        if(done)return;
-
-        done = true;
-
+      if(
+        v.readyState>=2 &&
+        v.videoWidth>0 &&
+        v.videoHeight>0
+      ){
+        done=true;
         cleanup();
+        resolve();
+      }
+    };
 
-        reject(
-          new Error(
-            'La vidéo ne peut pas être décodée.'
-          )
-        );
+    const fail=()=>{
+      if(done)return;
 
-      };
+      done=true;
+      cleanup();
 
-      const timer = setTimeout(
-        ()=>{
+      reject(
+        new Error(
+          'La vidéo ne peut pas être décodée.'
+        )
+      );
+    };
 
-          if(done)return;
+    const timer=setTimeout(()=>{
+      if(done)return;
 
-          done = true;
+      done=true;
+      cleanup();
 
-          cleanup();
-
-          reject(
-            new Error(
-              'Aucune image vidéo décodée.'
-            )
-          );
-
-        },
-        timeout
+      reject(
+        new Error(
+          'Aucune image vidéo décodée.'
+        )
       );
 
-      const events = [
-        'loadeddata',
-        'canplay',
-        'canplaythrough',
-        'timeupdate'
-      ];
+    },timeout);
 
-      const cleanup = ()=>{
+    const events=[
+      'loadeddata',
+      'canplay',
+      'canplaythrough',
+      'timeupdate'
+    ];
 
-        clearTimeout(timer);
-
-        events.forEach(
-          e => v.removeEventListener(
-            e,
-            check
-          )
-        );
-
-        v.removeEventListener(
-          'error',
-          fail
-        );
-
-      };
+    const cleanup=()=>{
+      clearTimeout(timer);
 
       events.forEach(
-        e => v.addEventListener(
-          e,
-          check
-        )
+        e=>v.removeEventListener(e,check)
       );
 
-      v.addEventListener(
-        'error',
-        fail,
-        {once:true}
-      );
+      v.removeEventListener('error',fail);
+    };
 
-      check();
+    events.forEach(
+      e=>v.addEventListener(e,check)
+    );
 
-    }
-  );
+    v.addEventListener(
+      'error',
+      fail,
+      {once:true}
+    );
 
+    check();
+  });
 }
 
-function waitSeek(
-  v,
-  time
-){
+function waitSeek(v,time){
+  return new Promise((resolve,reject)=>{
 
-  return new Promise(
-    (resolve,reject)=>{
-
-      if(
-        !Number.isFinite(v.duration)
-      ){
-
-        reject(
-          new Error(
-            'Durée vidéo inconnue.'
-          )
-        );
-
-        return;
-
-      }
-
-      const target = Math.max(
-        0,
-        Math.min(
-          time,
-          Math.max(
-            0,
-            v.duration - .02
-          )
+    if(!Number.isFinite(v.duration)){
+      reject(
+        new Error(
+          'Durée vidéo inconnue.'
         )
       );
+      return;
+    }
 
-      if(
-        Math.abs(
-          v.currentTime - target
-        ) < .015
-      ){
+    const target=Math.max(
+      0,
+      Math.min(
+        time,
+        Math.max(
+          0,
+          v.duration-.02
+        )
+      )
+    );
 
-        resolve();
+    if(
+      Math.abs(
+        v.currentTime-target
+      )<.015
+    ){
+      resolve();
+      return;
+    }
 
-        return;
+    const ok=()=>{
+      cleanup();
+      resolve();
+    };
 
-      }
+    const fail=()=>{
+      cleanup();
 
-      const ok = ()=>{
-
-        cleanup();
-
-        resolve();
-
-      };
-
-      const fail = ()=>{
-
-        cleanup();
-
-        reject(
-          new Error(
-            'Impossible de se déplacer dans la vidéo.'
-          )
-        );
-
-      };
-
-      const timer = setTimeout(
-        ()=>{
-
-          cleanup();
-
-          resolve();
-
-        },
-        2500
+      reject(
+        new Error(
+          'Impossible de se déplacer dans la vidéo.'
+        )
       );
+    };
 
-      const cleanup = ()=>{
+    const timer=setTimeout(()=>{
+      cleanup();
+      resolve();
+    },2500);
 
-        clearTimeout(timer);
+    const cleanup=()=>{
+      clearTimeout(timer);
 
-        v.removeEventListener(
-          'seeked',
-          ok
-        );
-
-        v.removeEventListener(
-          'error',
-          fail
-        );
-
-      };
-
-      v.addEventListener(
+      v.removeEventListener(
         'seeked',
-        ok,
-        {once:true}
+        ok
       );
 
-      v.addEventListener(
+      v.removeEventListener(
         'error',
-        fail,
-        {once:true}
+        fail
       );
+    };
 
-      try{
+    v.addEventListener(
+      'seeked',
+      ok,
+      {once:true}
+    );
 
-        v.currentTime = target;
+    v.addEventListener(
+      'error',
+      fail,
+      {once:true}
+    );
 
-      }catch(e){
-
-        cleanup();
-
-        reject(e);
-
-      }
-
+    try{
+      v.currentTime=target;
+    }catch(e){
+      cleanup();
+      reject(e);
     }
-  );
-
+  });
 }
 
-/* ===== TIMELINE ===== */
 
-function clamp(
-  n,
-  min,
-  max
-){
+/* =====================================================
+   TIMELINE
+===================================================== */
 
+function clamp(n,min,max){
   return Math.max(
     min,
-    Math.min(
-      max,
-      n
-    )
+    Math.min(max,n)
   );
-
 }
 
 function secondsFromPixels(px){
 
-  const rect =
+  const rect=
     timelineTrack.getBoundingClientRect();
 
   if(
     !rect.width ||
     !video.duration
   ){
-
     return 0;
-
   }
 
   return (
@@ -1155,56 +321,50 @@ function secondsFromPixels(px){
     rect.width *
     video.duration
   );
-
 }
 
 function renderSelection(
-  seekToStart = false
+  seekToStart=false
 ){
 
   if(
-    !Number.isFinite(video.duration) ||
-    video.duration <= 0
+    !Number.isFinite(
+      video.duration
+    ) ||
+    video.duration<=0
   ){
-
     return;
-
   }
 
-  clipStart = clamp(
+  clipStart=clamp(
     clipStart,
     0,
     video.duration
   );
 
-  clipEnd = clamp(
+  clipEnd=clamp(
     clipEnd,
     0,
     video.duration
   );
 
-  let len =
-    clipEnd - clipStart;
+  let len=
+    clipEnd-clipStart;
 
-  if(
-    len < MIN_CLIP
-  ){
+  if(len<MIN_CLIP){
 
-    clipEnd = Math.min(
+    clipEnd=Math.min(
       video.duration,
-      clipStart + MIN_CLIP
+      clipStart+MIN_CLIP
     );
-
   }
 
   if(
-    clipEnd - clipStart >
+    clipEnd-clipStart >
     MAX_CLIP
   ){
-
-    clipEnd =
-      clipStart + MAX_CLIP;
-
+    clipEnd=
+      clipStart+MAX_CLIP;
   }
 
   if(
@@ -1212,880 +372,702 @@ function renderSelection(
     video.duration
   ){
 
-    const width =
-      clipEnd - clipStart;
+    const width=
+      clipEnd-clipStart;
 
-    clipEnd =
+    clipEnd=
       video.duration;
 
-    clipStart =
-      Math.max(
-        0,
-        clipEnd - width
-      );
-
+    clipStart=Math.max(
+      0,
+      clipEnd-width
+    );
   }
 
-  const left =
+  const left=
     clipStart /
     video.duration *
     100;
 
-  const width =
+  const width=
     (
-      clipEnd -
-      clipStart
+      clipEnd-clipStart
     ) /
     video.duration *
     100;
 
-  selection.style.left =
+  selection.style.left=
     `${left}%`;
 
-  selection.style.width =
+  selection.style.width=
     `${width}%`;
 
-  bubbleStart.textContent =
+  bubbleStart.textContent=
     `${clipStart.toFixed(2)} s`;
 
-  bubbleEnd.textContent =
+  bubbleEnd.textContent=
     `${clipEnd.toFixed(2)} s`;
 
-  selectionInfo.textContent =
+  selectionInfo.textContent=
     `Sélection : ${clipStart.toFixed(2)} s → ${clipEnd.toFixed(2)} s · durée ${(clipEnd-clipStart).toFixed(2)} s`;
 
-  extract.disabled =
+  extract.disabled=
     (
-      clipEnd - clipStart
-    ) < MIN_CLIP ||
+      clipEnd-clipStart
+    )<MIN_CLIP ||
     (
-      clipEnd - clipStart
-    ) > MAX_CLIP + .01;
+      clipEnd-clipStart
+    )>MAX_CLIP+.01;
 
   if(seekToStart){
 
     try{
-
-      video.currentTime =
+      video.currentTime=
         clipStart;
-
     }catch(_){}
+  }
+}
+function setupTimeline(){
+  if(!Number.isFinite(video.duration)||video.duration<=0)return;
 
+  clipStart=0;
+  clipEnd=Math.min(MAX_CLIP,video.duration);
+
+  if(clipEnd-clipStart<MIN_CLIP&&video.duration>=MIN_CLIP){
+    clipEnd=MIN_CLIP;
   }
 
+  totalDuration.textContent=`${video.duration.toFixed(1)} s`;
+  trimControls.hidden=false;
+  renderSelection(true);
 }
 
-function setupTimeline(){
+function beginDrag(mode,e){
+  if(!Number.isFinite(video.duration)||video.duration<=0)return;
+  e.preventDefault();
 
-  if(
-    !Number.isFinite(video.duration) ||
-    video.duration <= 0
-  ){
+  dragMode=mode;
+  pointerStartX=e.clientX;
+  startClipAtPointer=clipStart;
+  endClipAtPointer=clipEnd;
 
-    return;
+  selection.classList.add('dragging');
 
+  try{
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }catch(_){}
+}
+
+selection.addEventListener('pointerdown',e=>{
+  if(e.target===handleLeft||e.target===handleRight)return;
+  beginDrag('move',e);
+});
+
+handleLeft.addEventListener('pointerdown',e=>{
+  e.stopPropagation();
+  beginDrag('left',e);
+});
+
+handleRight.addEventListener('pointerdown',e=>{
+  e.stopPropagation();
+  beginDrag('right',e);
+});
+
+window.addEventListener('pointermove',e=>{
+  if(!dragMode)return;
+
+  const delta=
+    secondsFromPixels(
+      e.clientX-pointerStartX
+    );
+
+  if(dragMode==='move'){
+    const len=
+      endClipAtPointer-
+      startClipAtPointer;
+
+    let start=
+      startClipAtPointer+
+      delta;
+
+    start=clamp(
+      start,
+      0,
+      Math.max(
+        0,
+        video.duration-len
+      )
+    );
+
+    clipStart=start;
+    clipEnd=start+len;
   }
 
-  clipStart = 0;
+  if(dragMode==='left'){
+    let newStart=
+      startClipAtPointer+
+      delta;
 
-  clipEnd =
-    Math.min(
-      MAX_CLIP,
+    newStart=clamp(
+      newStart,
+      0,
+      endClipAtPointer-MIN_CLIP
+    );
+
+    if(
+      endClipAtPointer-
+      newStart >
+      MAX_CLIP
+    ){
+      newStart=
+        endClipAtPointer-
+        MAX_CLIP;
+    }
+
+    clipStart=newStart;
+    clipEnd=endClipAtPointer;
+  }
+
+  if(dragMode==='right'){
+    let newEnd=
+      endClipAtPointer+
+      delta;
+
+    newEnd=clamp(
+      newEnd,
+      startClipAtPointer+
+      MIN_CLIP,
       video.duration
     );
 
-  if(
-    clipEnd - clipStart <
-    MIN_CLIP &&
-    video.duration >= MIN_CLIP
-  ){
+    if(
+      newEnd-
+      startClipAtPointer >
+      MAX_CLIP
+    ){
+      newEnd=
+        startClipAtPointer+
+        MAX_CLIP;
+    }
 
-    clipEnd =
-      MIN_CLIP;
-
+    clipStart=startClipAtPointer;
+    clipEnd=newEnd;
   }
-
-  totalDuration.textContent =
-    `${video.duration.toFixed(1)} s`;
-
-  trimControls.hidden =
-    false;
 
   renderSelection(true);
+});
 
-}
+window.addEventListener('pointerup',()=>{
+  if(!dragMode)return;
 
-function beginDrag(
-  mode,
-  e
-){
+  dragMode=null;
+  selection.classList.remove('dragging');
+});
 
+timelineTrack.addEventListener('pointerdown',e=>{
   if(
-    !Number.isFinite(video.duration) ||
-    video.duration <= 0
+    e.target===selection ||
+    selection.contains(e.target)
   ){
-
     return;
-
   }
 
-  e.preventDefault();
+  const rect=
+    timelineTrack.getBoundingClientRect();
 
-  dragMode = mode;
-
-  pointerStartX =
-    e.clientX;
-
-  startClipAtPointer =
-    clipStart;
-
-  endClipAtPointer =
-    clipEnd;
-
-  selection.classList.add(
-    'dragging'
+  const clickTime=clamp(
+    (
+      e.clientX-
+      rect.left
+    ) /
+    rect.width *
+    video.duration,
+    0,
+    video.duration
   );
 
+  const len=
+    clipEnd-
+    clipStart;
+
+  clipStart=clamp(
+    clickTime-len/2,
+    0,
+    Math.max(
+      0,
+      video.duration-len
+    )
+  );
+
+  clipEnd=
+    clipStart+
+    len;
+
+  renderSelection(true);
+});
+
+
+/* =====================================================
+   LECTURE DE LA SELECTION EN BOUCLE
+===================================================== */
+
+async function startLoop(){
+  stopLoop();
+
+  trimLoopActive=true;
+
+  previewTrim.textContent=
+    '■ Arrêter la boucle';
+
   try{
+    video.pause();
 
-    e.currentTarget.setPointerCapture(
-      e.pointerId
+    await waitSeek(
+      video,
+      clipStart
     );
 
-  }catch(_){}
+    await video.play();
 
-}
+    const tick=()=>{
 
-selection.addEventListener(
-  'pointerdown',
-  e => {
-
-    if(
-      e.target === handleLeft ||
-      e.target === handleRight
-    ){
-
-      return;
-
-    }
-
-    beginDrag(
-      'move',
-      e
-    );
-
-  }
-);
-
-handleLeft.addEventListener(
-  'pointerdown',
-  e => {
-
-    e.stopPropagation();
-
-    beginDrag(
-      'left',
-      e
-    );
-
-  }
-);
-
-handleRight.addEventListener(
-  'pointerdown',
-  e => {
-
-    e.stopPropagation();
-
-    beginDrag(
-      'right',
-      e
-    );
-
-  }
-);
-
-window.addEventListener(
-  'pointermove',
-  e => {
-
-    if(!dragMode)return;
-
-    const delta =
-      secondsFromPixels(
-        e.clientX -
-        pointerStartX
-      );
-
-    if(
-      dragMode === 'move'
-    ){
-
-      const len =
-        endClipAtPointer -
-        startClipAtPointer;
-
-      let start =
-        startClipAtPointer +
-        delta;
-
-      start = clamp(
-        start,
-        0,
-        Math.max(
-          0,
-          video.duration -
-          len
-        )
-      );
-
-      clipStart = start;
-
-      clipEnd =
-        start + len;
-
-    }
-
-    if(
-      dragMode === 'left'
-    ){
-
-      let newStart =
-        startClipAtPointer +
-        delta;
-
-      newStart = clamp(
-        newStart,
-        0,
-        endClipAtPointer -
-        MIN_CLIP
-      );
+      if(!trimLoopActive)return;
 
       if(
-        endClipAtPointer -
-        newStart >
-        MAX_CLIP
+        video.currentTime>=
+        clipEnd-.02 ||
+        video.currentTime<
+        clipStart-.05
       ){
-
-        newStart =
-          endClipAtPointer -
-          MAX_CLIP;
-
+        try{
+          video.currentTime=
+            clipStart;
+        }catch(_){}
       }
 
-      clipStart =
-        newStart;
-
-      clipEnd =
-        endClipAtPointer;
-
-    }
-
-    if(
-      dragMode === 'right'
-    ){
-
-      let newEnd =
-        endClipAtPointer +
-        delta;
-
-      newEnd = clamp(
-        newEnd,
-        startClipAtPointer +
-        MIN_CLIP,
-        video.duration
-      );
-
-      if(
-        newEnd -
-        startClipAtPointer >
-        MAX_CLIP
-      ){
-
-        newEnd =
-          startClipAtPointer +
-          MAX_CLIP;
-
-      }
-
-      clipStart =
-        startClipAtPointer;
-
-      clipEnd =
-        newEnd;
-
-    }
-
-    renderSelection(true);
-
-  }
-);
-
-window.addEventListener(
-  'pointerup',
-  ()=>{
-
-    if(!dragMode)return;
-
-    dragMode = null;
-
-    selection.classList.remove(
-      'dragging'
-    );
-
-  }
-);
-
-timelineTrack.addEventListener(
-  'pointerdown',
-  e => {
-
-    if(
-      e.target === selection ||
-      selection.contains(
-        e.target
-      )
-    ){
-
-      return;
-
-    }
-
-    const rect =
-      timelineTrack.getBoundingClientRect();
-
-    const clickTime =
-      clamp(
+      const progress=clamp(
         (
-          e.clientX -
-          rect.left
+          video.currentTime-
+          clipStart
         ) /
-        rect.width *
-        video.duration,
+        (
+          clipEnd-
+          clipStart
+        ),
         0,
-        video.duration
+        1
       );
 
-    const len =
-      clipEnd -
-      clipStart;
+      playhead.style.display=
+        'block';
 
-    clipStart =
-      clamp(
-        clickTime -
-        len / 2,
-        0,
-        Math.max(
+      playhead.style.left=
+        `${progress*100}%`;
+
+      timelinePlayed.style.width=
+        `${clamp(
+          video.currentTime/
+          video.duration,
           0,
-          video.duration -
-          len
-        )
+          1
+        )*100}%`;
+
+      loopRAF=
+        requestAnimationFrame(
+          tick
+        );
+    };
+
+    loopRAF=
+      requestAnimationFrame(
+        tick
       );
 
-    clipEnd =
-      clipStart +
-      len;
+  }catch(e){
 
-    renderSelection(true);
+    stopLoop();
 
+    log(
+      'Lecture de la sélection impossible : '+
+      e.message
+    );
   }
-);
-  video.addEventListener(
-  'timeupdate',
-  ()=>{
-
-    if(
-      !Number.isFinite(video.duration) ||
-      video.duration <= 0
-    ){
-      return;
-    }
-
-    const played =
-      video.currentTime /
-      video.duration *
-      100;
-
-    timelinePlayed.style.width =
-      `${played}%`;
-
-  }
-);
+}
 
 previewTrim.addEventListener(
   'click',
-  async ()=>{
-
-    if(
-      !Number.isFinite(video.duration) ||
-      video.duration <= 0
-    ){
-      return;
-    }
+  async()=>{
 
     if(trimLoopActive){
 
       stopLoop();
 
-      try{
-        video.pause();
-      }catch(_){}
+      video.pause();
 
-      return;
+    }else{
+
+      await startLoop();
+
     }
-
-    trimLoopActive = true;
-
-    previewTrim.textContent =
-      '■ Arrêter la lecture';
-
-    playhead.style.display =
-      'block';
-
-    try{
-
-      await waitSeek(
-        video,
-        clipStart
-      );
-
-      await video.play();
-
-    }catch(_){}
-
-    const loop = ()=>{
-
-      if(!trimLoopActive){
-        return;
-      }
-
-      if(
-        video.currentTime >=
-        clipEnd - .015
-      ){
-
-        try{
-          video.currentTime =
-            clipStart;
-        }catch(_){}
-
-      }
-
-      const pos =
-        (
-          video.currentTime -
-          clipStart
-        ) /
-        Math.max(
-          .001,
-          clipEnd -
-          clipStart
-        );
-
-      playhead.style.left =
-        `${clamp(pos,0,1)*100}%`;
-
-      loopRAF =
-        requestAnimationFrame(loop);
-
-    };
-
-    loop();
-
   }
 );
 
 
-/* ===== CHARGEMENT VIDÉO ===== */
-
-async function loadLocalVideo(file){
-
-  clearVideo();
-
-  if(!file){
-    return;
-  }
-
-  objectUrl =
-    URL.createObjectURL(file);
-
-  video.src =
-    objectUrl;
-
-  log(
-    'Chargement de la vidéo…'
-  );
-
-  try{
-
-    await waitForMetadata(video);
-
-    await waitForVideoFrame(video);
-
-    videoInfo.textContent =
-      `${video.videoWidth} × ${video.videoHeight} px · ${video.duration.toFixed(2)} s`;
-
-    if(
-      video.duration <
-      MIN_CLIP
-    ){
-
-      throw new Error(
-        `La vidéo est trop courte. Minimum : ${MIN_CLIP} seconde.`
-      );
-
-    }
-
-    setupTimeline();
-
-    extract.disabled =
-      false;
-
-    log(
-      'Vidéo prête. Choisis une zone de 1 à 5 secondes puis lance l’extraction automatique.'
-    );
-
-  }catch(err){
-
-    extract.disabled =
-      true;
-
-    trimControls.hidden =
-      true;
-
-    log(
-      `Erreur vidéo : ${err.message}`
-    );
-
-  }
-
-}
+/* =====================================================
+   CHARGEMENT D'UNE VIDEO EXISTANTE
+===================================================== */
 
 loadVideo.addEventListener(
   'click',
   ()=>{
-
     videoFile.click();
-
   }
 );
 
 videoFile.addEventListener(
   'change',
-  async ()=>{
+  async()=>{
 
-    const file =
+    const file=
       videoFile.files?.[0];
 
-    if(file){
+    if(!file)return;
 
-      await loadLocalVideo(file);
+    clearVideo();
 
-    }
-
-    videoFile.value = '';
-
-  }
-);
-
-
-/* ===== PIXVERSE ===== */
-
-generate.addEventListener(
-  'click',
-  async ()=>{
-
-    const file =
-      image.files?.[0];
-
-    if(!file){
-
-      log(
-        'Choisis d’abord une photo.'
-      );
-
-      return;
-
-    }
-
-    const userPrompt =
-      prompt.value.trim();
-
-    if(!userPrompt){
-
-      log(
-        'Le prompt est vide.'
-      );
-
-      return;
-
-    }
-
-    generate.disabled =
-      true;
-
-    extract.disabled =
-      true;
-
-    clearFrames();
+    videoInfo.textContent=
+      `${file.name||'Vidéo'} · ${file.type||'format inconnu'} · ${(file.size/1024/1024).toFixed(1)} Mo`;
 
     log(
-      'Envoi de la photo et création de la vidéo PixVerse…'
+      'Chargement de la vidéo…'
     );
 
     try{
 
-      const form =
-        new FormData();
+      objectUrl=
+        URL.createObjectURL(
+          file
+        );
 
-      form.append(
-        'image',
-        file
+      video.src=
+        objectUrl;
+
+      video.controls=true;
+      video.playsInline=true;
+      video.preload='auto';
+
+      video.load();
+
+      await waitForMetadata(
+        video
       );
 
-      form.append(
-        'prompt',
-        userPrompt
+      await waitForVideoFrame(
+        video
       );
 
-      const response =
-        await fetch(
-          '/api/generate',
-          {
-            method:'POST',
-            body:form
-          }
-        );
-
-      let result = null;
-
-      try{
-
-        result =
-          await response.json();
-
-      }catch(_){}
-
-      if(!response.ok){
-
-        throw new Error(
-          result?.error ||
-          `Erreur serveur ${response.status}`
-        );
-
-      }
-
-      if(!result?.videoUrl){
-
-        throw new Error(
-          'Aucune URL vidéo reçue.'
-        );
-
-      }
-
-      clearVideo();
-
-      video.src =
-        result.videoUrl;
-
-      log(
-        'Vidéo créée. Chargement…'
+      await waitSeek(
+        video,
+        Math.min(
+          .1,
+          Math.max(
+            0,
+            video.duration-.05
+          )
+        )
       );
 
-      await waitForMetadata(video);
-
-      await waitForVideoFrame(video);
-
-      videoInfo.textContent =
-        `${video.videoWidth} × ${video.videoHeight} px · ${video.duration.toFixed(2)} s`;
-
-      if(
-        video.duration <
-        MIN_CLIP
-      ){
-
-        throw new Error(
-          `Vidéo trop courte. Minimum : ${MIN_CLIP} seconde.`
-        );
-
-      }
+      videoInfo.textContent+=
+        ` · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
 
       setupTimeline();
 
-      extract.disabled =
-        false;
-
       log(
-        'Vidéo PixVerse prête. Sélectionne jusqu’à 5 secondes puis extrais les 9 vues.'
+        `Vidéo prête — ${video.duration.toFixed(2)} s.\n`+
+        `Déplace la fenêtre noire sur la barre et règle une zone de recherche entre 1 et 5 secondes. Le programme choisira automatiquement la micro-séquence la plus fluide à l’intérieur.`
       );
 
-    }catch(err){
+    }catch(e){
+
+      extract.disabled=true;
 
       log(
-        `Erreur PixVerse : ${err.message}`
+        'Erreur vidéo : '+
+        e.message
       );
-
-    }finally{
-
-      generate.disabled =
-        false;
-
     }
-
   }
 );
 
 
-/* ===== CAPTURE IMAGE ===== */
+/* =====================================================
+   PIXVERSE
+===================================================== */
 
-function createCanvas(
-  width,
-  height
+generate.addEventListener(
+  'click',
+  async()=>{
+
+    const file=
+      image.files?.[0];
+
+    if(!file){
+      log(
+        'Choisis d’abord une photo.'
+      );
+      return;
+    }
+
+    const p=
+      prompt.value.trim();
+
+    if(!p){
+      log(
+        'Le prompt PixVerse est vide.'
+      );
+      return;
+    }
+
+    clearVideo();
+
+    generate.disabled=true;
+
+    try{
+
+      log(
+        'Envoi de la photo à PixVerse…'
+      );
+
+      const fd=
+        new FormData();
+
+      fd.append(
+        'image',
+        file,
+        file.name||
+        'photo.jpg'
+      );
+
+      const ur=
+        await fetch(
+          '/api/pixverse-upload',
+          {
+            method:'POST',
+            body:fd
+          }
+        );
+
+      const uj=
+        await ur.json();
+
+      if(
+        !ur.ok ||
+        uj.ErrCode!==0
+      ){
+        throw new Error(
+          uj.ErrMsg||
+          uj.error||
+          'Échec upload PixVerse.'
+        );
+      }
+
+      const imgId=
+        uj.Resp?.img_id;
+
+      if(imgId==null){
+        throw new Error(
+          'PixVerse n’a pas renvoyé img_id.'
+        );
+      }
+
+      log(
+        'Photo reçue. Création de la micro-vidéo PixVerse 5 s…'
+      );
+
+      const cr=
+        await fetch(
+          '/api/pixverse-create',
+          {
+            method:'POST',
+            headers:{
+              'Content-Type':
+              'application/json'
+            },
+            body:JSON.stringify({
+              img_id:imgId,
+              prompt:p,
+              seed:0
+            })
+          }
+        );
+
+      const cj=
+        await cr.json();
+
+      if(
+        !cr.ok ||
+        cj.ErrCode!==0
+      ){
+        throw new Error(
+          cj.ErrMsg||
+          cj.error||
+          'Échec création PixVerse.'
+        );
+      }
+
+      const id=
+        cj.Resp?.video_id;
+
+      if(!id){
+        throw new Error(
+          'PixVerse n’a pas renvoyé video_id.'
+        );
+      }
+
+      let resultUrl='';
+
+      for(
+        let i=0;
+        i<90;
+        i++
+      ){
+
+        await sleep(
+          3000
+        );
+
+        const sr=
+          await fetch(
+            `/api/pixverse-status?id=${encodeURIComponent(id)}`,
+            {
+              cache:
+              'no-store'
+            }
+          );
+
+        const sj=
+          await sr.json();
+
+        if(!sr.ok){
+          throw new Error(
+            sj.error||
+            'Erreur statut PixVerse.'
+          );
+        }
+
+        const s=
+          sj.Resp?.status;
+
+        if(s===1){
+
+          resultUrl=
+            sj.Resp?.url||
+            '';
+
+          break;
+        }
+
+        if(s===7){
+          throw new Error(
+            'PixVerse a refusé cette génération.'
+          );
+        }
+
+        if(s===8){
+          throw new Error(
+            'PixVerse a échoué à générer la vidéo.'
+          );
+        }
+
+        log(
+          `Vidéo PixVerse #${id} en génération… statut ${s??'?'}`
+        );
+      }
+
+      if(!resultUrl){
+        throw new Error(
+          'La vidéo PixVerse n’est pas encore disponible.'
+        );
+      }
+
+      video.src=
+        `/api/pixverse-video?url=${encodeURIComponent(resultUrl)}`;
+
+      video.controls=true;
+      video.playsInline=true;
+      video.preload='auto';
+
+      video.load();
+
+      await waitForMetadata(
+        video
+      );
+
+      await waitForVideoFrame(
+        video
+      );
+
+      videoInfo.textContent=
+        `Vidéo PixVerse · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
+
+      setupTimeline();
+
+      log(
+        'Vidéo PixVerse prête. Vérifie la fenêtre de sélection puis extrais les 9 vues.'
+      );
+
+    }catch(e){
+
+      log(
+        'Erreur PixVerse : '+
+        e.message
+      );
+
+    }finally{
+
+      generate.disabled=false;
+
+    }
+  }
+);
+/* =====================================================
+   ANALYSE AUTOMATIQUE DU MOUVEMENT
+   v11.8
+===================================================== */
+
+function makeAnalysisCanvas(
+  w=96,
+  h=96
 ){
-
-  const c =
+  const c=
     document.createElement(
       'canvas'
     );
 
-  c.width =
-    width;
-
-  c.height =
-    height;
+  c.width=w;
+  c.height=h;
 
   return c;
-
 }
 
-function outputSize(){
-
-  const value =
-    $('#size').value;
-
-  if(
-    value ===
-    'original'
-  ){
-
-    return Math.min(
-      video.videoWidth,
-      video.videoHeight
-    );
-
-  }
-
-  return Number(value);
-
-}
-
-async function captureAt(
+async function captureAnalysisFrame(
+  v,
   time,
-  size
+  w=96,
+  h=96
 ){
-
   await waitSeek(
-    video,
+    v,
     time
   );
 
-  await sleep(30);
-
-  const sourceWidth =
-    video.videoWidth;
-
-  const sourceHeight =
-    video.videoHeight;
-
-  const crop =
-    Math.min(
-      sourceWidth,
-      sourceHeight
+  const c=
+    makeAnalysisCanvas(
+      w,
+      h
     );
 
-  const sx =
-    Math.round(
-      (
-        sourceWidth -
-        crop
-      ) / 2
-    );
-
-  const sy =
-    Math.round(
-      (
-        sourceHeight -
-        crop
-      ) / 2
-    );
-
-  const canvas =
-    createCanvas(
-      size,
-      size
-    );
-
-  const ctx =
-    canvas.getContext(
-      '2d',
-      {
-        alpha:true,
-        willReadFrequently:true
-      }
-    );
-
-  ctx.drawImage(
-    video,
-    sx,
-    sy,
-    crop,
-    crop,
-    0,
-    0,
-    size,
-    size
-  );
-
-  const blob =
-    await new Promise(
-      resolve =>
-        canvas.toBlob(
-          resolve,
-          'image/png'
-        )
-    );
-
-  if(!blob){
-
-    throw new Error(
-      'Impossible de créer une image PNG.'
-    );
-
-  }
-
-  return {
-    time,
-    canvas,
-    blob
-  };
-
-}
-
-
-/* ===== ANALYSE MOUVEMENT ===== */
-
-function smallImageData(
-  canvas,
-  side = 96
-){
-
-  const c =
-    createCanvas(
-      side,
-      side
-    );
-
-  const ctx =
+  const ctx=
     c.getContext(
       '2d',
       {
@@ -2094,847 +1076,785 @@ function smallImageData(
     );
 
   ctx.drawImage(
-    canvas,
+    v,
     0,
     0,
-    side,
-    side
+    w,
+    h
   );
 
   return ctx.getImageData(
     0,
     0,
-    side,
-    side
+    w,
+    h
   );
-
 }
 
-function imageDifference(
+function frameDifference(
   a,
   b
 ){
+  const da=a.data;
+  const db=b.data;
 
-  const ad =
-    a.data;
-
-  const bd =
-    b.data;
-
-  let total = 0;
-
-  const pixels =
-    ad.length / 4;
-
-  for(
-    let i=0;
-    i<ad.length;
-    i+=4
-  ){
-
-    const dr =
-      Math.abs(
-        ad[i] -
-        bd[i]
-      );
-
-    const dg =
-      Math.abs(
-        ad[i+1] -
-        bd[i+1]
-      );
-
-    const db =
-      Math.abs(
-        ad[i+2] -
-        bd[i+2]
-      );
-
-    total +=
-      (
-        dr +
-        dg +
-        db
-      ) / 3;
-
-  }
-
-  return (
-    total /
-    pixels /
-    255
-  );
-
-}
-
-function mean(values){
-
-  if(!values.length){
-    return 0;
-  }
-
-  return (
-    values.reduce(
-      (a,b)=>a+b,
-      0
-    ) /
-    values.length
-  );
-
-}
-
-function variance(values){
-
-  if(!values.length){
-    return 0;
-  }
-
-  const m =
-    mean(values);
-
-  return mean(
-    values.map(
-      v =>
-        (
-          v -
-          m
-        ) ** 2
-    )
-  );
-
-}
-  function signature(
-  canvas
-){
-
-  const data =
-    smallImageData(
-      canvas,
-      64
-    );
-
-  const p =
-    data.data;
-
-  const vals = [];
+  let total=0;
+  let count=0;
 
   /*
-    On découpe l'image en petites zones.
+    On saute quelques pixels
+    pour accélérer l'analyse.
 
-    Cela permet de mesurer le déplacement
-    général du sujet sans être trop sensible
-    à chaque pixel.
+    On compare surtout la luminance
+    globale plutôt que chaque canal
+    séparément.
   */
 
   for(
-    let gy=0;
-    gy<8;
-    gy++
-  ){
-
-    for(
-      let gx=0;
-      gx<8;
-      gx++
-    ){
-
-      let total = 0;
-      let count = 0;
-
-      for(
-        let y=gy*8;
-        y<(gy+1)*8;
-        y+=2
-      ){
-
-        for(
-          let x=gx*8;
-          x<(gx+1)*8;
-          x+=2
-        ){
-
-          const i =
-            (
-              y*64 +
-              x
-            ) * 4;
-
-          total +=
-            p[i] * .299 +
-            p[i+1] * .587 +
-            p[i+2] * .114;
-
-          count++;
-
-        }
-
-      }
-
-      vals.push(
-        total /
-        count
-      );
-
-    }
-
-  }
-
-  return vals;
-
-}
-
-function distance(
-  a,
-  b
-){
-
-  let s = 0;
-
-  for(
     let i=0;
-    i<a.length;
-    i++
+    i<da.length;
+    i+=16
   ){
+    const ar=da[i];
+    const ag=da[i+1];
+    const ab=da[i+2];
 
-    const d =
-      a[i] -
-      b[i];
+    const br=db[i];
+    const bg=db[i+1];
+    const bb=db[i+2];
 
-    s +=
-      d * d;
+    const lumA=
+      ar*.299+
+      ag*.587+
+      ab*.114;
 
-  }
+    const lumB=
+      br*.299+
+      bg*.587+
+      bb*.114;
 
-  return Math.sqrt(
-    s /
-    a.length
-  );
-
-}
-
-
-/* ===== CANVAS D'ANALYSE ===== */
-
-function captureAnalysisCanvas(){
-
-  const sourceWidth =
-    video.videoWidth;
-
-  const sourceHeight =
-    video.videoHeight;
-
-  const crop =
-    Math.min(
-      sourceWidth,
-      sourceHeight
-    );
-
-  const sx =
-    Math.round(
-      (
-        sourceWidth -
-        crop
-      ) / 2
-    );
-
-  const sy =
-    Math.round(
-      (
-        sourceHeight -
-        crop
-      ) / 2
-    );
-
-  const canvas =
-    createCanvas(
-      256,
-      256
-    );
-
-  const ctx =
-    canvas.getContext(
-      '2d',
-      {
-        willReadFrequently:true
-      }
-    );
-
-  ctx.drawImage(
-    video,
-    sx,
-    sy,
-    crop,
-    crop,
-    0,
-    0,
-    256,
-    256
-  );
-
-  return canvas;
-
-}
-
-
-/* ===== RECHERCHE DE LA MEILLEURE MICRO-SÉQUENCE ===== */
-
-function nearestSampleIndex(
-  samples,
-  t
-){
-
-  let best = 0;
-
-  let bestDistance =
-    Infinity;
-
-  for(
-    let i=0;
-    i<samples.length;
-    i++
-  ){
-
-    const d =
+    total+=
       Math.abs(
-        samples[i].t -
-        t
+        lumA-lumB
       );
 
-    if(
-      d <
-      bestDistance
-    ){
-
-      bestDistance =
-        d;
-
-      best =
-        i;
-
-    }
-
+    count++;
   }
 
-  return best;
+  if(!count)return 0;
 
+  return total/count;
 }
 
 
-/*
-  v11.7
+/* =====================================================
+   MESURE D'UNE SEQUENCE CANDIDATE
+===================================================== */
 
-  Le programme ne cherche plus simplement
-  "l'endroit où il y a le plus de mouvement".
-
-  Il cherche désormais :
-
-  - un mouvement visible ;
-  - progressif ;
-  - sans gros saut ;
-  - avec peu de déplacement global ;
-  - compatible avec seulement 9 vues.
-
-  Exemple :
-  regard / bouche / oreilles / tête = intéressant.
-
-  Chat qui traverse l'image = pénalisé.
-*/
-
-function sequenceMetrics(
-  samples,
+async function analyseCandidate(
+  v,
   start,
-  end
+  duration
 ){
-
-  const indexes = [];
-
-  const signatures = [];
+  const end=
+    start+
+    duration;
 
   /*
-    On simule les 9 vues finales.
+    On analyse 9 positions,
+    exactement comme les 9 vues finales.
   */
+
+  const times=[];
 
   for(
-    let k=0;
-    k<9;
-    k++
+    let i=0;
+    i<9;
+    i++
   ){
-
-    const t =
-      start +
+    times.push(
+      start+
+      duration*
       (
-        end -
-        start
-      ) *
-      k /
-      8;
-
-    const i =
-      nearestSampleIndex(
-        samples,
-        t
-      );
-
-    indexes.push(i);
-
-    signatures.push(
-      samples[i].sig
+        i/8
+      )
     );
-
   }
 
+  const analysisFrames=[];
 
-  /*
-    Différence entre chacune
-    des 9 vues.
-  */
+  for(
+    const t of times
+  ){
+    analysisFrames.push(
+      await captureAnalysisFrame(
+        v,
+        t
+      )
+    );
+  }
 
-  const deltas = [];
+  const diffs=[];
 
   for(
     let i=1;
-    i<signatures.length;
+    i<analysisFrames.length;
     i++
   ){
-
-    deltas.push(
-      distance(
-        signatures[i-1],
-        signatures[i]
+    diffs.push(
+      frameDifference(
+        analysisFrames[i-1],
+        analysisFrames[i]
       )
     );
-
   }
 
+  if(!diffs.length){
+    return null;
+  }
 
-  const avg =
-    mean(deltas);
+  const avg=
+    diffs.reduce(
+      (a,b)=>a+b,
+      0
+    )/
+    diffs.length;
 
-  const max =
+  const max=
     Math.max(
-      ...deltas
+      ...diffs
     );
 
-  const min =
+  const min=
     Math.min(
-      ...deltas
+      ...diffs
     );
 
-  const sd =
+  const variance=
+    diffs.reduce(
+      (sum,d)=>
+        sum+
+        Math.pow(
+          d-avg,
+          2
+        ),
+      0
+    )/
+    diffs.length;
+
+  const std=
     Math.sqrt(
-      variance(deltas)
+      variance
     );
-
-  const cv =
-    sd /
-    (
-      avg ||
-      1
-    );
-
-  const jumpRatio =
-    max /
-    (
-      avg ||
-      1
-    );
-
 
   /*
-    Si plusieurs transitions sont presque
-    identiques, la séquence est trop figée.
+    Une bonne animation lenticulaire :
+
+    - doit avoir du mouvement
+    - mais pas trop
+    - doit être régulière
+    - ne doit pas contenir un gros saut
   */
 
-  const flatCount =
-    deltas.filter(
-      d =>
-        d < 1.6
-    ).length;
+  const targetMotion=9;
 
+  const motionPenalty=
+    Math.abs(
+      avg-
+      targetMotion
+    )*
+    .55;
+
+  const regularityPenalty=
+    std*
+    .85;
+
+  const jumpPenalty=
+    Math.max(
+      0,
+      max-
+      avg*1.85
+    )*
+    1.4;
 
   /*
-    Très important :
-
-    distance directe entre la première
-    et la dernière vue.
-
-    Si elle est énorme, le sujet s'est
-    probablement déplacé dans l'image.
+    On vérifie aussi si les deux
+    extrémités sont extrêmement éloignées.
   */
 
-  const endpoint =
-    distance(
-      signatures[0],
-      signatures[
-        signatures.length -
-        1
+  const endpointDifference=
+    frameDifference(
+      analysisFrames[0],
+      analysisFrames[
+        analysisFrames.length-1
       ]
     );
 
-
-  /*
-    Somme de tous les petits mouvements.
-  */
-
-  const totalTravel =
-    deltas.reduce(
-      (a,b)=>a+b,
-      0
-    );
+  const endpointPenalty=
+    Math.max(
+      0,
+      endpointDifference-
+      22
+    )*
+    .45;
 
 
-  /*
-    endpoint / totalTravel :
+  /* ===================================================
+     DUREE ADAPTATIVE v11.8
 
-    proche de 1 =
-    déplacement dans une direction.
+     Priorité :
+     0,50 s si mouvement rapide.
 
-    plus faible =
-    mouvement local / retour /
-    petite animation.
-  */
+     Les durées très courtes restent
+     autorisées mais légèrement pénalisées
+     pour éviter de les choisir sans raison.
+  =================================================== */
 
-  const travelRatio =
-    endpoint /
-    (
-      totalTravel ||
-      1
-    );
-
-
-  /* ===== PÉNALITÉ MOUVEMENT ===== */
-
-  let motionPenalty = 0;
-
-
-  /*
-    Trop peu de mouvement :
-    résultat presque fixe.
-  */
+  let durationPenalty=0;
 
   if(
-    avg < 2.2
+    duration<=.36
   ){
-
-    motionPenalty +=
+    durationPenalty=
+      1.20;
+  }
+  else if(
+    duration<=.41
+  ){
+    durationPenalty=
+      .75;
+  }
+  else if(
+    duration<=.51
+  ){
+    durationPenalty=
+      .20;
+  }
+  else if(
+    duration>1
+  ){
+    durationPenalty=
       (
-        2.2 -
-        avg
-      ) *
-      2.4;
-
+        duration-1
+      )*
+      1.2;
   }
 
 
-  /*
-    Trop de mouvement :
-    cela ressemble davantage à une vidéo
-    qu'à une animation lenticulaire.
-  */
-
-  if(
-    avg > 8.5
-  ){
-
-    motionPenalty +=
-      (
-        avg -
-        8.5
-      ) *
-      1.35;
-
-  }
-
-
-  /*
-    Gros saut entre deux vues.
-  */
-
-  if(
-    max > 11.5
-  ){
-
-    motionPenalty +=
-      (
-        max -
-        11.5
-      ) *
-      .9;
-
-  }
-
-
-  /* ===== PÉNALITÉ DÉPLACEMENT GLOBAL ===== */
-
-  const endpointPenalty =
-
-    Math.max(
-      0,
-      endpoint -
-      18
-    ) *
-    .18
-
-    +
-
-    Math.max(
-      0,
-      endpoint -
-      28
-    ) *
-    .38
-
-    +
-
-    Math.max(
-      0,
-      travelRatio -
-      .52
-    ) *
-    10;
-
-
-  /* ===== RÉGULARITÉ ===== */
-
-  const regularityPenalty =
-
-    cv *
-    8
-
-    +
-
-    Math.max(
-      0,
-      jumpRatio -
-      1.45
-    ) *
-    5
-
-    +
-
-    flatCount *
-    1.5;
-
-
-  /*
-    On préfère légèrement une micro-animation
-    courte : environ 0,8 à 1 seconde.
-
-    Elle réduit fortement le risque
-    que le sujet change complètement
-    de position.
-  */
-
-  const duration =
-    end -
-    start;
-
-  const durationPenalty =
-    Math.max(
-      0,
-      duration -
-      1
-    ) *
-    1.2;
-
-
-  /*
-    PLUS LE SCORE EST PETIT,
-    PLUS LA SÉQUENCE EST INTÉRESSANTE.
-  */
-
-  const score =
-
-    regularityPenalty
-
-    +
-
-    motionPenalty
-
-    +
-
-    endpointPenalty
-
-    +
-
+  const score=
+    regularityPenalty+
+    motionPenalty+
+    jumpPenalty+
+    endpointPenalty+
     durationPenalty;
 
-
-  return {
-
+  return{
     start,
     end,
     duration,
 
-    indexes,
+    times,
 
-    deltas,
+    avgMotion:avg,
+    maxMotion:max,
+    minMotion:min,
+    stdMotion:std,
 
-    avg,
-    max,
-    min,
-
-    cv,
-
-    jumpRatio,
-
-    flatCount,
-
-    endpoint,
-
-    travelRatio,
+    endpointDifference,
 
     score
-
   };
-
 }
 
 
-/* ===== TEST DE PLUSIEURS DURÉES ===== */
+/* =====================================================
+   CHOIX DE LA MEILLEURE MICRO-SEQUENCE
+===================================================== */
 
-function findBestMicroSequence(
-  samples,
+async function findBestSequence(
+  v,
   zoneStart,
   zoneEnd
 ){
-
-  const zoneDuration =
-    zoneEnd -
+  const zoneDur=
+    zoneEnd-
     zoneStart;
 
+  if(zoneDur<=0){
+    throw new Error(
+      'Zone vidéo invalide.'
+    );
+  }
 
   /*
-    Priorité aux passages très courts.
+    NOUVEAU v11.8
 
-    Le programme teste plusieurs durées
-    et garde celle qui possède
-    le meilleur score lenticulaire.
+    Le programme teste plusieurs durées.
+
+    Rapide :
+    0,35 / 0,40 / 0,50 s
+
+    Moyen :
+    0,65 / 0,80 s
+
+    Lent :
+    1,00 / 1,20 s
   */
 
-  const durations = [
-    .8,
-    1.0,
-    1.2,
-    1.5
+  const durations=[
+    .35,
+    .40,
+    .50,
+    .65,
+    .80,
+    1.00,
+    1.20
   ].filter(
-    d =>
-      d <=
-      zoneDuration + .001
+    d=>
+      d<=
+      zoneDur+.001
   );
 
+  if(!durations.length){
+    throw new Error(
+      'La sélection vidéo est trop courte.'
+    );
+  }
+
+  let best=null;
 
   /*
-    Sécurité si la vidéo est juste
-    à la durée minimum.
+    On ne teste pas chaque milliseconde.
+
+    On balaie la fenêtre sélectionnée
+    par petits pas.
   */
 
-  if(
-    !durations.length
-  ){
-
-    durations.push(
-      zoneDuration
-    );
-
-  }
-
-
-  let best = null;
-
-
   for(
-    const duration
-    of durations
+    const duration of durations
   ){
+
+    const available=
+      zoneDur-
+      duration;
 
     /*
-      Analyse environ tous les 0,08 s
-      dans la zone choisie.
+      Plus la zone est grande,
+      plus on teste de positions.
     */
 
-    const steps =
-      Math.max(
-        1,
-        Math.ceil(
-          (
-            zoneDuration -
-            duration
-          ) /
-          .08
-        )
-      );
+    let samples=
+      Math.ceil(
+        available/.20
+      )+
+      1;
 
+    samples=clamp(
+      samples,
+      1,
+      22
+    );
 
     for(
-      let s=0;
-      s<=steps;
-      s++
+      let i=0;
+      i<samples;
+      i++
     ){
 
-      const start =
+      const ratio=
+        samples===1
+        ?0
+        :i/(samples-1);
 
-        zoneStart
+      const start=
+        zoneStart+
+        available*
+        ratio;
 
-        +
+      try{
 
-        (
-          zoneDuration -
-          duration
-        )
+        const candidate=
+          await analyseCandidate(
+            v,
+            start,
+            duration
+          );
 
-        *
+        if(!candidate)continue;
 
-        (
-          steps ?
-          s / steps :
-          0
+        if(
+          !best ||
+          candidate.score<
+          best.score
+        ){
+          best=
+            candidate;
+        }
+
+      }catch(e){
+
+        console.warn(
+          'Analyse candidate impossible',
+          e
         );
-
-
-      const end =
-        start +
-        duration;
-
-
-      const metrics =
-        sequenceMetrics(
-          samples,
-          start,
-          end
-        );
-
-
-      if(
-        !best ||
-        metrics.score <
-        best.score
-      ){
-
-        best =
-          metrics;
 
       }
-
     }
-
   }
 
+  if(!best){
+    throw new Error(
+      'Impossible de trouver une séquence exploitable.'
+    );
+  }
 
   return best;
-
 }
 
 
-let lastAutoSequence =
-  null;
+/* =====================================================
+   CLASSIFICATION DU MOUVEMENT
+===================================================== */
+
+function movementLabel(
+  candidate
+){
+  if(!candidate){
+    return{
+      level:'unknown',
+      text:
+        'Mouvement non analysé.'
+    };
+  }
+
+  const d=
+    candidate.duration;
+
+  const motion=
+    candidate.avgMotion;
+
+  /*
+    La durée choisie donne déjà
+    une très bonne indication
+    de la vitesse du mouvement.
+  */
+
+  if(
+    d<=.41
+  ){
+    return{
+      level:'very-fast',
+      text:
+        `Mouvement très rapide — extraction resserrée à ${d.toFixed(2)} s.`
+    };
+  }
+
+  if(
+    d<=.51
+  ){
+    return{
+      level:'fast',
+      text:
+        `Mouvement rapide — extraction optimisée à ${d.toFixed(2)} s.`
+    };
+  }
+
+  if(
+    d<=.81
+  ){
+    return{
+      level:'normal',
+      text:
+        `Mouvement modéré — extraction sur ${d.toFixed(2)} s.`
+    };
+  }
+
+  return{
+    level:'slow',
+    text:
+      `Mouvement lent — extraction sur ${d.toFixed(2)} s.`
+  };
+}
 
 
-/* ===== EXTRACTION AUTOMATIQUE ===== */
+/* =====================================================
+   AFFICHAGE QUALITE
+===================================================== */
+
+function updateQualityDisplay(
+  candidate
+){
+  const dot=
+    $('#qualityDot');
+
+  const text=
+    $('#qualityText');
+
+  if(
+    !dot ||
+    !text
+  ){
+    return;
+  }
+
+  if(!candidate){
+    dot.className='dot';
+
+    text.textContent=
+      'Pas encore analysé.';
+
+    return;
+  }
+
+  const movement=
+    movementLabel(
+      candidate
+    );
+
+  let quality=
+    'good';
+
+  /*
+    Si le mouvement est trop irrégulier,
+    on prévient l'utilisateur.
+  */
+
+  if(
+    candidate.stdMotion>8 ||
+    candidate.maxMotion>30
+  ){
+    quality=
+      'warning';
+  }
+
+  if(
+    candidate.stdMotion>13 ||
+    candidate.maxMotion>42
+  ){
+    quality=
+      'bad';
+  }
+
+  dot.className=
+    `dot ${quality}`;
+
+  text.textContent=
+    `${movement.text} Mouvement moyen : ${candidate.avgMotion.toFixed(1)} · irrégularité : ${candidate.stdMotion.toFixed(1)}.`;
+}
+/* =====================================================
+   EXTRACTION DES 9 VUES
+===================================================== */
+
+async function captureFullFrame(
+  v,
+  time
+){
+  await waitSeek(
+    v,
+    time
+  );
+
+  const c=
+    document.createElement(
+      'canvas'
+    );
+
+  c.width=
+    v.videoWidth;
+
+  c.height=
+    v.videoHeight;
+
+  const ctx=
+    c.getContext(
+      '2d'
+    );
+
+  ctx.drawImage(
+    v,
+    0,
+    0,
+    c.width,
+    c.height
+  );
+
+  return c;
+}
+
+
+/* =====================================================
+   CONVERSION CANVAS -> BLOB PNG
+===================================================== */
+
+function canvasToBlob(
+  canvas,
+  type='image/png',
+  quality=.95
+){
+  return new Promise(
+    (resolve,reject)=>{
+
+      canvas.toBlob(
+        blob=>{
+
+          if(blob){
+            resolve(blob);
+          }else{
+            reject(
+              new Error(
+                'Impossible de créer l’image PNG.'
+              )
+            );
+          }
+
+        },
+        type,
+        quality
+      );
+
+    }
+  );
+}
+
+
+/* =====================================================
+   MINIATURE
+===================================================== */
+
+function makeThumbnail(
+  canvas,
+  maxSize=180
+){
+  const ratio=
+    Math.min(
+      maxSize/canvas.width,
+      maxSize/canvas.height,
+      1
+    );
+
+  const c=
+    document.createElement(
+      'canvas'
+    );
+
+  c.width=
+    Math.round(
+      canvas.width*
+      ratio
+    );
+
+  c.height=
+    Math.round(
+      canvas.height*
+      ratio
+    );
+
+  const ctx=
+    c.getContext(
+      '2d'
+    );
+
+  ctx.drawImage(
+    canvas,
+    0,
+    0,
+    c.width,
+    c.height
+  );
+
+  return c;
+}
+
+
+/* =====================================================
+   AFFICHAGE DES 9 VUES
+===================================================== */
+
+function renderFrames(){
+  framesEl.innerHTML='';
+
+  frameData.forEach(
+    (frame,index)=>{
+
+      const wrapper=
+        document.createElement(
+          'div'
+        );
+
+      wrapper.className=
+        'frame-card';
+
+      const thumb=
+        makeThumbnail(
+          frame.canvas
+        );
+
+      thumb.className=
+        'frame-thumb';
+
+      const label=
+        document.createElement(
+          'div'
+        );
+
+      label.className=
+        'frame-label';
+
+      label.textContent=
+        `Vue ${String(index+1).padStart(2,'0')} · ${frame.time.toFixed(3)} s`;
+
+      wrapper.appendChild(
+        thumb
+      );
+
+      wrapper.appendChild(
+        label
+      );
+
+      framesEl.appendChild(
+        wrapper
+      );
+    }
+  );
+}
+
+
+/* =====================================================
+   EXTRACTION PRINCIPALE
+===================================================== */
 
 extract.addEventListener(
   'click',
-  async ()=>{
+  async()=>{
+
+    if(
+      !Number.isFinite(
+        video.duration
+      ) ||
+      video.duration<=0
+    ){
+      log(
+        'Charge d’abord une vidéo.'
+      );
+      return;
+    }
+
+    const zoneStart=
+      clipStart;
+
+    const zoneEnd=
+      clipEnd;
+
+    if(
+      zoneEnd-
+      zoneStart<
+      MIN_CLIP
+    ){
+      log(
+        'La zone sélectionnée est trop courte.'
+      );
+      return;
+    }
 
     stopLoop();
 
@@ -2942,172 +1862,40 @@ extract.addEventListener(
       video.pause();
     }catch(_){}
 
-
-    const searchDuration =
-      clipEnd -
-      clipStart;
-
-
-    if(
-      searchDuration <
-      MIN_CLIP ||
-      searchDuration >
-      MAX_CLIP + .01
-    ){
-
-      log(
-        'La zone de recherche doit durer entre 1 et 5 secondes.'
-      );
-
-      return;
-
-    }
-
-
-    extract.disabled =
-      true;
+    extract.disabled=true;
+    download.disabled=true;
 
     clearFrames();
-
 
     try{
 
       log(
-        'Analyse de la zone sélectionnée…'
+        'Analyse du mouvement dans la zone sélectionnée…'
       );
 
-
-      /*
-        Nombre d'images analysées.
-
-        24 analyses environ par seconde,
-        avec minimum 61 images.
-      */
-
-      const sampleCount =
-        Math.max(
-          61,
-          Math.min(
-            121,
-            Math.round(
-              searchDuration *
-              24
-            ) + 1
-          )
-        );
-
-
-      const samples = [];
-
-
-      for(
-        let i=0;
-        i<sampleCount;
-        i++
-      ){
-
-        const t =
-
-          clipStart
-
-          +
-
-          (
-            clipEnd -
-            clipStart
-          )
-
-          *
-
-          i /
-          (
-            sampleCount -
-            1
-          );
-
-
-        await waitSeek(
+      const best=
+        await findBestSequence(
           video,
-          t
+          zoneStart,
+          zoneEnd
         );
 
+      updateQualityDisplay(
+        best
+      );
 
-        const analysisCanvas =
-          captureAnalysisCanvas();
-
-
-        samples.push({
-
-          t,
-
-          sig:
-            signature(
-              analysisCanvas
-            )
-
-        });
-
-
-        if(
-          i % 10 === 0
-        ){
-
-          log(
-            `Analyse du mouvement… ${Math.round((i+1)/sampleCount*100)} %`
-          );
-
-        }
-
-      }
-
-
-      /*
-        Recherche automatique de la meilleure
-        micro-séquence à l'intérieur de la
-        zone de maximum 5 secondes.
-      */
-
-      const best =
-        findBestMicroSequence(
-          samples,
-          clipStart,
-          clipEnd
+      const movement=
+        movementLabel(
+          best
         );
-
-
-      if(!best){
-
-        throw new Error(
-          'Aucune micro-séquence exploitable détectée.'
-        );
-
-      }
-
-
-      lastAutoSequence =
-        best;
-
 
       log(
-        `Micro-séquence retenue : ${best.start.toFixed(2)} s → ${best.end.toFixed(2)} s · ${best.duration.toFixed(2)} s`
+        `${movement.text}\n`+
+        `Séquence retenue : ${best.start.toFixed(3)} s → ${best.end.toFixed(3)} s.\n`+
+        `Extraction des 9 vues…`
       );
 
-
-      /*
-        Maintenant seulement,
-        on fabrique les 9 PNG HD.
-      */
-
-      const size =
-        outputSize();
-
-
-      let previousSignature =
-        null;
-
-      let closeTransitions =
-        0;
-
+      frameData=[];
 
       for(
         let i=0;
@@ -3115,321 +1903,155 @@ extract.addEventListener(
         i++
       ){
 
-        const t =
-
-          best.start
-
-          +
-
+        const time=
+          best.start+
+          best.duration*
           (
-            best.end -
-            best.start
-          )
-
-          *
-
-          i /
-          8;
-
-
-        const result =
-          await captureAt(
-            t,
-            size
+            i/8
           );
-
-
-        const sig =
-          signature(
-            result.canvas
-          );
-
-
-        const delta =
-
-          previousSignature
-
-          ?
-
-          distance(
-            sig,
-            previousSignature
-          )
-
-          :
-
-          null;
-
-
-        if(
-          delta !== null &&
-          delta < 1.6
-        ){
-
-          closeTransitions++;
-
-        }
-
-
-        previousSignature =
-          sig;
-
-
-        frameData.push({
-
-          index:
-            i + 1,
-
-          time:
-            t,
-
-          delta,
-
-          blob:
-            result.blob
-
-        });
-
-
-        const url =
-          URL.createObjectURL(
-            result.blob
-          );
-
-
-        const frame =
-          document.createElement(
-            'div'
-          );
-
-
-        frame.className =
-          'frame';
-
-
-        frame.innerHTML =
-
-          `<img src="${url}">
-
-          <div class="meta">
-
-          vue-${String(i+1).padStart(2,'0')}
-
-          · ${t.toFixed(3)} s
-
-          ${
-
-            delta === null
-
-            ?
-
-            ''
-
-            :
-
-            ` · Δ ${delta.toFixed(1)}`
-
-          }
-
-          </div>`;
-
-
-        framesEl.appendChild(
-          frame
-        );
-
 
         log(
-          `Création des 9 vues… ${i+1}/9`
+          `Extraction vue ${i+1}/9 — ${time.toFixed(3)} s`
         );
 
-      }
-            /*
-        ÉVALUATION QUALITÉ FINALE
+        const canvas=
+          await captureFullFrame(
+            video,
+            time
+          );
 
-        On utilise les métriques de la
-        micro-séquence choisie + les deltas
-        réels des 9 PNG.
-      */
+        const blob=
+          await canvasToBlob(
+            canvas,
+            'image/png'
+          );
 
-      const dot =
-        $('#qualityDot');
-
-      const text =
-        $('#qualityText');
-
-
-      const realDeltas =
-        frameData
-
-        .map(
-          f => f.delta
-        )
-
-        .filter(
-          d =>
-            d !== null
-        );
-
-
-      const realAvg =
-        mean(
-          realDeltas
-        );
-
-
-      const realMax =
-        Math.max(
-          ...realDeltas
-        );
-
-
-      /*
-        Plus endpoint est grand,
-        plus la dernière vue est éloignée
-        de la première.
-
-        Pour un bon lenticulaire,
-        on préfère rester raisonnable.
-      */
-
-      let quality =
-        'good';
-
-
-      let qualityMessage =
-        'Bonne micro-animation pour lenticulaire.';
-
-
-      if(
-        best.endpoint > 35 ||
-        best.travelRatio > .72 ||
-        realMax > 15
-      ){
-
-        quality =
-          'bad';
-
-        qualityMessage =
-          'Mouvement probablement trop important : risque de saut ou mini-vidéo saccadée.';
-
+        frameData.push({
+          index:i,
+          time,
+          canvas,
+          blob
+        });
       }
 
-      else if(
-        best.endpoint > 24 ||
-        best.travelRatio > .58 ||
-        realMax > 11 ||
-        closeTransitions >= 4
-      ){
+      renderFrames();
 
-        quality =
-          'warn';
-
-        qualityMessage =
-          'Séquence exploitable, mais à vérifier visuellement avant impression.';
-
-      }
-
-
-      dot.className =
-        `dot ${quality}`;
-
-
-      text.textContent =
-
-        `${qualityMessage} `
-
-        +
-
-        `Mouvement moyen ${realAvg.toFixed(1)} · `
-
-        +
-
-        `max ${realMax.toFixed(1)} · `
-
-        +
-
-        `écart vue 1→9 ${best.endpoint.toFixed(1)}.`;
-
-
-      download.disabled =
-        false;
-
+      download.disabled=false;
 
       log(
-
-        `Extraction terminée.
-
-Micro-séquence retenue :
-${best.start.toFixed(3)} s → ${best.end.toFixed(3)} s
-
-Durée :
-${best.duration.toFixed(3)} s
-
-Score lenticulaire :
-${best.score.toFixed(2)}
-
-Écart vue 1 → vue 9 :
-${best.endpoint.toFixed(2)}
-
-9 images prêtes.`
-
+        `Terminé.\n`+
+        `9 vues extraites sur ${best.duration.toFixed(2)} s.\n`+
+        `Début : ${best.start.toFixed(3)} s · fin : ${best.end.toFixed(3)} s.\n`+
+        `Tu peux maintenant télécharger le ZIP.`
       );
 
-
-    }catch(err){
+    }catch(e){
 
       log(
-        `Erreur extraction : ${err.message}`
+        'Erreur extraction : '+
+        e.message
       );
 
     }finally{
 
-      extract.disabled =
-        false;
+      extract.disabled=false;
 
     }
-
   }
 );
 
 
-/* ===== EXPORT ZIP ===== */
+/* =====================================================
+   CREATION DU MANIFEST
+===================================================== */
+
+function buildManifest(){
+  return{
+    generator:
+      'LentiPrint Lab v11.8',
+
+    createdAt:
+      new Date().toISOString(),
+
+    video:{
+      width:
+        video.videoWidth,
+
+      height:
+        video.videoHeight,
+
+      duration:
+        Number(
+          video.duration.toFixed(3)
+        )
+    },
+
+    selection:{
+      start:
+        Number(
+          clipStart.toFixed(3)
+        ),
+
+      end:
+        Number(
+          clipEnd.toFixed(3)
+        ),
+
+      duration:
+        Number(
+          (
+            clipEnd-
+            clipStart
+          ).toFixed(3)
+        )
+    },
+
+    views:
+      frameData.map(
+        (frame,index)=>({
+          file:
+            `vue-${String(index+1).padStart(2,'0')}.png`,
+
+          index:
+            index+1,
+
+          time:
+            Number(
+              frame.time.toFixed(4)
+            )
+        })
+      )
+  };
+}
+
+
+/* =====================================================
+   TELECHARGEMENT ZIP
+===================================================== */
 
 download.addEventListener(
   'click',
-  async ()=>{
+  async()=>{
 
     if(
-      frameData.length !== 9
+      frameData.length!==9
     ){
-
       log(
         'Il faut d’abord extraire les 9 vues.'
       );
-
       return;
-
     }
-
 
     if(
-      typeof JSZip ===
-      'undefined'
+      typeof JSZip==='undefined'
     ){
-
       log(
-        'JSZip n’est pas disponible.'
+        'JSZip n’est pas chargé. Vérifie la bibliothèque JSZip dans index.html.'
       );
-
       return;
-
     }
 
-
-    download.disabled =
-      true;
-
+    download.disabled=true;
 
     try{
 
@@ -3437,254 +2059,168 @@ download.addEventListener(
         'Création du ZIP…'
       );
 
-
-      const zip =
+      const zip=
         new JSZip();
 
+      frameData.forEach(
+        (frame,index)=>{
 
-      const direction =
-        $('#direction').value;
-
-
-      const ordered =
-
-        direction === 'reverse'
-
-        ?
-
-        [...frameData].reverse()
-
-        :
-
-        [...frameData];
-
-
-      ordered.forEach(
-        (
-          frame,
-          i
-        )=>{
+          const filename=
+            `vue-${String(index+1).padStart(2,'0')}.png`;
 
           zip.file(
-
-            `vue-${String(i+1).padStart(2,'0')}.png`,
-
+            filename,
             frame.blob
-
           );
-
         }
       );
 
-
-      /*
-        MANIFEST
-
-        Très utile pour garder une trace
-        de la manière dont les vues
-        ont été obtenues.
-      */
-
-      const manifest = {
-
-        version:
-          '11.7',
-
-        createdAt:
-          new Date().toISOString(),
-
-        source: {
-
-          videoDuration:
-            video.duration,
-
-          width:
-            video.videoWidth,
-
-          height:
-            video.videoHeight
-
-        },
-
-        searchZone: {
-
-          start:
-            clipStart,
-
-          end:
-            clipEnd,
-
-          duration:
-            clipEnd -
-            clipStart
-
-        },
-
-        autoSequence:
-
-          lastAutoSequence
-
-          ?
-
-          {
-
-            start:
-              lastAutoSequence.start,
-
-            end:
-              lastAutoSequence.end,
-
-            duration:
-              lastAutoSequence.duration,
-
-            score:
-              lastAutoSequence.score,
-
-            averageMotion:
-              lastAutoSequence.avg,
-
-            maximumMotion:
-              lastAutoSequence.max,
-
-            endpointDistance:
-              lastAutoSequence.endpoint,
-
-            travelRatio:
-              lastAutoSequence.travelRatio,
-
-            regularity:
-              lastAutoSequence.cv
-
-          }
-
-          :
-
-          null,
-
-        views:
-
-          ordered.map(
-            (
-              frame,
-              i
-            )=>({
-
-              file:
-                `vue-${String(i+1).padStart(2,'0')}.png`,
-
-              originalIndex:
-                frame.index,
-
-              time:
-                frame.time,
-
-              delta:
-                frame.delta
-
-            })
-          ),
-
-        direction,
-
-        outputSize:
-          outputSize()
-
-      };
-
+      const manifest=
+        buildManifest();
 
       zip.file(
-
         'manifest.json',
-
         JSON.stringify(
           manifest,
           null,
           2
         )
-
       );
 
-
-      const blob =
+      const blob=
         await zip.generateAsync({
-
           type:'blob',
-
           compression:'DEFLATE',
-
           compressionOptions:{
             level:6
           }
-
         });
 
-
-      const url =
+      const url=
         URL.createObjectURL(
           blob
         );
 
-
-      const a =
+      const a=
         document.createElement(
           'a'
         );
 
-
-      a.href =
+      a.href=
         url;
 
-
-      a.download =
+      a.download=
         '9-vues-animation-lenticulaire.zip';
-
 
       document.body.appendChild(
         a
       );
 
-
       a.click();
-
 
       a.remove();
 
-
       setTimeout(
         ()=>{
-
           URL.revokeObjectURL(
             url
           );
-
         },
-        1500
+        3000
       );
 
-
       log(
-        'ZIP créé : 9 PNG + manifest.json.'
+        'ZIP téléchargé : 9 vues PNG + manifest.json.'
       );
 
-
-    }catch(err){
+    }catch(e){
 
       log(
-        `Erreur ZIP : ${err.message}`
+        'Erreur création ZIP : '+
+        e.message
       );
 
     }finally{
 
-      download.disabled =
-        false;
+      download.disabled=false;
 
     }
-
   }
 );
+/* =====================================================
+   SECURITES ET PETITS EVENEMENTS D'INTERFACE
+===================================================== */
+
+video.addEventListener('ended',()=>{
+  if(trimLoopActive){
+    try{
+      video.currentTime=clipStart;
+      video.play();
+    }catch(_){}
+  }
+});
+
+video.addEventListener('timeupdate',()=>{
+  if(
+    !Number.isFinite(video.duration) ||
+    video.duration<=0
+  ){
+    return;
+  }
+
+  timelinePlayed.style.width=
+    `${clamp(
+      video.currentTime/video.duration,
+      0,
+      1
+    )*100}%`;
+});
 
 
-/* ===== NETTOYAGE ===== */
+/* =====================================================
+   RESET PHOTO
+===================================================== */
+
+image.addEventListener('change',()=>{
+  if(!image.files?.length)return;
+
+  clearVideo();
+
+  log(
+    'Photo chargée. Choisis l’action puis génère la micro-vidéo.'
+  );
+});
+
+
+/* =====================================================
+   DIRECTION DES 9 VUES
+===================================================== */
+
+const direction=$('#direction');
+
+if(direction){
+  direction.addEventListener(
+    'change',
+    ()=>{
+
+      if(frameData.length===9){
+
+        log(
+          direction.value==='reverse'
+          ? 'Ordre inversé sélectionné : le ZIP sera exporté de la vue 9 vers la vue 1.'
+          : 'Ordre normal sélectionné : le ZIP sera exporté de la vue 1 vers la vue 9.'
+        );
+
+      }
+
+    }
+  );
+}
+
+
+/* =====================================================
+   PROTECTION AVANT FERMETURE
+===================================================== */
 
 window.addEventListener(
   'beforeunload',
@@ -3693,23 +2229,31 @@ window.addEventListener(
     stopLoop();
 
     if(objectUrl){
-
       try{
-
         URL.revokeObjectURL(
           objectUrl
         );
-
       }catch(_){}
-
     }
 
   }
 );
 
-</script>
 
-</body>
-</html>
-      
-  
+/* =====================================================
+   ETAT INITIAL
+===================================================== */
+
+clearFrames();
+
+extract.disabled=true;
+download.disabled=true;
+
+if(trimControls){
+  trimControls.hidden=true;
+}
+
+log(
+  'Prêt. Charge une photo pour créer une animation PixVerse ou charge directement une vidéo existante.'
+);
+
