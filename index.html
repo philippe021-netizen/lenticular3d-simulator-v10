@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>LentiPrint Lab v11.3</title>
+<title>LentiPrint Lab v11.4</title>
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
@@ -11,17 +11,21 @@
 :root{
   font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   color:#151515;
-  background:#f5f5f3;
+  background:#f5f5f3
 }
 
-*{box-sizing:border-box}
+*{
+  box-sizing:border-box
+}
 
-body{margin:0}
+body{
+  margin:0
+}
 
 .wrap{
   max-width:1100px;
   margin:auto;
-  padding:22px;
+  padding:22px
 }
 
 .top{
@@ -29,7 +33,7 @@ body{margin:0}
   gap:14px;
   align-items:center;
   justify-content:space-between;
-  margin-bottom:18px;
+  margin-bottom:18px
 }
 
 .badge{
@@ -37,50 +41,50 @@ body{margin:0}
   padding:6px 9px;
   border-radius:999px;
   background:#111;
-  color:white;
+  color:#fff
 }
 
 .card{
-  background:white;
+  background:#fff;
   border:1px solid #ddd;
   border-radius:18px;
   padding:18px;
   margin:14px 0;
-  box-shadow:0 1px 8px #0000000a;
+  box-shadow:0 1px 8px #0000000a
 }
 
 h1{
   font-size:25px;
-  margin:0;
+  margin:0
 }
 
 h2{
   font-size:18px;
-  margin:0 0 12px;
+  margin:0 0 12px
 }
 
 .row{
   display:grid;
   grid-template-columns:1fr 1fr;
-  gap:14px;
+  gap:14px
 }
 
 .field{
   display:flex;
   flex-direction:column;
-  gap:7px;
+  gap:7px
 }
 
 label{
   font-size:13px;
-  font-weight:650;
+  font-weight:650
 }
 
 input,
 textarea,
 select,
 button{
-  font:inherit;
+  font:inherit
 }
 
 input,
@@ -89,19 +93,19 @@ select{
   border:1px solid #ccc;
   border-radius:11px;
   padding:11px;
-  background:#fff;
+  background:#fff
 }
 
 textarea{
   min-height:110px;
-  resize:vertical;
+  resize:vertical
 }
 
 .actions{
   display:flex;
   gap:10px;
   flex-wrap:wrap;
-  margin-top:14px;
+  margin-top:14px
 }
 
 button{
@@ -109,19 +113,19 @@ button{
   border-radius:12px;
   padding:11px 15px;
   background:#111;
-  color:white;
+  color:#fff;
   font-weight:700;
-  cursor:pointer;
+  cursor:pointer
 }
 
 button.secondary{
   background:#ececec;
-  color:#111;
+  color:#111
 }
 
 button:disabled{
   opacity:.45;
-  cursor:not-allowed;
+  cursor:not-allowed
 }
 
 .status{
@@ -129,136 +133,230 @@ button:disabled{
   border-radius:12px;
   background:#f3f3f3;
   font-size:13px;
-  white-space:pre-wrap;
+  white-space:pre-wrap
 }
 
 .preview{
   display:grid;
-  grid-template-columns:340px 1fr;
+  grid-template-columns:360px 1fr;
   gap:16px;
-  align-items:start;
+  align-items:start
 }
 
 video{
   display:block;
   width:100%;
-  min-height:180px;
-  max-width:100%;
   border-radius:14px;
-  background:#111;
+  background:#111
 }
 
 .frames{
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:10px;
+  gap:10px
 }
 
 .frame{
   border:1px solid #ddd;
   border-radius:12px;
   padding:7px;
-  background:#fafafa;
+  background:#fafafa
 }
 
 .frame img{
   width:100%;
   aspect-ratio:1/1;
   object-fit:cover;
-  border-radius:9px;
+  border-radius:9px
 }
 
 .meta{
   font-size:11px;
   color:#666;
-  margin-top:6px;
+  margin-top:6px
 }
 
 .quality{
   display:flex;
   gap:8px;
   align-items:center;
-  font-size:12px;
+  font-size:12px
 }
 
 .dot{
   width:9px;
   height:9px;
   border-radius:50%;
-  background:#999;
+  background:#999
 }
 
-.good{background:#159947}
-.warn{background:#e09b00}
-.bad{background:#c62929}
+.good{
+  background:#159947
+}
 
-.trim{
+.warn{
+  background:#e09b00
+}
+
+.bad{
+  background:#c62929
+}
+
+.trimBox{
   margin-top:14px;
   padding:14px;
   border:1px solid #ddd;
   border-radius:14px;
-  background:#fafafa;
+  background:#fafafa
 }
 
 .trimTitle{
-  font-weight:700;
+  font-weight:750;
   font-size:14px;
-  margin-bottom:12px;
+  margin-bottom:8px
 }
 
-.trimrow{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:16px;
-}
-
-.trimLabel{
-  display:flex;
-  justify-content:space-between;
-  gap:8px;
-  margin-bottom:4px;
-}
-
-.trim input[type=range]{
-  width:100%;
-  padding:0;
-}
-
-.trimMeta{
-  margin-top:10px;
-  padding:9px;
-  border-radius:9px;
-  background:#fff;
-  border:1px solid #e1e1e1;
-  font-size:13px;
-  font-weight:650;
-}
-
-.help{
+.trimHelp{
   font-size:12px;
   color:#666;
   line-height:1.4;
-  margin-top:8px;
+  margin-bottom:14px
+}
+
+.timeline{
+  position:relative;
+  height:54px;
+  margin:12px 4px 6px;
+  touch-action:none;
+  user-select:none
+}
+
+.timelineTrack{
+  position:absolute;
+  left:0;
+  right:0;
+  top:20px;
+  height:12px;
+  border-radius:999px;
+  background:#d7dbe1;
+  overflow:visible
+}
+
+.timelinePlayed{
+  position:absolute;
+  left:0;
+  top:0;
+  height:100%;
+  width:0;
+  border-radius:999px;
+  background:#aab3bf;
+  pointer-events:none
+}
+
+.selection{
+  position:absolute;
+  top:-7px;
+  height:26px;
+  border-radius:10px;
+  background:#111;
+  cursor:grab;
+  touch-action:none;
+  box-shadow:0 2px 6px #0003
+}
+
+.selection.dragging{
+  cursor:grabbing
+}
+
+.handle{
+  position:absolute;
+  top:-5px;
+  width:24px;
+  height:36px;
+  border-radius:9px;
+  background:#fff;
+  border:2px solid #111;
+  box-shadow:0 1px 5px #0002;
+  touch-action:none
+}
+
+.handle.left{
+  left:-12px;
+  cursor:ew-resize
+}
+
+.handle.right{
+  right:-12px;
+  cursor:ew-resize
+}
+
+.timeBubble{
+  position:absolute;
+  top:-28px;
+  transform:translateX(-50%);
+  background:#111;
+  color:#fff;
+  font-size:11px;
+  font-weight:700;
+  padding:4px 6px;
+  border-radius:7px;
+  white-space:nowrap
+}
+
+#bubbleStart{
+  left:0
+}
+
+#bubbleEnd{
+  left:100%
+}
+
+.playhead{
+  position:absolute;
+  top:-6px;
+  width:3px;
+  height:24px;
+  background:#f33;
+  border-radius:3px;
+  pointer-events:none;
+  display:none
+}
+
+.timelineTicks{
+  display:flex;
+  justify-content:space-between;
+  font-size:11px;
+  color:#777;
+  margin-top:2px
+}
+
+.selectionInfo{
+  margin-top:12px;
+  padding:10px;
+  border-radius:10px;
+  background:#fff;
+  border:1px solid #e0e0e0;
+  font-weight:700;
+  font-size:13px
 }
 
 @media(max-width:760px){
 
   .row,
-  .preview,
-  .trimrow{
-    grid-template-columns:1fr;
+  .preview{
+    grid-template-columns:1fr
   }
 
   .frames{
-    grid-template-columns:repeat(3,1fr);
+    grid-template-columns:repeat(3,1fr)
   }
 
   .wrap{
-    padding:12px;
+    padding:12px
   }
 
   h1{
-    font-size:21px;
+    font-size:21px
   }
 }
 </style>
@@ -272,10 +370,10 @@ video{
 
 <div>
 <h1>LentiPrint Lab</h1>
-<div>Photo / vidéo → sélection 5 s max → 9 vues lenticulaires</div>
+<div>Vidéo → fenêtre glissante 1 à 5 s → 9 vues</div>
 </div>
 
-<span class="badge">v11.3</span>
+<span class="badge">v11.4</span>
 
 </div>
 
@@ -400,75 +498,86 @@ class="meta">
 
 <div
 id="trimControls"
-class="trim"
+class="trimBox"
 hidden>
 
 <div class="trimTitle">
-Sélectionner le passage utile
+Choisir le passage utile
+</div>
+
+<div class="trimHelp">
+Fais glisser la zone noire pour la déplacer dans la vidéo.
+Tire les poignées gauche et droite pour régler la durée entre 1 et 5 secondes.
 </div>
 
 
-<div class="trimrow">
+<div
+id="timeline"
+class="timeline">
+
+<div
+id="timelineTrack"
+class="timelineTrack">
+
+<div
+id="timelinePlayed"
+class="timelinePlayed">
+</div>
 
 
-<div>
+<div
+id="selection"
+class="selection">
 
-<div class="trimLabel">
-
-<span>Début</span>
-
-<strong id="trimStartText">
+<div
+id="bubbleStart"
+class="timeBubble">
 0.00 s
-</strong>
-
 </div>
 
-<input
-id="trimStart"
-type="range"
-min="0"
-max="5"
-step="0.01"
-value="0">
-
-</div>
-
-
-<div>
-
-<div class="trimLabel">
-
-<span>Fin</span>
-
-<strong id="trimEndText">
+<div
+id="bubbleEnd"
+class="timeBubble">
 5.00 s
-</strong>
+</div>
+
+<div
+id="handleLeft"
+class="handle left">
+</div>
+
+<div
+id="handleRight"
+class="handle right">
+</div>
+
+<div
+id="playhead"
+class="playhead">
+</div>
 
 </div>
 
-<input
-id="trimEnd"
-type="range"
-min="0"
-max="5"
-step="0.01"
-value="5">
+</div>
 
 </div>
 
+
+<div class="timelineTicks">
+
+<span>0 s</span>
+
+<span id="totalDuration">
+0 s
+</span>
 
 </div>
 
 
 <div
-id="trimMeta"
-class="trimMeta">
-Séquence sélectionnée : 5.00 s / 5.00 s max
-</div>
-
-
-<div class="help">
-La vidéo complète peut être longue. Seule la zone comprise entre Début et Fin sera utilisée. Minimum 1 seconde, maximum 5 secondes.
+id="selectionInfo"
+class="selectionInfo">
+Sélection : 0.00 s → 5.00 s · durée 5.00 s
 </div>
 
 
@@ -601,77 +710,75 @@ Pas encore analysé.
 
 <script type="module">
 
-const $ = s => document.querySelector(s);
+const $=s=>document.querySelector(s);
+
+const image=$('#image');
+const preset=$('#preset');
+const prompt=$('#prompt');
+const status=$('#status');
+
+const video=$('#video');
+const videoInfo=$('#videoInfo');
+
+const generate=$('#generate');
+const loadVideo=$('#loadVideo');
+const videoFile=$('#videoFile');
+
+const trimControls=$('#trimControls');
+const timelineTrack=$('#timelineTrack');
+const selection=$('#selection');
+
+const handleLeft=$('#handleLeft');
+const handleRight=$('#handleRight');
+
+const bubbleStart=$('#bubbleStart');
+const bubbleEnd=$('#bubbleEnd');
+
+const selectionInfo=$('#selectionInfo');
+const totalDuration=$('#totalDuration');
+
+const previewTrim=$('#previewTrim');
+const playhead=$('#playhead');
+const timelinePlayed=$('#timelinePlayed');
+
+const extract=$('#extract');
+const framesEl=$('#frames');
+const download=$('#download');
+
+const MIN_CLIP=1;
+const MAX_CLIP=5;
+
+let objectUrl=null;
+let frameData=[];
+
+let clipStart=0;
+let clipEnd=5;
+
+let dragMode=null;
+let pointerStartX=0;
+let startClipAtPointer=0;
+let endClipAtPointer=0;
+
+let trimLoopActive=false;
+let loopRAF=null;
 
 
-/* =========================================================
-   ELEMENTS
-========================================================= */
-
-const image = $('#image');
-const preset = $('#preset');
-const prompt = $('#prompt');
-
-const status = $('#status');
-
-const video = $('#video');
-const videoInfo = $('#videoInfo');
-
-const generate = $('#generate');
-const loadVideo = $('#loadVideo');
-const videoFile = $('#videoFile');
-
-const trimControls = $('#trimControls');
-const trimStart = $('#trimStart');
-const trimEnd = $('#trimEnd');
-
-const trimStartText = $('#trimStartText');
-const trimEndText = $('#trimEndText');
-const trimMeta = $('#trimMeta');
-
-const previewTrim = $('#previewTrim');
-
-const extract = $('#extract');
-const framesEl = $('#frames');
-
-const download = $('#download');
-
-
-/* =========================================================
-   VARIABLES
-========================================================= */
-
-let objectUrl = null;
-
-let frameData = [];
-
-let trimLoopActive = false;
-let trimLoopRAF = null;
-
-const MIN_CLIP = 1;
-const MAX_CLIP = 5;
-
-
-/* =========================================================
-   PROMPTS PIXVERSE
-========================================================= */
-
-const prompts = {
+const prompts={
 
 bark:
-`FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.`,
+'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
 
 blink:
-`FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.`,
+'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
 
 smile:
-`FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.`,
+'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
 
 kiss:
-`FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.`,
+'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
 
 dance:
-`FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.`,
+'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
 
 custom:''
 
@@ -681,10 +788,10 @@ custom:''
 function setPrompt(){
 
 if(
-preset.value !== 'custom'
+preset.value!=='custom'
 ){
 
-prompt.value =
+prompt.value=
 prompts[preset.value];
 
 }
@@ -700,14 +807,9 @@ setPrompt
 setPrompt();
 
 
-/* =========================================================
-   OUTILS
-========================================================= */
+function log(t){
 
-function log(message){
-
-status.textContent =
-message;
+status.textContent=t;
 
 }
 
@@ -715,45 +817,47 @@ message;
 function sleep(ms){
 
 return new Promise(
-resolve =>
-setTimeout(resolve,ms)
+r=>setTimeout(r,ms)
 );
 
 }
 
 
-function stopTrimLoop(){
+function stopLoop(){
 
-trimLoopActive = false;
+trimLoopActive=false;
 
-if(trimLoopRAF){
+if(loopRAF){
 
 cancelAnimationFrame(
-trimLoopRAF
+loopRAF
 );
 
-trimLoopRAF = null;
+loopRAF=null;
 
 }
 
-previewTrim.textContent =
+previewTrim.textContent=
 '▶ Lire la sélection en boucle';
+
+playhead.style.display=
+'none';
 
 }
 
 
 function clearFrames(){
 
-frameData = [];
+frameData=[];
 
-framesEl.innerHTML = '';
+framesEl.innerHTML='';
 
-download.disabled = true;
+download.disabled=true;
 
-$('#qualityDot').className =
+$('#qualityDot').className=
 'dot';
 
-$('#qualityText').textContent =
+$('#qualityText').textContent=
 'Pas encore analysé.';
 
 }
@@ -761,7 +865,7 @@ $('#qualityText').textContent =
 
 function clearVideo(){
 
-stopTrimLoop();
+stopLoop();
 
 clearFrames();
 
@@ -771,18 +875,15 @@ video.pause();
 
 }catch(_){}
 
-
 video.removeAttribute(
 'src'
 );
-
 
 try{
 
 video.load();
 
 }catch(_){}
-
 
 if(objectUrl){
 
@@ -794,23 +895,18 @@ objectUrl
 
 }catch(_){}
 
-objectUrl = null;
+objectUrl=null;
 
 }
 
+trimControls.hidden=true;
 
-trimControls.hidden = true;
+extract.disabled=true;
 
-extract.disabled = true;
-
-videoInfo.textContent = '';
+videoInfo.textContent='';
 
 }
 
-
-/* =========================================================
-   ATTENTE VIDEO
-========================================================= */
 
 function waitForMetadata(v){
 
@@ -819,26 +915,22 @@ return new Promise(
 
 if(
 Number.isFinite(v.duration) &&
-v.duration > 0
+v.duration>0
 ){
 
 resolve();
-
 return;
 
 }
 
-
-const ok = ()=>{
+const ok=()=>{
 
 cleanup();
-
 resolve();
 
 };
 
-
-const fail = ()=>{
+const fail=()=>{
 
 cleanup();
 
@@ -850,8 +942,7 @@ new Error(
 
 };
 
-
-const cleanup = ()=>{
+const cleanup=()=>{
 
 v.removeEventListener(
 'loadedmetadata',
@@ -864,7 +955,6 @@ fail
 );
 
 };
-
 
 v.addEventListener(
 'loadedmetadata',
@@ -886,28 +976,27 @@ fail,
 
 function waitForVideoFrame(
 v,
-timeout = 15000
+timeout=15000
 ){
 
 return new Promise(
 (resolve,reject)=>{
 
-let finished = false;
+let done=false;
 
+const check=()=>{
 
-const check = ()=>{
-
-if(finished){
+if(done){
 return;
 }
 
 if(
-v.readyState >= 2 &&
-v.videoWidth > 0 &&
-v.videoHeight > 0
+v.readyState>=2 &&
+v.videoWidth>0 &&
+v.videoHeight>0
 ){
 
-finished = true;
+done=true;
 
 cleanup();
 
@@ -917,14 +1006,13 @@ resolve();
 
 };
 
+const fail=()=>{
 
-const fail = ()=>{
-
-if(finished){
+if(done){
 return;
 }
 
-finished = true;
+done=true;
 
 cleanup();
 
@@ -936,22 +1024,21 @@ new Error(
 
 };
 
-
-const timer =
+const timer=
 setTimeout(
 ()=>{
 
-if(finished){
+if(done){
 return;
 }
 
-finished = true;
+done=true;
 
 cleanup();
 
 reject(
 new Error(
-'Aucune image vidéo décodée après 15 secondes.'
+'Aucune image vidéo décodée.'
 )
 );
 
@@ -959,22 +1046,23 @@ new Error(
 timeout
 );
 
+const events=[
+'loadeddata',
+'canplay',
+'canplaythrough',
+'timeupdate'
+];
 
-const cleanup = ()=>{
+const cleanup=()=>{
 
 clearTimeout(
 timer
 );
 
-[
-'loadeddata',
-'canplay',
-'canplaythrough',
-'timeupdate'
-].forEach(
-event =>
+events.forEach(
+e=>
 v.removeEventListener(
-event,
+e,
 check
 )
 );
@@ -986,16 +1074,10 @@ fail
 
 };
 
-
-[
-'loadeddata',
-'canplay',
-'canplaythrough',
-'timeupdate'
-].forEach(
-event =>
+events.forEach(
+e=>
 v.addEventListener(
-event,
+e,
 check
 )
 );
@@ -1013,10 +1095,6 @@ check();
 
 }
 
-
-/* =========================================================
-   SEEK
-========================================================= */
 
 function waitSeek(
 v,
@@ -1040,34 +1118,30 @@ return;
 
 }
 
-
-const target =
+const target=
 Math.max(
 0,
 Math.min(
 time,
 Math.max(
 0,
-v.duration - 0.02
+v.duration-.02
 )
 )
 );
 
-
 if(
 Math.abs(
-v.currentTime - target
-) < 0.015
+v.currentTime-target
+)<.015
 ){
 
 resolve();
-
 return;
 
 }
 
-
-const ok = ()=>{
+const ok=()=>{
 
 cleanup();
 
@@ -1075,8 +1149,7 @@ resolve();
 
 };
 
-
-const fail = ()=>{
+const fail=()=>{
 
 cleanup();
 
@@ -1088,8 +1161,7 @@ new Error(
 
 };
 
-
-const timer =
+const timer=
 setTimeout(
 ()=>{
 
@@ -1101,8 +1173,7 @@ resolve();
 2500
 );
 
-
-const cleanup = ()=>{
+const cleanup=()=>{
 
 clearTimeout(
 timer
@@ -1120,7 +1191,6 @@ fail
 
 };
 
-
 v.addEventListener(
 'seeked',
 ok,
@@ -1133,10 +1203,9 @@ fail,
 {once:true}
 );
 
-
 try{
 
-v.currentTime =
+v.currentTime=
 target;
 
 }catch(e){
@@ -1153,231 +1222,161 @@ reject(e);
 }
 
 
-/* =========================================================
-   CURSEURS
-========================================================= */
+function clamp(
+n,
+min,
+max
+){
 
-function updateTrim(
-source = 'start'
+return Math.max(
+min,
+Math.min(
+max,
+n
+)
+);
+
+}
+
+
+function secondsFromPixels(
+px
+){
+
+const rect=
+timelineTrack.getBoundingClientRect();
+
+if(
+!rect.width ||
+!video.duration
+){
+
+return 0;
+
+}
+
+return
+px /
+rect.width *
+video.duration;
+
+}
+
+
+function renderSelection(
+seekToStart=false
 ){
 
 if(
 !Number.isFinite(video.duration) ||
-video.duration <= 0
+video.duration<=0
 ){
 
 return;
 
 }
 
+clipStart=
+clamp(
+clipStart,
+0,
+video.duration
+);
 
-const duration =
+clipEnd=
+clamp(
+clipEnd,
+0,
+video.duration
+);
+
+let len=
+clipEnd-clipStart;
+
+if(
+len<MIN_CLIP
+){
+
+clipEnd=
+Math.min(
+video.duration,
+clipStart+MIN_CLIP
+);
+
+}
+
+if(
+clipEnd-clipStart>
+MAX_CLIP
+){
+
+clipEnd=
+clipStart+MAX_CLIP;
+
+}
+
+if(
+clipEnd>
+video.duration
+){
+
+const width=
+clipEnd-clipStart;
+
+clipEnd=
 video.duration;
 
-
-let start =
-Number(
-trimStart.value
-);
-
-
-let end =
-Number(
-trimEnd.value
-);
-
-
-if(
-!Number.isFinite(start)
-){
-
-start = 0;
-
-}
-
-
-if(
-!Number.isFinite(end)
-){
-
-end =
-Math.min(
-MAX_CLIP,
-duration
-);
-
-}
-
-
-start =
+clipStart=
 Math.max(
 0,
-Math.min(
-start,
-duration
-)
-);
-
-
-end =
-Math.max(
-0,
-Math.min(
-end,
-duration
-)
-);
-
-
-/*
-Déplacement du curseur DEBUT
-*/
-
-if(
-source === 'start'
-){
-
-if(
-end - start >
-MAX_CLIP
-){
-
-end =
-Math.min(
-duration,
-start + MAX_CLIP
+clipEnd-width
 );
 
 }
 
+const left=
+clipStart /
+video.duration *
+100;
 
-if(
-end - start <
-MIN_CLIP
-){
-
-end =
-Math.min(
-duration,
-start + MIN_CLIP
-);
-
-}
-
-
-if(
-end - start <
-MIN_CLIP
-){
-
-start =
-Math.max(
-0,
-end - MIN_CLIP
-);
-
-}
-
-}
-
-
-/*
-Déplacement du curseur FIN
-*/
-
-if(
-source === 'end'
-){
-
-if(
-end - start >
-MAX_CLIP
-){
-
-start =
-Math.max(
-0,
-end - MAX_CLIP
-);
-
-}
-
-
-if(
-end - start <
-MIN_CLIP
-){
-
-start =
-Math.max(
-0,
-end - MIN_CLIP
-);
-
-}
-
-
-if(
-end - start <
-MIN_CLIP
-){
-
-end =
-Math.min(
-duration,
-start + MIN_CLIP
-);
-
-}
-
-}
-
-
-trimStart.value =
-start.toFixed(2);
-
-trimEnd.value =
-end.toFixed(2);
-
-
-trimStartText.textContent =
-`${start.toFixed(2)} s`;
-
-trimEndText.textContent =
-`${end.toFixed(2)} s`;
-
-
-const selectedDuration =
-end - start;
-
-
-trimMeta.textContent =
-`Séquence sélectionnée : ${selectedDuration.toFixed(2)} s / 5.00 s max`;
-
-
-extract.disabled =
-selectedDuration < MIN_CLIP ||
-selectedDuration > MAX_CLIP + 0.01;
-
-
-/*
-Si la boucle est active et que le curseur
-sort de la nouvelle sélection,
-on revient immédiatement au début.
-*/
-
-if(
-trimLoopActive &&
+const width=
 (
-video.currentTime < start ||
-video.currentTime >= end
-)
+clipEnd-clipStart
+) /
+video.duration *
+100;
+
+selection.style.left=
+`${left}%`;
+
+selection.style.width=
+`${width}%`;
+
+bubbleStart.textContent=
+`${clipStart.toFixed(2)} s`;
+
+bubbleEnd.textContent=
+`${clipEnd.toFixed(2)} s`;
+
+selectionInfo.textContent=
+`Sélection : ${clipStart.toFixed(2)} s → ${clipEnd.toFixed(2)} s · durée ${(clipEnd-clipStart).toFixed(2)} s`;
+
+extract.disabled=
+(
+clipEnd-clipStart
+)<MIN_CLIP ||
+(
+clipEnd-clipStart
+)>MAX_CLIP+.01;
+
+if(
+seekToStart
 ){
 
 try{
 
-video.currentTime =
-start;
+video.currentTime=
+clipStart;
 
 }catch(_){}
 
@@ -1386,106 +1385,351 @@ start;
 }
 
 
-function setupTrim(){
+function setupTimeline(){
 
 if(
 !Number.isFinite(video.duration) ||
-video.duration <= 0
+video.duration<=0
 ){
 
 return;
 
 }
 
+clipStart=0;
 
-stopTrimLoop();
-
-
-const duration =
-video.duration;
-
-
-trimStart.min = '0';
-trimEnd.min = '0';
-
-trimStart.max =
-duration.toFixed(2);
-
-trimEnd.max =
-duration.toFixed(2);
-
-
-trimStart.value =
-'0';
-
-
-trimEnd.value =
+clipEnd=
 Math.min(
 MAX_CLIP,
-duration
-).toFixed(2);
+video.duration
+);
 
+if(
+clipEnd-clipStart<
+MIN_CLIP &&
+video.duration>=MIN_CLIP
+){
 
-trimControls.hidden =
-false;
+clipEnd=
+MIN_CLIP;
 
+}
 
-updateTrim(
-'start'
+totalDuration.textContent=
+`${video.duration.toFixed(1)} s`;
+
+trimControls.hidden=false;
+
+renderSelection(
+true
 );
 
 }
 
 
-trimStart.addEventListener(
-'input',
-()=>updateTrim('start')
-);
-
-
-trimEnd.addEventListener(
-'input',
-()=>updateTrim('end')
-);
-
-
-/* =========================================================
-   LECTURE EN BOUCLE ENTRE LES DEUX CURSEURS
-========================================================= */
-
-async function startTrimLoop(){
-
-const start =
-Number(
-trimStart.value
-);
-
-const end =
-Number(
-trimEnd.value
-);
-
+function beginDrag(
+mode,
+e
+){
 
 if(
-!Number.isFinite(start) ||
-!Number.isFinite(end) ||
-end <= start
+!Number.isFinite(video.duration) ||
+video.duration<=0
 ){
 
 return;
 
 }
 
+e.preventDefault();
 
-stopTrimLoop();
+dragMode=
+mode;
+
+pointerStartX=
+e.clientX;
+
+startClipAtPointer=
+clipStart;
+
+endClipAtPointer=
+clipEnd;
+
+selection.classList.add(
+'dragging'
+);
+
+try{
+
+e.currentTarget.setPointerCapture(
+e.pointerId
+);
+
+}catch(_){}
+
+}
 
 
-trimLoopActive = true;
+selection.addEventListener(
+'pointerdown',
+e=>{
+
+if(
+e.target===handleLeft ||
+e.target===handleRight
+){
+
+return;
+
+}
+
+beginDrag(
+'move',
+e
+);
+
+}
+);
 
 
-previewTrim.textContent =
+handleLeft.addEventListener(
+'pointerdown',
+e=>{
+
+e.stopPropagation();
+
+beginDrag(
+'left',
+e
+);
+
+}
+);
+
+
+handleRight.addEventListener(
+'pointerdown',
+e=>{
+
+e.stopPropagation();
+
+beginDrag(
+'right',
+e
+);
+
+}
+);
+
+
+window.addEventListener(
+'pointermove',
+e=>{
+
+if(!dragMode){
+return;
+}
+
+const delta=
+secondsFromPixels(
+e.clientX-
+pointerStartX
+);
+
+if(
+dragMode==='move'
+){
+
+const len=
+endClipAtPointer-
+startClipAtPointer;
+
+let start=
+startClipAtPointer+
+delta;
+
+start=
+clamp(
+start,
+0,
+Math.max(
+0,
+video.duration-len
+)
+);
+
+clipStart=
+start;
+
+clipEnd=
+start+len;
+
+}
+
+if(
+dragMode==='left'
+){
+
+let newStart=
+startClipAtPointer+
+delta;
+
+newStart=
+clamp(
+newStart,
+0,
+endClipAtPointer-
+MIN_CLIP
+);
+
+if(
+endClipAtPointer-
+newStart>
+MAX_CLIP
+){
+
+newStart=
+endClipAtPointer-
+MAX_CLIP;
+
+}
+
+clipStart=
+newStart;
+
+clipEnd=
+endClipAtPointer;
+
+}
+
+if(
+dragMode==='right'
+){
+
+let newEnd=
+endClipAtPointer+
+delta;
+
+newEnd=
+clamp(
+newEnd,
+startClipAtPointer+
+MIN_CLIP,
+video.duration
+);
+
+if(
+newEnd-
+startClipAtPointer>
+MAX_CLIP
+){
+
+newEnd=
+startClipAtPointer+
+MAX_CLIP;
+
+}
+
+clipStart=
+startClipAtPointer;
+
+clipEnd=
+newEnd;
+
+}
+
+renderSelection(
+true
+);
+
+}
+);
+
+
+window.addEventListener(
+'pointerup',
+()=>{
+
+if(!dragMode){
+return;
+}
+
+dragMode=
+null;
+
+selection.classList.remove(
+'dragging'
+);
+
+}
+);
+
+
+timelineTrack.addEventListener(
+'pointerdown',
+e=>{
+
+if(
+e.target===selection ||
+selection.contains(e.target)
+){
+
+return;
+
+}
+
+const rect=
+timelineTrack.getBoundingClientRect();
+
+const clickTime=
+clamp(
+(
+e.clientX-
+rect.left
+) /
+rect.width *
+video.duration,
+0,
+video.duration
+);
+
+const len=
+clipEnd-
+clipStart;
+
+clipStart=
+clamp(
+clickTime-
+len/2,
+0,
+Math.max(
+0,
+video.duration-
+len
+)
+);
+
+clipEnd=
+clipStart+
+len;
+
+renderSelection(
+true
+);
+
+}
+);
+
+
+async function startLoop(){
+
+stopLoop();
+
+trimLoopActive=
+true;
+
+previewTrim.textContent=
 '■ Arrêter la boucle';
-
 
 try{
 
@@ -1493,14 +1737,12 @@ video.pause();
 
 await waitSeek(
 video,
-start
+clipStart
 );
-
 
 await video.play();
 
-
-const loopCheck = ()=>{
+const tick=()=>{
 
 if(
 !trimLoopActive
@@ -1510,58 +1752,60 @@ return;
 
 }
 
-
-const currentStart =
-Number(
-trimStart.value
-);
-
-const currentEnd =
-Number(
-trimEnd.value
-);
-
-
 if(
-video.currentTime >=
-currentEnd - 0.025 ||
-video.currentTime <
-currentStart - 0.05
+video.currentTime>=
+clipEnd-.02 ||
+video.currentTime<
+clipStart-.05
 ){
 
 try{
 
-video.currentTime =
-currentStart;
-
-if(video.paused){
-
-video.play().catch(()=>{});
-
-}
+video.currentTime=
+clipStart;
 
 }catch(_){}
 
 }
 
+const progress=
+clamp(
+(
+video.currentTime-
+clipStart
+) /
+(
+clipEnd-
+clipStart
+),
+0,
+1
+);
 
-trimLoopRAF =
+playhead.style.display=
+'block';
+
+playhead.style.left=
+`${progress*100}%`;
+
+timelinePlayed.style.width=
+`${clamp(video.currentTime/video.duration,0,1)*100}%`;
+
+loopRAF=
 requestAnimationFrame(
-loopCheck
+tick
 );
 
 };
 
-
-trimLoopRAF =
+loopRAF=
 requestAnimationFrame(
-loopCheck
+tick
 );
-
 
 }catch(e){
 
-stopTrimLoop();
+stopLoop();
 
 log(
 'Lecture de la sélection impossible : '+
@@ -1581,24 +1825,19 @@ if(
 trimLoopActive
 ){
 
-stopTrimLoop();
+stopLoop();
 
 video.pause();
 
-return;
+}else{
+
+await startLoop();
 
 }
-
-
-await startTrimLoop();
 
 }
 );
 
-
-/* =========================================================
-   CHARGEMENT VIDEO EXISTANTE
-========================================================= */
 
 loadVideo.addEventListener(
 'click',
@@ -1614,97 +1853,76 @@ videoFile.addEventListener(
 'change',
 async()=>{
 
-const file =
+const file=
 videoFile.files?.[0];
 
-
 if(!file){
-
 return;
-
 }
-
 
 clearVideo();
 
-
-videoInfo.textContent =
-`${file.name || 'Vidéo'} · `+
-`${file.type || 'format inconnu'} · `+
-`${(file.size/1024/1024).toFixed(1)} Mo`;
-
+videoInfo.textContent=
+`${file.name||'Vidéo'} · ${file.type||'format inconnu'} · ${(file.size/1024/1024).toFixed(1)} Mo`;
 
 log(
 'Chargement de la vidéo…'
 );
 
-
 try{
 
-objectUrl =
+objectUrl=
 URL.createObjectURL(
 file
 );
 
-
-video.src =
+video.src=
 objectUrl;
 
-video.controls = true;
-video.playsInline = true;
-video.preload = 'auto';
+video.controls=
+true;
+
+video.playsInline=
+true;
+
+video.preload=
+'auto';
 
 video.load();
-
 
 await waitForMetadata(
 video
 );
 
-
 await waitForVideoFrame(
 video
 );
 
-
-/*
-Force une première vraie image visible.
-*/
-
-const firstFrameTime =
+await waitSeek(
+video,
 Math.min(
-0.10,
+.1,
 Math.max(
 0,
-video.duration - 0.05
+video.duration-.05
+)
 )
 );
 
+videoInfo.textContent+=
+` · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
 
-await waitSeek(
-video,
-firstFrameTime
-);
-
-
-videoInfo.textContent +=
-` · ${video.videoWidth}×${video.videoHeight}`+
-` · ${video.duration.toFixed(2)} s`;
-
-
-setupTrim();
-
+setupTimeline();
 
 log(
 `Vidéo prête — ${video.duration.toFixed(2)} s.
-Choisis maintenant le passage utile avec les deux curseurs.
-La sélection est limitée à 5 secondes.`
+Déplace la fenêtre noire sur la barre et règle sa largeur entre 1 et 5 secondes.`
 );
-
 
 }catch(e){
 
-extract.disabled = true;
+extract.disabled=
+true;
 
 log(
 'Erreur vidéo : '+
@@ -1717,17 +1935,12 @@ e.message
 );
 
 
-/* =========================================================
-   PIXVERSE
-========================================================= */
-
 generate.addEventListener(
 'click',
 async()=>{
 
-const file =
+const file=
 image.files?.[0];
-
 
 if(!file){
 
@@ -1739,12 +1952,10 @@ return;
 
 }
 
-
-const textPrompt =
+const p=
 prompt.value.trim();
 
-
-if(!textPrompt){
+if(!p){
 
 log(
 'Le prompt PixVerse est vide.'
@@ -1754,12 +1965,10 @@ return;
 
 }
 
-
 clearVideo();
 
-
-generate.disabled = true;
-
+generate.disabled=
+true;
 
 try{
 
@@ -1767,24 +1976,17 @@ log(
 'Envoi de la photo à PixVerse…'
 );
 
-
-/*
-ETAPE 1 : upload image
-*/
-
-const fd =
+const fd=
 new FormData();
-
 
 fd.append(
 'image',
 file,
-file.name ||
+file.name||
 'photo.jpg'
 );
 
-
-const uploadResponse =
+const ur=
 await fetch(
 '/api/pixverse-upload',
 {
@@ -1793,31 +1995,27 @@ body:fd
 }
 );
 
-
-const uploadJson =
-await uploadResponse.json();
-
+const uj=
+await ur.json();
 
 if(
-!uploadResponse.ok ||
-uploadJson.ErrCode !== 0
+!ur.ok ||
+uj.ErrCode!==0
 ){
 
 throw new Error(
-uploadJson.ErrMsg ||
-uploadJson.error ||
+uj.ErrMsg ||
+uj.error ||
 'Échec upload PixVerse.'
 );
 
 }
 
-
-const imageId =
-uploadJson.Resp?.img_id;
-
+const imgId=
+uj.Resp?.img_id;
 
 if(
-imageId == null
+imgId==null
 ){
 
 throw new Error(
@@ -1826,17 +2024,11 @@ throw new Error(
 
 }
 
-
-/*
-ETAPE 2 : génération
-*/
-
 log(
 'Photo reçue. Création de la micro-vidéo PixVerse 5 s…'
 );
 
-
-const createResponse =
+const cr=
 await fetch(
 '/api/pixverse-create',
 {
@@ -1844,38 +2036,35 @@ method:'POST',
 headers:{
 'Content-Type':'application/json'
 },
-body:JSON.stringify({
-img_id:imageId,
-prompt:textPrompt,
+body:
+JSON.stringify({
+img_id:imgId,
+prompt:p,
 seed:0
 })
 }
 );
 
-
-const createJson =
-await createResponse.json();
-
+const cj=
+await cr.json();
 
 if(
-!createResponse.ok ||
-createJson.ErrCode !== 0
+!cr.ok ||
+cj.ErrCode!==0
 ){
 
 throw new Error(
-createJson.ErrMsg ||
-createJson.error ||
+cj.ErrMsg ||
+cj.error ||
 'Échec création PixVerse.'
 );
 
 }
 
+const id=
+cj.Resp?.video_id;
 
-const videoId =
-createJson.Resp?.video_id;
-
-
-if(!videoId){
+if(!id){
 
 throw new Error(
 'PixVerse n’a pas renvoyé video_id.'
@@ -1883,18 +2072,7 @@ throw new Error(
 
 }
 
-
-/*
-ETAPE 3 : attente résultat
-*/
-
-log(
-`Vidéo PixVerse #${videoId} en génération…`
-);
-
-
-let resultUrl = '';
-
+let resultUrl='';
 
 for(
 let i=0;
@@ -1906,49 +2084,43 @@ await sleep(
 3000
 );
 
-
-const response =
+const sr=
 await fetch(
-`/api/pixverse-status?id=${encodeURIComponent(videoId)}`,
+`/api/pixverse-status?id=${encodeURIComponent(id)}`,
 {
 cache:'no-store'
 }
 );
 
+const sj=
+await sr.json();
 
-const json =
-await response.json();
-
-
-if(!response.ok){
+if(!sr.ok){
 
 throw new Error(
-json.error ||
-'Erreur lors du contrôle PixVerse.'
+sj.error ||
+'Erreur statut PixVerse.'
 );
 
 }
 
-
-const pixStatus =
-json.Resp?.status;
-
+const s=
+sj.Resp?.status;
 
 if(
-pixStatus === 1
+s===1
 ){
 
-resultUrl =
-json.Resp?.url ||
+resultUrl=
+sj.Resp?.url||
 '';
 
 break;
 
 }
 
-
 if(
-pixStatus === 7
+s===7
 ){
 
 throw new Error(
@@ -1957,24 +2129,21 @@ throw new Error(
 
 }
 
-
 if(
-pixStatus === 8
+s===8
 ){
 
 throw new Error(
-'PixVerse n’a pas réussi à générer la vidéo.'
+'PixVerse a échoué à générer la vidéo.'
 );
 
 }
-
 
 log(
-`Vidéo PixVerse #${videoId} en génération… statut ${pixStatus ?? '?'}`
+`Vidéo PixVerse #${id} en génération… statut ${s??'?'}`
 );
 
 }
-
 
 if(!resultUrl){
 
@@ -1984,45 +2153,36 @@ throw new Error(
 
 }
 
-
-/*
-ETAPE 4 : affichage vidéo
-*/
-
-video.src =
+video.src=
 `/api/pixverse-video?url=${encodeURIComponent(resultUrl)}`;
 
-video.controls = true;
-video.playsInline = true;
-video.preload = 'auto';
+video.controls=
+true;
+
+video.playsInline=
+true;
+
+video.preload=
+'auto';
 
 video.load();
-
 
 await waitForMetadata(
 video
 );
 
-
 await waitForVideoFrame(
 video
 );
 
+videoInfo.textContent=
+`Vidéo PixVerse · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
 
-videoInfo.textContent =
-`Vidéo PixVerse · `+
-`${video.videoWidth}×${video.videoHeight}`+
-` · ${video.duration.toFixed(2)} s`;
-
-
-setupTrim();
-
+setupTimeline();
 
 log(
-`Vidéo PixVerse prête — ${video.duration.toFixed(2)} s.
-Vérifie la sélection puis extrais les 9 vues.`
+'Vidéo PixVerse prête. Vérifie la fenêtre de sélection puis extrais les 9 vues.'
 );
-
 
 }catch(e){
 
@@ -2033,7 +2193,8 @@ e.message
 
 }finally{
 
-generate.disabled = false;
+generate.disabled=
+false;
 
 }
 
@@ -2041,22 +2202,17 @@ generate.disabled = false;
 );
 
 
-/* =========================================================
-   CAPTURE IMAGE
-========================================================= */
-
 function drawCover(
 ctx,
 v,
 size
 ){
 
-const vw =
+const vw=
 v.videoWidth;
 
-const vh =
+const vh=
 v.videoHeight;
-
 
 if(
 !vw ||
@@ -2069,21 +2225,17 @@ throw new Error(
 
 }
 
-
-const side =
+const side=
 Math.min(
 vw,
 vh
 );
 
-
-const sx =
+const sx=
 (vw-side)/2;
 
-
-const sy =
+const sy=
 (vh-side)/2;
-
 
 ctx.drawImage(
 v,
@@ -2102,104 +2254,79 @@ size
 
 function captureCanvas(
 v,
-small = false
+small=false
 ){
 
 let outputSize;
 
+if(
+small
+){
 
-if(small){
-
-outputSize = 64;
+outputSize=
+64;
 
 }else{
 
-const selectedSize =
+const selectedSize=
 $('#size').value;
 
-
-if(
-selectedSize ===
-'original'
-){
-
-outputSize =
+outputSize=
+selectedSize==='original'
+?
 Math.min(
 v.videoWidth,
 v.videoHeight
-);
-
-}else{
-
-outputSize =
+)
+:
 Number(
 selectedSize
 );
 
 }
 
-}
-
-
-const canvas =
+const c=
 document.createElement(
 'canvas'
 );
 
-
-canvas.width =
+c.width=
 outputSize;
 
-canvas.height =
+c.height=
 outputSize;
 
-
-const ctx =
-canvas.getContext(
+drawCover(
+c.getContext(
 '2d',
 {
 willReadFrequently:true
 }
-);
-
-
-drawCover(
-ctx,
+),
 v,
 outputSize
 );
 
-
-return canvas;
+return c;
 
 }
 
 
-/* =========================================================
-   SIGNATURE VISUELLE
-========================================================= */
-
 function signature(
-canvas
+c
 ){
 
-const ctx =
-canvas.getContext(
+const p=
+c.getContext(
 '2d'
-);
-
-
-const pixels =
-ctx.getImageData(
+).getImageData(
 0,
 0,
 64,
 64
 ).data;
 
-
-const values = [];
-
+const vals=[];
 
 for(
 let gy=0;
@@ -2213,9 +2340,8 @@ gx<8;
 gx++
 ){
 
-let total = 0;
-let count = 0;
-
+let total=0;
+let count=0;
 
 for(
 let y=gy*8;
@@ -2229,17 +2355,13 @@ x<(gx+1)*8;
 x+=2
 ){
 
-const index =
+const i=
 (y*64+x)*4;
 
-
-const grey =
-pixels[index]*0.299 +
-pixels[index+1]*0.587 +
-pixels[index+2]*0.114;
-
-
-total += grey;
+total+=
+p[i]*.299+
+p[i+1]*.587+
+p[i+2]*.114;
 
 count++;
 
@@ -2247,8 +2369,7 @@ count++;
 
 }
 
-
-values.push(
+vals.push(
 total/count
 );
 
@@ -2256,8 +2377,7 @@ total/count
 
 }
 
-
-return values;
+return vals;
 
 }
 
@@ -2267,8 +2387,7 @@ a,
 b
 ){
 
-let sum = 0;
-
+let s=0;
 
 for(
 let i=0;
@@ -2276,48 +2395,39 @@ i<a.length;
 i++
 ){
 
-const difference =
-a[i] - b[i];
+const d=
+a[i]-b[i];
 
-
-sum +=
-difference*difference;
+s+=
+d*d;
 
 }
 
-
 return Math.sqrt(
-sum/a.length
+s/a.length
 );
 
 }
 
 
 function canvasBlob(
-canvas
+c
 ){
 
 return new Promise(
 (resolve,reject)=>{
 
-canvas.toBlob(
-blob=>{
-
-if(blob){
-
-resolve(blob);
-
-}else{
-
+c.toBlob(
+b=>
+b
+?
+resolve(b)
+:
 reject(
 new Error(
 'Impossible de créer le PNG.'
 )
-);
-
-}
-
-},
+),
 'image/png'
 );
 
@@ -2327,40 +2437,23 @@ new Error(
 }
 
 
-/* =========================================================
-   EXTRACTION INTELLIGENTE DES 9 VUES
-========================================================= */
-
 extract.addEventListener(
 'click',
 async()=>{
 
-stopTrimLoop();
+stopLoop();
 
 video.pause();
 
-
-const clipStart =
-Number(
-trimStart.value
-);
-
-
-const clipEnd =
-Number(
-trimEnd.value
-);
-
-
-const clipDuration =
-clipEnd -
+const duration=
+clipEnd-
 clipStart;
 
-
 if(
-!Number.isFinite(clipDuration) ||
-clipDuration < MIN_CLIP ||
-clipDuration > MAX_CLIP + 0.01
+duration<
+MIN_CLIP ||
+duration>
+MAX_CLIP+.01
 ){
 
 log(
@@ -2371,91 +2464,73 @@ return;
 
 }
 
-
-extract.disabled = true;
+extract.disabled=
+true;
 
 clearFrames();
-
 
 try{
 
 log(
-'Analyse de la sélection…'
+'Analyse de la zone sélectionnée…'
 );
 
+const N=49;
 
-/*
-49 échantillons dans la zone choisie.
-*/
-
-const SAMPLE_COUNT = 49;
-
-const samples = [];
-
+const samples=[];
 
 for(
 let i=0;
-i<SAMPLE_COUNT;
+i<N;
 i++
 ){
 
-const time =
-clipStart +
+const t=
+clipStart+
 (
-clipEnd -
+clipEnd-
 clipStart
-) *
-i /
-(SAMPLE_COUNT-1);
-
+)*
+i/
+(
+N-1
+);
 
 await waitSeek(
 video,
-time
+t
 );
 
-
-const canvas =
+const c=
 captureCanvas(
 video,
 true
 );
 
-
 samples.push({
-time,
-signature:
-signature(canvas)
+t,
+sig:
+signature(c)
 });
 
 }
 
-
-/*
-On conserve les extrêmes.
-Puis on cherche progressivement
-les images visuellement les plus utiles,
-tout en conservant une répartition temporelle.
-*/
-
-const selected =
-[
+const selected=[
 0,
-SAMPLE_COUNT-1
+N-1
 ];
 
-
 while(
-selected.length < 9
+selected.length<
+9
 ){
 
-let bestIndex = -1;
-let bestScore = -1;
-
+let best=-1;
+let bestScore=-1;
 
 for(
 let i=1;
-i<SAMPLE_COUNT-1;
+i<N-1;
 i++
 ){
 
@@ -2467,149 +2542,132 @@ continue;
 
 }
 
-
-let minimumVisual =
+let minVisual=
 Infinity;
 
-
-let minimumTime =
+let minTime=
 Infinity;
-
 
 for(
-const selectedIndex
+const j
 of selected
 ){
 
-minimumVisual =
+minVisual=
 Math.min(
-minimumVisual,
+minVisual,
 distance(
-samples[i].signature,
-samples[selectedIndex].signature
+samples[i].sig,
+samples[j].sig
 )
 );
 
-
-minimumTime =
+minTime=
 Math.min(
-minimumTime,
+minTime,
 Math.abs(
-i-selectedIndex
-) /
-(SAMPLE_COUNT-1)
+i-j
+)/
+(
+N-1
+)
 );
 
 }
 
-
-const score =
-minimumVisual *
+const score=
+minVisual*
 (
-0.65 +
-0.35 *
+.65+
+.35*
 Math.min(
 1,
-minimumTime*8
+minTime*8
 )
 );
 
-
 if(
-score >
+score>
 bestScore
 ){
 
-bestScore =
+bestScore=
 score;
 
-bestIndex =
+best=
 i;
 
 }
 
 }
 
-
 selected.push(
-bestIndex
+best
 );
 
 }
-
 
 selected.sort(
 (a,b)=>a-b
 );
 
-
-/*
-Sécurité de couverture :
-évite de concentrer toutes les vues
-sur un seul petit geste.
-*/
-
-const evenlySpaced =
+const even=
 Array.from(
 {length:9},
-(_,index)=>
+(_,k)=>
 Math.round(
-index *
-(SAMPLE_COUNT-1) /
+k*
+(
+N-1
+)/
 8
 )
 );
 
-
 for(
-let i=0;
-i<9;
-i++
+let k=0;
+k<9;
+k++
 ){
 
 if(
 Math.abs(
-selected[i] -
-evenlySpaced[i]
-) > 8
+selected[k]-
+even[k]
+)>8
 ){
 
-selected[i] =
-evenlySpaced[i];
+selected[k]=
+even[k];
 
 }
 
 }
-
 
 selected.sort(
 (a,b)=>a-b
 );
 
-
-const unique =
-[
+const unique=[
 ...new Set(
 selected
 )
 ];
 
-
 while(
-unique.length < 9
+unique.length<
+9
 ){
 
-const candidate =
-evenlySpaced.find(
-index =>
-!unique.includes(index)
+const candidate=
+even.find(
+x=>
+!unique.includes(x)
 );
-
 
 unique.push(
 candidate
 );
-
 
 unique.sort(
 (a,b)=>a-b
@@ -2617,18 +2675,11 @@ unique.sort(
 
 }
 
-
-/*
-Création des 9 PNG.
-*/
-
-let previousSignature =
+let prevSig=
 null;
 
-
-let closeTransitions =
+let closeTransitions=
 0;
-
 
 for(
 let i=0;
@@ -2636,75 +2687,65 @@ i<9;
 i++
 ){
 
-const sample =
+const sample=
 samples[
 unique[i]
 ];
 
-
 await waitSeek(
 video,
-sample.time
+sample.t
 );
 
-
-const finalCanvas =
+const finalCanvas=
 captureCanvas(
 video,
 false
 );
 
-
-const blob =
+const blob=
 await canvasBlob(
 finalCanvas
 );
 
-
-const smallCanvas =
+const sig=
+signature(
 captureCanvas(
 video,
 true
+)
 );
 
-
-const currentSignature =
-signature(
-smallCanvas
-);
-
-
-const delta =
-previousSignature
+const delta=
+prevSig
 ?
 distance(
-currentSignature,
-previousSignature
+sig,
+prevSig
 )
 :
 null;
 
-
 if(
-delta !== null &&
-delta < 2.2
+delta!==null &&
+delta<
+2.2
 ){
 
 closeTransitions++;
 
 }
 
-
-previousSignature =
-currentSignature;
-
+prevSig=
+sig;
 
 frameData.push({
 
-index:i+1,
+index:
+i+1,
 
 time:
-sample.time,
+sample.t,
 
 delta,
 
@@ -2712,37 +2753,29 @@ blob
 
 });
 
-
-const url =
+const url=
 URL.createObjectURL(
 blob
 );
 
-
-const frame =
+const frame=
 document.createElement(
 'div'
 );
 
-
-frame.className =
+frame.className=
 'frame';
 
-
-frame.innerHTML =
-
+frame.innerHTML=
 `<img src="${url}">
 <div class="meta">
-vue-${String(i+1).padStart(2,'0')}
-· ${sample.time.toFixed(2)} s
-${delta===null ? '' : ` · Δ ${delta.toFixed(1)}`}
+vue-${String(i+1).padStart(2,'0')} · ${sample.t.toFixed(2)} s
+${delta===null?'':` · Δ ${delta.toFixed(1)}`}
 </div>`;
-
 
 framesEl.appendChild(
 frame
 );
-
 
 log(
 `Extraction des vues… ${i+1}/9`
@@ -2750,61 +2783,50 @@ log(
 
 }
 
-
-/*
-Analyse qualité simple.
-*/
-
-const qualityDot =
+const q=
 $('#qualityDot');
 
-
-const qualityText =
+const qt=
 $('#qualityText');
 
-
 if(
-closeTransitions === 0
+closeTransitions===
+0
 ){
 
-qualityDot.className =
+q.className=
 'dot good';
 
-
-qualityText.textContent =
+qt.textContent=
 '9 vues bien différenciées.';
 
 }else if(
-closeTransitions <= 2
+closeTransitions<=
+2
 ){
 
-qualityDot.className =
+q.className=
 'dot warn';
 
-
-qualityText.textContent =
-`${closeTransitions} transition(s) très proche(s) — résultat à contrôler visuellement.`;
+qt.textContent=
+`${closeTransitions} transition(s) très proche(s) — à contrôler visuellement.`;
 
 }else{
 
-qualityDot.className =
+q.className=
 'dot bad';
 
-
-qualityText.textContent =
-`${closeTransitions} transitions trop proches — sélection ou animation à améliorer.`;
+qt.textContent=
+`${closeTransitions} transitions trop proches — sélection à améliorer.`;
 
 }
 
-
-download.disabled =
+download.disabled=
 false;
-
 
 log(
 '9 vues extraites. Vérifie la grille puis télécharge le ZIP.'
 );
-
 
 }catch(e){
 
@@ -2815,7 +2837,7 @@ e.message
 
 }finally{
 
-extract.disabled =
+extract.disabled=
 false;
 
 }
@@ -2824,25 +2846,21 @@ false;
 );
 
 
-/* =========================================================
-   ZIP
-========================================================= */
-
 download.addEventListener(
 'click',
 async()=>{
 
 if(
-frameData.length !== 9
+frameData.length!==
+9
 ){
 
 return;
 
 }
 
-
 if(
-typeof JSZip ===
+typeof JSZip===
 'undefined'
 ){
 
@@ -2854,64 +2872,58 @@ return;
 
 }
 
-
-const reverse =
-$('#direction').value ===
+const reverse=
+$('#direction').value===
 'reverse';
 
-
-const ordered =
+const ordered=
 reverse
 ?
 [...frameData].reverse()
 :
 frameData;
 
-
-const zip =
+const zip=
 new JSZip();
 
-
 ordered.forEach(
-(frame,index)=>{
-
-const fileName =
-`vue-${String(index+1).padStart(2,'0')}.png`;
-
+(f,i)=>{
 
 zip.file(
-fileName,
-frame.blob
+`vue-${String(i+1).padStart(2,'0')}.png`,
+f.blob
 );
 
 }
 );
 
-
-const manifest = {
+zip.file(
+'manifest.json',
+JSON.stringify(
+{
 
 generator:
-'LentiPrint Lab v11.3',
+'LentiPrint Lab v11.4',
 
 source:
 'PixVerse ou vidéo locale',
 
 selectionStart:
 Number(
-trimStart.value
+clipStart.toFixed(4)
 ),
 
 selectionEnd:
 Number(
-trimEnd.value
+clipEnd.toFixed(4)
 ),
 
 selectionDuration:
 Number(
 (
-Number(trimEnd.value) -
-Number(trimStart.value)
-).toFixed(3)
+clipEnd-
+clipStart
+).toFixed(4)
 ),
 
 views:
@@ -2926,50 +2938,44 @@ reverse
 
 frames:
 ordered.map(
-(frame,index)=>({
+(f,i)=>({
 
 file:
-`vue-${String(index+1).padStart(2,'0')}.png`,
+`vue-${String(i+1).padStart(2,'0')}.png`,
 
 sourceTime:
 Number(
-frame.time.toFixed(4)
+f.time.toFixed(4)
 ),
 
 delta:
-frame.delta === null
+f.delta===null
 ?
 null
 :
 Number(
-frame.delta.toFixed(2)
+f.delta.toFixed(2)
 )
 
 })
 )
 
-};
-
-
-zip.file(
-'manifest.json',
-JSON.stringify(
-manifest,
+},
 null,
 2
 )
 );
 
-
 log(
 'Création du ZIP…'
 );
 
+const blob=
+await zip.generateAsync(
+{
 
-const blob =
-await zip.generateAsync({
-
-type:'blob',
+type:
+'blob',
 
 compression:
 'DEFLATE',
@@ -2978,39 +2984,32 @@ compressionOptions:{
 level:6
 }
 
-});
+}
+);
 
-
-const url =
+const url=
 URL.createObjectURL(
 blob
 );
 
-
-const link =
+const a=
 document.createElement(
 'a'
 );
 
-
-link.href =
+a.href=
 url;
 
-
-link.download =
+a.download=
 '9-vues-animation-lenticulaire.zip';
 
-
 document.body.appendChild(
-link
+a
 );
 
+a.click();
 
-link.click();
-
-
-link.remove();
-
+a.remove();
 
 setTimeout(
 ()=>{
@@ -3022,7 +3021,6 @@ url
 },
 5000
 );
-
 
 log(
 'ZIP téléchargé — 9 vues + manifest.json.'
