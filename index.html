@@ -6,145 +6,1374 @@
 <title>LentiPrint Lab v11 — PixVerse → 9 vues</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
-:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#151515;background:#f5f5f3}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1100px;margin:auto;padding:22px}.top{display:flex;gap:14px;align-items:center;justify-content:space-between;margin-bottom:18px}.badge{font-size:12px;padding:6px 9px;border-radius:999px;background:#111;color:white}.card{background:white;border:1px solid #ddd;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 1px 8px #0000000a}h1{font-size:25px;margin:0}h2{font-size:18px;margin:0 0 12px}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field{display:flex;flex-direction:column;gap:7px}label{font-size:13px;font-weight:650}input,textarea,select,button{font:inherit}input,textarea,select{border:1px solid #ccc;border-radius:11px;padding:11px;background:#fff}textarea{min-height:110px;resize:vertical}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:12px;padding:11px 15px;background:#111;color:white;font-weight:700;cursor:pointer}button.secondary{background:#ececec;color:#111}button:disabled{opacity:.45;cursor:not-allowed}.status{padding:11px;border-radius:12px;background:#f3f3f3;font-size:13px;white-space:pre-wrap}.preview{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}video,img{max-width:100%;border-radius:14px;background:#111}.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.frame{border:1px solid #ddd;border-radius:12px;padding:7px;background:#fafafa}.frame img{width:100%;aspect-ratio:1/1;object-fit:cover}.meta{font-size:11px;color:#666;margin-top:4px}.quality{display:flex;gap:8px;align-items:center;font-size:12px}.dot{width:9px;height:9px;border-radius:50%;background:#999}.good{background:#159947}.warn{background:#e09b00}.bad{background:#c62929}@media(max-width:760px){.row,.preview{grid-template-columns:1fr}.frames{grid-template-columns:repeat(3,1fr)}.wrap{padding:12px}h1{font-size:21px}}
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#151515;background:#f5f5f3}
+*{box-sizing:border-box}
+body{margin:0}
+.wrap{max-width:1100px;margin:auto;padding:22px}
+.top{display:flex;gap:14px;align-items:center;justify-content:space-between;margin-bottom:18px}
+.badge{font-size:12px;padding:6px 9px;border-radius:999px;background:#111;color:white}
+.card{background:white;border:1px solid #ddd;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 1px 8px #0000000a}
+h1{font-size:25px;margin:0}
+h2{font-size:18px;margin:0 0 12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{display:flex;flex-direction:column;gap:7px}
+label{font-size:13px;font-weight:650}
+input,textarea,select,button{font:inherit}
+input,textarea,select{border:1px solid #ccc;border-radius:11px;padding:11px;background:#fff}
+textarea{min-height:110px;resize:vertical}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button{border:0;border-radius:12px;padding:11px 15px;background:#111;color:white;font-weight:700;cursor:pointer}
+button.secondary{background:#ececec;color:#111}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{padding:11px;border-radius:12px;background:#f3f3f3;font-size:13px;white-space:pre-wrap}
+.preview{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}
+video,img{max-width:100%;border-radius:14px;background:#111}
+.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.frame{border:1px solid #ddd;border-radius:12px;padding:7px;background:#fafafa}
+.frame img{width:100%;aspect-ratio:1/1;object-fit:cover}
+.meta{font-size:11px;color:#666;margin-top:4px}
+.quality{display:flex;gap:8px;align-items:center;font-size:12px}
+.dot{width:9px;height:9px;border-radius:50%;background:#999}
+.good{background:#159947}
+.warn{background:#e09b00}
+.bad{background:#c62929}
+@media(max-width:760px){
+  .row,.preview{grid-template-columns:1fr}
+  .frames{grid-template-columns:repeat(3,1fr)}
+  .wrap{padding:12px}
+  h1{font-size:21px}
+}
 </style>
 </head>
-<body><div class="wrap">
-<div class="top"><div><h1>LentiPrint Lab</h1><div>Photo → PixVerse → sélection intelligente de 9 vues</div></div><span class="badge">v11</span></div>
+
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div>
+    <h1>LentiPrint Lab</h1>
+    <div>Photo → PixVerse → sélection intelligente de 9 vues</div>
+  </div>
+  <span class="badge">v11.1</span>
+</div>
 
 <div class="card">
 <h2>1. Photo et micro-animation</h2>
+
 <div class="row">
-<div class="field"><label>Photo source</label><input id="image" type="file" accept="image/png,image/jpeg,image/webp" /></div>
-<div class="field"><label>Action</label><select id="preset"><option value="bark">Chien — petit aboiement</option><option value="blink">Chat — clignement naturel</option><option value="smile">Personne — léger sourire</option><option value="kiss">Couple — baiser léger</option><option value="dance">Personne — mini mouvement de danse</option><option value="custom">Personnalisé</option></select></div>
+  <div class="field">
+    <label>Photo source</label>
+    <input id="image" type="file" accept="image/png,image/jpeg,image/webp" />
+  </div>
+
+  <div class="field">
+    <label>Action</label>
+    <select id="preset">
+      <option value="bark">Chien — petit aboiement</option>
+      <option value="blink">Chat — clignement naturel</option>
+      <option value="smile">Personne — léger sourire</option>
+      <option value="kiss">Couple — baiser léger</option>
+      <option value="dance">Personne — mini mouvement de danse</option>
+      <option value="custom">Personnalisé</option>
+    </select>
+  </div>
 </div>
-<div class="field" style="margin-top:12px"><label>Prompt PixVerse</label><textarea id="prompt"></textarea></div>
-<div class="actions"><button id="generate">Créer la micro-vidéo PixVerse</button><button id="loadVideo" class="secondary">Ou charger un MP4 existant</button><input id="videoFile" type="file" accept="video/mp4,video/quicktime" hidden /></div>
+
+<div class="field" style="margin-top:12px">
+  <label>Prompt PixVerse</label>
+  <textarea id="prompt"></textarea>
+</div>
+
+<div class="actions">
+  <button id="generate">Créer la micro-vidéo PixVerse</button>
+  <button id="loadVideo" class="secondary">Ou charger une vidéo existante</button>
+  <input id="videoFile" type="file" accept="video/*" hidden />
+</div>
+
 <div id="status" class="status" style="margin-top:12px">Prêt.</div>
 </div>
 
 <div class="card">
 <h2>2. Vidéo et extraction</h2>
+
 <div class="preview">
-<div><video id="video" controls playsinline crossorigin="anonymous"></video><div class="actions"><button id="extract" disabled>Extraire 9 vues intelligentes</button></div></div>
-<div><div id="frames" class="frames"></div></div>
+
+<div>
+  <video id="video" controls playsinline preload="auto"></video>
+
+  <div id="videoInfo" class="meta" style="margin-top:8px"></div>
+
+  <div class="actions">
+    <button id="extract" disabled>Extraire 9 vues intelligentes</button>
+  </div>
+</div>
+
+<div>
+  <div id="frames" class="frames"></div>
+</div>
+
 </div>
 </div>
 
 <div class="card">
 <h2>3. Export production</h2>
+
 <div class="row">
-<div class="field"><label>Format de sortie</label><select id="size"><option value="772">772 × 772 — médaillon test</option><option value="1024">1024 × 1024 — haute définition carrée</option><option value="original">Format vidéo recadré carré</option></select></div>
-<div class="field"><label>Sens de lecture</label><select id="direction"><option value="normal">1 → 9</option><option value="reverse">9 → 1</option></select></div>
+
+<div class="field">
+<label>Format de sortie</label>
+<select id="size">
+  <option value="772">772 × 772 — médaillon test</option>
+  <option value="1024">1024 × 1024 — haute définition carrée</option>
+  <option value="original">Format vidéo recadré carré</option>
+</select>
 </div>
-<div class="actions"><button id="download" disabled>Télécharger ZIP — 9 vues</button></div>
-<div class="quality" style="margin-top:12px"><span id="qualityDot" class="dot"></span><span id="qualityText">Pas encore analysé.</span></div>
+
+<div class="field">
+<label>Sens de lecture</label>
+<select id="direction">
+  <option value="normal">1 → 9</option>
+  <option value="reverse">9 → 1</option>
+</select>
 </div>
+
 </div>
+
+<div class="actions">
+  <button id="download" disabled>Télécharger ZIP — 9 vues</button>
+</div>
+
+<div class="quality" style="margin-top:12px">
+  <span id="qualityDot" class="dot"></span>
+  <span id="qualityText">Pas encore analysé.</span>
+</div>
+
+</div>
+
+</div>
+
 <script type="module">
+
 const $=s=>document.querySelector(s);
-const image=$('#image'), preset=$('#preset'), prompt=$('#prompt'), status=$('#status'), video=$('#video'), framesEl=$('#frames');
-const generate=$('#generate'), extract=$('#extract'), download=$('#download'), loadVideo=$('#loadVideo'), videoFile=$('#videoFile');
-let frameData=[]; let objectUrl=null;
+
+const image=$('#image');
+const preset=$('#preset');
+const prompt=$('#prompt');
+const status=$('#status');
+const video=$('#video');
+const framesEl=$('#frames');
+const videoInfo=$('#videoInfo');
+
+const generate=$('#generate');
+const extract=$('#extract');
+const download=$('#download');
+const loadVideo=$('#loadVideo');
+const videoFile=$('#videoFile');
+
+let frameData=[];
+let objectUrl=null;
 
 const prompts={
- bark:'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
- blink:'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
- smile:'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
- kiss:'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
- dance:'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
- custom:''
-};
-function setPrompt(){ if(preset.value!=='custom') prompt.value=prompts[preset.value]; }
-preset.addEventListener('change',setPrompt); setPrompt();
-function log(t){ status.textContent=t; }
-function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
-loadVideo.onclick=()=>videoFile.click();
-videoFile.onchange=()=>{const f=videoFile.files[0]; if(!f)return; if(objectUrl)URL.revokeObjectURL(objectUrl); objectUrl=URL.createObjectURL(f); video.src=objectUrl; video.load(); video.onloadedmetadata=()=>{extract.disabled=false;log(`Vidéo locale chargée — ${video.duration.toFixed(2)} s.`)}};
+bark:
+'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
+
+blink:
+'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
+
+smile:
+'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
+
+kiss:
+'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
+
+dance:
+'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
+
+custom:''
+};
+
+function setPrompt(){
+  if(preset.value!=='custom'){
+    prompt.value=prompts[preset.value];
+  }
+}
+
+preset.addEventListener('change',setPrompt);
+setPrompt();
+
+function log(t){
+  status.textContent=t;
+}
+
+function sleep(ms){
+  return new Promise(r=>setTimeout(r,ms));
+}
+
+function clearVideoSource(){
+
+  try{
+    video.pause();
+  }catch(_){}
+
+  video.removeAttribute('src');
+
+  try{
+    video.load();
+  }catch(_){}
+
+  if(objectUrl){
+    try{
+      URL.revokeObjectURL(objectUrl);
+    }catch(_){}
+    objectUrl=null;
+  }
+
+  extract.disabled=true;
+  download.disabled=true;
+
+  frameData=[];
+  framesEl.innerHTML='';
+}
+
+function waitForVideoFrame(v,timeout=12000){
+
+  return new Promise((resolve,reject)=>{
+
+    let done=false;
+
+    const ok=()=>{
+
+      if(done)return;
+
+      if(
+        v.readyState>=2 &&
+        v.videoWidth>0 &&
+        v.videoHeight>0
+      ){
+        done=true;
+        cleanup();
+        resolve();
+      }
+    };
+
+    const fail=()=>{
+
+      if(done)return;
+
+      done=true;
+      cleanup();
+
+      const code=v.error?.code
+        ? ` (code ${v.error.code})`
+        : '';
+
+      reject(
+        new Error(
+          'La vidéo n’a pas pu être décodée'+code
+        )
+      );
+    };
+
+    const timer=setTimeout(()=>{
+
+      if(done)return;
+
+      done=true;
+      cleanup();
+
+      reject(
+        new Error(
+          'La première image vidéo n’a pas été décodée sur cet iPad.'
+        )
+      );
+
+    },timeout);
+
+    const cleanup=()=>{
+
+      clearTimeout(timer);
+
+      [
+        'loadeddata',
+        'canplay',
+        'canplaythrough',
+        'playing',
+        'timeupdate'
+      ].forEach(ev=>{
+        v.removeEventListener(ev,ok);
+      });
+
+      v.removeEventListener('error',fail);
+    };
+
+    [
+      'loadeddata',
+      'canplay',
+      'canplaythrough',
+      'playing',
+      'timeupdate'
+    ].forEach(ev=>{
+      v.addEventListener(ev,ok);
+    });
+
+    v.addEventListener('error',fail,{once:true});
+
+    ok();
+  });
+}
+
+async function forceVisibleFrame(v){
+
+  if(
+    !isFinite(v.duration) ||
+    v.duration<=0
+  ){
+    return;
+  }
+
+  const t=Math.min(
+    Math.max(
+      0.08,
+      v.duration*0.01
+    ),
+    Math.max(
+      0.08,
+      v.duration-0.08
+    )
+  );
+
+  await new Promise(resolve=>{
+
+    const done=()=>{
+      resolve();
+    };
+
+    v.addEventListener(
+      'seeked',
+      done,
+      {once:true}
+    );
+
+    try{
+      v.currentTime=t;
+    }catch(_){
+      resolve();
+    }
+
+    setTimeout(
+      resolve,
+      1500
+    );
+  });
+}
+
+loadVideo.onclick=()=>{
+  videoFile.click();
+};
+
+videoFile.onchange=async()=>{
+
+  const f=videoFile.files?.[0];
+
+  if(!f)return;
+
+  clearVideoSource();
+
+  videoInfo.textContent=
+    `${f.name || 'Vidéo'} · `+
+    `${f.type || 'type inconnu'} · `+
+    `${(f.size/1024/1024).toFixed(1)} Mo`;
+
+  log(
+    'Chargement et décodage de la vidéo locale…'
+  );
+
+  try{
+
+    objectUrl=
+      URL.createObjectURL(f);
+
+    const metadataPromise=
+      new Promise((resolve,reject)=>{
+
+        const onMeta=()=>{
+
+          cleanup();
+          resolve();
+        };
+
+        const onErr=()=>{
+
+          cleanup();
+
+          reject(
+            new Error(
+              'Impossible de lire les métadonnées de cette vidéo.'
+            )
+          );
+        };
+
+        const cleanup=()=>{
+
+          video.removeEventListener(
+            'loadedmetadata',
+            onMeta
+          );
+
+          video.removeEventListener(
+            'error',
+            onErr
+          );
+        };
+
+        video.addEventListener(
+          'loadedmetadata',
+          onMeta,
+          {once:true}
+        );
+
+        video.addEventListener(
+          'error',
+          onErr,
+          {once:true}
+        );
+      });
+
+    video.src=objectUrl;
+    video.controls=true;
+    video.playsInline=true;
+    video.preload='auto';
+
+    video.load();
+
+    await metadataPromise;
+
+    await waitForVideoFrame(video);
+
+    await forceVisibleFrame(video);
+
+    const test=
+      document.createElement('canvas');
+
+    test.width=32;
+    test.height=32;
+
+    const tx=
+      test.getContext(
+        '2d',
+        {willReadFrequently:true}
+      );
+
+    tx.drawImage(
+      video,
+      0,
+      0,
+      32,
+      32
+    );
+
+    const px=
+      tx.getImageData(
+        0,
+        0,
+        32,
+        32
+      ).data;
+
+    let energy=0;
+
+    for(
+      let i=0;
+      i<px.length;
+      i+=4
+    ){
+      energy+=
+        px[i]+
+        px[i+1]+
+        px[i+2];
+    }
+
+    if(
+      video.videoWidth===0 ||
+      video.videoHeight===0
+    ){
+      throw new Error(
+        'La vidéo est chargée mais aucune image n’est décodée.'
+      );
+    }
+
+    videoInfo.textContent+=
+      ` · ${video.videoWidth}×${video.videoHeight}`+
+      ` · ${video.duration.toFixed(2)} s`;
+
+    extract.disabled=false;
+
+    log(
+      `Vidéo locale prête — `+
+      `${video.duration.toFixed(2)} s. `+
+      `L’image est décodée, tu peux lancer l’extraction.`
+    );
+
+  }catch(e){
+
+    extract.disabled=true;
+
+    log(
+      'Erreur vidéo locale : '+
+      e.message+
+      '\nSi elle se lit dans Photos mais reste noire ici, le codec du fichier n’est pas exploitable par le lecteur web/canvas. Dans ce cas, utilise un MP4 H.264.'
+    );
+  }
+};
 
 generate.onclick=async()=>{
- const f=image.files[0]; if(!f){log('Choisis d’abord une photo.');return;}
- generate.disabled=true; extract.disabled=true; download.disabled=true; frameData=[]; framesEl.innerHTML='';
- try{
-   log('Envoi de la photo à PixVerse…');
-   const fd=new FormData(); fd.append('image',f,f.name);
-   const ur=await fetch('/api/pixverse-upload',{method:'POST',body:fd}); const uj=await ur.json();
-   if(!ur.ok||uj.ErrCode!==0) throw new Error(uj.ErrMsg||uj.error||'Échec upload PixVerse');
-   const imgId=uj.Resp?.img_id; if(imgId==null) throw new Error('PixVerse n’a pas renvoyé img_id');
-   log('Photo reçue. Création de la micro-vidéo V6 720p / 5 s…');
-   const cr=await fetch('/api/pixverse-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({img_id:imgId,prompt:prompt.value,seed:0})});
-   const cj=await cr.json(); if(!cr.ok||cj.ErrCode!==0) throw new Error(cj.ErrMsg||cj.error||'Échec création PixVerse');
-   const id=cj.Resp?.video_id; if(!id) throw new Error('PixVerse n’a pas renvoyé video_id');
-   log(`Vidéo #${id} en génération…`);
-   let url='';
-   for(let i=0;i<90;i++){
-     await sleep(3000);
-     const sr=await fetch(`/api/pixverse-status?id=${encodeURIComponent(id)}`); const sj=await sr.json();
-     const s=sj.Resp?.status;
-     if(s===1){url=sj.Resp?.url||'';break;}
-     if(s===7) throw new Error('PixVerse a refusé le contenu (modération).');
-     if(s===8) throw new Error('PixVerse a échoué à générer la vidéo.');
-     log(`Vidéo #${id} en génération… statut ${s ?? '?'}`);
-   }
-   if(!url) throw new Error('La vidéo n’est pas encore disponible.');
-   video.src=`/api/pixverse-video?url=${encodeURIComponent(url)}`; video.load();
-   await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve; video.onerror=()=>reject(new Error('Impossible de charger la vidéo générée.'));});
-   extract.disabled=false; log(`Vidéo PixVerse prête — ${video.duration.toFixed(2)} s. Tu peux extraire les 9 vues.`);
- }catch(e){log('Erreur : '+e.message);}finally{generate.disabled=false;}
+
+  const f=image.files[0];
+
+  if(!f){
+    log(
+      'Choisis d’abord une photo.'
+    );
+    return;
+  }
+
+  generate.disabled=true;
+  extract.disabled=true;
+  download.disabled=true;
+
+  frameData=[];
+  framesEl.innerHTML='';
+
+  try{
+
+    log(
+      'Envoi de la photo à PixVerse…'
+    );
+
+    const fd=
+      new FormData();
+
+    fd.append(
+      'image',
+      f,
+      f.name
+    );
+
+    const ur=
+      await fetch(
+        '/api/pixverse-upload',
+        {
+          method:'POST',
+          body:fd
+        }
+      );
+
+    const uj=
+      await ur.json();
+
+    if(
+      !ur.ok ||
+      uj.ErrCode!==0
+    ){
+      throw new Error(
+        uj.ErrMsg ||
+        uj.error ||
+        'Échec upload PixVerse'
+      );
+    }
+
+    const imgId=
+      uj.Resp?.img_id;
+
+    if(imgId==null){
+      throw new Error(
+        'PixVerse n’a pas renvoyé img_id'
+      );
+    }
+
+    log(
+      'Photo reçue. Création de la micro-vidéo V6 720p / 5 s…'
+    );
+
+    const cr=
+      await fetch(
+        '/api/pixverse-create',
+        {
+          method:'POST',
+          headers:{
+            'Content-Type':
+            'application/json'
+          },
+          body:JSON.stringify({
+            img_id:imgId,
+            prompt:prompt.value,
+            seed:0
+          })
+        }
+      );
+
+    const cj=
+      await cr.json();
+
+    if(
+      !cr.ok ||
+      cj.ErrCode!==0
+    ){
+      throw new Error(
+        cj.ErrMsg ||
+        cj.error ||
+        'Échec création PixVerse'
+      );
+    }
+
+    const id=
+      cj.Resp?.video_id;
+
+    if(!id){
+      throw new Error(
+        'PixVerse n’a pas renvoyé video_id'
+      );
+    }
+
+    log(
+      `Vidéo #${id} en génération…`
+    );
+
+    let url='';
+
+    for(
+      let i=0;
+      i<90;
+      i++
+    ){
+
+      await sleep(3000);
+
+      const sr=
+        await fetch(
+          `/api/pixverse-status?id=${encodeURIComponent(id)}`
+        );
+
+      const sj=
+        await sr.json();
+
+      const s=
+        sj.Resp?.status;
+
+      if(s===1){
+
+        url=
+          sj.Resp?.url ||
+          '';
+
+        break;
+      }
+
+      if(s===7){
+        throw new Error(
+          'PixVerse a refusé le contenu (modération).'
+        );
+      }
+
+      if(s===8){
+        throw new Error(
+          'PixVerse a échoué à générer la vidéo.'
+        );
+      }
+
+      log(
+        `Vidéo #${id} en génération… statut ${s ?? '?'}`
+      );
+    }
+
+    if(!url){
+      throw new Error(
+        'La vidéo n’est pas encore disponible.'
+      );
+    }
+
+    video.src=
+      `/api/pixverse-video?url=${encodeURIComponent(url)}`;
+
+    video.load();
+
+    await new Promise(
+      (resolve,reject)=>{
+
+        video.onloadedmetadata=
+          resolve;
+
+        video.onerror=
+          ()=>reject(
+            new Error(
+              'Impossible de charger la vidéo générée.'
+            )
+          );
+      }
+    );
+
+    await waitForVideoFrame(video);
+
+    await forceVisibleFrame(video);
+
+    extract.disabled=false;
+
+    log(
+      `Vidéo PixVerse prête — `+
+      `${video.duration.toFixed(2)} s. `+
+      `Tu peux extraire les 9 vues.`
+    );
+
+  }catch(e){
+
+    log(
+      'Erreur : '+
+      e.message
+    );
+
+  }finally{
+
+    generate.disabled=false;
+  }
 };
 
-function waitSeek(v,t){return new Promise((resolve,reject)=>{const on=()=>{cleanup();resolve();}, er=()=>{cleanup();reject(new Error('Erreur de lecture vidéo'));}, cleanup=()=>{v.removeEventListener('seeked',on);v.removeEventListener('error',er)};v.addEventListener('seeked',on,{once:true});v.addEventListener('error',er,{once:true});v.currentTime=Math.max(0,Math.min(t,v.duration-.02));});}
-function captureCanvas(v,small=false){const side=Math.min(v.videoWidth,v.videoHeight);const sx=(v.videoWidth-side)/2, sy=(v.videoHeight-side)/2;const c=document.createElement('canvas');const out=small?64:( $('#size').value==='original'?side:Number($('#size').value));c.width=out;c.height=out;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,sx,sy,side,side,0,0,out,out);return c;}
-function signature(c){const x=c.getContext('2d').getImageData(0,0,c.width,c.height).data;const a=[];for(let gy=0;gy<8;gy++)for(let gx=0;gx<8;gx++){let s=0,n=0;for(let y=gy*8;y<(gy+1)*8;y+=2)for(let xx=gx*8;xx<(gx+1)*8;xx+=2){const i=(y*64+xx)*4;s+=(x[i]*.299+x[i+1]*.587+x[i+2]*.114);n++;}a.push(s/n);}return a;}
-function dist(a,b){let s=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];s+=d*d;}return Math.sqrt(s/a.length);}
-async function blobOf(c){return await new Promise(r=>c.toBlob(r,'image/png'));}
+function waitSeek(v,t){
+
+  return new Promise(
+    (resolve,reject)=>{
+
+      const on=()=>{
+
+        cleanup();
+        resolve();
+      };
+
+      const er=()=>{
+
+        cleanup();
+
+        reject(
+          new Error(
+            'Erreur de lecture vidéo'
+          )
+        );
+      };
+
+      const cleanup=()=>{
+
+        v.removeEventListener(
+          'seeked',
+          on
+        );
+
+        v.removeEventListener(
+          'error',
+          er
+        );
+      };
+
+      v.addEventListener(
+        'seeked',
+        on,
+        {once:true}
+      );
+
+      v.addEventListener(
+        'error',
+        er,
+        {once:true}
+      );
+
+      v.currentTime=
+        Math.max(
+          0,
+          Math.min(
+            t,
+            v.duration-.02
+          )
+        );
+    }
+  );
+}
+
+function captureCanvas(v,small=false){
+
+  const side=
+    Math.min(
+      v.videoWidth,
+      v.videoHeight
+    );
+
+  if(!side){
+    throw new Error(
+      'Aucune image vidéo décodée.'
+    );
+  }
+
+  const sx=
+    (v.videoWidth-side)/2;
+
+  const sy=
+    (v.videoHeight-side)/2;
+
+  const c=
+    document.createElement(
+      'canvas'
+    );
+
+  const out=
+    small
+      ?64
+      :(
+        $('#size').value==='original'
+          ?side
+          :Number($('#size').value)
+      );
+
+  c.width=out;
+  c.height=out;
+
+  const x=
+    c.getContext(
+      '2d',
+      {willReadFrequently:true}
+    );
+
+  x.drawImage(
+    v,
+    sx,
+    sy,
+    side,
+    side,
+    0,
+    0,
+    out,
+    out
+  );
+
+  return c;
+}
+
+function signature(c){
+
+  const x=
+    c.getContext('2d')
+      .getImageData(
+        0,
+        0,
+        c.width,
+        c.height
+      ).data;
+
+  const a=[];
+
+  for(
+    let gy=0;
+    gy<8;
+    gy++
+  ){
+
+    for(
+      let gx=0;
+      gx<8;
+      gx++
+    ){
+
+      let s=0;
+      let n=0;
+
+      for(
+        let y=gy*8;
+        y<(gy+1)*8;
+        y+=2
+      ){
+
+        for(
+          let xx=gx*8;
+          xx<(gx+1)*8;
+          xx+=2
+        ){
+
+          const i=
+            (y*64+xx)*4;
+
+          s+=
+            x[i]*.299+
+            x[i+1]*.587+
+            x[i+2]*.114;
+
+          n++;
+        }
+      }
+
+      a.push(s/n);
+    }
+  }
+
+  return a;
+}
+
+function dist(a,b){
+
+  let s=0;
+
+  for(
+    let i=0;
+    i<a.length;
+    i++
+  ){
+
+    const d=
+      a[i]-b[i];
+
+    s+=d*d;
+  }
+
+  return Math.sqrt(
+    s/a.length
+  );
+}
+
+async function blobOf(c){
+
+  return await new Promise(
+    r=>c.toBlob(
+      r,
+      'image/png'
+    )
+  );
+}
 
 extract.onclick=async()=>{
- if(!video.duration){log('Aucune vidéo exploitable.');return;}
- extract.disabled=true;download.disabled=true;framesEl.innerHTML='';frameData=[];
- try{
-   log('Analyse de la micro-vidéo… recherche des instants les plus distincts.');
-   const N=49, start=Math.max(.03,video.duration*.03), end=Math.max(start+.1,video.duration*.97); const samples=[];
-   for(let i=0;i<N;i++){
-     const t=start+(end-start)*i/(N-1); await waitSeek(video,t); const c=captureCanvas(video,true); samples.push({t,sig:signature(c)});
-   }
-   // Dynamic-programming-like greedy selection: endpoints + repeatedly choose the frame farthest in visual/time space from selected.
-   const selected=[0,N-1];
-   while(selected.length<9){
-     let best=-1,score=-1;
-     for(let i=1;i<N-1;i++){
-       if(selected.includes(i))continue;
-       let minVisual=Infinity,minTime=Infinity;
-       for(const j of selected){minVisual=Math.min(minVisual,dist(samples[i].sig,samples[j].sig));minTime=Math.min(minTime,Math.abs(i-j)/(N-1));}
-       const sc=minVisual*(0.65+0.35*Math.min(1,minTime*8));
-       if(sc>score){score=sc;best=i;}
-     }
-     selected.push(best);
-   }
-   selected.sort((a,b)=>a-b);
-   // Guarantee temporal coverage: blend with evenly spaced targets if greedy collapses in one action zone.
-   const even=Array.from({length:9},(_,k)=>Math.round(k*(N-1)/8));
-   for(let k=0;k<9;k++) if(Math.abs(selected[k]-even[k])>8) selected[k]=even[k];
-   selected.sort((a,b)=>a-b);
-   const unique=[...new Set(selected)];
-   while(unique.length<9){const cand=even.find(x=>!unique.includes(x));unique.push(cand);unique.sort((a,b)=>a-b);}
-   let prevSig=null, closeCount=0;
-   for(let k=0;k<9;k++){
-     const s=samples[unique[k]]; await waitSeek(video,s.t); const c=captureCanvas(video,false), blob=await blobOf(c); const sig=signature(captureCanvas(video,true)); const d=prevSig?dist(sig,prevSig):null; if(d!==null&&d<2.2)closeCount++; prevSig=sig;
-     frameData.push({index:k+1,time:s.t,blob,delta:d});
-     const u=URL.createObjectURL(blob); const box=document.createElement('div');box.className='frame';box.innerHTML=`<img src="${u}"><div class="meta">vue-${String(k+1).padStart(2,'0')} · ${s.t.toFixed(2)} s${d===null?'':` · Δ ${d.toFixed(1)}`}</div>`;framesEl.appendChild(box);
-   }
-   const q=$('#qualityDot'), qt=$('#qualityText');q.className='dot '+(closeCount===0?'good':closeCount<=2?'warn':'bad');qt.textContent=closeCount===0?'9 vues bien différenciées.':closeCount<=2?`${closeCount} transition(s) très proche(s) : export possible, à contrôler visuellement.`:`${closeCount} transition(s) trop proche(s) : mieux vaut régénérer une animation avec davantage de mouvement.`;
-   download.disabled=false; log('9 vues extraites et analysées. Vérifie la grille puis télécharge le ZIP.');
- }catch(e){log('Erreur extraction : '+e.message);}finally{extract.disabled=false;}
+
+  if(!video.duration){
+
+    log(
+      'Aucune vidéo exploitable.'
+    );
+
+    return;
+  }
+
+  extract.disabled=true;
+  download.disabled=true;
+
+  framesEl.innerHTML='';
+  frameData=[];
+
+  try{
+
+    log(
+      'Analyse de la micro-vidéo… recherche des instants les plus distincts.'
+    );
+
+    const N=49;
+
+    const start=
+      Math.max(
+        .03,
+        video.duration*.03
+      );
+
+    const end=
+      Math.max(
+        start+.1,
+        video.duration*.97
+      );
+
+    const samples=[];
+
+    for(
+      let i=0;
+      i<N;
+      i++
+    ){
+
+      const t=
+        start+
+        (end-start)*
+        i/
+        (N-1);
+
+      await waitSeek(
+        video,
+        t
+      );
+
+      const c=
+        captureCanvas(
+          video,
+          true
+        );
+
+      samples.push({
+        t,
+        sig:signature(c)
+      });
+    }
+
+    const selected=[
+      0,
+      N-1
+    ];
+
+    while(
+      selected.length<9
+    ){
+
+      let best=-1;
+      let score=-1;
+
+      for(
+        let i=1;
+        i<N-1;
+        i++
+      ){
+
+        if(
+          selected.includes(i)
+        ){
+          continue;
+        }
+
+        let minVisual=
+          Infinity;
+
+        let minTime=
+          Infinity;
+
+        for(
+          const j of selected
+        ){
+
+          minVisual=
+            Math.min(
+              minVisual,
+              dist(
+                samples[i].sig,
+                samples[j].sig
+              )
+            );
+
+          minTime=
+            Math.min(
+              minTime,
+              Math.abs(i-j)/
+              (N-1)
+            );
+        }
+
+        const sc=
+          minVisual*
+          (
+            0.65+
+            0.35*
+            Math.min(
+              1,
+              minTime*8
+            )
+          );
+
+        if(sc>score){
+
+          score=sc;
+          best=i;
+        }
+      }
+
+      selected.push(best);
+    }
+
+    selected.sort(
+      (a,b)=>a-b
+    );
+
+    const even=
+      Array.from(
+        {length:9},
+        (_,k)=>
+          Math.round(
+            k*(N-1)/8
+          )
+      );
+
+    for(
+      let k=0;
+      k<9;
+      k++
+    ){
+
+      if(
+        Math.abs(
+          selected[k]-
+          even[k]
+        )>8
+      ){
+
+        selected[k]=
+          even[k];
+      }
+    }
+
+    selected.sort(
+      (a,b)=>a-b
+    );
+
+    const unique=
+      [...new Set(selected)];
+
+    while(
+      unique.length<9
+    ){
+
+      const cand=
+        even.find(
+          x=>!unique.includes(x)
+        );
+
+      unique.push(cand);
+
+      unique.sort(
+        (a,b)=>a-b
+      );
+    }
+
+    let prevSig=null;
+    let closeCount=0;
+
+    for(
+      let k=0;
+      k<9;
+      k++
+    ){
+
+      const s=
+        samples[
+          unique[k]
+        ];
+
+      await waitSeek(
+        video,
+        s.t
+      );
+
+      const c=
+        captureCanvas(
+          video,
+          false
+        );
+
+      const blob=
+        await blobOf(c);
+
+      const sig=
+        signature(
+          captureCanvas(
+            video,
+            true
+          )
+        );
+
+      const d=
+        prevSig
+          ?dist(
+            sig,
+            prevSig
+          )
+          :null;
+
+      if(
+        d!==null &&
+        d<2.2
+      ){
+        closeCount++;
+      }
+
+      prevSig=sig;
+
+      frameData.push({
+        index:k+1,
+        time:s.t,
+        blob,
+        delta:d
+      });
+
+      const u=
+        URL.createObjectURL(
+          blob
+        );
+
+      const box=
+        document.createElement(
+          'div'
+        );
+
+      box.className=
+        'frame';
+
+      box.innerHTML=
+        `<img src="${u}">`+
+        `<div class="meta">`+
+        `vue-${String(k+1).padStart(2,'0')} · `+
+        `${s.t.toFixed(2)} s`+
+        `${d===null?'':` · Δ ${d.toFixed(1)}`}`+
+        `</div>`;
+
+      framesEl.appendChild(
+        box
+      );
+    }
+
+    const q=
+      $('#qualityDot');
+
+    const qt=
+      $('#qualityText');
+
+    q.className=
+      'dot '+
+      (
+        closeCount===0
+          ?'good'
+          :closeCount<=2
+            ?'warn'
+            :'bad'
+      );
+
+    qt.textContent=
+      closeCount===0
+        ?'9 vues bien différenciées.'
+        :closeCount<=2
+          ?`${closeCount} transition(s) très proche(s) : export possible, à contrôler visuellement.`
+          :`${closeCount} transition(s) trop proche(s) : mieux vaut régénérer une animation avec davantage de mouvement.`;
+
+    download.disabled=false;
+
+    log(
+      '9 vues extraites et analysées. Vérifie la grille puis télécharge le ZIP.'
+    );
+
+  }catch(e){
+
+    log(
+      'Erreur extraction : '+
+      e.message
+    );
+
+  }finally{
+
+    extract.disabled=false;
+  }
 };
 
 download.onclick=async()=>{
- if(frameData.length!==9)return;
- const reverse=$('#direction').value==='reverse'; const ordered=reverse?[...frameData].reverse():frameData;
- const zip=new JSZip(); ordered.forEach((f,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,f.blob));
- zip.file('manifest.json',JSON.stringify({generator:'LentiPrint Lab v11',source:'PixVerse/local video',views:9,direction:reverse?'reverse':'normal',frames:ordered.map((f,i)=>({file:`vue-${String(i+1).padStart(2,'0')}.png`,sourceTime:Number(f.time.toFixed(4)),delta:f.delta===null?null:Number(f.delta.toFixed(2))}))},null,2));
- const out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}}); const a=document.createElement('a');a.href=URL.createObjectURL(out);a.download='9-vues-animation-lenticulaire.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+
+  if(
+    frameData.length!==9
+  ){
+    return;
+  }
+
+  const reverse=
+    $('#direction').value===
+    'reverse';
+
+  const ordered=
+    reverse
+      ?[...frameData].reverse()
+      :frameData;
+
+  const zip=
+    new JSZip();
+
+  ordered.forEach(
+    (f,i)=>{
+
+      zip.file(
+        `vue-${String(i+1).padStart(2,'0')}.png`,
+        f.blob
+      );
+    }
+  );
+
+  zip.file(
+    'manifest.json',
+    JSON.stringify(
+      {
+        generator:
+          'LentiPrint Lab v11.1',
+
+        source:
+          'PixVerse/local video',
+
+        views:9,
+
+        direction:
+          reverse
+            ?'reverse'
+            :'normal',
+
+        frames:
+          ordered.map(
+            (f,i)=>({
+              file:
+                `vue-${String(i+1).padStart(2,'0')}.png`,
+
+              sourceTime:
+                Number(
+                  f.time.toFixed(4)
+                ),
+
+              delta:
+                f.delta===null
+                  ?null
+                  :Number(
+                    f.delta.toFixed(2)
+                  )
+            })
+          )
+      },
+      null,
+      2
+    )
+  );
+
+  const out=
+    await zip.generateAsync({
+      type:'blob',
+      compression:'DEFLATE',
+      compressionOptions:{
+        level:6
+      }
+    });
+
+  const a=
+    document.createElement(
+      'a'
+    );
+
+  a.href=
+    URL.createObjectURL(
+      out
+    );
+
+  a.download=
+    '9-vues-animation-lenticulaire.zip';
+
+  a.click();
+
+  setTimeout(
+    ()=>{
+      URL.revokeObjectURL(
+        a.href
+      );
+    },
+    3000
+  );
 };
-</script></body></html>
+
+</script>
+
+</body>
+</html>
