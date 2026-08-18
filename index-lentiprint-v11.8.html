@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LentiPrint Lab v11.8</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#151515;background:#f5f5f3
+}
+*{box-sizing:border-box}
+body{margin:0}
+.wrap{max-width:1100px;margin:auto;padding:22px}
+.top{display:flex;gap:14px;align-items:center;justify-content:space-between;margin-bottom:18px}
+.badge{font-size:12px;padding:6px 9px;border-radius:999px;background:#111;color:#fff}
+.card{background:#fff;border:1px solid #ddd;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 1px 8px #0000000a}
+h1{font-size:25px;margin:0}
+h2{font-size:18px;margin:0 0 12px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{display:flex;flex-direction:column;gap:7px}
+label{font-size:13px;font-weight:650}
+input,textarea,select,button{font:inherit}
+input,textarea,select{border:1px solid #ccc;border-radius:11px;padding:11px;background:#fff}
+textarea{min-height:110px;resize:vertical}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button{border:0;border-radius:12px;padding:11px 15px;background:#111;color:#fff;font-weight:700;cursor:pointer}
+button.secondary{background:#ececec;color:#111}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{padding:11px;border-radius:12px;background:#f3f3f3;font-size:13px;white-space:pre-wrap}
+.preview{display:grid;grid-template-columns:360px 1fr;gap:16px;align-items:start}
+video{display:block;width:100%;border-radius:14px;background:#111}
+.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.frame{border:1px solid #ddd;border-radius:12px;padding:7px;background:#fafafa}
+.frame img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:9px}
+.meta{font-size:11px;color:#666;margin-top:6px}
+.quality{display:flex;gap:8px;align-items:center;font-size:12px}
+.dot{width:9px;height:9px;border-radius:50%;background:#999}
+.good{background:#159947}.warn{background:#e09b00}.bad{background:#c62929}
+
+/* ===== Timeline unique ===== */
+.trimBox{
+  margin-top:14px;padding:14px;border:1px solid #ddd;border-radius:14px;background:#fafafa
+}
+.trimTitle{font-weight:750;font-size:14px;margin-bottom:8px}
+.trimHelp{font-size:12px;color:#666;line-height:1.4;margin-bottom:14px}
+.timeline{
+  position:relative;
+  height:54px;
+  margin:12px 4px 6px;
+  touch-action:none;
+  user-select:none
+}
+.timelineTrack{
+  position:absolute;left:0;right:0;top:20px;height:12px;
+  border-radius:999px;background:#d7dbe1;overflow:visible
+}
+.timelinePlayed{
+  position:absolute;left:0;top:0;height:100%;width:0;
+  border-radius:999px;background:#aab3bf;pointer-events:none
+}
+.selection{
+  position:absolute;top:-7px;height:26px;
+  border-radius:10px;background:#111;
+  cursor:grab;touch-action:none;
+  box-shadow:0 2px 6px #0003
+}
+.selection.dragging{cursor:grabbing}
+.handle{
+  position:absolute;top:-5px;width:24px;height:36px;
+  border-radius:9px;background:#fff;border:2px solid #111;
+  box-shadow:0 1px 5px #0002;touch-action:none
+}
+.handle.left{left:-12px;cursor:ew-resize}
+.handle.right{right:-12px;cursor:ew-resize}
+.timeBubble{
+  position:absolute;top:-28px;transform:translateX(-50%);
+  background:#111;color:#fff;font-size:11px;font-weight:700;
+  padding:4px 6px;border-radius:7px;white-space:nowrap
+}
+#bubbleStart{left:0}
+#bubbleEnd{left:100%}
+.playhead{
+  position:absolute;top:-6px;width:3px;height:24px;
+  background:#f33;border-radius:3px;pointer-events:none;display:none
+}
+.timelineTicks{
+  display:flex;justify-content:space-between;font-size:11px;color:#777;margin-top:2px
+}
+.selectionInfo{
+  margin-top:12px;padding:10px;border-radius:10px;background:#fff;border:1px solid #e0e0e0;
+  font-weight:700;font-size:13px
+}
+
+@media(max-width:760px){
+  .row,.preview{grid-template-columns:1fr}
+  .frames{grid-template-columns:repeat(3,1fr)}
+  .wrap{padding:12px}
+  h1{font-size:21px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div>
+    <h1>LentiPrint Lab</h1>
+    <div>Vidéo → zone de recherche 1 à 5 s → meilleure micro-séquence → 9 vues</div>
+  </div>
+  <span class="badge">v11.6</span>
+</div>
+
+<div class="card">
+<h2>1. Source</h2>
+
+<div class="row">
+  <div class="field">
+    <label>Photo source pour PixVerse</label>
+    <input id="image" type="file" accept="image/png,image/jpeg,image/webp">
+  </div>
+
+  <div class="field">
+    <label>Action PixVerse</label>
+    <select id="preset">
+      <option value="bark">Chien — petit aboiement</option>
+      <option value="blink">Chat — clignement naturel</option>
+      <option value="smile">Personne — léger sourire</option>
+      <option value="kiss">Couple — baiser léger</option>
+      <option value="dance">Personne — mini mouvement de danse</option>
+      <option value="custom">Personnalisé</option>
+    </select>
+  </div>
+</div>
+
+<div class="field" style="margin-top:12px">
+  <label>Prompt PixVerse</label>
+  <textarea id="prompt"></textarea>
+</div>
+
+<div class="actions">
+  <button id="generate">Créer la micro-vidéo PixVerse</button>
+  <button id="loadVideo" class="secondary">Charger une vidéo existante</button>
+  <input id="videoFile" type="file" accept="video/*" hidden>
+</div>
+
+<div id="status" class="status" style="margin-top:12px">Prêt.</div>
+</div>
+
+<div class="card">
+<h2>2. Vidéo et sélection</h2>
+
+<div class="preview">
+
+<div>
+  <video id="video" controls playsinline preload="auto"></video>
+  <div id="videoInfo" class="meta"></div>
+
+  <div id="trimControls" class="trimBox" hidden>
+    <div class="trimTitle">Choisir le passage utile</div>
+    <div class="trimHelp">
+      Fais glisser la zone noire pour la déplacer dans la vidéo.
+      Tire les poignées gauche/droite pour régler la durée entre 1 et 5 secondes.
+    </div>
+
+    <div id="timeline" class="timeline">
+      <div id="timelineTrack" class="timelineTrack">
+        <div id="timelinePlayed" class="timelinePlayed"></div>
+
+        <div id="selection" class="selection">
+          <div id="bubbleStart" class="timeBubble">0.00 s</div>
+          <div id="bubbleEnd" class="timeBubble">5.00 s</div>
+          <div id="handleLeft" class="handle left"></div>
+          <div id="handleRight" class="handle right"></div>
+          <div id="playhead" class="playhead"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="timelineTicks">
+      <span>0 s</span>
+      <span id="totalDuration">0 s</span>
+    </div>
+
+    <div id="selectionInfo" class="selectionInfo">
+      Sélection : 0.00 s → 5.00 s · durée 5.00 s
+    </div>
+
+    <div class="actions">
+      <button id="previewTrim" class="secondary" type="button">▶ Lire la sélection en boucle</button>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="extract" disabled>Extraire les 9 vues</button>
+  </div>
+</div>
+
+<div>
+  <div id="frames" class="frames"></div>
+</div>
+
+</div>
+</div>
+
+<div class="card">
+<h2>3. Export production</h2>
+
+<div class="row">
+  <div class="field">
+    <label>Format de sortie</label>
+    <select id="size">
+      <option value="772">772 × 772 — médaillon test</option>
+      <option value="1024">1024 × 1024 — haute définition</option>
+      <option value="original">Format carré résolution vidéo</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>Sens de lecture</label>
+    <select id="direction">
+      <option value="normal">1 → 9</option>
+      <option value="reverse">9 → 1</option>
+    </select>
+  </div>
+</div>
+
+<div class="actions">
+  <button id="download" disabled>Télécharger ZIP — 9 vues</button>
+</div>
+
+<div class="quality" style="margin-top:12px">
+  <span id="qualityDot" class="dot"></span>
+  <span id="qualityText">Pas encore analysé.</span>
+</div>
+</div>
+
+</div>
+
+<script type="module">
+const $=s=>document.querySelector(s);
+
+const image=$('#image'),preset=$('#preset'),prompt=$('#prompt'),status=$('#status');
+const video=$('#video'),videoInfo=$('#videoInfo');
+const generate=$('#generate'),loadVideo=$('#loadVideo'),videoFile=$('#videoFile');
+const trimControls=$('#trimControls'),timelineTrack=$('#timelineTrack'),selection=$('#selection');
+const handleLeft=$('#handleLeft'),handleRight=$('#handleRight');
+const bubbleStart=$('#bubbleStart'),bubbleEnd=$('#bubbleEnd');
+const selectionInfo=$('#selectionInfo'),totalDuration=$('#totalDuration');
+const previewTrim=$('#previewTrim'),playhead=$('#playhead'),timelinePlayed=$('#timelinePlayed');
+const extract=$('#extract'),framesEl=$('#frames'),download=$('#download');
+
+const MIN_CLIP=1;
+const MAX_CLIP=5;
+
+let objectUrl=null;
+let frameData=[];
+let clipStart=0;
+let clipEnd=5;
+let dragMode=null;
+let pointerStartX=0;
+let startClipAtPointer=0;
+let endClipAtPointer=0;
+let trimLoopActive=false;
+let loopRAF=null;
+
+const prompts={
+  bark:'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
+  blink:'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
+  smile:'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
+  kiss:'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
+  dance:'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
+  custom:''
+};
+
+function setPrompt(){if(preset.value!=='custom')prompt.value=prompts[preset.value]}
+preset.addEventListener('change',setPrompt);setPrompt();
+
+function log(t){status.textContent=t}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+function stopLoop(){
+  trimLoopActive=false;
+  if(loopRAF){cancelAnimationFrame(loopRAF);loopRAF=null}
+  previewTrim.textContent='▶ Lire la sélection en boucle';
+  playhead.style.display='none';
+}
+
+function clearFrames(){
+  frameData=[];
+  framesEl.innerHTML='';
+  download.disabled=true;
+  $('#qualityDot').className='dot';
+  $('#qualityText').textContent='Pas encore analysé.';
+}
+
+function clearVideo(){
+  stopLoop();clearFrames();
+  try{video.pause()}catch(_){}
+  video.removeAttribute('src');
+  try{video.load()}catch(_){}
+  if(objectUrl){try{URL.revokeObjectURL(objectUrl)}catch(_){} objectUrl=null}
+  trimControls.hidden=true;
+  extract.disabled=true;
+  videoInfo.textContent='';
+}
+
+function waitForMetadata(v){
+  return new Promise((resolve,reject)=>{
+    if(Number.isFinite(v.duration)&&v.duration>0){resolve();return}
+    const ok=()=>{cleanup();resolve()};
+    const fail=()=>{cleanup();reject(new Error('Impossible de lire les informations de cette vidéo.'))};
+    const cleanup=()=>{v.removeEventListener('loadedmetadata',ok);v.removeEventListener('error',fail)};
+    v.addEventListener('loadedmetadata',ok,{once:true});
+    v.addEventListener('error',fail,{once:true});
+  });
+}
+
+function waitForVideoFrame(v,timeout=15000){
+  return new Promise((resolve,reject)=>{
+    let done=false;
+    const check=()=>{
+      if(done)return;
+      if(v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0){
+        done=true;cleanup();resolve();
+      }
+    };
+    const fail=()=>{if(done)return;done=true;cleanup();reject(new Error('La vidéo ne peut pas être décodée.'))};
+    const timer=setTimeout(()=>{if(done)return;done=true;cleanup();reject(new Error('Aucune image vidéo décodée.'))},timeout);
+    const events=['loadeddata','canplay','canplaythrough','timeupdate'];
+    const cleanup=()=>{
+      clearTimeout(timer);
+      events.forEach(e=>v.removeEventListener(e,check));
+      v.removeEventListener('error',fail);
+    };
+    events.forEach(e=>v.addEventListener(e,check));
+    v.addEventListener('error',fail,{once:true});
+    check();
+  });
+}
+
+function waitSeek(v,time){
+  return new Promise((resolve,reject)=>{
+    if(!Number.isFinite(v.duration)){reject(new Error('Durée vidéo inconnue.'));return}
+    const target=Math.max(0,Math.min(time,Math.max(0,v.duration-.02)));
+    if(Math.abs(v.currentTime-target)<.015){resolve();return}
+    const ok=()=>{cleanup();resolve()};
+    const fail=()=>{cleanup();reject(new Error('Impossible de se déplacer dans la vidéo.'))};
+    const timer=setTimeout(()=>{cleanup();resolve()},2500);
+    const cleanup=()=>{
+      clearTimeout(timer);
+      v.removeEventListener('seeked',ok);
+      v.removeEventListener('error',fail);
+    };
+    v.addEventListener('seeked',ok,{once:true});
+    v.addEventListener('error',fail,{once:true});
+    try{v.currentTime=target}catch(e){cleanup();reject(e)}
+  });
+}
+
+/* ===== Timeline ===== */
+
+function clamp(n,min,max){return Math.max(min,Math.min(max,n))}
+
+function secondsFromPixels(px){
+  const rect=timelineTrack.getBoundingClientRect();
+  if(!rect.width||!video.duration)return 0;
+  return px/rect.width*video.duration;
+}
+
+function renderSelection(seekToStart=false){
+  if(!Number.isFinite(video.duration)||video.duration<=0)return;
+
+  clipStart=clamp(clipStart,0,video.duration);
+  clipEnd=clamp(clipEnd,0,video.duration);
+
+  let len=clipEnd-clipStart;
+  if(len<MIN_CLIP)clipEnd=Math.min(video.duration,clipStart+MIN_CLIP);
+  if(clipEnd-clipStart>MAX_CLIP)clipEnd=clipStart+MAX_CLIP;
+
+  if(clipEnd>video.duration){
+    const width=clipEnd-clipStart;
+    clipEnd=video.duration;
+    clipStart=Math.max(0,clipEnd-width);
+  }
+
+  const left=clipStart/video.duration*100;
+  const width=(clipEnd-clipStart)/video.duration*100;
+
+  selection.style.left=`${left}%`;
+  selection.style.width=`${width}%`;
+
+  bubbleStart.textContent=`${clipStart.toFixed(2)} s`;
+  bubbleEnd.textContent=`${clipEnd.toFixed(2)} s`;
+
+  selectionInfo.textContent=
+    `Sélection : ${clipStart.toFixed(2)} s → ${clipEnd.toFixed(2)} s · durée ${(clipEnd-clipStart).toFixed(2)} s`;
+
+  extract.disabled=(clipEnd-clipStart)<MIN_CLIP||(clipEnd-clipStart)>MAX_CLIP+.01;
+
+  if(seekToStart){
+    try{video.currentTime=clipStart}catch(_){}
+  }
+}
+
+function setupTimeline(){
+  if(!Number.isFinite(video.duration)||video.duration<=0)return;
+
+  clipStart=0;
+  clipEnd=Math.min(MAX_CLIP,video.duration);
+
+  if(clipEnd-clipStart<MIN_CLIP&&video.duration>=MIN_CLIP){
+    clipEnd=MIN_CLIP;
+  }
+
+  totalDuration.textContent=`${video.duration.toFixed(1)} s`;
+  trimControls.hidden=false;
+  renderSelection(true);
+}
+
+function beginDrag(mode,e){
+  if(!Number.isFinite(video.duration)||video.duration<=0)return;
+  e.preventDefault();
+  dragMode=mode;
+  pointerStartX=e.clientX;
+  startClipAtPointer=clipStart;
+  endClipAtPointer=clipEnd;
+  selection.classList.add('dragging');
+  try{e.currentTarget.setPointerCapture(e.pointerId)}catch(_){}
+}
+
+selection.addEventListener('pointerdown',e=>{
+  if(e.target===handleLeft||e.target===handleRight)return;
+  beginDrag('move',e);
+});
+
+handleLeft.addEventListener('pointerdown',e=>{
+  e.stopPropagation();
+  beginDrag('left',e);
+});
+
+handleRight.addEventListener('pointerdown',e=>{
+  e.stopPropagation();
+  beginDrag('right',e);
+});
+
+window.addEventListener('pointermove',e=>{
+  if(!dragMode)return;
+
+  const delta=secondsFromPixels(e.clientX-pointerStartX);
+
+  if(dragMode==='move'){
+    const len=endClipAtPointer-startClipAtPointer;
+    let start=startClipAtPointer+delta;
+    start=clamp(start,0,Math.max(0,video.duration-len));
+    clipStart=start;
+    clipEnd=start+len;
+  }
+
+  if(dragMode==='left'){
+    let newStart=startClipAtPointer+delta;
+    newStart=clamp(newStart,0,endClipAtPointer-MIN_CLIP);
+    if(endClipAtPointer-newStart>MAX_CLIP)newStart=endClipAtPointer-MAX_CLIP;
+    clipStart=newStart;
+    clipEnd=endClipAtPointer;
+  }
+
+  if(dragMode==='right'){
+    let newEnd=endClipAtPointer+delta;
+    newEnd=clamp(newEnd,startClipAtPointer+MIN_CLIP,video.duration);
+    if(newEnd-startClipAtPointer>MAX_CLIP)newEnd=startClipAtPointer+MAX_CLIP;
+    clipStart=startClipAtPointer;
+    clipEnd=newEnd;
+  }
+
+  renderSelection(true);
+});
+
+window.addEventListener('pointerup',()=>{
+  if(!dragMode)return;
+  dragMode=null;
+  selection.classList.remove('dragging');
+});
+
+timelineTrack.addEventListener('pointerdown',e=>{
+  if(e.target===selection||selection.contains(e.target))return;
+  const rect=timelineTrack.getBoundingClientRect();
+  const clickTime=clamp((e.clientX-rect.left)/rect.width*video.duration,0,video.duration);
+  const len=clipEnd-clipStart;
+  clipStart=clamp(clickTime-len/2,0,Math.max(0,video.duration-len));
+  clipEnd=clipStart+len;
+  renderSelection(true);
+});
+
+/* ===== Boucle ===== */
+
+async function startLoop(){
+  stopLoop();
+  trimLoopActive=true;
+  previewTrim.textContent='■ Arrêter la boucle';
+
+  try{
+    video.pause();
+    await waitSeek(video,clipStart);
+    await video.play();
+
+    const tick=()=>{
+      if(!trimLoopActive)return;
+
+      if(video.currentTime>=clipEnd-.02||video.currentTime<clipStart-.05){
+        try{video.currentTime=clipStart}catch(_){}
+      }
+
+      const progress=clamp((video.currentTime-clipStart)/(clipEnd-clipStart),0,1);
+      playhead.style.display='block';
+      playhead.style.left=`${progress*100}%`;
+
+      timelinePlayed.style.width=`${clamp(video.currentTime/video.duration,0,1)*100}%`;
+
+      loopRAF=requestAnimationFrame(tick);
+    };
+
+    loopRAF=requestAnimationFrame(tick);
+  }catch(e){
+    stopLoop();
+    log('Lecture de la sélection impossible : '+e.message);
+  }
+}
+
+previewTrim.addEventListener('click',async()=>{
+  if(trimLoopActive){
+    stopLoop();video.pause();
+  }else{
+    await startLoop();
+  }
+});
+
+/* ===== Vidéo locale ===== */
+
+loadVideo.addEventListener('click',()=>videoFile.click());
+
+videoFile.addEventListener('change',async()=>{
+  const file=videoFile.files?.[0];
+  if(!file)return;
+
+  clearVideo();
+
+  videoInfo.textContent=
+    `${file.name||'Vidéo'} · ${file.type||'format inconnu'} · ${(file.size/1024/1024).toFixed(1)} Mo`;
+
+  log('Chargement de la vidéo…');
+
+  try{
+    objectUrl=URL.createObjectURL(file);
+    video.src=objectUrl;
+    video.controls=true;
+    video.playsInline=true;
+    video.preload='auto';
+    video.load();
+
+    await waitForMetadata(video);
+    await waitForVideoFrame(video);
+    await waitSeek(video,Math.min(.1,Math.max(0,video.duration-.05)));
+
+    videoInfo.textContent+=` · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
+    setupTimeline();
+
+    log(
+      `Vidéo prête — ${video.duration.toFixed(2)} s.\n`+
+      `Déplace la fenêtre noire sur la barre et règle une zone de recherche entre 1 et 5 secondes. Le programme choisira automatiquement la micro-séquence la plus fluide à l’intérieur.`
+    );
+  }catch(e){
+    extract.disabled=true;
+    log('Erreur vidéo : '+e.message);
+  }
+});
+
+/* ===== PixVerse ===== */
+
+generate.addEventListener('click',async()=>{
+  const file=image.files?.[0];
+  if(!file){log('Choisis d’abord une photo.');return}
+
+  const p=prompt.value.trim();
+  if(!p){log('Le prompt PixVerse est vide.');return}
+
+  clearVideo();
+  generate.disabled=true;
+
+  try{
+    log('Envoi de la photo à PixVerse…');
+
+    const fd=new FormData();
+    fd.append('image',file,file.name||'photo.jpg');
+
+    const ur=await fetch('/api/pixverse-upload',{method:'POST',body:fd});
+    const uj=await ur.json();
+
+    if(!ur.ok||uj.ErrCode!==0){
+      throw new Error(uj.ErrMsg||uj.error||'Échec upload PixVerse.');
+    }
+
+    const imgId=uj.Resp?.img_id;
+    if(imgId==null)throw new Error('PixVerse n’a pas renvoyé img_id.');
+
+    log('Photo reçue. Création de la micro-vidéo PixVerse 5 s…');
+
+    const cr=await fetch('/api/pixverse-create',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({img_id:imgId,prompt:p,seed:0})
+    });
+
+    const cj=await cr.json();
+
+    if(!cr.ok||cj.ErrCode!==0){
+      throw new Error(cj.ErrMsg||cj.error||'Échec création PixVerse.');
+    }
+
+    const id=cj.Resp?.video_id;
+    if(!id)throw new Error('PixVerse n’a pas renvoyé video_id.');
+
+    let resultUrl='';
+
+    for(let i=0;i<90;i++){
+      await sleep(3000);
+
+      const sr=await fetch(`/api/pixverse-status?id=${encodeURIComponent(id)}`,{cache:'no-store'});
+      const sj=await sr.json();
+
+      if(!sr.ok)throw new Error(sj.error||'Erreur statut PixVerse.');
+
+      const s=sj.Resp?.status;
+
+      if(s===1){
+        resultUrl=sj.Resp?.url||'';
+        break;
+      }
+
+      if(s===7)throw new Error('PixVerse a refusé cette génération.');
+      if(s===8)throw new Error('PixVerse a échoué à générer la vidéo.');
+
+      log(`Vidéo PixVerse #${id} en génération… statut ${s??'?'}`);
+    }
+
+    if(!resultUrl)throw new Error('La vidéo PixVerse n’est pas encore disponible.');
+
+    video.src=`/api/pixverse-video?url=${encodeURIComponent(resultUrl)}`;
+    video.controls=true;
+    video.playsInline=true;
+    video.preload='auto';
+    video.load();
+
+    await waitForMetadata(video);
+    await waitForVideoFrame(video);
+
+    videoInfo.textContent=`Vidéo PixVerse · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
+
+    setupTimeline();
+
+    log('Vidéo PixVerse prête. Vérifie la fenêtre de sélection puis extrais les 9 vues.');
+
+  }catch(e){
+    log('Erreur PixVerse : '+e.message);
+  }finally{
+    generate.disabled=false;
+  }
+});
+
+/* ===== Capture / analyse ===== */
+
+function drawCover(ctx,v,size){
+  const vw=v.videoWidth,vh=v.videoHeight;
+  if(!vw||!vh)throw new Error('Aucune image vidéo disponible.');
+  const side=Math.min(vw,vh);
+  const sx=(vw-side)/2,sy=(vh-side)/2;
+  ctx.drawImage(v,sx,sy,side,side,0,0,size,size);
+}
+
+function captureCanvas(v,small=false){
+  let outputSize;
+  if(small){
+    outputSize=64;
+  }else{
+    const selectedSize=$('#size').value;
+    outputSize=selectedSize==='original'?Math.min(v.videoWidth,v.videoHeight):Number(selectedSize);
+  }
+
+  const c=document.createElement('canvas');
+  c.width=outputSize;c.height=outputSize;
+  drawCover(c.getContext('2d',{willReadFrequently:true}),v,outputSize);
+  return c;
+}
+
+function signature(c){
+  const p=c.getContext('2d').getImageData(0,0,64,64).data;
+  const vals=[];
+
+  for(let gy=0;gy<8;gy++){
+    for(let gx=0;gx<8;gx++){
+      let total=0,count=0;
+      for(let y=gy*8;y<(gy+1)*8;y+=2){
+        for(let x=gx*8;x<(gx+1)*8;x+=2){
+          const i=(y*64+x)*4;
+          total+=p[i]*.299+p[i+1]*.587+p[i+2]*.114;
+          count++;
+        }
+      }
+      vals.push(total/count);
+    }
+  }
+
+  return vals;
+}
+
+function distance(a,b){
+  let s=0;
+  for(let i=0;i<a.length;i++){
+    const d=a[i]-b[i];
+    s+=d*d;
+  }
+  return Math.sqrt(s/a.length);
+}
+
+function canvasBlob(c){
+  return new Promise((resolve,reject)=>{
+    c.toBlob(b=>b?resolve(b):reject(new Error('Impossible de créer le PNG.')),'image/png');
+  });
+}
+
+/* ===== Extraction 9 vues ===== */
+
+function nearestSampleIndex(samples,t){
+  let best=0,bestD=Infinity;
+  for(let i=0;i<samples.length;i++){
+    const d=Math.abs(samples[i].t-t);
+    if(d<bestD){bestD=d;best=i;}
+  }
+  return best;
+}
+
+function sequenceMetrics(samples,start,end){
+  const idx=[];
+  const sigs=[];
+  for(let k=0;k<9;k++){
+    const t=start+(end-start)*k/8;
+    const i=nearestSampleIndex(samples,t);
+    idx.push(i);
+    sigs.push(samples[i].sig);
+  }
+
+  const ds=[];
+  for(let i=1;i<sigs.length;i++)ds.push(distance(sigs[i-1],sigs[i]));
+  const avg=ds.reduce((a,b)=>a+b,0)/ds.length;
+  const max=Math.max(...ds),min=Math.min(...ds);
+  const variance=ds.reduce((a,b)=>a+(b-avg)*(b-avg),0)/ds.length;
+  const sd=Math.sqrt(variance);
+  const cv=sd/(avg||1);
+  const jumpRatio=max/(avg||1);
+  const flatCount=ds.filter(d=>d<1.6).length;
+
+  // Distance entre le début et la fin : très utile pour repérer un sujet
+  // qui traverse l'image (marche, course, gros déplacement) au lieu de faire
+  // un micro-mouvement lenticulaire.
+  const endpoint=distance(sigs[0],sigs[sigs.length-1]);
+  const totalTravel=ds.reduce((a,b)=>a+b,0);
+  const travelRatio=endpoint/(totalTravel||1);
+
+  // v11.8 : on cherche une MICRO-animation et on adapte aussi sa durée
+  // zone qui contient le plus de mouvement.
+  // Zone idéale : mouvement visible, régulier, mais contenu.
+  let motionPenalty=0;
+  if(avg<2.2) motionPenalty+=(2.2-avg)*2.4;      // trop figé
+  if(avg>8.5) motionPenalty+=(avg-8.5)*1.35;    // trop animé
+  if(max>11.5) motionPenalty+=(max-11.5)*0.9;   // saut ponctuel
+
+  // Pénalise fortement les grands déplacements nets entre vue 1 et vue 9.
+  // Un mouvement local (regard, tête, bouche, oreilles) reste favorisé.
+  const endpointPenalty=
+    Math.max(0,endpoint-18)*0.18 +
+    Math.max(0,endpoint-28)*0.38 +
+    Math.max(0,travelRatio-0.52)*10;
+
+  const regularityPenalty=cv*8 + Math.max(0,jumpRatio-1.45)*5 + flatCount*1.5;
+
+  // v11.8 : durée adaptative.
+  // Les séquences très rapides doivent pouvoir descendre vers 0,35–0,50 s,
+  // alors qu'un mouvement calme peut rester vers 0,65–1,00 s.
+  const duration=end-start;
+  let durationPenalty=0;
+  if(duration<=0.36) durationPenalty=1.20;
+  else if(duration<=0.41) durationPenalty=0.75;
+  else if(duration<=0.51) durationPenalty=0.20;
+  else if(duration>1.0) durationPenalty=(duration-1.0)*1.2;
+
+  const score=regularityPenalty+motionPenalty+endpointPenalty+durationPenalty;
+
+  return {start,end,duration,idx,ds,avg,max,min,cv,jumpRatio,flatCount,endpoint,travelRatio,score};
+}
+
+function findBestMicroSequence(samples,zoneStart,zoneEnd){
+  const zoneDur=zoneEnd-zoneStart;
+  const durations=[.35,.40,.50,.65,.80,1.0,1.2].filter(d=>d<=zoneDur+.001);
+  if(!durations.length)durations.push(zoneDur);
+
+  let best=null;
+  for(const dur of durations){
+    const steps=Math.max(1,Math.ceil((zoneDur-dur)/.08));
+    for(let s=0;s<=steps;s++){
+      const start=zoneStart+(zoneDur-dur)*(steps? s/steps:0);
+      const end=start+dur;
+      const m=sequenceMetrics(samples,start,end);
+      if(!best||m.score<best.score)best=m;
+    }
+  }
+  return best;
+}
+
+let lastAutoSequence=null;
+
+extract.addEventListener('click',async()=>{
+  stopLoop();video.pause();
+
+  const duration=clipEnd-clipStart;
+
+  if(duration<MIN_CLIP||duration>MAX_CLIP+.01){
+    log('La zone de recherche doit durer entre 1 et 5 secondes.');
+    return;
+  }
+
+  extract.disabled=true;
+  clearFrames();
+
+  try{
+    log('Analyse de la zone sélectionnée et recherche du mouvement le plus fluide…');
+
+    const N=Math.max(61,Math.min(121,Math.round(duration*24)+1));
+    const samples=[];
+
+    for(let i=0;i<N;i++){
+      const t=clipStart+(clipEnd-clipStart)*i/(N-1);
+      await waitSeek(video,t);
+      const c=captureCanvas(video,true);
+      samples.push({t,sig:signature(c)});
+      if(i%10===0)log(`Analyse… ${Math.round((i+1)/N*100)} %`);
+    }
+
+    const best=findBestMicroSequence(samples,clipStart,clipEnd);
+    lastAutoSequence=best;
+
+    log(`Meilleure micro-séquence : ${best.start.toFixed(2)} s → ${best.end.toFixed(2)} s · ${best.duration.toFixed(2)} s.`);
+
+    let prevSig=null;
+    let closeTransitions=0;
+
+    for(let i=0;i<9;i++){
+      const t=best.start+(best.end-best.start)*i/8;
+      await waitSeek(video,t);
+
+      const finalCanvas=captureCanvas(video,false);
+      const blob=await canvasBlob(finalCanvas);
+      const sig=signature(captureCanvas(video,true));
+      const delta=prevSig?distance(sig,prevSig):null;
+
+      if(delta!==null&&delta<1.6)closeTransitions++;
+      prevSig=sig;
+
+      frameData.push({
+        index:i+1,
+        time:t,
+        delta,
+        blob
+      });
+
+      const url=URL.createObjectURL(blob);
+      const frame=document.createElement('div');
+      frame.className='frame';
+      frame.innerHTML=
+        `<img src="${url}">
+         <div class="meta">
+         vue-${String(i+1).padStart(2,'0')} · ${t.toFixed(2)} s
+         ${delta===null?'':` · Δ ${delta.toFixed(1)}`}
+         </div>`;
+      framesEl.appendChild(frame);
+      log(`Extraction des vues… ${i+1}/9`);
+    }
+
+    const q=$('#qualityDot');
+    const qt=$('#qualityText');
+    const ds=frameData.slice(1).map(f=>f.delta).filter(Number.isFinite);
+    const avg=ds.reduce((a,b)=>a+b,0)/(ds.length||1);
+    const mx=ds.length?Math.max(...ds):0;
+    const ratio=mx/(avg||1);
+
+    if(closeTransitions===0&&ratio<1.55&&avg<=12){
+      q.className='dot good';
+      qt.textContent=`Micro-séquence fluide retenue (${best.duration.toFixed(2)} s) — Δ moyen ${avg.toFixed(1)}.`;
+    }else if(closeTransitions<=2&&ratio<1.9){
+      q.className='dot warn';
+      qt.textContent=`Séquence exploitable à contrôler — ${best.duration.toFixed(2)} s, Δ moyen ${avg.toFixed(1)}.`;
+    }else{
+      q.className='dot bad';
+      qt.textContent=`Mouvement encore irrégulier — essaie de déplacer la zone de 5 s sur un passage plus calme.`;
+    }
+
+    download.disabled=false;
+    log('9 vues extraites depuis la meilleure micro-séquence. Vérifie la grille puis télécharge le ZIP.');
+
+  }catch(e){
+    log('Erreur extraction : '+e.message);
+  }finally{
+    extract.disabled=false;
+  }
+});
+
+/* ===== ZIP ===== */
+
+download.addEventListener('click',async()=>{
+  if(frameData.length!==9)return;
+
+  if(typeof JSZip==='undefined'){
+    log('Le module ZIP n’est pas disponible.');
+    return;
+  }
+
+  const reverse=$('#direction').value==='reverse';
+  const ordered=reverse?[...frameData].reverse():frameData;
+
+  const zip=new JSZip();
+
+  ordered.forEach((f,i)=>{
+    zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,f.blob);
+  });
+
+  zip.file('manifest.json',JSON.stringify({
+    generator:'LentiPrint Lab v11.8',
+    source:'PixVerse ou vidéo locale',
+    selectionStart:Number(clipStart.toFixed(4)),
+    selectionEnd:Number(clipEnd.toFixed(4)),
+    selectionDuration:Number((clipEnd-clipStart).toFixed(4)),
+    autoSequenceStart:lastAutoSequence?Number(lastAutoSequence.start.toFixed(4)):null,
+    autoSequenceEnd:lastAutoSequence?Number(lastAutoSequence.end.toFixed(4)):null,
+    autoSequenceDuration:lastAutoSequence?Number(lastAutoSequence.duration.toFixed(4)):null,
+    autoSequenceScore:lastAutoSequence?Number(lastAutoSequence.score.toFixed(4)):null,
+    views:9,
+    direction:reverse?'reverse':'normal',
+    frames:ordered.map((f,i)=>({
+      file:`vue-${String(i+1).padStart(2,'0')}.png`,
+      sourceTime:Number(f.time.toFixed(4)),
+      delta:f.delta===null?null:Number(f.delta.toFixed(2))
+    }))
+  },null,2));
+
+  log('Création du ZIP…');
+
+  const blob=await zip.generateAsync({
+    type:'blob',
+    compression:'DEFLATE',
+    compressionOptions:{level:6}
+  });
+
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+
+  a.href=url;
+  a.download='9-vues-animation-lenticulaire.zip';
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+
+  log('ZIP téléchargé — 9 vues + manifest.json.');
+});
+
+</script>
+</body>
+</html>
