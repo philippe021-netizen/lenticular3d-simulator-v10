@@ -1,5 +1,6 @@
 {
-  "name": "lenticular-client-preview-v14",
-  "version": "1.0.0",
-  "private": true
+  "name": "lentiprint-lab-v11-pixverse-9views",
+  "version": "11.0.0",
+  "private": true,
+  "type": "module"
 }

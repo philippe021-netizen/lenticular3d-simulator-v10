@@ -1,9 +1,15 @@
 {
   "version": 2,
   "functions": {
-    "api/generate-3d.js": { "maxDuration": 60 },
-    "api/pixverse-create.js": { "maxDuration": 60 },
-    "api/pixverse-status.js": { "maxDuration": 30 },
-    "api/pixverse-video.js": { "maxDuration": 60 }
-  }
+    "api/*.js": { "maxDuration": 60 }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "same-origin" }
+      ]
+    }
+  ]
 }

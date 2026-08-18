@@ -1,100 +1,150 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Aperçu lenticulaire 3D + Animation IA</title>
-  <link rel="stylesheet" href="./styles.css?v=27">
-  <link rel="stylesheet" href="./animation.css?v=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>LentiPrint Lab v11 — PixVerse → 9 vues</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#151515;background:#f5f5f3}*{box-sizing:border-box}body{margin:0}.wrap{max-width:1100px;margin:auto;padding:22px}.top{display:flex;gap:14px;align-items:center;justify-content:space-between;margin-bottom:18px}.badge{font-size:12px;padding:6px 9px;border-radius:999px;background:#111;color:white}.card{background:white;border:1px solid #ddd;border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 1px 8px #0000000a}h1{font-size:25px;margin:0}h2{font-size:18px;margin:0 0 12px}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field{display:flex;flex-direction:column;gap:7px}label{font-size:13px;font-weight:650}input,textarea,select,button{font:inherit}input,textarea,select{border:1px solid #ccc;border-radius:11px;padding:11px;background:#fff}textarea{min-height:110px;resize:vertical}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button{border:0;border-radius:12px;padding:11px 15px;background:#111;color:white;font-weight:700;cursor:pointer}button.secondary{background:#ececec;color:#111}button:disabled{opacity:.45;cursor:not-allowed}.status{padding:11px;border-radius:12px;background:#f3f3f3;font-size:13px;white-space:pre-wrap}.preview{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start}video,img{max-width:100%;border-radius:14px;background:#111}.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.frame{border:1px solid #ddd;border-radius:12px;padding:7px;background:#fafafa}.frame img{width:100%;aspect-ratio:1/1;object-fit:cover}.meta{font-size:11px;color:#666;margin-top:4px}.quality{display:flex;gap:8px;align-items:center;font-size:12px}.dot{width:9px;height:9px;border-radius:50%;background:#999}.good{background:#159947}.warn{background:#e09b00}.bad{background:#c62929}@media(max-width:760px){.row,.preview{grid-template-columns:1fr}.frames{grid-template-columns:repeat(3,1fr)}.wrap{padding:12px}h1{font-size:21px}}
+</style>
 </head>
-<body>
-  <main class="app">
-    <header>
-      <div>
-        <div class="eyebrow">Simulation client</div>
-        <h1>Aperçu lenticulaire 3D</h1>
-        <p>Choisissez votre support, chargez votre photo puis choisissez une profondeur 3D ou une animation IA destinée au lenticulaire.</p>
-      </div>
-      <div class="badge">V29 3D + Animation IA</div>
-    </header>
+<body><div class="wrap">
+<div class="top"><div><h1>LentiPrint Lab</h1><div>Photo → PixVerse → sélection intelligente de 9 vues</div></div><span class="badge">v11</span></div>
 
-    <section class="workspace">
-      <aside class="controls">
-        <div class="support-zone">
-          <h2>1. Choisissez le support</h2>
-          <div class="support-grid">
-            <button type="button" class="support-card active" data-support="medallion-cat"><span class="support-icon">🐱</span><span class="support-name">Médaillon chat</span></button>
-            <button type="button" class="support-card" data-support="medallion-dog"><span class="support-icon">🐶</span><span class="support-name">Médaillon chien</span></button>
-            <button type="button" class="support-card" data-support="card"><span class="support-icon">💳</span><span class="support-name">Carte CB</span></button>
-            <button type="button" class="support-card" data-support="keychain"><span class="support-icon">🔑</span><span class="support-name">Porte-clé rectangulaire</span></button>
-          </div>
-        </div>
+<div class="card">
+<h2>1. Photo et micro-animation</h2>
+<div class="row">
+<div class="field"><label>Photo source</label><input id="image" type="file" accept="image/png,image/jpeg,image/webp" /></div>
+<div class="field"><label>Action</label><select id="preset"><option value="bark">Chien — petit aboiement</option><option value="blink">Chat — clignement naturel</option><option value="smile">Personne — léger sourire</option><option value="kiss">Couple — baiser léger</option><option value="dance">Personne — mini mouvement de danse</option><option value="custom">Personnalisé</option></select></div>
+</div>
+<div class="field" style="margin-top:12px"><label>Prompt PixVerse</label><textarea id="prompt"></textarea></div>
+<div class="actions"><button id="generate">Créer la micro-vidéo PixVerse</button><button id="loadVideo" class="secondary">Ou charger un MP4 existant</button><input id="videoFile" type="file" accept="video/mp4,video/quicktime" hidden /></div>
+<div id="status" class="status" style="margin-top:12px">Prêt.</div>
+</div>
 
-        <div class="upload-zone">
-          <h2>2. Ajoutez votre photo</h2>
-          <p>JPG / PNG / WEBP</p>
-          <input id="imageInput" type="file" accept="image/*">
-        </div>
-        <img id="thumb" class="thumb" alt="Photo choisie">
+<div class="card">
+<h2>2. Vidéo et extraction</h2>
+<div class="preview">
+<div><video id="video" controls playsinline crossorigin="anonymous"></video><div class="actions"><button id="extract" disabled>Extraire 9 vues intelligentes</button></div></div>
+<div><div id="frames" class="frames"></div></div>
+</div>
+</div>
 
-        <div class="mode-zone">
-          <h2>3. Choisissez l’effet</h2>
-          <div class="mode-switch">
-            <button id="mode3d" type="button" class="active">3D / profondeur</button>
-            <button id="modeAnim" type="button">Animation IA</button>
-          </div>
+<div class="card">
+<h2>3. Export production</h2>
+<div class="row">
+<div class="field"><label>Format de sortie</label><select id="size"><option value="772">772 × 772 — médaillon test</option><option value="1024">1024 × 1024 — haute définition carrée</option><option value="original">Format vidéo recadré carré</option></select></div>
+<div class="field"><label>Sens de lecture</label><select id="direction"><option value="normal">1 → 9</option><option value="reverse">9 → 1</option></select></div>
+</div>
+<div class="actions"><button id="download" disabled>Télécharger ZIP — 9 vues</button></div>
+<div class="quality" style="margin-top:12px"><span id="qualityDot" class="dot"></span><span id="qualityText">Pas encore analysé.</span></div>
+</div>
+</div>
+<script type="module">
+const $=s=>document.querySelector(s);
+const image=$('#image'), preset=$('#preset'), prompt=$('#prompt'), status=$('#status'), video=$('#video'), framesEl=$('#frames');
+const generate=$('#generate'), extract=$('#extract'), download=$('#download'), loadVideo=$('#loadVideo'), videoFile=$('#videoFile');
+let frameData=[]; let objectUrl=null;
 
-          <div id="animationControls" class="animation-controls">
-            <label for="animPrompt">Que doit faire le sujet ?</label>
-            <textarea id="animPrompt" placeholder="Ex. : le chien se met doucement sur ses pattes arrière et fait le beau"></textarea>
-            <div class="anim-grid2">
-              <div>
-                <label for="animDuration">Durée</label>
-                <select id="animDuration"><option value="2" selected>2 s</option><option value="3">3 s</option><option value="5">5 s</option></select>
-              </div>
-              <div>
-                <label for="animQuality">Qualité</label>
-                <select id="animQuality"><option value="540p" selected>540p test</option><option value="720p">720p premium</option></select>
-              </div>
-            </div>
-            <div class="anim-note">Le programme ajoute automatiquement : caméra fixe, pas de zoom, identité et décor conservés, une seule action simple.</div>
-            <button id="animGenerate" type="button" disabled>Générer la micro-vidéo avec PixVerse</button>
-            <video id="animationVideo" class="animation-video" muted loop playsinline controls></video>
-            <button id="animExtract" type="button" disabled>Extraire automatiquement les 9 vues</button>
-            <div id="animationViews" class="animation-views"></div>
-            <button id="animDownloadZip" type="button" disabled>Télécharger les 9 vues en ZIP</button>
-          </div>
-        </div>
+const prompts={
+ bark:'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
+ blink:'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
+ smile:'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
+ kiss:'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
+ dance:'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
+ custom:''
+};
+function setPrompt(){ if(preset.value!=='custom') prompt.value=prompts[preset.value]; }
+preset.addEventListener('change',setPrompt); setPrompt();
+function log(t){ status.textContent=t; }
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
-        <button id="generateBtn" disabled>Créer l’aperçu 3D</button>
-        <button id="exportVideoBtn" disabled>Enregistrer la simulation</button>
-        <button id="exportViewsBtn" disabled>Générer les 9 vues en ZIP</button>
-        <a id="downloadVideo" class="download-video" style="display:none" download="simulation-lenticulaire.mp4">Télécharger la simulation</a>
+loadVideo.onclick=()=>videoFile.click();
+videoFile.onchange=()=>{const f=videoFile.files[0]; if(!f)return; if(objectUrl)URL.revokeObjectURL(objectUrl); objectUrl=URL.createObjectURL(f); video.src=objectUrl; video.load(); video.onloadedmetadata=()=>{extract.disabled=false;log(`Vidéo locale chargée — ${video.duration.toFixed(2)} s.`)}};
 
-        <div id="status">Choisissez un support puis chargez une photo.</div>
-        <div class="progress"><i id="bar"></i></div>
-        <div class="disclaimer">La simulation est un aperçu visuel. En mode Animation IA, la vidéo n’est qu’un intermédiaire : les 9 vues PNG sont les fichiers utiles à la production lenticulaire.</div>
-      </aside>
+generate.onclick=async()=>{
+ const f=image.files[0]; if(!f){log('Choisis d’abord une photo.');return;}
+ generate.disabled=true; extract.disabled=true; download.disabled=true; frameData=[]; framesEl.innerHTML='';
+ try{
+   log('Envoi de la photo à PixVerse…');
+   const fd=new FormData(); fd.append('image',f,f.name);
+   const ur=await fetch('/api/pixverse-upload',{method:'POST',body:fd}); const uj=await ur.json();
+   if(!ur.ok||uj.ErrCode!==0) throw new Error(uj.ErrMsg||uj.error||'Échec upload PixVerse');
+   const imgId=uj.Resp?.img_id; if(imgId==null) throw new Error('PixVerse n’a pas renvoyé img_id');
+   log('Photo reçue. Création de la micro-vidéo V6 720p / 5 s…');
+   const cr=await fetch('/api/pixverse-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({img_id:imgId,prompt:prompt.value,seed:0})});
+   const cj=await cr.json(); if(!cr.ok||cj.ErrCode!==0) throw new Error(cj.ErrMsg||cj.error||'Échec création PixVerse');
+   const id=cj.Resp?.video_id; if(!id) throw new Error('PixVerse n’a pas renvoyé video_id');
+   log(`Vidéo #${id} en génération…`);
+   let url='';
+   for(let i=0;i<90;i++){
+     await sleep(3000);
+     const sr=await fetch(`/api/pixverse-status?id=${encodeURIComponent(id)}`); const sj=await sr.json();
+     const s=sj.Resp?.status;
+     if(s===1){url=sj.Resp?.url||'';break;}
+     if(s===7) throw new Error('PixVerse a refusé le contenu (modération).');
+     if(s===8) throw new Error('PixVerse a échoué à générer la vidéo.');
+     log(`Vidéo #${id} en génération… statut ${s ?? '?'}`);
+   }
+   if(!url) throw new Error('La vidéo n’est pas encore disponible.');
+   video.src=`/api/pixverse-video?url=${encodeURIComponent(url)}`; video.load();
+   await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve; video.onerror=()=>reject(new Error('Impossible de charger la vidéo générée.'));});
+   extract.disabled=false; log(`Vidéo PixVerse prête — ${video.duration.toFixed(2)} s. Tu peux extraire les 9 vues.`);
+ }catch(e){log('Erreur : '+e.message);}finally{generate.disabled=false;}
+};
 
-      <section class="preview-panel">
-        <div id="productStage" class="product-stage support-medallion-cat">
-          <div id="productShell" class="product-shell">
-            <div id="productRing" class="product-ring"></div>
-            <div id="productLug" class="product-lug"></div>
-            <div id="viewer" class="viewer">
-              <div id="placeholder" class="placeholder">
-                <strong>Votre aperçu 3D apparaîtra ici</strong>
-                <span>Choisissez un support, ajoutez une photo, puis lancez la simulation.</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="supportLabel" class="label">Médaillon chat</div>
-      </section>
-    </section>
-  </main>
+function waitSeek(v,t){return new Promise((resolve,reject)=>{const on=()=>{cleanup();resolve();}, er=()=>{cleanup();reject(new Error('Erreur de lecture vidéo'));}, cleanup=()=>{v.removeEventListener('seeked',on);v.removeEventListener('error',er)};v.addEventListener('seeked',on,{once:true});v.addEventListener('error',er,{once:true});v.currentTime=Math.max(0,Math.min(t,v.duration-.02));});}
+function captureCanvas(v,small=false){const side=Math.min(v.videoWidth,v.videoHeight);const sx=(v.videoWidth-side)/2, sy=(v.videoHeight-side)/2;const c=document.createElement('canvas');const out=small?64:( $('#size').value==='original'?side:Number($('#size').value));c.width=out;c.height=out;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(v,sx,sy,side,side,0,0,out,out);return c;}
+function signature(c){const x=c.getContext('2d').getImageData(0,0,c.width,c.height).data;const a=[];for(let gy=0;gy<8;gy++)for(let gx=0;gx<8;gx++){let s=0,n=0;for(let y=gy*8;y<(gy+1)*8;y+=2)for(let xx=gx*8;xx<(gx+1)*8;xx+=2){const i=(y*64+xx)*4;s+=(x[i]*.299+x[i+1]*.587+x[i+2]*.114);n++;}a.push(s/n);}return a;}
+function dist(a,b){let s=0;for(let i=0;i<a.length;i++){const d=a[i]-b[i];s+=d*d;}return Math.sqrt(s/a.length);}
+async function blobOf(c){return await new Promise(r=>c.toBlob(r,'image/png'));}
 
-  <script type="module" src="./app.js?v=28"></script>
-  <script type="module" src="./animation.js?v=1"></script>
-</body>
-</html>
+extract.onclick=async()=>{
+ if(!video.duration){log('Aucune vidéo exploitable.');return;}
+ extract.disabled=true;download.disabled=true;framesEl.innerHTML='';frameData=[];
+ try{
+   log('Analyse de la micro-vidéo… recherche des instants les plus distincts.');
+   const N=49, start=Math.max(.03,video.duration*.03), end=Math.max(start+.1,video.duration*.97); const samples=[];
+   for(let i=0;i<N;i++){
+     const t=start+(end-start)*i/(N-1); await waitSeek(video,t); const c=captureCanvas(video,true); samples.push({t,sig:signature(c)});
+   }
+   // Dynamic-programming-like greedy selection: endpoints + repeatedly choose the frame farthest in visual/time space from selected.
+   const selected=[0,N-1];
+   while(selected.length<9){
+     let best=-1,score=-1;
+     for(let i=1;i<N-1;i++){
+       if(selected.includes(i))continue;
+       let minVisual=Infinity,minTime=Infinity;
+       for(const j of selected){minVisual=Math.min(minVisual,dist(samples[i].sig,samples[j].sig));minTime=Math.min(minTime,Math.abs(i-j)/(N-1));}
+       const sc=minVisual*(0.65+0.35*Math.min(1,minTime*8));
+       if(sc>score){score=sc;best=i;}
+     }
+     selected.push(best);
+   }
+   selected.sort((a,b)=>a-b);
+   // Guarantee temporal coverage: blend with evenly spaced targets if greedy collapses in one action zone.
+   const even=Array.from({length:9},(_,k)=>Math.round(k*(N-1)/8));
+   for(let k=0;k<9;k++) if(Math.abs(selected[k]-even[k])>8) selected[k]=even[k];
+   selected.sort((a,b)=>a-b);
+   const unique=[...new Set(selected)];
+   while(unique.length<9){const cand=even.find(x=>!unique.includes(x));unique.push(cand);unique.sort((a,b)=>a-b);}
+   let prevSig=null, closeCount=0;
+   for(let k=0;k<9;k++){
+     const s=samples[unique[k]]; await waitSeek(video,s.t); const c=captureCanvas(video,false), blob=await blobOf(c); const sig=signature(captureCanvas(video,true)); const d=prevSig?dist(sig,prevSig):null; if(d!==null&&d<2.2)closeCount++; prevSig=sig;
+     frameData.push({index:k+1,time:s.t,blob,delta:d});
+     const u=URL.createObjectURL(blob); const box=document.createElement('div');box.className='frame';box.innerHTML=`<img src="${u}"><div class="meta">vue-${String(k+1).padStart(2,'0')} · ${s.t.toFixed(2)} s${d===null?'':` · Δ ${d.toFixed(1)}`}</div>`;framesEl.appendChild(box);
+   }
+   const q=$('#qualityDot'), qt=$('#qualityText');q.className='dot '+(closeCount===0?'good':closeCount<=2?'warn':'bad');qt.textContent=closeCount===0?'9 vues bien différenciées.':closeCount<=2?`${closeCount} transition(s) très proche(s) : export possible, à contrôler visuellement.`:`${closeCount} transition(s) trop proche(s) : mieux vaut régénérer une animation avec davantage de mouvement.`;
+   download.disabled=false; log('9 vues extraites et analysées. Vérifie la grille puis télécharge le ZIP.');
+ }catch(e){log('Erreur extraction : '+e.message);}finally{extract.disabled=false;}
+};
+
+download.onclick=async()=>{
+ if(frameData.length!==9)return;
+ const reverse=$('#direction').value==='reverse'; const ordered=reverse?[...frameData].reverse():frameData;
+ const zip=new JSZip(); ordered.forEach((f,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,f.blob));
+ zip.file('manifest.json',JSON.stringify({generator:'LentiPrint Lab v11',source:'PixVerse/local video',views:9,direction:reverse?'reverse':'normal',frames:ordered.map((f,i)=>({file:`vue-${String(i+1).padStart(2,'0')}.png`,sourceTime:Number(f.time.toFixed(4)),delta:f.delta===null?null:Number(f.delta.toFixed(2))}))},null,2));
+ const out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}}); const a=document.createElement('a');a.href=URL.createObjectURL(out);a.download='9-vues-animation-lenticulaire.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+};
+</script></body></html>
