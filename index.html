@@ -33,12 +33,17 @@ video,img{max-width:100%;border-radius:14px;background:#111}
 .frame img{width:100%;aspect-ratio:1/1;object-fit:cover}
 .meta{font-size:11px;color:#666;margin-top:4px}
 .quality{display:flex;gap:8px;align-items:center;font-size:12px}
+.trim{margin-top:12px;padding:12px;border:1px solid #ddd;border-radius:12px;background:#fafafa}
+.trimrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.trim label{display:flex;justify-content:space-between}
+.trim input[type=range]{width:100%}
+.trimmeta{font-size:12px;color:#555;margin-top:8px}
 .dot{width:9px;height:9px;border-radius:50%;background:#999}
 .good{background:#159947}
 .warn{background:#e09b00}
 .bad{background:#c62929}
 @media(max-width:760px){
-  .row,.preview{grid-template-columns:1fr}
+  .row,.preview,.trimrow{grid-template-columns:1fr}
   .frames{grid-template-columns:repeat(3,1fr)}
   .wrap{padding:12px}
   h1{font-size:21px}
@@ -54,7 +59,7 @@ video,img{max-width:100%;border-radius:14px;background:#111}
     <h1>LentiPrint Lab</h1>
     <div>Photo → PixVerse → sélection intelligente de 9 vues</div>
   </div>
-  <span class="badge">v11.1</span>
+  <span class="badge">v11.2</span>
 </div>
 
 <div class="card">
@@ -99,17 +104,69 @@ video,img{max-width:100%;border-radius:14px;background:#111}
 <div class="preview">
 
 <div>
-  <video id="video" controls playsinline preload="auto"></video>
 
-  <div id="videoInfo" class="meta" style="margin-top:8px"></div>
+<video id="video" controls playsinline preload="auto"></video>
 
-  <div class="actions">
-    <button id="extract" disabled>Extraire 9 vues intelligentes</button>
-  </div>
+<div id="videoInfo" class="meta" style="margin-top:8px"></div>
+
+<div id="trimControls" class="trim" hidden>
+
+<div class="trimrow">
+
+<div>
+<label>
+Début
+<strong id="trimStartText">0.00 s</strong>
+</label>
+
+<input
+id="trimStart"
+type="range"
+min="0"
+max="0"
+step="0.01"
+value="0">
 </div>
 
 <div>
-  <div id="frames" class="frames"></div>
+<label>
+Fin
+<strong id="trimEndText">0.00 s</strong>
+</label>
+
+<input
+id="trimEnd"
+type="range"
+min="0"
+max="0"
+step="0.01"
+value="0">
+</div>
+
+</div>
+
+<div id="trimMeta" class="trimmeta">
+Séquence sélectionnée : 0.00 s / 5.00 s max
+</div>
+
+<div class="actions">
+<button id="previewTrim" class="secondary" type="button">
+Prévisualiser la sélection
+</button>
+</div>
+
+</div>
+
+<div class="actions">
+<button id="extract" disabled>
+Extraire 9 vues intelligentes
+</button>
+</div>
+
+</div>
+
+<div>
+<div id="frames" class="frames"></div>
 </div>
 
 </div>
@@ -123,29 +180,31 @@ video,img{max-width:100%;border-radius:14px;background:#111}
 <div class="field">
 <label>Format de sortie</label>
 <select id="size">
-  <option value="772">772 × 772 — médaillon test</option>
-  <option value="1024">1024 × 1024 — haute définition carrée</option>
-  <option value="original">Format vidéo recadré carré</option>
+<option value="772">772 × 772 — médaillon test</option>
+<option value="1024">1024 × 1024 — haute définition carrée</option>
+<option value="original">Format vidéo recadré carré</option>
 </select>
 </div>
 
 <div class="field">
 <label>Sens de lecture</label>
 <select id="direction">
-  <option value="normal">1 → 9</option>
-  <option value="reverse">9 → 1</option>
+<option value="normal">1 → 9</option>
+<option value="reverse">9 → 1</option>
 </select>
 </div>
 
 </div>
 
 <div class="actions">
-  <button id="download" disabled>Télécharger ZIP — 9 vues</button>
+<button id="download" disabled>
+Télécharger ZIP — 9 vues
+</button>
 </div>
 
 <div class="quality" style="margin-top:12px">
-  <span id="qualityDot" class="dot"></span>
-  <span id="qualityText">Pas encore analysé.</span>
+<span id="qualityDot" class="dot"></span>
+<span id="qualityText">Pas encore analysé.</span>
 </div>
 
 </div>
@@ -163,6 +222,14 @@ const status=$('#status');
 const video=$('#video');
 const framesEl=$('#frames');
 const videoInfo=$('#videoInfo');
+
+const trimControls=$('#trimControls');
+const trimStart=$('#trimStart');
+const trimEnd=$('#trimEnd');
+const trimStartText=$('#trimStartText');
+const trimEndText=$('#trimEndText');
+const trimMeta=$('#trimMeta');
+const previewTrim=$('#previewTrim');
 
 const generate=$('#generate');
 const extract=$('#extract');
@@ -210,6 +277,221 @@ function sleep(ms){
   return new Promise(r=>setTimeout(r,ms));
 }
 
+const MAX_CLIP=5;
+const MIN_CLIP=1;
+
+function updateTrim(source='start'){
+
+  if(
+    !Number.isFinite(video.duration) ||
+    video.duration<=0
+  ){
+    return;
+  }
+
+  let start=
+    Number(trimStart.value)||0;
+
+  let end=
+    Number(trimEnd.value)||0;
+
+  const d=
+    video.duration;
+
+  start=
+    Math.max(
+      0,
+      Math.min(start,d)
+    );
+
+  end=
+    Math.max(
+      0,
+      Math.min(end,d)
+    );
+
+  if(source==='start'){
+
+    if(
+      end<
+      start+MIN_CLIP
+    ){
+      end=
+        Math.min(
+          d,
+          start+MIN_CLIP
+        );
+    }
+
+    if(
+      end>
+      start+MAX_CLIP
+    ){
+      end=
+        Math.min(
+          d,
+          start+MAX_CLIP
+        );
+    }
+
+    if(
+      end-start<MIN_CLIP &&
+      d>=MIN_CLIP
+    ){
+      start=
+        Math.max(
+          0,
+          end-MIN_CLIP
+        );
+    }
+
+  }else{
+
+    if(
+      end<
+      start+MIN_CLIP
+    ){
+      start=
+        Math.max(
+          0,
+          end-MIN_CLIP
+        );
+    }
+
+    if(
+      end>
+      start+MAX_CLIP
+    ){
+      start=
+        Math.max(
+          0,
+          end-MAX_CLIP
+        );
+    }
+  }
+
+  trimStart.value=
+    start.toFixed(2);
+
+  trimEnd.value=
+    end.toFixed(2);
+
+  trimStartText.textContent=
+    `${start.toFixed(2)} s`;
+
+  trimEndText.textContent=
+    `${end.toFixed(2)} s`;
+
+  const len=
+    Math.max(
+      0,
+      end-start
+    );
+
+  trimMeta.textContent=
+    `Séquence sélectionnée : ${len.toFixed(2)} s / 5.00 s max`;
+
+  extract.disabled=
+    len<MIN_CLIP ||
+    len>MAX_CLIP+0.001;
+}
+
+function setupTrim(){
+
+  if(
+    !Number.isFinite(video.duration) ||
+    video.duration<=0
+  ){
+    return;
+  }
+
+  const d=
+    video.duration;
+
+  trimStart.max=
+    d.toFixed(2);
+
+  trimEnd.max=
+    d.toFixed(2);
+
+  trimStart.value='0';
+
+  trimEnd.value=
+    Math.min(
+      MAX_CLIP,
+      d
+    ).toFixed(2);
+
+  trimControls.hidden=false;
+
+  updateTrim('start');
+}
+
+trimStart.addEventListener(
+  'input',
+  ()=>updateTrim('start')
+);
+
+trimEnd.addEventListener(
+  'input',
+  ()=>updateTrim('end')
+);
+
+previewTrim.addEventListener(
+  'click',
+  async()=>{
+
+    const start=
+      Number(trimStart.value);
+
+    const end=
+      Number(trimEnd.value);
+
+    if(!(end>start)){
+      return;
+    }
+
+    try{
+
+      video.pause();
+
+      await waitSeek(
+        video,
+        start
+      );
+
+      const stop=()=>{
+
+        if(
+          video.currentTime>=end
+        ){
+
+          video.pause();
+
+          video.removeEventListener(
+            'timeupdate',
+            stop
+          );
+        }
+      };
+
+      video.addEventListener(
+        'timeupdate',
+        stop
+      );
+
+      await video.play();
+
+    }catch(e){
+
+      log(
+        'Prévisualisation impossible : '+
+        e.message
+      );
+    }
+  }
+);
+
 function clearVideoSource(){
 
   try{
@@ -223,9 +505,13 @@ function clearVideoSource(){
   }catch(_){}
 
   if(objectUrl){
+
     try{
-      URL.revokeObjectURL(objectUrl);
+      URL.revokeObjectURL(
+        objectUrl
+      );
     }catch(_){}
+
     objectUrl=null;
   }
 
@@ -234,65 +520,102 @@ function clearVideoSource(){
 
   frameData=[];
   framesEl.innerHTML='';
+
+  trimControls.hidden=true;
 }
 
-function waitForVideoFrame(v,timeout=12000){
+function waitForVideoFrame(
+  v,
+  timeout=12000
+){
 
-  return new Promise((resolve,reject)=>{
+  return new Promise(
+    (resolve,reject)=>{
 
-    let done=false;
+      let done=false;
 
-    const ok=()=>{
+      const ok=()=>{
 
-      if(done)return;
+        if(done)return;
 
-      if(
-        v.readyState>=2 &&
-        v.videoWidth>0 &&
-        v.videoHeight>0
-      ){
+        if(
+          v.readyState>=2 &&
+          v.videoWidth>0 &&
+          v.videoHeight>0
+        ){
+
+          done=true;
+
+          cleanup();
+
+          resolve();
+        }
+      };
+
+      const fail=()=>{
+
+        if(done)return;
+
         done=true;
+
         cleanup();
-        resolve();
-      }
-    };
 
-    const fail=()=>{
+        const code=
+          v.error?.code
+            ?` (code ${v.error.code})`
+            :'';
 
-      if(done)return;
+        reject(
+          new Error(
+            'La vidéo n’a pas pu être décodée'+
+            code
+          )
+        );
+      };
 
-      done=true;
-      cleanup();
+      const timer=
+        setTimeout(
+          ()=>{
 
-      const code=v.error?.code
-        ? ` (code ${v.error.code})`
-        : '';
+            if(done)return;
 
-      reject(
-        new Error(
-          'La vidéo n’a pas pu être décodée'+code
-        )
-      );
-    };
+            done=true;
 
-    const timer=setTimeout(()=>{
+            cleanup();
 
-      if(done)return;
+            reject(
+              new Error(
+                'La première image vidéo n’a pas été décodée sur cet iPad.'
+              )
+            );
 
-      done=true;
-      cleanup();
+          },
+          timeout
+        );
 
-      reject(
-        new Error(
-          'La première image vidéo n’a pas été décodée sur cet iPad.'
-        )
-      );
+      const cleanup=()=>{
 
-    },timeout);
+        clearTimeout(timer);
 
-    const cleanup=()=>{
+        [
+          'loadeddata',
+          'canplay',
+          'canplaythrough',
+          'playing',
+          'timeupdate'
+        ].forEach(
+          ev=>
+            v.removeEventListener(
+              ev,
+              ok
+            )
+        );
 
-      clearTimeout(timer);
+        v.removeEventListener(
+          'error',
+          fail
+        );
+      };
 
       [
         'loadeddata',
@@ -300,27 +623,23 @@ function waitForVideoFrame(v,timeout=12000){
         'canplaythrough',
         'playing',
         'timeupdate'
-      ].forEach(ev=>{
-        v.removeEventListener(ev,ok);
-      });
+      ].forEach(
+        ev=>
+          v.addEventListener(
+            ev,
+            ok
+          )
+      );
 
-      v.removeEventListener('error',fail);
-    };
+      v.addEventListener(
+        'error',
+        fail,
+        {once:true}
+      );
 
-    [
-      'loadeddata',
-      'canplay',
-      'canplaythrough',
-      'playing',
-      'timeupdate'
-    ].forEach(ev=>{
-      v.addEventListener(ev,ok);
-    });
-
-    v.addEventListener('error',fail,{once:true});
-
-    ok();
-  });
+      ok();
+    }
+  );
 }
 
 async function forceVisibleFrame(v){
@@ -332,40 +651,43 @@ async function forceVisibleFrame(v){
     return;
   }
 
-  const t=Math.min(
-    Math.max(
-      0.08,
-      v.duration*0.01
-    ),
-    Math.max(
-      0.08,
-      v.duration-0.08
-    )
-  );
-
-  await new Promise(resolve=>{
-
-    const done=()=>{
-      resolve();
-    };
-
-    v.addEventListener(
-      'seeked',
-      done,
-      {once:true}
+  const t=
+    Math.min(
+      Math.max(
+        0.08,
+        v.duration*0.01
+      ),
+      Math.max(
+        0.08,
+        v.duration-0.08
+      )
     );
 
-    try{
-      v.currentTime=t;
-    }catch(_){
-      resolve();
+  await new Promise(
+    resolve=>{
+
+      const done=()=>{
+        resolve();
+      };
+
+      v.addEventListener(
+        'seeked',
+        done,
+        {once:true}
+      );
+
+      try{
+        v.currentTime=t;
+      }catch(_){
+        resolve();
+      }
+
+      setTimeout(
+        resolve,
+        1500
+      );
     }
-
-    setTimeout(
-      resolve,
-      1500
-    );
-  });
+  );
 }
 
 loadVideo.onclick=()=>{
@@ -374,9 +696,12 @@ loadVideo.onclick=()=>{
 
 videoFile.onchange=async()=>{
 
-  const f=videoFile.files?.[0];
+  const f=
+    videoFile.files?.[0];
 
-  if(!f)return;
+  if(!f){
+    return;
+  }
 
   clearVideoSource();
 
@@ -395,52 +720,57 @@ videoFile.onchange=async()=>{
       URL.createObjectURL(f);
 
     const metadataPromise=
-      new Promise((resolve,reject)=>{
+      new Promise(
+        (resolve,reject)=>{
 
-        const onMeta=()=>{
+          const onMeta=()=>{
 
-          cleanup();
-          resolve();
-        };
+            cleanup();
 
-        const onErr=()=>{
+            resolve();
+          };
 
-          cleanup();
+          const onErr=()=>{
 
-          reject(
-            new Error(
-              'Impossible de lire les métadonnées de cette vidéo.'
-            )
-          );
-        };
+            cleanup();
 
-        const cleanup=()=>{
+            reject(
+              new Error(
+                'Impossible de lire les métadonnées de cette vidéo.'
+              )
+            );
+          };
 
-          video.removeEventListener(
+          const cleanup=()=>{
+
+            video.removeEventListener(
+              'loadedmetadata',
+              onMeta
+            );
+
+            video.removeEventListener(
+              'error',
+              onErr
+            );
+          };
+
+          video.addEventListener(
             'loadedmetadata',
-            onMeta
+            onMeta,
+            {once:true}
           );
 
-          video.removeEventListener(
+          video.addEventListener(
             'error',
-            onErr
+            onErr,
+            {once:true}
           );
-        };
+        }
+      );
 
-        video.addEventListener(
-          'loadedmetadata',
-          onMeta,
-          {once:true}
-        );
+    video.src=
+      objectUrl;
 
-        video.addEventListener(
-          'error',
-          onErr,
-          {once:true}
-        );
-      });
-
-    video.src=objectUrl;
     video.controls=true;
     video.playsInline=true;
     video.preload='auto';
@@ -449,12 +779,18 @@ videoFile.onchange=async()=>{
 
     await metadataPromise;
 
-    await waitForVideoFrame(video);
+    await waitForVideoFrame(
+      video
+    );
 
-    await forceVisibleFrame(video);
+    await forceVisibleFrame(
+      video
+    );
 
     const test=
-      document.createElement('canvas');
+      document.createElement(
+        'canvas'
+      );
 
     test.width=32;
     test.height=32;
@@ -488,6 +824,7 @@ videoFile.onchange=async()=>{
       i<px.length;
       i+=4
     ){
+
       energy+=
         px[i]+
         px[i+1]+
@@ -498,6 +835,7 @@ videoFile.onchange=async()=>{
       video.videoWidth===0 ||
       video.videoHeight===0
     ){
+
       throw new Error(
         'La vidéo est chargée mais aucune image n’est décodée.'
       );
@@ -507,12 +845,10 @@ videoFile.onchange=async()=>{
       ` · ${video.videoWidth}×${video.videoHeight}`+
       ` · ${video.duration.toFixed(2)} s`;
 
-    extract.disabled=false;
+    setupTrim();
 
     log(
-      `Vidéo locale prête — `+
-      `${video.duration.toFixed(2)} s. `+
-      `L’image est décodée, tu peux lancer l’extraction.`
+      `Vidéo locale prête — ${video.duration.toFixed(2)} s. Sélectionne maintenant une portion de 1 à 5 secondes.`
     );
 
   }catch(e){
@@ -529,12 +865,15 @@ videoFile.onchange=async()=>{
 
 generate.onclick=async()=>{
 
-  const f=image.files[0];
+  const f=
+    image.files[0];
 
   if(!f){
+
     log(
       'Choisis d’abord une photo.'
     );
+
     return;
   }
 
@@ -576,6 +915,7 @@ generate.onclick=async()=>{
       !ur.ok ||
       uj.ErrCode!==0
     ){
+
       throw new Error(
         uj.ErrMsg ||
         uj.error ||
@@ -587,6 +927,7 @@ generate.onclick=async()=>{
       uj.Resp?.img_id;
 
     if(imgId==null){
+
       throw new Error(
         'PixVerse n’a pas renvoyé img_id'
       );
@@ -605,11 +946,12 @@ generate.onclick=async()=>{
             'Content-Type':
             'application/json'
           },
-          body:JSON.stringify({
-            img_id:imgId,
-            prompt:prompt.value,
-            seed:0
-          })
+          body:
+            JSON.stringify({
+              img_id:imgId,
+              prompt:prompt.value,
+              seed:0
+            })
         }
       );
 
@@ -620,6 +962,7 @@ generate.onclick=async()=>{
       !cr.ok ||
       cj.ErrCode!==0
     ){
+
       throw new Error(
         cj.ErrMsg ||
         cj.error ||
@@ -631,6 +974,7 @@ generate.onclick=async()=>{
       cj.Resp?.video_id;
 
     if(!id){
+
       throw new Error(
         'PixVerse n’a pas renvoyé video_id'
       );
@@ -661,7 +1005,9 @@ generate.onclick=async()=>{
       const s=
         sj.Resp?.status;
 
-      if(s===1){
+      if(
+        s===1
+      ){
 
         url=
           sj.Resp?.url ||
@@ -671,12 +1017,14 @@ generate.onclick=async()=>{
       }
 
       if(s===7){
+
         throw new Error(
           'PixVerse a refusé le contenu (modération).'
         );
       }
 
       if(s===8){
+
         throw new Error(
           'PixVerse a échoué à générer la vidéo.'
         );
@@ -688,6 +1036,7 @@ generate.onclick=async()=>{
     }
 
     if(!url){
+
       throw new Error(
         'La vidéo n’est pas encore disponible.'
       );
@@ -713,16 +1062,18 @@ generate.onclick=async()=>{
       }
     );
 
-    await waitForVideoFrame(video);
+    await waitForVideoFrame(
+      video
+    );
 
-    await forceVisibleFrame(video);
+    await forceVisibleFrame(
+      video
+    );
 
-    extract.disabled=false;
+    setupTrim();
 
     log(
-      `Vidéo PixVerse prête — `+
-      `${video.duration.toFixed(2)} s. `+
-      `Tu peux extraire les 9 vues.`
+      `Vidéo PixVerse prête — ${video.duration.toFixed(2)} s. Sélectionne la portion utile (5 s max) puis extrais les 9 vues.`
     );
 
   }catch(e){
@@ -746,6 +1097,7 @@ function waitSeek(v,t){
       const on=()=>{
 
         cleanup();
+
         resolve();
       };
 
@@ -806,6 +1158,7 @@ function captureCanvas(v,small=false){
     );
 
   if(!side){
+
     throw new Error(
       'Aucune image vidéo décodée.'
     );
@@ -828,7 +1181,9 @@ function captureCanvas(v,small=false){
       :(
         $('#size').value==='original'
           ?side
-          :Number($('#size').value)
+          :Number(
+            $('#size').value
+          )
       );
 
   c.width=out;
@@ -907,7 +1262,9 @@ function signature(c){
         }
       }
 
-      a.push(s/n);
+      a.push(
+        s/n
+      );
     }
   }
 
@@ -927,7 +1284,8 @@ function dist(a,b){
     const d=
       a[i]-b[i];
 
-    s+=d*d;
+    s+=
+      d*d;
   }
 
   return Math.sqrt(
@@ -938,10 +1296,11 @@ function dist(a,b){
 async function blobOf(c){
 
   return await new Promise(
-    r=>c.toBlob(
-      r,
-      'image/png'
-    )
+    r=>
+      c.toBlob(
+        r,
+        'image/png'
+      )
   );
 }
 
@@ -971,16 +1330,29 @@ extract.onclick=async()=>{
     const N=49;
 
     const start=
-      Math.max(
-        .03,
-        video.duration*.03
+      Number(
+        trimStart.value
       );
 
     const end=
-      Math.max(
-        start+.1,
-        video.duration*.97
+      Number(
+        trimEnd.value
       );
+
+    const clipLength=
+      end-start;
+
+    if(
+      !Number.isFinite(start) ||
+      !Number.isFinite(end) ||
+      clipLength<MIN_CLIP ||
+      clipLength>MAX_CLIP+0.001
+    ){
+
+      throw new Error(
+        'Sélectionne une portion comprise entre 1 et 5 secondes.'
+      );
+    }
 
     const samples=[];
 
@@ -1082,7 +1454,9 @@ extract.onclick=async()=>{
         }
       }
 
-      selected.push(best);
+      selected.push(
+        best
+      );
     }
 
     selected.sort(
@@ -1121,7 +1495,11 @@ extract.onclick=async()=>{
     );
 
     const unique=
-      [...new Set(selected)];
+      [
+        ...new Set(
+          selected
+        )
+      ];
 
     while(
       unique.length<9
@@ -1129,10 +1507,13 @@ extract.onclick=async()=>{
 
       const cand=
         even.find(
-          x=>!unique.includes(x)
+          x=>
+            !unique.includes(x)
         );
 
-      unique.push(cand);
+      unique.push(
+        cand
+      );
 
       unique.sort(
         (a,b)=>a-b
@@ -1187,10 +1568,12 @@ extract.onclick=async()=>{
         d!==null &&
         d<2.2
       ){
+
         closeCount++;
       }
 
-      prevSig=sig;
+      prevSig=
+        sig;
 
       frameData.push({
         index:k+1,
@@ -1302,12 +1685,13 @@ download.onclick=async()=>{
     JSON.stringify(
       {
         generator:
-          'LentiPrint Lab v11.1',
+          'LentiPrint Lab v11.2',
 
         source:
           'PixVerse/local video',
 
-        views:9,
+        views:
+          9,
 
         direction:
           reverse
@@ -1317,6 +1701,7 @@ download.onclick=async()=>{
         frames:
           ordered.map(
             (f,i)=>({
+
               file:
                 `vue-${String(i+1).padStart(2,'0')}.png`,
 
