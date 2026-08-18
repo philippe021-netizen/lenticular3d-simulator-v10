@@ -1,2479 +1,3054 @@
-const $ = selector => document.querySelector(selector);
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LentiPrint Lab v11.5</title>
 
-/* =========================================================
-   ELEMENTS
-========================================================= */
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<style>
+:root{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#151515;
+  background:#f5f5f3;
+}
+
+*{box-sizing:border-box}
+body{margin:0}
+
+.wrap{
+  max-width:1100px;
+  margin:auto;
+  padding:22px;
+}
+
+.top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:18px;
+}
+
+h1{
+  margin:0;
+  font-size:25px;
+}
+
+h2{
+  margin:0 0 12px;
+  font-size:18px;
+}
+
+.badge{
+  background:#111;
+  color:white;
+  border-radius:999px;
+  padding:6px 9px;
+  font-size:12px;
+}
+
+.card{
+  background:white;
+  border:1px solid #ddd;
+  border-radius:18px;
+  padding:18px;
+  margin:14px 0;
+}
+
+.row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+}
+
+.field{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+
+label{
+  font-size:13px;
+  font-weight:650;
+}
+
+input,
+textarea,
+select,
+button{
+  font:inherit;
+}
+
+input,
+textarea,
+select{
+  border:1px solid #ccc;
+  border-radius:11px;
+  padding:11px;
+  background:white;
+}
+
+textarea{
+  min-height:110px;
+}
+
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:14px;
+}
+
+button{
+  border:0;
+  border-radius:12px;
+  padding:11px 15px;
+  background:#111;
+  color:white;
+  font-weight:700;
+}
+
+button.secondary{
+  background:#ececec;
+  color:#111;
+}
+
+button:disabled{
+  opacity:.4;
+}
+
+.status{
+  margin-top:12px;
+  padding:11px;
+  background:#f3f3f3;
+  border-radius:12px;
+  font-size:13px;
+  white-space:pre-wrap;
+}
+
+.preview{
+  display:grid;
+  grid-template-columns:380px 1fr;
+  gap:18px;
+  align-items:start;
+}
+
+video{
+  display:block;
+  width:100%;
+  background:#111;
+  border-radius:14px;
+}
+
+.meta{
+  margin-top:6px;
+  font-size:11px;
+  color:#666;
+}
+
+.frames{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+
+.frame{
+  border:1px solid #ddd;
+  border-radius:12px;
+  padding:7px;
+  background:#fafafa;
+}
+
+.frame img{
+  width:100%;
+  aspect-ratio:1/1;
+  object-fit:cover;
+  border-radius:9px;
+}
+
+.quality{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  margin-top:12px;
+  font-size:12px;
+}
+
+.dot{
+  width:9px;
+  height:9px;
+  border-radius:50%;
+  background:#999;
+}
+
+.good{background:#159947}
+.warn{background:#e09b00}
+.bad{background:#c62929}
+
+/* ================= TIMELINE ================= */
+
+.trimBox{
+  margin-top:15px;
+  padding:15px;
+  border:1px solid #ddd;
+  border-radius:14px;
+  background:#fafafa;
+}
+
+.trimTitle{
+  font-size:14px;
+  font-weight:750;
+  margin-bottom:6px;
+}
+
+.trimHelp{
+  font-size:12px;
+  line-height:1.4;
+  color:#666;
+  margin-bottom:22px;
+}
+
+.timeline{
+  position:relative;
+  height:70px;
+  margin:0 8px;
+  touch-action:none;
+  user-select:none;
+}
+
+.track{
+  position:absolute;
+  left:0;
+  right:0;
+  top:29px;
+  height:12px;
+  border-radius:999px;
+  background:#d7dbe1;
+}
+
+.selection{
+  position:absolute;
+  top:-9px;
+  height:30px;
+  border-radius:9px;
+  background:#111;
+  touch-action:none;
+  cursor:grab;
+}
+
+.handle{
+  position:absolute;
+  top:-6px;
+  width:30px;
+  height:42px;
+  background:white;
+  border:3px solid #111;
+  border-radius:10px;
+  touch-action:none;
+}
+
+.handle.left{
+  left:-15px;
+}
+
+.handle.right{
+  right:-15px;
+}
+
+.timeLabel{
+  position:absolute;
+  top:-34px;
+  color:white;
+  background:#111;
+  padding:4px 6px;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+.timeLabel.left{
+  left:0;
+  transform:translateX(-50%);
+}
+
+.timeLabel.right{
+  right:0;
+  transform:translateX(50%);
+}
+
+.playhead{
+  display:none;
+  position:absolute;
+  top:-7px;
+  width:3px;
+  height:26px;
+  background:red;
+  pointer-events:none;
+}
+
+.timelineBottom{
+  display:flex;
+  justify-content:space-between;
+  color:#777;
+  font-size:11px;
+}
+
+.selectionInfo{
+  margin-top:10px;
+  padding:10px;
+  background:white;
+  border:1px solid #ddd;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:700;
+}
+
+.durationRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:12px;
+}
+
+.durationRow label{
+  min-width:90px;
+}
+
+.durationRow input{
+  flex:1;
+}
+
+@media(max-width:760px){
+  .row,
+  .preview{
+    grid-template-columns:1fr;
+  }
+
+  .frames{
+    grid-template-columns:repeat(3,1fr);
+  }
+
+  .wrap{
+    padding:12px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+<div class="top">
+  <div>
+    <h1>LentiPrint Lab</h1>
+    <div>Vidéo → sélection 1 à 5 s → 9 vues lenticulaires</div>
+  </div>
+
+  <span class="badge">v11.5</span>
+</div>
+
+
+<div class="card">
+
+<h2>1. Source</h2>
+
+<div class="row">
+
+<div class="field">
+  <label>Photo pour PixVerse</label>
+  <input id="image" type="file" accept="image/png,image/jpeg,image/webp">
+</div>
+
+<div class="field">
+  <label>Action</label>
+
+  <select id="preset">
+    <option value="bark">Chien — petit aboiement</option>
+    <option value="blink">Chat — clignement naturel</option>
+    <option value="smile">Personne — léger sourire</option>
+    <option value="kiss">Couple — baiser léger</option>
+    <option value="dance">Personne — mini danse</option>
+    <option value="custom">Personnalisé</option>
+  </select>
+</div>
+
+</div>
+
+<div class="field" style="margin-top:12px">
+  <label>Prompt PixVerse</label>
+  <textarea id="prompt"></textarea>
+</div>
+
+<div class="actions">
+
+<button id="generate">
+Créer la micro-vidéo PixVerse
+</button>
+
+<button id="loadVideo" class="secondary">
+Charger une vidéo existante
+</button>
+
+<input id="videoFile" type="file" accept="video/*" hidden>
+
+</div>
+
+<div id="status" class="status">Prêt.</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>2. Vidéo et sélection</h2>
+
+<div class="preview">
+
+<div>
+
+<video
+  id="video"
+  controls
+  playsinline
+  preload="auto">
+</video>
+
+<div id="videoInfo" class="meta"></div>
+
+
+<div id="trimControls" class="trimBox" hidden>
+
+<div class="trimTitle">
+Choisir le passage utile
+</div>
+
+<div class="trimHelp">
+Déplace la fenêtre noire sur la vidéo.
+La durée se règle de 1 à 5 secondes.
+Les deux poignées définissent précisément le début et la fin.
+</div>
+
+
+<div id="timeline" class="timeline">
+
+<div id="track" class="track">
+
+<div id="selection" class="selection">
+
+<div
+  id="startLabel"
+  class="timeLabel left">
+0.00 s
+</div>
+
+<div
+  id="endLabel"
+  class="timeLabel right">
+5.00 s
+</div>
+
+<div
+  id="leftHandle"
+  class="handle left">
+</div>
+
+<div
+  id="rightHandle"
+  class="handle right">
+</div>
+
+<div
+  id="playhead"
+  class="playhead">
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<div class="timelineBottom">
+  <span>0 s</span>
+  <span id="totalTime">0 s</span>
+</div>
+
+
+<div id="selectionInfo" class="selectionInfo">
+Sélection : 0.00 → 5.00 s
+</div>
+
+
+<div class="durationRow">
+
+<label>Durée</label>
+
+<input
+  id="durationSlider"
+  type="range"
+  min="1"
+  max="5"
+  value="5"
+  step="0.1">
+
+<strong id="durationText">
+5.0 s
+</strong>
+
+</div>
+
+
+<div class="actions">
+
+<button
+  id="previewTrim"
+  class="secondary">
+▶ Lire en boucle
+</button>
+
+</div>
+
+</div>
+
+
+<div class="actions">
+
+<button
+  id="extract"
+  disabled>
+Extraire les 9 vues
+</button>
+
+</div>
+
+</div>
+
+
+<div>
+<div id="frames" class="frames"></div>
+</div>
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>3. Export</h2>
+
+<div class="row">
+
+<div class="field">
+<label>Format</label>
+
+<select id="size">
+  <option value="772">772 × 772</option>
+  <option value="1024">1024 × 1024</option>
+  <option value="original">Résolution vidéo carrée</option>
+</select>
+</div>
+
+<div class="field">
+<label>Sens</label>
+
+<select id="direction">
+  <option value="normal">1 → 9</option>
+  <option value="reverse">9 → 1</option>
+</select>
+</div>
+
+</div>
+
+<div class="actions">
+
+<button id="download" disabled>
+Télécharger ZIP — 9 vues
+</button>
+
+</div>
+
+<div class="quality">
+<span id="qualityDot" class="dot"></span>
+<span id="qualityText">Pas encore analysé.</span>
+</div>
+
+</div>
+
+</div>
+
+
+<script type="module">
+
+const $ = s => document.querySelector(s);
 
 const image = $('#image');
 const preset = $('#preset');
 const prompt = $('#prompt');
+
 const status = $('#status');
 
 const video = $('#video');
 const videoInfo = $('#videoInfo');
 
 const generate = $('#generate');
+
 const loadVideo = $('#loadVideo');
 const videoFile = $('#videoFile');
 
 const trimControls = $('#trimControls');
-const timelineTrack = $('#timelineTrack');
-const selection = $('#selection');
-const handleLeft = $('#handleLeft');
-const handleRight = $('#handleRight');
 
-const bubbleStart = $('#bubbleStart');
-const bubbleEnd = $('#bubbleEnd');
+const track = $('#track');
+const selection = $('#selection');
+
+const leftHandle = $('#leftHandle');
+const rightHandle = $('#rightHandle');
+
+const startLabel = $('#startLabel');
+const endLabel = $('#endLabel');
+
+const playhead = $('#playhead');
+
+const totalTime = $('#totalTime');
 
 const selectionInfo = $('#selectionInfo');
-const totalDuration = $('#totalDuration');
+
+const durationSlider = $('#durationSlider');
+const durationText = $('#durationText');
 
 const previewTrim = $('#previewTrim');
-const playhead = $('#playhead');
-const timelinePlayed = $('#timelinePlayed');
 
 const extract = $('#extract');
-const framesEl = $('#frames');
-const download = $('#download');
 
-const sizeSelect = $('#size');
-const directionSelect = $('#direction');
+const frames = $('#frames');
+
+const size = $('#size');
+const direction = $('#direction');
+
+const download = $('#download');
 
 const qualityDot = $('#qualityDot');
 const qualityText = $('#qualityText');
 
 
-/* =========================================================
-   CONSTANTES
-========================================================= */
+const MIN_DURATION = 1;
+const MAX_DURATION = 5;
 
-const MIN_CLIP = 1;
-const MAX_CLIP = 5;
-
-
-/* =========================================================
-   ETAT
-========================================================= */
 
 let objectUrl = null;
-let frameData = [];
 
 let clipStart = 0;
 let clipEnd = 5;
 
-let dragMode = null;
-let pointerStartX = 0;
-let dragStartClip = 0;
-let dragEndClip = 0;
+let dragType = null;
+let dragX = 0;
+let dragStart = 0;
+let dragEnd = 5;
 
-let trimLoopActive = false;
-let loopRAF = null;
+let looping = false;
+let loopFrame = null;
+
+let frameData = [];
 
 
-/* =========================================================
-   PROMPTS PIXVERSE
-========================================================= */
+/* =========================
+   PROMPTS
+========================= */
 
 const prompts = {
 
-  bark:
-    'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark: mouth opens briefly, lower jaw and cheeks move naturally, ears make a very subtle reaction, then the mouth returns closed. No walking, no zoom, no camera movement, no scene change, no body translation. Subtle realistic micro-motion only.',
+bark:
+'FIXED CAMERA. Keep the dog identity, body, fur, lighting and background stable. The dog stays in the same position and makes one small natural bark. No walking, no zoom, no camera movement, no scene change.',
 
-  blink:
-    'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with a tiny synchronized eyelid, cheek and ear micro-movement, then returns to the exact starting pose. No walking, no zoom, no camera movement, no scene change.',
+blink:
+'FIXED CAMERA. Keep the cat identity, body, fur, lighting and background stable. The cat remains still and performs one natural slow blink with tiny natural eyelid and ear movement. No walking, no zoom, no camera movement, no scene change.',
 
-  smile:
-    'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person remains in place and gradually forms a small natural smile, with subtle cheeks and eyes movement, then returns close to the starting expression. No walking, no zoom, no camera movement, no scene change.',
+smile:
+'FIXED CAMERA. Keep the person identity, pose, clothes, lighting and background stable. The person forms a small natural smile. No walking, no zoom, no camera movement, no scene change.',
 
-  kiss:
-    'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They remain essentially in place and make one short gentle kiss with minimal natural head movement, then return close to the starting pose. No camera movement, no zoom, no scene change, no large body motion.',
+kiss:
+'FIXED CAMERA. Keep both people identities, clothes, lighting and background stable. They make one short gentle kiss with minimal natural head movement. No zoom, no camera movement, no scene change.',
 
-  dance:
-    'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one very small rhythmic dance gesture while staying centered and nearly in the same footprint, then returns close to the starting pose. No camera movement, no zoom, no scene change, no large displacement.',
+dance:
+'FIXED CAMERA. Keep the person identity, clothes, lighting and background stable. The person makes one small rhythmic dance gesture while staying centered. No zoom, no camera movement, no scene change.',
 
-  custom: ''
+custom:''
 
 };
 
 
-/* =========================================================
-   OUTILS
-========================================================= */
+function updatePrompt(){
 
-function log(message) {
-  status.textContent = message;
+if(
+preset.value !== 'custom'
+){
+
+prompt.value =
+prompts[preset.value];
+
 }
 
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-
-function formatTime(value) {
-  if (!Number.isFinite(value)) {
-    return '0.00 s';
-  }
-
-  return `${value.toFixed(2)} s`;
-}
-
-
-function canvasToBlob(canvas) {
-  return new Promise((resolve, reject) => {
-
-    canvas.toBlob(blob => {
-
-      if (!blob) {
-        reject(
-          new Error('Impossible de créer le PNG.')
-        );
-        return;
-      }
-
-      resolve(blob);
-
-    }, 'image/png');
-  });
-}
-
-
-/* =========================================================
-   PROMPT
-========================================================= */
-
-function updatePrompt() {
-
-  if (preset.value !== 'custom') {
-    prompt.value = prompts[preset.value];
-  }
 }
 
 
 preset.addEventListener(
-  'change',
-  updatePrompt
+'change',
+updatePrompt
 );
-
 
 updatePrompt();
 
 
-/* =========================================================
-   RESET
-========================================================= */
+/* =========================
+   GENERAL
+========================= */
 
-function stopLoop() {
+function log(text){
 
-  trimLoopActive = false;
+status.textContent =
+text;
 
-  if (loopRAF) {
-    cancelAnimationFrame(loopRAF);
-    loopRAF = null;
-  }
-
-  previewTrim.textContent =
-    '▶ Lire la sélection en boucle';
-
-  playhead.style.display =
-    'none';
 }
 
 
-function clearFrames() {
+function sleep(ms){
 
-  frameData = [];
+return new Promise(
+resolve =>
+setTimeout(
+resolve,
+ms
+)
+);
 
-  framesEl.innerHTML = '';
-
-  download.disabled = true;
-
-  qualityDot.className =
-    'dot';
-
-  qualityText.textContent =
-    'Pas encore analysé.';
 }
 
 
-function clearVideo() {
+function clamp(
+value,
+minimum,
+maximum
+){
 
-  stopLoop();
-  clearFrames();
+return Math.max(
+minimum,
+Math.min(
+maximum,
+value
+)
+);
 
-  try {
-    video.pause();
-  } catch (_) {}
-
-  video.removeAttribute('src');
-
-  try {
-    video.load();
-  } catch (_) {}
-
-  if (objectUrl) {
-
-    try {
-      URL.revokeObjectURL(objectUrl);
-    } catch (_) {}
-
-    objectUrl = null;
-  }
-
-  trimControls.hidden = true;
-  extract.disabled = true;
-  videoInfo.textContent = '';
 }
 
 
-/* =========================================================
-   VIDEO READY
-========================================================= */
+function clearFrames(){
 
-function waitForMetadata(videoElement) {
+frameData = [];
 
-  return new Promise((resolve, reject) => {
+frames.innerHTML = '';
 
-    if (
-      Number.isFinite(videoElement.duration) &&
-      videoElement.duration > 0
-    ) {
-      resolve();
-      return;
-    }
+download.disabled = true;
 
+qualityDot.className =
+'dot';
 
-    const onLoaded = () => {
-      cleanup();
-      resolve();
-    };
+qualityText.textContent =
+'Pas encore analysé.';
 
-
-    const onError = () => {
-      cleanup();
-
-      reject(
-        new Error(
-          'Impossible de lire les informations de cette vidéo.'
-        )
-      );
-    };
-
-
-    const cleanup = () => {
-
-      videoElement.removeEventListener(
-        'loadedmetadata',
-        onLoaded
-      );
-
-      videoElement.removeEventListener(
-        'error',
-        onError
-      );
-    };
-
-
-    videoElement.addEventListener(
-      'loadedmetadata',
-      onLoaded,
-      { once: true }
-    );
-
-
-    videoElement.addEventListener(
-      'error',
-      onError,
-      { once: true }
-    );
-  });
 }
 
 
-function waitForVideoFrame(
-  videoElement,
-  timeout = 15000
-) {
+/* =========================
+   VIDEO
+========================= */
 
-  return new Promise((resolve, reject) => {
+function stopLoop(){
 
-    let finished = false;
+looping = false;
 
+if(loopFrame){
 
-    const check = () => {
+cancelAnimationFrame(
+loopFrame
+);
 
-      if (finished) {
-        return;
-      }
+loopFrame = null;
 
-      if (
-        videoElement.readyState >= 2 &&
-        videoElement.videoWidth > 0 &&
-        videoElement.videoHeight > 0
-      ) {
+}
 
-        finished = true;
+playhead.style.display =
+'none';
 
-        cleanup();
+previewTrim.textContent =
+'▶ Lire en boucle';
 
-        resolve();
-      }
-    };
-
-
-    const fail = () => {
-
-      if (finished) {
-        return;
-      }
-
-      finished = true;
-
-      cleanup();
-
-      reject(
-        new Error(
-          'La vidéo ne peut pas être décodée.'
-        )
-      );
-    };
-
-
-    const timer = setTimeout(() => {
-
-      if (finished) {
-        return;
-      }
-
-      finished = true;
-
-      cleanup();
-
-      reject(
-        new Error(
-          'Aucune image vidéo décodée.'
-        )
-      );
-
-    }, timeout);
-
-
-    const events = [
-      'loadeddata',
-      'canplay',
-      'canplaythrough',
-      'timeupdate'
-    ];
-
-
-    const cleanup = () => {
-
-      clearTimeout(timer);
-
-      events.forEach(eventName => {
-
-        videoElement.removeEventListener(
-          eventName,
-          check
-        );
-      });
-
-      videoElement.removeEventListener(
-        'error',
-        fail
-      );
-    };
-
-
-    events.forEach(eventName => {
-
-      videoElement.addEventListener(
-        eventName,
-        check
-      );
-    });
-
-
-    videoElement.addEventListener(
-      'error',
-      fail,
-      { once: true }
-    );
-
-
-    check();
-  });
 }
 
 
-/* =========================================================
-   SEEK
-========================================================= */
+function clearVideo(){
 
-function waitSeek(
-  videoElement,
-  time
-) {
+stopLoop();
 
-  return new Promise((resolve, reject) => {
+clearFrames();
 
-    if (
-      !Number.isFinite(videoElement.duration) ||
-      videoElement.duration <= 0
-    ) {
+try{
 
-      reject(
-        new Error(
-          'Durée vidéo inconnue.'
-        )
-      );
+video.pause();
 
-      return;
-    }
+}catch(_){}
 
+video.removeAttribute(
+'src'
+);
 
-    const safeTime =
-      clamp(
-        time,
-        0,
-        Math.max(
-          0,
-          videoElement.duration - 0.02
-        )
-      );
+try{
 
+video.load();
 
-    if (
-      Math.abs(
-        videoElement.currentTime - safeTime
-      ) < 0.015
-    ) {
+}catch(_){}
 
-      resolve();
-      return;
-    }
+if(objectUrl){
 
+URL.revokeObjectURL(
+objectUrl
+);
 
-    const onSeeked = () => {
-      cleanup();
-      resolve();
-    };
+objectUrl = null;
 
+}
 
-    const onError = () => {
-      cleanup();
+trimControls.hidden = true;
 
-      reject(
-        new Error(
-          'Impossible de se déplacer dans la vidéo.'
-        )
-      );
-    };
+extract.disabled = true;
 
+videoInfo.textContent = '';
 
-    const timer = setTimeout(() => {
-      cleanup();
-      resolve();
-    }, 2500);
-
-
-    const cleanup = () => {
-
-      clearTimeout(timer);
-
-      videoElement.removeEventListener(
-        'seeked',
-        onSeeked
-      );
-
-      videoElement.removeEventListener(
-        'error',
-        onError
-      );
-    };
-
-
-    videoElement.addEventListener(
-      'seeked',
-      onSeeked,
-      { once: true }
-    );
-
-
-    videoElement.addEventListener(
-      'error',
-      onError,
-      { once: true }
-    );
-
-
-    try {
-      videoElement.currentTime = safeTime;
-    } catch (error) {
-
-      cleanup();
-      reject(error);
-    }
-  });
 }
 
 
-/* =========================================================
+function waitMetadata(){
+
+return new Promise(
+(resolve,reject)=>{
+
+if(
+Number.isFinite(
+video.duration
+) &&
+video.duration > 0
+){
+
+resolve();
+
+return;
+
+}
+
+const ready = ()=>{
+
+cleanup();
+
+resolve();
+
+};
+
+const error = ()=>{
+
+cleanup();
+
+reject(
+new Error(
+'Impossible de lire la vidéo.'
+)
+);
+
+};
+
+const cleanup = ()=>{
+
+video.removeEventListener(
+'loadedmetadata',
+ready
+);
+
+video.removeEventListener(
+'error',
+error
+);
+
+};
+
+video.addEventListener(
+'loadedmetadata',
+ready,
+{once:true}
+);
+
+video.addEventListener(
+'error',
+error,
+{once:true}
+);
+
+}
+);
+
+}
+
+
+function waitVideoFrame(){
+
+return new Promise(
+(resolve,reject)=>{
+
+if(
+video.readyState >= 2 &&
+video.videoWidth > 0
+){
+
+resolve();
+
+return;
+
+}
+
+let finished = false;
+
+const ready = ()=>{
+
+if(finished){
+return;
+}
+
+if(
+video.readyState >= 2 &&
+video.videoWidth > 0
+){
+
+finished = true;
+
+cleanup();
+
+resolve();
+
+}
+
+};
+
+const error = ()=>{
+
+if(finished){
+return;
+}
+
+finished = true;
+
+cleanup();
+
+reject(
+new Error(
+'Image vidéo non décodable.'
+)
+);
+
+};
+
+const timer =
+setTimeout(
+()=>{
+
+if(finished){
+return;
+}
+
+finished = true;
+
+cleanup();
+
+reject(
+new Error(
+'La vidéo met trop de temps à se charger.'
+)
+);
+
+},
+15000
+);
+
+const cleanup = ()=>{
+
+clearTimeout(
+timer
+);
+
+video.removeEventListener(
+'loadeddata',
+ready
+);
+
+video.removeEventListener(
+'canplay',
+ready
+);
+
+video.removeEventListener(
+'error',
+error
+);
+
+};
+
+video.addEventListener(
+'loadeddata',
+ready
+);
+
+video.addEventListener(
+'canplay',
+ready
+);
+
+video.addEventListener(
+'error',
+error
+);
+
+}
+);
+
+}
+
+
+function seek(
+time
+){
+
+return new Promise(
+(resolve,reject)=>{
+
+if(
+!Number.isFinite(
+video.duration
+)
+){
+
+reject(
+new Error(
+'Durée vidéo inconnue.'
+)
+);
+
+return;
+
+}
+
+const target =
+clamp(
+time,
+0,
+Math.max(
+0,
+video.duration - 0.03
+)
+);
+
+if(
+Math.abs(
+video.currentTime -
+target
+) < 0.02
+){
+
+resolve();
+
+return;
+
+}
+
+let ended = false;
+
+const done = ()=>{
+
+if(ended){
+return;
+}
+
+ended = true;
+
+cleanup();
+
+resolve();
+
+};
+
+const error = ()=>{
+
+if(ended){
+return;
+}
+
+ended = true;
+
+cleanup();
+
+reject(
+new Error(
+'Erreur de lecture vidéo.'
+)
+);
+
+};
+
+const timer =
+setTimeout(
+done,
+2500
+);
+
+const cleanup = ()=>{
+
+clearTimeout(
+timer
+);
+
+video.removeEventListener(
+'seeked',
+done
+);
+
+video.removeEventListener(
+'error',
+error
+);
+
+};
+
+video.addEventListener(
+'seeked',
+done,
+{once:true}
+);
+
+video.addEventListener(
+'error',
+error,
+{once:true}
+);
+
+try{
+
+video.currentTime =
+target;
+
+}catch(e){
+
+error();
+
+}
+
+}
+);
+
+}
+
+
+/* =========================
    TIMELINE
-========================================================= */
+========================= */
 
-function secondsFromPixels(px) {
+function timeFromPixels(
+pixels
+){
 
-  const rect =
-    timelineTrack.getBoundingClientRect();
+const rect =
+track.getBoundingClientRect();
 
-  if (
-    !rect.width ||
-    !Number.isFinite(video.duration) ||
-    video.duration <= 0
-  ) {
-    return 0;
-  }
+if(
+rect.width <= 0 ||
+!Number.isFinite(
+video.duration
+)
+){
 
-  return (px / rect.width) * video.duration;
+return 0;
+
+}
+
+/*
+IMPORTANT :
+pas de retour à la ligne
+entre return et le calcul.
+*/
+
+return (pixels / rect.width) * video.duration;
+
 }
 
 
-function renderSelection(
-  seekToStart = false
-) {
+function updateTimeline(
+moveVideo = false
+){
 
-  if (
-    !Number.isFinite(video.duration) ||
-    video.duration <= 0
-  ) {
-    return;
-  }
+if(
+!Number.isFinite(
+video.duration
+) ||
+video.duration <= 0
+){
 
+return;
 
-  clipStart =
-    clamp(
-      clipStart,
-      0,
-      video.duration
-    );
+}
 
+clipStart =
+clamp(
+clipStart,
+0,
+video.duration
+);
 
-  clipEnd =
-    clamp(
-      clipEnd,
-      0,
-      video.duration
-    );
-
-
-  let length =
-    clipEnd - clipStart;
+clipEnd =
+clamp(
+clipEnd,
+0,
+video.duration
+);
 
 
-  if (length < MIN_CLIP) {
-
-    clipEnd =
-      Math.min(
-        video.duration,
-        clipStart + MIN_CLIP
-      );
-  }
+let duration =
+clipEnd -
+clipStart;
 
 
-  if (
-    clipEnd - clipStart >
-    MAX_CLIP
-  ) {
+if(
+duration <
+MIN_DURATION
+){
 
-    clipEnd =
-      clipStart + MAX_CLIP;
-  }
+clipEnd =
+Math.min(
+video.duration,
+clipStart +
+MIN_DURATION
+);
 
-
-  if (
-    clipEnd >
-    video.duration
-  ) {
-
-    const currentLength =
-      clipEnd - clipStart;
-
-    clipEnd =
-      video.duration;
-
-    clipStart =
-      Math.max(
-        0,
-        clipEnd - currentLength
-      );
-  }
-
-
-  const leftPercent =
-    (
-      clipStart /
-      video.duration
-    ) * 100;
-
-
-  const widthPercent =
-    (
-      (
-        clipEnd -
-        clipStart
-      ) /
-      video.duration
-    ) * 100;
-
-
-  selection.style.left =
-    `${leftPercent}%`;
-
-
-  selection.style.width =
-    `${widthPercent}%`;
-
-
-  bubbleStart.textContent =
-    formatTime(
-      clipStart
-    );
-
-
-  bubbleEnd.textContent =
-    formatTime(
-      clipEnd
-    );
-
-
-  const selectedDuration =
-    clipEnd - clipStart;
-
-
-  selectionInfo.textContent =
-    `Sélection : ${clipStart.toFixed(2)} s → ${clipEnd.toFixed(2)} s · durée ${selectedDuration.toFixed(2)} s`;
-
-
-  extract.disabled =
-    selectedDuration < MIN_CLIP ||
-    selectedDuration > MAX_CLIP + 0.01;
-
-
-  if (seekToStart) {
-
-    try {
-      video.currentTime =
-        clipStart;
-    } catch (_) {}
-  }
 }
 
 
-function setupTimeline() {
+if(
+clipEnd -
+clipStart >
+MAX_DURATION
+){
 
-  if (
-    !Number.isFinite(video.duration) ||
-    video.duration <= 0
-  ) {
-    return;
-  }
+clipEnd =
+clipStart +
+MAX_DURATION;
 
-
-  stopLoop();
-
-
-  clipStart = 0;
-
-
-  clipEnd =
-    Math.min(
-      MAX_CLIP,
-      video.duration
-    );
-
-
-  if (
-    clipEnd - clipStart <
-    MIN_CLIP &&
-    video.duration >= MIN_CLIP
-  ) {
-
-    clipEnd =
-      MIN_CLIP;
-  }
-
-
-  totalDuration.textContent =
-    `${video.duration.toFixed(1)} s`;
-
-
-  trimControls.hidden =
-    false;
-
-
-  renderSelection(
-    true
-  );
 }
 
 
-/* =========================================================
-   DRAG
-========================================================= */
+if(
+clipEnd >
+video.duration
+){
 
-function startDrag(
-  mode,
-  event
-) {
+const length =
+clipEnd -
+clipStart;
 
-  if (
-    !Number.isFinite(video.duration) ||
-    video.duration <= 0
-  ) {
-    return;
-  }
+clipEnd =
+video.duration;
 
+clipStart =
+Math.max(
+0,
+clipEnd -
+length
+);
 
-  event.preventDefault();
-
-
-  dragMode =
-    mode;
+}
 
 
-  pointerStartX =
-    event.clientX;
+duration =
+clipEnd -
+clipStart;
 
 
-  dragStartClip =
-    clipStart;
+const left =
+clipStart /
+video.duration *
+100;
 
 
-  dragEndClip =
-    clipEnd;
+const realWidth =
+duration /
+video.duration *
+100;
 
 
-  selection.classList.add(
-    'dragging'
-  );
+/*
+Sur les longues vidéos,
+5 secondes donneraient une zone
+trop petite à manipuler.
+
+On impose donc une largeur visuelle
+minimum, sans modifier les temps réels.
+*/
+
+const trackWidth =
+track.getBoundingClientRect().width;
 
 
-  try {
+const minimumPercent =
+trackWidth > 0
+?
+(58 / trackWidth) * 100
+:
+0;
 
-    event.currentTarget.setPointerCapture(
-      event.pointerId
-    );
 
-  } catch (_) {}
+const visualWidth =
+Math.max(
+realWidth,
+minimumPercent
+);
+
+
+selection.style.left =
+`${Math.min(
+left,
+100 - visualWidth
+)}%`;
+
+
+selection.style.width =
+`${Math.min(
+100,
+visualWidth
+)}%`;
+
+
+startLabel.textContent =
+`${clipStart.toFixed(2)} s`;
+
+
+endLabel.textContent =
+`${clipEnd.toFixed(2)} s`;
+
+
+selectionInfo.textContent =
+`Sélection : ${clipStart.toFixed(2)} s → ${clipEnd.toFixed(2)} s · durée ${duration.toFixed(2)} s`;
+
+
+durationSlider.value =
+clamp(
+duration,
+MIN_DURATION,
+MAX_DURATION
+);
+
+
+durationText.textContent =
+`${duration.toFixed(1)} s`;
+
+
+extract.disabled =
+duration < MIN_DURATION ||
+duration > MAX_DURATION + 0.01;
+
+
+if(moveVideo){
+
+try{
+
+video.currentTime =
+clipStart;
+
+}catch(_){}
+
+}
+
+}
+
+
+function setupTimeline(){
+
+clipStart = 0;
+
+clipEnd =
+Math.min(
+5,
+video.duration
+);
+
+
+if(
+video.duration >= 1 &&
+clipEnd < 1
+){
+
+clipEnd = 1;
+
+}
+
+
+totalTime.textContent =
+`${video.duration.toFixed(1)} s`;
+
+
+trimControls.hidden =
+false;
+
+
+updateTimeline(
+true
+);
+
+}
+
+
+/* =========================
+   DUREE 1 A 5 S
+========================= */
+
+durationSlider.addEventListener(
+'input',
+()=>{
+
+if(
+!Number.isFinite(
+video.duration
+)
+){
+
+return;
+
+}
+
+let newDuration =
+Number(
+durationSlider.value
+);
+
+
+newDuration =
+clamp(
+newDuration,
+MIN_DURATION,
+MAX_DURATION
+);
+
+
+clipEnd =
+clipStart +
+newDuration;
+
+
+if(
+clipEnd >
+video.duration
+){
+
+clipEnd =
+video.duration;
+
+clipStart =
+Math.max(
+0,
+clipEnd -
+newDuration
+);
+
+}
+
+
+updateTimeline(
+true
+);
+
+}
+);
+
+
+/* =========================
+   GLISSER LA FENETRE
+========================= */
+
+function beginDrag(
+type,
+event
+){
+
+if(
+!Number.isFinite(
+video.duration
+)
+){
+
+return;
+
+}
+
+event.preventDefault();
+
+dragType =
+type;
+
+dragX =
+event.clientX;
+
+dragStart =
+clipStart;
+
+dragEnd =
+clipEnd;
+
+try{
+
+event.currentTarget.setPointerCapture(
+event.pointerId
+);
+
+}catch(_){}
+
 }
 
 
 selection.addEventListener(
-  'pointerdown',
-  event => {
+'pointerdown',
+event=>{
 
-    if (
-      event.target === handleLeft ||
-      event.target === handleRight
-    ) {
-      return;
-    }
+if(
+event.target ===
+leftHandle ||
+event.target ===
+rightHandle
+){
 
-    startDrag(
-      'move',
-      event
-    );
-  }
+return;
+
+}
+
+beginDrag(
+'move',
+event
+);
+
+}
 );
 
 
-handleLeft.addEventListener(
-  'pointerdown',
-  event => {
+leftHandle.addEventListener(
+'pointerdown',
+event=>{
 
-    event.stopPropagation();
+event.stopPropagation();
 
-    startDrag(
-      'left',
-      event
-    );
-  }
+beginDrag(
+'left',
+event
+);
+
+}
 );
 
 
-handleRight.addEventListener(
-  'pointerdown',
-  event => {
+rightHandle.addEventListener(
+'pointerdown',
+event=>{
 
-    event.stopPropagation();
+event.stopPropagation();
 
-    startDrag(
-      'right',
-      event
-    );
-  }
+beginDrag(
+'right',
+event
 );
 
-
-window.addEventListener(
-  'pointermove',
-  event => {
-
-    if (!dragMode) {
-      return;
-    }
-
-
-    const pixelDelta =
-      event.clientX -
-      pointerStartX;
-
-
-    const timeDelta =
-      secondsFromPixels(
-        pixelDelta
-      );
-
-
-    if (dragMode === 'move') {
-
-      const length =
-        dragEndClip -
-        dragStartClip;
-
-
-      let newStart =
-        dragStartClip +
-        timeDelta;
-
-
-      newStart =
-        clamp(
-          newStart,
-          0,
-          Math.max(
-            0,
-            video.duration - length
-          )
-        );
-
-
-      clipStart =
-        newStart;
-
-
-      clipEnd =
-        newStart + length;
-    }
-
-
-    if (dragMode === 'left') {
-
-      let newStart =
-        dragStartClip +
-        timeDelta;
-
-
-      newStart =
-        clamp(
-          newStart,
-          0,
-          dragEndClip -
-          MIN_CLIP
-        );
-
-
-      if (
-        dragEndClip -
-        newStart >
-        MAX_CLIP
-      ) {
-
-        newStart =
-          dragEndClip -
-          MAX_CLIP;
-      }
-
-
-      clipStart =
-        newStart;
-
-
-      clipEnd =
-        dragEndClip;
-    }
-
-
-    if (dragMode === 'right') {
-
-      let newEnd =
-        dragEndClip +
-        timeDelta;
-
-
-      newEnd =
-        clamp(
-          newEnd,
-          dragStartClip +
-          MIN_CLIP,
-          video.duration
-        );
-
-
-      if (
-        newEnd -
-        dragStartClip >
-        MAX_CLIP
-      ) {
-
-        newEnd =
-          dragStartClip +
-          MAX_CLIP;
-      }
-
-
-      clipStart =
-        dragStartClip;
-
-
-      clipEnd =
-        newEnd;
-    }
-
-
-    renderSelection(
-      true
-    );
-  }
+}
 );
 
 
 window.addEventListener(
-  'pointerup',
-  () => {
+'pointermove',
+event=>{
 
-    if (!dragMode) {
-      return;
-    }
+if(!dragType){
 
+return;
 
-    dragMode =
-      null;
+}
 
-
-    selection.classList.remove(
-      'dragging'
-    );
-  }
+const seconds =
+timeFromPixels(
+event.clientX -
+dragX
 );
 
 
-/* =========================================================
-   CLIC SUR LA BARRE
-========================================================= */
+if(
+dragType ===
+'move'
+){
 
-timelineTrack.addEventListener(
-  'pointerdown',
-  event => {
-
-    if (
-      event.target === selection ||
-      selection.contains(event.target)
-    ) {
-      return;
-    }
+const duration =
+dragEnd -
+dragStart;
 
 
-    if (
-      !Number.isFinite(video.duration) ||
-      video.duration <= 0
-    ) {
-      return;
-    }
+let start =
+dragStart +
+seconds;
 
 
-    const rect =
-      timelineTrack.getBoundingClientRect();
-
-
-    const clickTime =
-      clamp(
-        (
-          (
-            event.clientX -
-            rect.left
-          ) /
-          rect.width
-        ) *
-        video.duration,
-        0,
-        video.duration
-      );
-
-
-    const currentLength =
-      clipEnd -
-      clipStart;
-
-
-    clipStart =
-      clamp(
-        clickTime -
-        currentLength / 2,
-        0,
-        Math.max(
-          0,
-          video.duration -
-          currentLength
-        )
-      );
-
-
-    clipEnd =
-      clipStart +
-      currentLength;
-
-
-    renderSelection(
-      true
-    );
-  }
+start =
+clamp(
+start,
+0,
+Math.max(
+0,
+video.duration -
+duration
+)
 );
 
 
-/* =========================================================
+clipStart =
+start;
+
+
+clipEnd =
+start +
+duration;
+
+}
+
+
+if(
+dragType ===
+'left'
+){
+
+let start =
+dragStart +
+seconds;
+
+
+start =
+clamp(
+start,
+0,
+dragEnd -
+MIN_DURATION
+);
+
+
+if(
+dragEnd -
+start >
+MAX_DURATION
+){
+
+start =
+dragEnd -
+MAX_DURATION;
+
+}
+
+
+clipStart =
+start;
+
+
+clipEnd =
+dragEnd;
+
+}
+
+
+if(
+dragType ===
+'right'
+){
+
+let end =
+dragEnd +
+seconds;
+
+
+end =
+clamp(
+end,
+dragStart +
+MIN_DURATION,
+video.duration
+);
+
+
+if(
+end -
+dragStart >
+MAX_DURATION
+){
+
+end =
+dragStart +
+MAX_DURATION;
+
+}
+
+
+clipStart =
+dragStart;
+
+
+clipEnd =
+end;
+
+}
+
+
+updateTimeline(
+true
+);
+
+}
+);
+
+
+window.addEventListener(
+'pointerup',
+()=>{
+
+dragType =
+null;
+
+}
+);
+
+
+/* =========================
+   CLIC BARRE
+========================= */
+
+track.addEventListener(
+'pointerdown',
+event=>{
+
+if(
+selection.contains(
+event.target
+)
+){
+
+return;
+
+}
+
+
+const rect =
+track.getBoundingClientRect();
+
+
+const clicked =
+(
+event.clientX -
+rect.left
+) /
+rect.width *
+video.duration;
+
+
+const duration =
+clipEnd -
+clipStart;
+
+
+clipStart =
+clamp(
+clicked -
+duration / 2,
+0,
+Math.max(
+0,
+video.duration -
+duration
+)
+);
+
+
+clipEnd =
+clipStart +
+duration;
+
+
+updateTimeline(
+true
+);
+
+}
+);
+
+
+/* =========================
    BOUCLE
-========================================================= */
+========================= */
 
-async function startLoop() {
+async function startLoop(){
 
-  stopLoop();
+stopLoop();
 
+looping = true;
 
-  trimLoopActive =
-    true;
-
-
-  previewTrim.textContent =
-    '■ Arrêter la boucle';
+previewTrim.textContent =
+'■ Arrêter la boucle';
 
 
-  try {
+try{
 
-    video.pause();
-
-
-    await waitSeek(
-      video,
-      clipStart
-    );
+await seek(
+clipStart
+);
 
 
-    await video.play();
+await video.play();
 
 
-    const tick = () => {
+const loop = ()=>{
 
-      if (!trimLoopActive) {
-        return;
-      }
+if(!looping){
 
+return;
 
-      if (
-        video.currentTime >=
-        clipEnd - 0.02 ||
-        video.currentTime <
-        clipStart - 0.05
-      ) {
-
-        try {
-          video.currentTime =
-            clipStart;
-        } catch (_) {}
-      }
+}
 
 
-      const progress =
-        clamp(
-          (
-            video.currentTime -
-            clipStart
-          ) /
-          (
-            clipEnd -
-            clipStart
-          ),
-          0,
-          1
-        );
+if(
+video.currentTime >=
+clipEnd - 0.03 ||
+video.currentTime <
+clipStart - 0.05
+){
+
+video.currentTime =
+clipStart;
+
+}
 
 
-      playhead.style.display =
-        'block';
+const position =
+clamp(
+(
+video.currentTime -
+clipStart
+) /
+(
+clipEnd -
+clipStart
+),
+0,
+1
+);
 
 
-      playhead.style.left =
-        `${progress * 100}%`;
+playhead.style.display =
+'block';
 
 
-      timelinePlayed.style.width =
-        `${clamp(
-          video.currentTime /
-          video.duration,
-          0,
-          1
-        ) * 100}%`;
+playhead.style.left =
+`${position * 100}%`;
 
 
-      loopRAF =
-        requestAnimationFrame(
-          tick
-        );
-    };
+loopFrame =
+requestAnimationFrame(
+loop
+);
+
+};
 
 
-    loopRAF =
-      requestAnimationFrame(
-        tick
-      );
+loopFrame =
+requestAnimationFrame(
+loop
+);
 
 
-  } catch (error) {
+}catch(e){
 
-    stopLoop();
+stopLoop();
 
+log(
+'Impossible de lire la boucle : '+
+e.message
+);
 
-    log(
-      'Lecture de la sélection impossible : ' +
-      error.message
-    );
-  }
+}
+
 }
 
 
 previewTrim.addEventListener(
-  'click',
-  async () => {
+'click',
+async()=>{
 
-    if (trimLoopActive) {
+if(looping){
 
-      stopLoop();
+stopLoop();
 
-      video.pause();
+video.pause();
 
-      return;
-    }
+}else{
 
+await startLoop();
 
-    await startLoop();
-  }
+}
+
+}
 );
 
 
-/* =========================================================
-   VIDEO LOCALE
-========================================================= */
+/* =========================
+   VIDEO EXISTANTE
+========================= */
 
 loadVideo.addEventListener(
-  'click',
-  () => {
+'click',
+()=>{
 
-    videoFile.click();
-  }
+videoFile.click();
+
+}
 );
 
 
 videoFile.addEventListener(
-  'change',
-  async () => {
+'change',
+async()=>{
 
-    const file =
-      videoFile.files?.[0];
-
-
-    if (!file) {
-      return;
-    }
+const file =
+videoFile.files?.[0];
 
 
-    clearVideo();
+if(!file){
+
+return;
+
+}
 
 
-    videoInfo.textContent =
-      `${file.name || 'Vidéo'} · ` +
-      `${file.type || 'format inconnu'} · ` +
-      `${(file.size / 1024 / 1024).toFixed(1)} Mo`;
+clearVideo();
 
 
-    log(
-      'Chargement de la vidéo…'
-    );
+videoInfo.textContent =
+`${file.name} · ${file.type || 'vidéo'} · ${(file.size/1024/1024).toFixed(1)} Mo`;
 
 
-    try {
-
-      objectUrl =
-        URL.createObjectURL(
-          file
-        );
-
-
-      video.src =
-        objectUrl;
-
-
-      video.controls =
-        true;
-
-
-      video.playsInline =
-        true;
-
-
-      video.preload =
-        'auto';
-
-
-      video.load();
-
-
-      await waitForMetadata(
-        video
-      );
-
-
-      await waitForVideoFrame(
-        video
-      );
-
-
-      await waitSeek(
-        video,
-        Math.min(
-          0.10,
-          Math.max(
-            0,
-            video.duration - 0.05
-          )
-        )
-      );
-
-
-      videoInfo.textContent +=
-        ` · ${video.videoWidth}×${video.videoHeight}` +
-        ` · ${video.duration.toFixed(2)} s`;
-
-
-      setupTimeline();
-
-
-      log(
-        `Vidéo prête — ${video.duration.toFixed(2)} s.\n` +
-        `Déplace la fenêtre noire sur la barre et règle sa largeur entre 1 et 5 secondes.`
-      );
-
-
-    } catch (error) {
-
-      extract.disabled =
-        true;
-
-
-      log(
-        'Erreur vidéo : ' +
-        error.message
-      );
-    }
-  }
+log(
+'Chargement de la vidéo…'
 );
 
 
-/* =========================================================
+try{
+
+objectUrl =
+URL.createObjectURL(
+file
+);
+
+
+video.src =
+objectUrl;
+
+
+video.load();
+
+
+await waitMetadata();
+
+await waitVideoFrame();
+
+
+await seek(
+Math.min(
+0.1,
+video.duration / 10
+)
+);
+
+
+videoInfo.textContent +=
+` · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
+
+
+setupTimeline();
+
+
+log(
+`Vidéo prête — ${video.duration.toFixed(2)} s.
+Déplace la fenêtre sur la barre, puis règle la durée entre 1 et 5 secondes.`
+);
+
+
+}catch(e){
+
+log(
+'Erreur vidéo : '+
+e.message
+);
+
+}
+
+}
+);
+
+
+/* =========================
    PIXVERSE
-========================================================= */
+========================= */
 
 generate.addEventListener(
-  'click',
-  async () => {
+'click',
+async()=>{
 
-    const file =
-      image.files?.[0];
+const file =
+image.files?.[0];
 
 
-    if (!file) {
+if(!file){
 
-      log(
-        'Choisis d’abord une photo.'
-      );
+log(
+'Choisis une photo.'
+);
 
-      return;
-    }
+return;
 
+}
 
-    const textPrompt =
-      prompt.value.trim();
 
+const text =
+prompt.value.trim();
 
-    if (!textPrompt) {
 
-      log(
-        'Le prompt PixVerse est vide.'
-      );
+if(!text){
 
-      return;
-    }
+log(
+'Prompt vide.'
+);
 
+return;
 
-    clearVideo();
+}
 
 
-    generate.disabled =
-      true;
+clearVideo();
 
+generate.disabled = true;
 
-    try {
 
-      log(
-        'Envoi de la photo à PixVerse…'
-      );
+try{
 
-
-      const formData =
-        new FormData();
-
-
-      formData.append(
-        'image',
-        file,
-        file.name ||
-        'photo.jpg'
-      );
-
-
-      const uploadResponse =
-        await fetch(
-          '/api/pixverse-upload',
-          {
-            method: 'POST',
-            body: formData
-          }
-        );
-
-
-      const uploadJson =
-        await uploadResponse.json();
-
-
-      if (
-        !uploadResponse.ok ||
-        uploadJson.ErrCode !== 0
-      ) {
-
-        throw new Error(
-          uploadJson.ErrMsg ||
-          uploadJson.error ||
-          'Échec upload PixVerse.'
-        );
-      }
-
-
-      const imageId =
-        uploadJson.Resp?.img_id;
-
-
-      if (
-        imageId == null
-      ) {
-
-        throw new Error(
-          'PixVerse n’a pas renvoyé img_id.'
-        );
-      }
-
-
-      log(
-        'Photo reçue. Création de la micro-vidéo PixVerse 5 s…'
-      );
-
-
-      const createResponse =
-        await fetch(
-          '/api/pixverse-create',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type':
-                'application/json'
-            },
-            body: JSON.stringify({
-              img_id: imageId,
-              prompt: textPrompt,
-              seed: 0
-            })
-          }
-        );
-
-
-      const createJson =
-        await createResponse.json();
-
-
-      if (
-        !createResponse.ok ||
-        createJson.ErrCode !== 0
-      ) {
-
-        throw new Error(
-          createJson.ErrMsg ||
-          createJson.error ||
-          'Échec création PixVerse.'
-        );
-      }
-
-
-      const videoId =
-        createJson.Resp?.video_id;
-
-
-      if (!videoId) {
-
-        throw new Error(
-          'PixVerse n’a pas renvoyé video_id.'
-        );
-      }
-
-
-      let resultUrl = '';
-
-
-      for (
-        let i = 0;
-        i < 90;
-        i++
-      ) {
-
-        await sleep(
-          3000
-        );
-
-
-        const statusResponse =
-          await fetch(
-            `/api/pixverse-status?id=${encodeURIComponent(videoId)}`,
-            {
-              cache: 'no-store'
-            }
-          );
-
-
-        const statusJson =
-          await statusResponse.json();
-
-
-        if (!statusResponse.ok) {
-
-          throw new Error(
-            statusJson.error ||
-            'Erreur statut PixVerse.'
-          );
-        }
-
-
-        const pixverseStatus =
-          statusJson.Resp?.status;
-
-
-        if (
-          pixverseStatus === 1
-        ) {
-
-          resultUrl =
-            statusJson.Resp?.url ||
-            '';
-
-          break;
-        }
-
-
-        if (
-          pixverseStatus === 7
-        ) {
-
-          throw new Error(
-            'PixVerse a refusé cette génération.'
-          );
-        }
-
-
-        if (
-          pixverseStatus === 8
-        ) {
-
-          throw new Error(
-            'PixVerse a échoué à générer la vidéo.'
-          );
-        }
-
-
-        log(
-          `Vidéo PixVerse #${videoId} en génération… statut ${pixverseStatus ?? '?'}`
-        );
-      }
-
-
-      if (!resultUrl) {
-
-        throw new Error(
-          'La vidéo PixVerse n’est pas encore disponible.'
-        );
-      }
-
-
-      video.src =
-        `/api/pixverse-video?url=${encodeURIComponent(resultUrl)}`;
-
-
-      video.controls =
-        true;
-
-
-      video.playsInline =
-        true;
-
-
-      video.preload =
-        'auto';
-
-
-      video.load();
-
-
-      await waitForMetadata(
-        video
-      );
-
-
-      await waitForVideoFrame(
-        video
-      );
-
-
-      videoInfo.textContent =
-        `Vidéo PixVerse · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
-
-
-      setupTimeline();
-
-
-      log(
-        'Vidéo PixVerse prête. Vérifie la fenêtre de sélection puis extrais les 9 vues.'
-      );
-
-
-    } catch (error) {
-
-      log(
-        'Erreur PixVerse : ' +
-        error.message
-      );
-
-    } finally {
-
-      generate.disabled =
-        false;
-    }
-  }
+log(
+'Envoi à PixVerse…'
 );
 
 
-/* =========================================================
-   CAPTURE
-========================================================= */
-
-function drawCover(
-  context,
-  videoElement,
-  size
-) {
-
-  const videoWidth =
-    videoElement.videoWidth;
+const form =
+new FormData();
 
 
-  const videoHeight =
-    videoElement.videoHeight;
+form.append(
+'image',
+file,
+file.name
+);
 
 
-  if (
-    !videoWidth ||
-    !videoHeight
-  ) {
-
-    throw new Error(
-      'Aucune image vidéo disponible.'
-    );
-  }
-
-
-  const side =
-    Math.min(
-      videoWidth,
-      videoHeight
-    );
+const upload =
+await fetch(
+'/api/pixverse-upload',
+{
+method:'POST',
+body:form
+}
+);
 
 
-  const sourceX =
-    (
-      videoWidth -
-      side
-    ) / 2;
+const uploadData =
+await upload.json();
 
 
-  const sourceY =
-    (
-      videoHeight -
-      side
-    ) / 2;
+if(
+!upload.ok ||
+uploadData.ErrCode !== 0
+){
 
+throw new Error(
+uploadData.ErrMsg ||
+uploadData.error ||
+'Erreur upload'
+);
 
-  context.drawImage(
-    videoElement,
-    sourceX,
-    sourceY,
-    side,
-    side,
-    0,
-    0,
-    size,
-    size
-  );
 }
 
+
+const imgId =
+uploadData.Resp?.img_id;
+
+
+const creation =
+await fetch(
+'/api/pixverse-create',
+{
+method:'POST',
+headers:{
+'Content-Type':
+'application/json'
+},
+body:
+JSON.stringify({
+img_id:imgId,
+prompt:text,
+seed:0
+})
+}
+);
+
+
+const creationData =
+await creation.json();
+
+
+if(
+!creation.ok ||
+creationData.ErrCode !== 0
+){
+
+throw new Error(
+creationData.ErrMsg ||
+creationData.error ||
+'Erreur PixVerse'
+);
+
+}
+
+
+const videoId =
+creationData.Resp?.video_id;
+
+
+let resultUrl = '';
+
+
+for(
+let i=0;
+i<90;
+i++
+){
+
+await sleep(
+3000
+);
+
+
+const response =
+await fetch(
+`/api/pixverse-status?id=${encodeURIComponent(videoId)}`
+);
+
+
+const data =
+await response.json();
+
+
+const state =
+data.Resp?.status;
+
+
+if(state === 1){
+
+resultUrl =
+data.Resp?.url ||
+'';
+
+break;
+
+}
+
+
+if(state === 7){
+
+throw new Error(
+'PixVerse a refusé la génération.'
+);
+
+}
+
+
+if(state === 8){
+
+throw new Error(
+'PixVerse a échoué.'
+);
+
+}
+
+
+log(
+`PixVerse travaille… statut ${state ?? '?'}`
+);
+
+}
+
+
+if(!resultUrl){
+
+throw new Error(
+'Vidéo non disponible.'
+);
+
+}
+
+
+video.src =
+`/api/pixverse-video?url=${encodeURIComponent(resultUrl)}`;
+
+
+video.load();
+
+
+await waitMetadata();
+
+await waitVideoFrame();
+
+
+videoInfo.textContent =
+`PixVerse · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(2)} s`;
+
+
+setupTimeline();
+
+
+log(
+'Vidéo PixVerse prête.'
+);
+
+
+}catch(e){
+
+log(
+'Erreur PixVerse : '+
+e.message
+);
+
+
+}finally{
+
+generate.disabled = false;
+
+}
+
+}
+);
+
+
+/* =========================
+   CAPTURE
+========================= */
 
 function captureCanvas(
-  videoElement,
-  small = false
-) {
+small=false
+){
 
-  let outputSize;
-
-
-  if (small) {
-
-    outputSize = 64;
-
-  } else {
-
-    const selectedSize =
-      sizeSelect.value;
+const side =
+Math.min(
+video.videoWidth,
+video.videoHeight
+);
 
 
-    if (
-      selectedSize ===
-      'original'
-    ) {
+if(!side){
 
-      outputSize =
-        Math.min(
-          videoElement.videoWidth,
-          videoElement.videoHeight
-        );
+throw new Error(
+'Image vidéo indisponible.'
+);
 
-    } else {
-
-      outputSize =
-        Number(
-          selectedSize
-        );
-    }
-  }
-
-
-  const canvas =
-    document.createElement(
-      'canvas'
-    );
-
-
-  canvas.width =
-    outputSize;
-
-
-  canvas.height =
-    outputSize;
-
-
-  const context =
-    canvas.getContext(
-      '2d',
-      {
-        willReadFrequently: true
-      }
-    );
-
-
-  drawCover(
-    context,
-    videoElement,
-    outputSize
-  );
-
-
-  return canvas;
 }
 
 
-/* =========================================================
-   SIGNATURE VISUELLE
-========================================================= */
-
-function makeSignature(canvas) {
-
-  const pixels =
-    canvas
-      .getContext('2d')
-      .getImageData(
-        0,
-        0,
-        64,
-        64
-      )
-      .data;
+const sourceX =
+(
+video.videoWidth -
+side
+) / 2;
 
 
-  const values = [];
+const sourceY =
+(
+video.videoHeight -
+side
+) / 2;
 
 
-  for (
-    let gridY = 0;
-    gridY < 8;
-    gridY++
-  ) {
-
-    for (
-      let gridX = 0;
-      gridX < 8;
-      gridX++
-    ) {
-
-      let total = 0;
-      let count = 0;
+let output;
 
 
-      for (
-        let y = gridY * 8;
-        y < (gridY + 1) * 8;
-        y += 2
-      ) {
+if(small){
 
-        for (
-          let x = gridX * 8;
-          x < (gridX + 1) * 8;
-          x += 2
-        ) {
+output = 64;
 
-          const index =
-            (
-              y * 64 +
-              x
-            ) * 4;
+}else if(
+size.value ===
+'original'
+){
 
+output = side;
 
-          total +=
-            pixels[index] * 0.299 +
-            pixels[index + 1] * 0.587 +
-            pixels[index + 2] * 0.114;
+}else{
 
+output =
+Number(
+size.value
+);
 
-          count++;
-        }
-      }
-
-
-      values.push(
-        total / count
-      );
-    }
-  }
-
-
-  return values;
 }
 
 
-function signatureDistance(
-  first,
-  second
-) {
-
-  let sum = 0;
+const canvas =
+document.createElement(
+'canvas'
+);
 
 
-  for (
-    let i = 0;
-    i < first.length;
-    i++
-  ) {
+canvas.width =
+output;
 
-    const difference =
-      first[i] -
-      second[i];
+canvas.height =
+output;
 
 
-    sum +=
-      difference *
-      difference;
-  }
+const context =
+canvas.getContext(
+'2d',
+{
+willReadFrequently:true
+}
+);
 
 
-  return Math.sqrt(
-    sum /
-    first.length
-  );
+context.drawImage(
+video,
+sourceX,
+sourceY,
+side,
+side,
+0,
+0,
+output,
+output
+);
+
+
+return canvas;
+
 }
 
 
-/* =========================================================
+function signature(
+canvas
+){
+
+const pixels =
+canvas
+.getContext('2d')
+.getImageData(
+0,
+0,
+64,
+64
+).data;
+
+
+const values = [];
+
+
+for(
+let gy=0;
+gy<8;
+gy++
+){
+
+for(
+let gx=0;
+gx<8;
+gx++
+){
+
+let total = 0;
+let count = 0;
+
+
+for(
+let y=gy*8;
+y<(gy+1)*8;
+y+=2
+){
+
+for(
+let x=gx*8;
+x<(gx+1)*8;
+x+=2
+){
+
+const i =
+(
+y*64+x
+)*4;
+
+
+total +=
+pixels[i]*0.299 +
+pixels[i+1]*0.587 +
+pixels[i+2]*0.114;
+
+
+count++;
+
+}
+
+}
+
+
+values.push(
+total/count
+);
+
+}
+
+}
+
+
+return values;
+
+}
+
+
+function distance(
+a,
+b
+){
+
+let result = 0;
+
+
+for(
+let i=0;
+i<a.length;
+i++
+){
+
+const d =
+a[i] -
+b[i];
+
+
+result +=
+d*d;
+
+}
+
+
+return Math.sqrt(
+result/a.length
+);
+
+}
+
+
+function canvasBlob(
+canvas
+){
+
+return new Promise(
+(resolve,reject)=>{
+
+canvas.toBlob(
+blob=>{
+
+if(blob){
+
+resolve(blob);
+
+}else{
+
+reject(
+new Error(
+'PNG impossible.'
+)
+);
+
+}
+
+},
+'image/png'
+);
+
+}
+);
+
+}
+
+
+/* =========================
    EXTRACTION
-========================================================= */
+========================= */
 
 extract.addEventListener(
-  'click',
-  async () => {
+'click',
+async()=>{
 
-    stopLoop();
+stopLoop();
 
-    video.pause();
+video.pause();
 
 
-    const selectedDuration =
-      clipEnd -
-      clipStart;
+const duration =
+clipEnd -
+clipStart;
 
 
-    if (
-      selectedDuration < MIN_CLIP ||
-      selectedDuration > MAX_CLIP + 0.01
-    ) {
+if(
+duration < 1 ||
+duration > 5.01
+){
 
-      log(
-        'La sélection doit durer entre 1 et 5 secondes.'
-      );
+log(
+'Sélection invalide.'
+);
 
-      return;
-    }
+return;
 
+}
 
-    extract.disabled =
-      true;
 
+extract.disabled = true;
 
-    clearFrames();
+clearFrames();
 
 
-    try {
+try{
 
-      log(
-        'Analyse de la zone sélectionnée…'
-      );
-
-
-      const SAMPLE_COUNT = 49;
-
-
-      const samples = [];
-
-
-      for (
-        let i = 0;
-        i < SAMPLE_COUNT;
-        i++
-      ) {
-
-        const time =
-          clipStart +
-          (
-            clipEnd -
-            clipStart
-          ) *
-          i /
-          (
-            SAMPLE_COUNT -
-            1
-          );
-
-
-        await waitSeek(
-          video,
-          time
-        );
-
-
-        const sampleCanvas =
-          captureCanvas(
-            video,
-            true
-          );
-
-
-        samples.push({
-          time,
-          signature:
-            makeSignature(
-              sampleCanvas
-            )
-        });
-      }
-
-
-      const selectedIndexes =
-        [
-          0,
-          SAMPLE_COUNT - 1
-        ];
-
-
-      while (
-        selectedIndexes.length <
-        9
-      ) {
-
-        let bestIndex = -1;
-        let bestScore = -1;
-
-
-        for (
-          let i = 1;
-          i < SAMPLE_COUNT - 1;
-          i++
-        ) {
-
-          if (
-            selectedIndexes.includes(i)
-          ) {
-            continue;
-          }
-
-
-          let minimumVisual =
-            Infinity;
-
-
-          let minimumTime =
-            Infinity;
-
-
-          for (
-            const selectedIndex
-            of selectedIndexes
-          ) {
-
-            minimumVisual =
-              Math.min(
-                minimumVisual,
-                signatureDistance(
-                  samples[i].signature,
-                  samples[selectedIndex].signature
-                )
-              );
-
-
-            minimumTime =
-              Math.min(
-                minimumTime,
-                Math.abs(
-                  i -
-                  selectedIndex
-                ) /
-                (
-                  SAMPLE_COUNT -
-                  1
-                )
-              );
-          }
-
-
-          const score =
-            minimumVisual *
-            (
-              0.65 +
-              0.35 *
-              Math.min(
-                1,
-                minimumTime * 8
-              )
-            );
-
-
-          if (
-            score >
-            bestScore
-          ) {
-
-            bestScore =
-              score;
-
-
-            bestIndex =
-              i;
-          }
-        }
-
-
-        selectedIndexes.push(
-          bestIndex
-        );
-      }
-
-
-      selectedIndexes.sort(
-        (a, b) =>
-          a - b
-      );
-
-
-      const evenlySpaced =
-        Array.from(
-          {
-            length: 9
-          },
-          (_, index) =>
-            Math.round(
-              index *
-              (
-                SAMPLE_COUNT -
-                1
-              ) /
-              8
-            )
-        );
-
-
-      for (
-        let i = 0;
-        i < 9;
-        i++
-      ) {
-
-        if (
-          Math.abs(
-            selectedIndexes[i] -
-            evenlySpaced[i]
-          ) >
-          8
-        ) {
-
-          selectedIndexes[i] =
-            evenlySpaced[i];
-        }
-      }
-
-
-      selectedIndexes.sort(
-        (a, b) =>
-          a - b
-      );
-
-
-      const uniqueIndexes =
-        [
-          ...new Set(
-            selectedIndexes
-          )
-        ];
-
-
-      while (
-        uniqueIndexes.length <
-        9
-      ) {
-
-        const candidate =
-          evenlySpaced.find(
-            index =>
-              !uniqueIndexes.includes(
-                index
-              )
-          );
-
-
-        uniqueIndexes.push(
-          candidate
-        );
-
-
-        uniqueIndexes.sort(
-          (a, b) =>
-            a - b
-        );
-      }
-
-
-      let previousSignature =
-        null;
-
-
-      let closeTransitions =
-        0;
-
-
-      for (
-        let i = 0;
-        i < 9;
-        i++
-      ) {
-
-        const sample =
-          samples[
-            uniqueIndexes[i]
-          ];
-
-
-        await waitSeek(
-          video,
-          sample.time
-        );
-
-
-        const finalCanvas =
-          captureCanvas(
-            video,
-            false
-          );
-
-
-        const blob =
-          await canvasToBlob(
-            finalCanvas
-          );
-
-
-        const currentSignature =
-          makeSignature(
-            captureCanvas(
-              video,
-              true
-            )
-          );
-
-
-        const delta =
-          previousSignature
-            ? signatureDistance(
-                currentSignature,
-                previousSignature
-              )
-            : null;
-
-
-        if (
-          delta !== null &&
-          delta < 2.2
-        ) {
-
-          closeTransitions++;
-        }
-
-
-        previousSignature =
-          currentSignature;
-
-
-        frameData.push({
-          index:
-            i + 1,
-          time:
-            sample.time,
-          delta,
-          blob
-        });
-
-
-        const imageUrl =
-          URL.createObjectURL(
-            blob
-          );
-
-
-        const frame =
-          document.createElement(
-            'div'
-          );
-
-
-        frame.className =
-          'frame';
-
-
-        frame.innerHTML =
-          `<img src="${imageUrl}">
-           <div class="meta">
-           vue-${String(i + 1).padStart(2, '0')} · ${sample.time.toFixed(2)} s
-           ${delta === null ? '' : ` · Δ ${delta.toFixed(1)}`}
-           </div>`;
-
-
-        framesEl.appendChild(
-          frame
-        );
-
-
-        log(
-          `Extraction des vues… ${i + 1}/9`
-        );
-      }
-
-
-      if (
-        closeTransitions ===
-        0
-      ) {
-
-        qualityDot.className =
-          'dot good';
-
-
-        qualityText.textContent =
-          '9 vues bien différenciées.';
-
-      } else if (
-        closeTransitions <=
-        2
-      ) {
-
-        qualityDot.className =
-          'dot warn';
-
-
-        qualityText.textContent =
-          `${closeTransitions} transition(s) très proche(s) — à contrôler visuellement.`;
-
-      } else {
-
-        qualityDot.className =
-          'dot bad';
-
-
-        qualityText.textContent =
-          `${closeTransitions} transitions trop proches — sélection à améliorer.`;
-      }
-
-
-      download.disabled =
-        false;
-
-
-      log(
-        '9 vues extraites. Vérifie la grille puis télécharge le ZIP.'
-      );
-
-
-    } catch (error) {
-
-      log(
-        'Erreur extraction : ' +
-        error.message
-      );
-
-    } finally {
-
-      extract.disabled =
-        false;
-    }
-  }
+log(
+'Analyse de la sélection…'
 );
 
 
-/* =========================================================
+const SAMPLE_COUNT = 49;
+
+const samples = [];
+
+
+for(
+let i=0;
+i<SAMPLE_COUNT;
+i++
+){
+
+const time =
+clipStart +
+(
+clipEnd -
+clipStart
+) *
+i /
+(
+SAMPLE_COUNT -
+1
+);
+
+
+await seek(
+time
+);
+
+
+const small =
+captureCanvas(
+true
+);
+
+
+samples.push({
+time,
+sig:
+signature(
+small
+)
+});
+
+}
+
+
+/*
+Sélection des 9 vues
+*/
+
+const selected =
+[
+0,
+SAMPLE_COUNT - 1
+];
+
+
+while(
+selected.length <
+9
+){
+
+let best = -1;
+let bestScore = -1;
+
+
+for(
+let i=1;
+i<SAMPLE_COUNT-1;
+i++
+){
+
+if(
+selected.includes(i)
+){
+
+continue;
+
+}
+
+
+let visual =
+Infinity;
+
+let temporal =
+Infinity;
+
+
+for(
+const existing
+of selected
+){
+
+visual =
+Math.min(
+visual,
+distance(
+samples[i].sig,
+samples[existing].sig
+)
+);
+
+
+temporal =
+Math.min(
+temporal,
+Math.abs(
+i-existing
+) /
+(
+SAMPLE_COUNT-1
+)
+);
+
+}
+
+
+const score =
+visual *
+(
+0.65 +
+0.35 *
+Math.min(
+1,
+temporal*8
+)
+);
+
+
+if(
+score >
+bestScore
+){
+
+bestScore =
+score;
+
+best =
+i;
+
+}
+
+}
+
+
+selected.push(
+best
+);
+
+}
+
+
+selected.sort(
+(a,b)=>a-b
+);
+
+
+const even =
+Array.from(
+{length:9},
+(_,i)=>
+Math.round(
+i *
+(
+SAMPLE_COUNT-1
+) /
+8
+)
+);
+
+
+for(
+let i=0;
+i<9;
+i++
+){
+
+if(
+Math.abs(
+selected[i] -
+even[i]
+) > 8
+){
+
+selected[i] =
+even[i];
+
+}
+
+}
+
+
+selected.sort(
+(a,b)=>a-b
+);
+
+
+let previous = null;
+
+let close = 0;
+
+
+for(
+let i=0;
+i<9;
+i++
+){
+
+const sample =
+samples[
+selected[i]
+];
+
+
+await seek(
+sample.time
+);
+
+
+const canvas =
+captureCanvas(
+false
+);
+
+
+const blob =
+await canvasBlob(
+canvas
+);
+
+
+const sig =
+signature(
+captureCanvas(
+true
+)
+);
+
+
+const delta =
+previous
+?
+distance(
+sig,
+previous
+)
+:
+null;
+
+
+if(
+delta !== null &&
+delta < 2.2
+){
+
+close++;
+
+}
+
+
+previous = sig;
+
+
+frameData.push({
+time:
+sample.time,
+delta,
+blob
+});
+
+
+const url =
+URL.createObjectURL(
+blob
+);
+
+
+const element =
+document.createElement(
+'div'
+);
+
+
+element.className =
+'frame';
+
+
+element.innerHTML =
+`<img src="${url}">
+<div class="meta">
+Vue ${i+1} · ${sample.time.toFixed(2)} s
+${delta === null ? '' : ` · Δ ${delta.toFixed(1)}`}
+</div>`;
+
+
+frames.appendChild(
+element
+);
+
+
+log(
+`Extraction ${i+1}/9`
+);
+
+}
+
+
+if(close === 0){
+
+qualityDot.className =
+'dot good';
+
+qualityText.textContent =
+'9 vues bien différenciées.';
+
+}else if(close <= 2){
+
+qualityDot.className =
+'dot warn';
+
+qualityText.textContent =
+`${close} transition(s) proches.`;
+
+}else{
+
+qualityDot.className =
+'dot bad';
+
+qualityText.textContent =
+`${close} transitions trop proches.`;
+
+}
+
+
+download.disabled = false;
+
+
+log(
+'9 vues prêtes.'
+);
+
+
+}catch(e){
+
+log(
+'Erreur extraction : '+
+e.message
+);
+
+
+}finally{
+
+extract.disabled = false;
+
+}
+
+}
+);
+
+
+/* =========================
    ZIP
-========================================================= */
+========================= */
 
 download.addEventListener(
-  'click',
-  async () => {
+'click',
+async()=>{
 
-    if (
-      frameData.length !==
-      9
-    ) {
-      return;
-    }
+if(
+frameData.length !== 9
+){
 
+return;
 
-    if (
-      typeof JSZip ===
-      'undefined'
-    ) {
-
-      log(
-        'Le module ZIP n’est pas disponible.'
-      );
-
-      return;
-    }
+}
 
 
-    const reverse =
-      directionSelect.value ===
-      'reverse';
+const reverse =
+direction.value ===
+'reverse';
 
 
-    const orderedFrames =
-      reverse
-        ? [...frameData].reverse()
-        : frameData;
+const ordered =
+reverse
+?
+[...frameData].reverse()
+:
+frameData;
 
 
-    const zip =
-      new JSZip();
+const zip =
+new JSZip();
 
 
-    orderedFrames.forEach(
-      (frame, index) => {
+ordered.forEach(
+(frame,index)=>{
 
-        zip.file(
-          `vue-${String(index + 1).padStart(2, '0')}.png`,
-          frame.blob
-        );
-      }
-    );
-
-
-    const manifest = {
-
-      generator:
-        'LentiPrint Lab v11.5',
-
-      source:
-        'PixVerse ou vidéo locale',
-
-      selectionStart:
-        Number(
-          clipStart.toFixed(4)
-        ),
-
-      selectionEnd:
-        Number(
-          clipEnd.toFixed(4)
-        ),
-
-      selectionDuration:
-        Number(
-          (
-            clipEnd -
-            clipStart
-          ).toFixed(4)
-        ),
-
-      views:
-        9,
-
-      direction:
-        reverse
-          ? 'reverse'
-          : 'normal',
-
-      frames:
-        orderedFrames.map(
-          (frame, index) => ({
-
-            file:
-              `vue-${String(index + 1).padStart(2, '0')}.png`,
-
-            sourceTime:
-              Number(
-                frame.time.toFixed(4)
-              ),
-
-            delta:
-              frame.delta === null
-                ? null
-                : Number(
-                    frame.delta.toFixed(2)
-                  )
-          })
-        )
-    };
-
-
-    zip.file(
-      'manifest.json',
-      JSON.stringify(
-        manifest,
-        null,
-        2
-      )
-    );
-
-
-    log(
-      'Création du ZIP…'
-    );
-
-
-    const zipBlob =
-      await zip.generateAsync({
-        type:
-          'blob',
-        compression:
-          'DEFLATE',
-        compressionOptions: {
-          level: 6
-        }
-      });
-
-
-    const zipUrl =
-      URL.createObjectURL(
-        zipBlob
-      );
-
-
-    const link =
-      document.createElement(
-        'a'
-      );
-
-
-    link.href =
-      zipUrl;
-
-
-    link.download =
-      '9-vues-animation-lenticulaire.zip';
-
-
-    document.body.appendChild(
-      link
-    );
-
-
-    link.click();
-
-
-    link.remove();
-
-
-    setTimeout(
-      () => {
-
-        URL.revokeObjectURL(
-          zipUrl
-        );
-
-      },
-      5000
-    );
-
-
-    log(
-      'ZIP téléchargé — 9 vues + manifest.json.'
-    );
-  }
+zip.file(
+`vue-${String(index+1).padStart(2,'0')}.png`,
+frame.blob
 );
+
+}
+);
+
+
+zip.file(
+'manifest.json',
+JSON.stringify(
+{
+
+generator:
+'LentiPrint Lab v11.5',
+
+selectionStart:
+clipStart,
+
+selectionEnd:
+clipEnd,
+
+selectionDuration:
+clipEnd -
+clipStart,
+
+views:
+9,
+
+frames:
+ordered.map(
+(frame,index)=>({
+
+file:
+`vue-${String(index+1).padStart(2,'0')}.png`,
+
+time:
+frame.time,
+
+delta:
+frame.delta
+
+})
+)
+
+},
+null,
+2
+)
+);
+
+
+const blob =
+await zip.generateAsync({
+type:'blob',
+compression:'DEFLATE',
+compressionOptions:{
+level:6
+}
+});
+
+
+const url =
+URL.createObjectURL(
+blob
+);
+
+
+const link =
+document.createElement(
+'a'
+);
+
+
+link.href = url;
+
+link.download =
+'9-vues-animation-lenticulaire.zip';
+
+
+document.body.appendChild(
+link
+);
+
+
+link.click();
+
+link.remove();
+
+
+setTimeout(
+()=>URL.revokeObjectURL(url),
+5000
+);
+
+
+log(
+'ZIP téléchargé.'
+);
+
+}
+);
+
+</script>
+
+</body>
+</html>
