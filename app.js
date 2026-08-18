@@ -1,1839 +1,1099 @@
-const imageInput =
-  document.getElementById("imageInput");
+const $ = (id) => document.getElementById(id);
 
-const generateBtn =
-  document.getElementById("generateBtn");
+const imageInput = $('imageInput');
+const videoInput = $('videoInput');
 
-const exportVideoBtn =
-  document.getElementById("exportVideoBtn");
+const mode3d = $('mode3d');
+const modeAnim = $('modeAnim');
 
-const exportViewsBtn =
-  document.getElementById("exportViewsBtn");
+const animControls = $('animationControls');
 
-const downloadVideo =
-  document.getElementById("downloadVideo");
+const generateBtn = $('generateBtn');
+const exportVideoBtn = $('exportVideoBtn');
+const exportViewsBtn = $('exportViewsBtn');
 
-const statusBox =
-  document.getElementById("status");
+const downloadVideo = $('downloadVideo');
 
-const bar =
-  document.getElementById("bar");
+const animGenerate = $('animGenerate');
+const animExtract = $('animExtract');
+const animDownloadZip = $('animDownloadZip');
 
-const thumb =
-  document.getElementById("thumb");
+const MAX_SELECTION_DURATION = 5;
+const NUMBER_OF_VIEWS = 9;
 
-const viewer =
-  document.getElementById("viewer");
+/*
+====================================================
+ÉTAT
+====================================================
+*/
 
-const placeholder =
-  document.getElementById("placeholder");
+let loadedVideo = null;
+let loadedVideoURL = null;
 
-const productStage =
-  document.getElementById("productStage");
+let selectionStart = 0;
+let selectionEnd = 0;
 
-const productShell =
-  document.getElementById("productShell");
+let extractedViews = [];
+let bestSequenceInfo = null;
 
-const supportLabel =
-  document.getElementById("supportLabel");
+/*
+====================================================
+UTILITAIRES
+====================================================
+*/
 
-const supportButtons =
-  document.querySelectorAll(
-    ".support-card"
-  );
-
-
-let sourceFile = null;
-let thumbUrl = null;
-let engine = null;
-let videoUrl = null;
-
-let simulationReady = false;
-
-let selectedSupport =
-  "medallion-cat";
-
-
-/* =========================================
-   SUPPORTS
-========================================= */
-
-const supports = {
-
-  "medallion-cat": {
-    className:
-      "support-medallion-cat",
-    label:
-      "Médaillon chat"
-  },
-
-  "medallion-dog": {
-    className:
-      "support-medallion-dog",
-    label:
-      "Médaillon chien"
-  },
-
-  "card": {
-    className:
-      "support-card-cb",
-    label:
-      "Carte CB"
-  },
-
-  "keychain": {
-    className:
-      "support-keychain",
-    label:
-      "Porte-clé rectangulaire"
-  }
-};
-
-
-/* =========================================
-   STATUT
-========================================= */
-
-function setStatus(
-  message,
-  progress = null
-) {
-
-  statusBox.textContent =
-    message;
-
-  if (progress !== null) {
-
-    bar.style.width =
-      `${progress}%`;
-  }
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
-
-/* =========================================
-   ROTATION DU SUPPORT
-========================================= */
-
-let shellAnimationFrame = 0;
-
-let shellAnimationStart = 0;
-
-
-function stopProductShellRotation() {
-
-  if (shellAnimationFrame) {
-
-    cancelAnimationFrame(
-      shellAnimationFrame
-    );
-
-    shellAnimationFrame =
-      0;
-  }
-
-
-  if (productShell) {
-
-    productShell.style.transform =
-      "";
-  }
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-
-function startProductShellRotation() {
-
-  if (!productShell) {
-    return;
-  }
-
-
-  stopProductShellRotation();
-
-
-  shellAnimationStart =
-    performance.now();
-
-
-  const animateShell =
-    currentTime => {
-
-      const elapsed =
-        (
-          currentTime -
-          shellAnimationStart
-        )
-        /
-        6000;
-
-
-      const position =
-        Math.sin(
-          elapsed *
-          Math.PI *
-          2
-        );
-
-
-      const shellAngle =
-        position *
-        6;
-
-
-      const scaleX =
-        1 -
-        Math.abs(
-          position
-        ) *
-        0.018;
-
-
-      productShell.style.transform =
-        `
-          perspective(1200px)
-          rotateY(${shellAngle}deg)
-          scaleX(${scaleX})
-        `;
-
-
-      shellAnimationFrame =
-        requestAnimationFrame(
-          animateShell
-        );
-    };
-
-
-  shellAnimationFrame =
-    requestAnimationFrame(
-      animateShell
-    );
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds)) return '0.00';
+  return seconds.toFixed(2);
 }
 
+/*
+====================================================
+CRÉATION DES CONTRÔLES VIDÉO
+====================================================
+*/
 
-/* =========================================
-   CHANGEMENT DE SUPPORT
-========================================= */
+function ensureAnimationUI() {
+  if (!animControls) return;
 
-async function selectSupport(
-  supportName
-) {
+  let panel = $('videoSelectionPanel');
 
-  const support =
-    supports[
-      supportName
-    ];
+  if (panel) return;
 
+  panel = document.createElement('div');
+  panel.id = 'videoSelectionPanel';
 
-  if (!support) {
-    return;
-  }
+  panel.innerHTML = `
+    <div class="video-selection-block">
 
+      <video
+        id="animationPreviewVideo"
+        controls
+        playsinline
+        preload="metadata"
+        style="
+          width:100%;
+          max-width:600px;
+          border-radius:12px;
+          background:#111;
+          margin-bottom:16px;
+        "
+      ></video>
 
-  selectedSupport =
-    supportName;
+      <div style="margin-bottom:14px;">
+        <strong>Sélection vidéo</strong>
+        <div style="font-size:13px;opacity:.7;margin-top:4px;">
+          Sélection maximale : 5 secondes
+        </div>
+      </div>
 
+      <div style="margin-bottom:14px;">
+        <label>
+          Début :
+          <span id="selectionStartLabel">0.00 s</span>
+        </label>
 
-  supportButtons.forEach(
-    button => {
+        <input
+          id="selectionStartRange"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value="0"
+          style="width:100%;"
+        />
+      </div>
 
-      const active =
-        button.dataset.support ===
-        supportName;
+      <div style="margin-bottom:14px;">
+        <label>
+          Fin :
+          <span id="selectionEndLabel">0.00 s</span>
+        </label>
 
+        <input
+          id="selectionEndRange"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value="0"
+          style="width:100%;"
+        />
+      </div>
 
-      button.classList.toggle(
-        "active",
-        active
-      );
-    }
-  );
+      <div
+        id="selectionDurationInfo"
+        style="
+          margin:12px 0;
+          padding:10px 12px;
+          border-radius:8px;
+          background:rgba(255,255,255,.06);
+        "
+      >
+        Durée sélectionnée : 0.00 s
+      </div>
 
+      <button
+        id="previewSelectionBtn"
+        type="button"
+        style="margin-right:8px;"
+      >
+        Lire la sélection
+      </button>
 
-  productStage.classList.remove(
-    "support-medallion-cat",
-    "support-medallion-dog",
-    "support-card-cb",
-    "support-keychain"
-  );
+      <button
+        id="autoFindSequenceBtn"
+        type="button"
+      >
+        Trouver le meilleur passage
+      </button>
 
+      <div
+        id="analysisStatus"
+        style="
+          margin-top:14px;
+          font-size:14px;
+          line-height:1.4;
+        "
+      ></div>
 
-  productStage.classList.add(
-    support.className
-  );
+      <div
+        id="viewsPreview"
+        style="
+          display:grid;
+          grid-template-columns:repeat(3,1fr);
+          gap:8px;
+          margin-top:18px;
+        "
+      ></div>
 
+    </div>
+  `;
 
-  supportLabel.textContent =
-    support.label;
+  animControls.appendChild(panel);
 
-
-  await new Promise(
-    resolve =>
-      requestAnimationFrame(
-        resolve
-      )
-  );
-
-
-  await new Promise(
-    resolve =>
-      requestAnimationFrame(
-        resolve
-      )
-  );
-
-
-  if (
-    engine &&
-    typeof engine.refreshSupport ===
-    "function"
-  ) {
-
-    engine.refreshSupport();
-  }
-
-
-  window.dispatchEvent(
-    new Event(
-      "resize"
-    )
-  );
-
-
-  if (simulationReady) {
-
-    startProductShellRotation();
-
-
-    setStatus(
-      `${support.label} sélectionné. La simulation existante est réutilisée sans nouveau calcul IA.`,
-      100
-    );
-  }
-
-  else {
-
-    setStatus(
-      `${support.label} sélectionné. Ajoutez une photo puis créez l’aperçu 3D.`,
-      0
-    );
-  }
+  bindAnimationUI();
 }
 
+/*
+====================================================
+CONTRÔLES
+====================================================
+*/
 
-/* =========================================
-   CLIC SUPPORT
-========================================= */
+function bindAnimationUI() {
+  const previewVideo = $('animationPreviewVideo');
+  const startRange = $('selectionStartRange');
+  const endRange = $('selectionEndRange');
 
-supportButtons.forEach(
-  button => {
+  const previewBtn = $('previewSelectionBtn');
+  const autoBtn = $('autoFindSequenceBtn');
 
-    button.addEventListener(
-      "click",
-      () => {
+  if (startRange) {
+    startRange.addEventListener('input', () => {
+      selectionStart = Number(startRange.value);
 
-        selectSupport(
-          button.dataset.support
+      if (selectionEnd - selectionStart > MAX_SELECTION_DURATION) {
+        selectionEnd = selectionStart + MAX_SELECTION_DURATION;
+      }
+
+      if (selectionEnd <= selectionStart) {
+        selectionEnd = Math.min(
+          selectionStart + 0.5,
+          loadedVideo?.duration || selectionStart + 0.5
         );
       }
-    );
+
+      updateSelectionUI();
+    });
   }
-);
 
+  if (endRange) {
+    endRange.addEventListener('input', () => {
+      selectionEnd = Number(endRange.value);
 
-/* =========================================
-   PRÉPARATION PHOTO
-========================================= */
-
-async function compressImage(
-  file,
-  maxSide = 1400,
-  quality = 0.9
-) {
-
-  const url =
-    URL.createObjectURL(
-      file
-    );
-
-
-  try {
-
-    const image =
-      await new Promise(
-        (
-          resolve,
-          reject
-        ) => {
-
-          const img =
-            new Image();
-
-
-          img.onload =
-            () =>
-              resolve(
-                img
-              );
-
-
-          img.onerror =
-            () =>
-              reject(
-                new Error(
-                  "Impossible de lire la photo."
-                )
-              );
-
-
-          img.src =
-            url;
-        }
-      );
-
-
-    const scale =
-      Math.min(
-        1,
-
-        maxSide /
-        Math.max(
-          image.naturalWidth,
-          image.naturalHeight
-        )
-      );
-
-
-    const width =
-      Math.max(
-        64,
-
-        Math.round(
-          image.naturalWidth *
-          scale
-        )
-      );
-
-
-    const height =
-      Math.max(
-        64,
-
-        Math.round(
-          image.naturalHeight *
-          scale
-        )
-      );
-
-
-    const canvas =
-      document.createElement(
-        "canvas"
-      );
-
-
-    canvas.width =
-      width;
-
-    canvas.height =
-      height;
-
-
-    const context =
-      canvas.getContext(
-        "2d"
-      );
-
-
-    context.drawImage(
-      image,
-      0,
-      0,
-      width,
-      height
-    );
-
-
-    const blob =
-      await new Promise(
-        resolve =>
-          canvas.toBlob(
-            resolve,
-            "image/jpeg",
-            quality
-          )
-      );
-
-
-    if (!blob) {
-
-      throw new Error(
-        "Compression impossible."
-      );
-    }
-
-
-    return new File(
-      [blob],
-      "photo.jpg",
-      {
-        type:
-          "image/jpeg"
+      if (selectionEnd - selectionStart > MAX_SELECTION_DURATION) {
+        selectionStart = selectionEnd - MAX_SELECTION_DURATION;
       }
-    );
-  }
 
-  finally {
-
-    URL.revokeObjectURL(
-      url
-    );
-  }
-}
-
-
-/* =========================================
-   API
-========================================= */
-
-async function postForm(
-  endpoint,
-  form
-) {
-
-  const response =
-    await fetch(
-      endpoint,
-      {
-        method:
-          "POST",
-
-        body:
-          form
+      if (selectionEnd <= selectionStart) {
+        selectionStart = Math.max(0, selectionEnd - 0.5);
       }
-    );
 
-
-  if (!response.ok) {
-
-    let message =
-      await response.text();
-
-
-    try {
-
-      const json =
-        JSON.parse(
-          message
-        );
-
-
-      message =
-        json.error ||
-        message;
-    }
-
-    catch {}
-
-
-    throw new Error(
-      message ||
-      `Erreur ${response.status}`
-    );
+      updateSelectionUI();
+    });
   }
 
+  if (previewBtn) {
+    previewBtn.addEventListener('click', previewSelectedSection);
+  }
 
-  return await response.blob();
-}
+  if (autoBtn) {
+    autoBtn.addEventListener('click', async () => {
+      try {
+        await findAndExtractBestSequence();
+      } catch (error) {
+        console.error(error);
+        setStatus(`Erreur : ${error.message}`);
+      }
+    });
+  }
 
-
-/* =========================================
-   BLOB → IMAGE
-========================================= */
-
-function blobToImage(
-  blob
-) {
-
-  return new Promise(
-    (
-      resolve,
-      reject
-    ) => {
-
-      const url =
-        URL.createObjectURL(
-          blob
-        );
-
-
-      const image =
-        new Image();
-
-
-      image.onload =
-        () =>
-          resolve({
-            image,
-            url
-          });
-
-
-      image.onerror =
-        () => {
-
-          URL.revokeObjectURL(
-            url
-          );
-
-
-          reject(
-            new Error(
-              "Image détourée illisible."
-            )
-          );
-        };
-
-
-      image.src =
-        url;
-    }
-  );
-}
-
-
-/* =========================================
-   MASQUE
-========================================= */
-
-async function makeEraseMask(
-  subjectBlob
-) {
-
-  const {
-    image,
-    url
-  } =
-    await blobToImage(
-      subjectBlob
-    );
-
-
-  try {
-
-    const width =
-      image.naturalWidth;
-
-
-    const height =
-      image.naturalHeight;
-
-
-    const canvas =
-      document.createElement(
-        "canvas"
-      );
-
-
-    canvas.width =
-      width;
-
-    canvas.height =
-      height;
-
-
-    const context =
-      canvas.getContext(
-        "2d",
-        {
-          willReadFrequently:
-            true
-        }
-      );
-
-
-    context.drawImage(
-      image,
-      0,
-      0,
-      width,
-      height
-    );
-
-
-    const imageData =
-      context.getImageData(
-        0,
-        0,
-        width,
-        height
-      );
-
-
-    const alpha =
-      new Uint8ClampedArray(
-        width *
-        height
-      );
-
-
-    for (
-      let i = 0;
-      i <
-      width *
-      height;
-      i++
-    ) {
-
-      alpha[i] =
-        imageData.data[
-          i * 4 + 3
-        ];
-    }
-
-
-    const output =
-      context.createImageData(
-        width,
-        height
-      );
-
-
-    const radius =
-      2;
-
-
-    for (
-      let y = 0;
-      y < height;
-      y++
-    ) {
-
-      for (
-        let x = 0;
-        x < width;
-        x++
+  if (previewVideo) {
+    previewVideo.addEventListener('timeupdate', () => {
+      if (
+        previewVideo.currentTime >= selectionEnd &&
+        !previewVideo.paused
       ) {
-
-        let erase =
-          0;
-
-
-        for (
-          let yy =
-            Math.max(
-              0,
-              y - radius
-            );
-
-          yy <=
-            Math.min(
-              height - 1,
-              y + radius
-            ) &&
-          !erase;
-
-          yy++
-        ) {
-
-          for (
-            let xx =
-              Math.max(
-                0,
-                x - radius
-              );
-
-            xx <=
-              Math.min(
-                width - 1,
-                x + radius
-              );
-
-            xx++
-          ) {
-
-            if (
-              alpha[
-                yy *
-                width +
-                xx
-              ] >
-              32
-            ) {
-
-              erase =
-                255;
-
-              break;
-            }
-          }
-        }
-
-
-        const index =
-          (
-            y *
-            width +
-            x
-          ) *
-          4;
-
-
-        output.data[
-          index
-        ] =
-          erase;
-
-
-        output.data[
-          index + 1
-        ] =
-          erase;
-
-
-        output.data[
-          index + 2
-        ] =
-          erase;
-
-
-        output.data[
-          index + 3
-        ] =
-          255;
+        previewVideo.pause();
       }
-    }
-
-
-    context.putImageData(
-      output,
-      0,
-      0
-    );
-
-
-    return await new Promise(
-      resolve =>
-        canvas.toBlob(
-          resolve,
-          "image/png"
-        )
-    );
-  }
-
-  finally {
-
-    URL.revokeObjectURL(
-      url
-    );
+    });
   }
 }
 
+/*
+====================================================
+CHARGEMENT VIDÉO
+====================================================
+*/
 
-/* =========================================
-   MOTEUR V27
-========================================= */
+if (videoInput) {
+  videoInput.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
 
-async function getEngine() {
+    if (!file) return;
 
-  if (engine) {
+    await loadVideoFile(file);
+  });
+}
 
-    return engine;
+async function loadVideoFile(file) {
+  ensureAnimationUI();
+
+  const previewVideo = $('animationPreviewVideo');
+
+  if (!previewVideo) {
+    throw new Error('Lecteur vidéo introuvable.');
   }
 
+  if (loadedVideoURL) {
+    URL.revokeObjectURL(loadedVideoURL);
+  }
 
-  engine =
-    await import(
-      "./engine.js?v=27"
-    );
+  loadedVideoURL = URL.createObjectURL(file);
 
+  previewVideo.src = loadedVideoURL;
 
-  await engine.init(
-    viewer
+  loadedVideo = previewVideo;
+
+  await new Promise((resolve, reject) => {
+    previewVideo.onloadedmetadata = resolve;
+    previewVideo.onerror = reject;
+  });
+
+  const duration = previewVideo.duration;
+
+  const startRange = $('selectionStartRange');
+  const endRange = $('selectionEndRange');
+
+  startRange.max = duration;
+  endRange.max = duration;
+
+  selectionStart = 0;
+  selectionEnd = Math.min(MAX_SELECTION_DURATION, duration);
+
+  startRange.value = selectionStart;
+  endRange.value = selectionEnd;
+
+  updateSelectionUI();
+
+  extractedViews = [];
+  bestSequenceInfo = null;
+
+  renderViewsPreview();
+
+  setStatus(
+    `Vidéo chargée : ${formatTime(duration)} s. ` +
+    `Choisis une zone de maximum ${MAX_SELECTION_DURATION} secondes.`
   );
-
-
-  return engine;
 }
 
+/*
+====================================================
+MISE À JOUR SÉLECTION
+====================================================
+*/
 
-/* =========================================
-   CHOIX PHOTO
-========================================= */
+function updateSelectionUI() {
+  if (!loadedVideo) return;
 
-imageInput.addEventListener(
-  "change",
-  () => {
+  const duration = loadedVideo.duration;
 
-    sourceFile =
-      imageInput.files?.[0] ||
-      null;
+  selectionStart = clamp(selectionStart, 0, duration);
+  selectionEnd = clamp(selectionEnd, 0, duration);
 
-
-    simulationReady =
-      false;
-
-
-    stopProductShellRotation();
-
-
-    generateBtn.disabled =
-      !sourceFile;
-
-
-    if (exportVideoBtn) {
-
-      exportVideoBtn.disabled =
-        true;
-    }
-
-
-    if (exportViewsBtn) {
-
-      exportViewsBtn.disabled =
-        true;
-    }
-
-
-    if (downloadVideo) {
-
-      downloadVideo.style.display =
-        "none";
-    }
-
-
-    if (videoUrl) {
-
-      URL.revokeObjectURL(
-        videoUrl
-      );
-
-
-      videoUrl =
-        null;
-    }
-
-
-    if (thumbUrl) {
-
-      URL.revokeObjectURL(
-        thumbUrl
-      );
-    }
-
-
-    if (sourceFile) {
-
-      thumbUrl =
-        URL.createObjectURL(
-          sourceFile
-        );
-
-
-      thumb.src =
-        thumbUrl;
-
-
-      thumb.style.display =
-        "block";
-
-
-      setStatus(
-        `${supports[selectedSupport].label} sélectionné. Photo chargée : lancez l’aperçu 3D.`,
-        0
-      );
-    }
-
-    else {
-
-      thumb.style.display =
-        "none";
-
-
-      setStatus(
-        "Choisissez un support puis chargez une photo.",
-        0
-      );
-    }
+  if (selectionEnd <= selectionStart) {
+    selectionEnd = Math.min(duration, selectionStart + 0.5);
   }
-);
 
+  if (selectionEnd - selectionStart > MAX_SELECTION_DURATION) {
+    selectionEnd = Math.min(
+      duration,
+      selectionStart + MAX_SELECTION_DURATION
+    );
+  }
 
-/* =========================================
-   CRÉATION SIMULATION
-========================================= */
+  $('selectionStartRange').value = selectionStart;
+  $('selectionEndRange').value = selectionEnd;
 
-generateBtn.addEventListener(
-  "click",
-  async () => {
+  $('selectionStartLabel').textContent =
+    `${formatTime(selectionStart)} s`;
 
-    if (!sourceFile) {
+  $('selectionEndLabel').textContent =
+    `${formatTime(selectionEnd)} s`;
 
+  $('selectionDurationInfo').textContent =
+    `Durée sélectionnée : ${
+      formatTime(selectionEnd - selectionStart)
+    } s`;
+}
+
+/*
+====================================================
+LECTURE DE LA SÉLECTION
+====================================================
+*/
+
+async function previewSelectedSection() {
+  if (!loadedVideo) return;
+
+  loadedVideo.pause();
+
+  loadedVideo.currentTime = selectionStart;
+
+  await waitForSeek(loadedVideo);
+
+  await loadedVideo.play();
+}
+
+/*
+====================================================
+POSITIONNEMENT VIDÉO
+====================================================
+*/
+
+function waitForSeek(video) {
+  return new Promise((resolve) => {
+    if (!video.seeking) {
+      resolve();
       return;
     }
 
-
-    generateBtn.disabled =
-      true;
-
-
-    exportVideoBtn.disabled =
-      true;
-
-
-    exportViewsBtn.disabled =
-      true;
-
-
-    simulationReady =
-      false;
-
-
-    stopProductShellRotation();
-
-
-    try {
-
-      setStatus(
-        "1/5 Préparation de la photo…",
-        6
-      );
-
-
-      const photo =
-        await compressImage(
-          sourceFile
-        );
-
-
-      setStatus(
-        "2/5 Détourage précis du sujet…",
-        20
-      );
-
-
-      const removeForm =
-        new FormData();
-
-
-      removeForm.append(
-        "image",
-        photo,
-        photo.name
-      );
-
-
-      removeForm.append(
-        "output_format",
-        "png"
-      );
-
-
-      const subjectBlob =
-        await postForm(
-          "/api/remove-background",
-          removeForm
-        );
-
-
-      setStatus(
-        "3/5 Reconstruction du fond sans le sujet…",
-        43
-      );
-
-
-      const maskBlob =
-        await makeEraseMask(
-          subjectBlob
-        );
-
-
-      if (!maskBlob) {
-
-        throw new Error(
-          "Création du masque impossible."
-        );
-      }
-
-
-      const eraseForm =
-        new FormData();
-
-
-      eraseForm.append(
-        "image",
-        photo,
-        photo.name
-      );
-
-
-      eraseForm.append(
-        "mask",
-        maskBlob,
-        "mask.png"
-      );
-
-
-      eraseForm.append(
-        "grow_mask",
-        "10"
-      );
-
-
-      eraseForm.append(
-        "output_format",
-        "png"
-      );
-
-
-      const cleanBackground =
-        await postForm(
-          "/api/erase-background",
-          eraseForm
-        );
-
-
-      setStatus(
-        "4/5 Analyse des profondeurs…",
-        66
-      );
-
-
-      const currentEngine =
-        await getEngine();
-
-
-      await currentEngine.build(
-        photo,
-        cleanBackground,
-        subjectBlob,
-        setStatus
-      );
-
-
-      if (
-        typeof currentEngine.refreshSupport ===
-        "function"
-      ) {
-
-        currentEngine.refreshSupport();
-      }
-
-
-      placeholder.style.display =
-        "none";
-
-
-      setStatus(
-        "5/5 Mise en mouvement…",
-        90
-      );
-
-
-      currentEngine.start();
-
-
-      startProductShellRotation();
-
-
-      simulationReady =
-        true;
-
-
-      exportVideoBtn.disabled =
-        false;
-
-
-      exportViewsBtn.disabled =
-        false;
-
-
-      setStatus(
-        `Simulation prête dans le support « ${supports[selectedSupport].label} ».`,
-        100
-      );
-    }
-
-    catch (error) {
-
-      console.error(
-        error
-      );
-
-
-      setStatus(
-        `Erreur : ${
-          error?.message ||
-          String(error)
-        }`,
-        0
-      );
-    }
-
-    finally {
-
-      generateBtn.disabled =
-        false;
-    }
-  }
-);
-
-
-/* =========================================
-   CHARGEMENT JSZIP
-========================================= */
-
-async function getJSZip() {
-
-  if (window.JSZip) {
-
-    return window.JSZip;
-  }
-
-
-  await new Promise(
-    (resolve, reject) => {
-
-      const script =
-        document.createElement(
-          "script"
-        );
-
-
-      script.src =
-        "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
-
-
-      script.onload =
-        resolve;
-
-
-      script.onerror =
-        () =>
-          reject(
-            new Error(
-              "Impossible de charger JSZip."
-            )
-          );
-
-
-      document.head.appendChild(
-        script
-      );
-    }
-  );
-
-
-  if (!window.JSZip) {
-
-    throw new Error(
-      "JSZip n'est pas disponible."
-    );
-  }
-
-
-  return window.JSZip;
-}
-
-
-/* =========================================
-   EXPORT ZIP DES 9 VUES
-========================================= */
-
-if (exportViewsBtn) {
-
-  exportViewsBtn.addEventListener(
-    "click",
-    async () => {
-
-      exportViewsBtn.disabled =
-        true;
-
-
-      try {
-
-        const currentEngine =
-          await getEngine();
-
-
-        setStatus(
-          "Création des 9 vues…",
-          0
-        );
-
-
-        const views =
-          await currentEngine
-            .exportProductionViews(
-              (
-                current,
-                total,
-                angle
-              ) => {
-
-                const percent =
-                  Math.round(
-                    current /
-                    total *
-                    75
-                  );
-
-
-                setStatus(
-                  `Vue ${current}/${total} — angle ${angle}°`,
-                  percent
-                );
-              }
-            );
-
-
-        setStatus(
-          "Assemblage du ZIP…",
-          80
-        );
-
-
-        const JSZip =
-          await getJSZip();
-
-
-        const zip =
-          new JSZip();
-
-
-        const folder =
-          zip.folder(
-            `vues-${selectedSupport}`
-          );
-
-
-        for (
-          let i = 0;
-          i < views.length;
-          i++
-        ) {
-
-          const view =
-            views[i];
-
-
-          folder.file(
-            view.filename,
-            view.blob
-          );
-
-
-          const percent =
-            80 +
-            Math.round(
-              (
-                (i + 1) /
-                views.length
-              ) *
-              10
-            );
-
-
-          setStatus(
-            `Ajout au ZIP ${i + 1}/${views.length}…`,
-            percent
-          );
-        }
-
-
-        setStatus(
-          "Compression du ZIP…",
-          92
-        );
-
-
-        const zipBlob =
-          await zip.generateAsync(
-            {
-              type:
-                "blob",
-
-              compression:
-                "DEFLATE",
-
-              compressionOptions: {
-                level: 6
-              }
-            },
-
-            metadata => {
-
-              const percent =
-                92 +
-                Math.round(
-                  metadata.percent *
-                  0.08
-                );
-
-
-              setStatus(
-                `Compression ZIP… ${Math.round(metadata.percent)}%`,
-                Math.min(
-                  100,
-                  percent
-                )
-              );
-            }
-          );
-
-
-        const url =
-          URL.createObjectURL(
-            zipBlob
-          );
-
-
-        const link =
-          document.createElement(
-            "a"
-          );
-
-
-        link.href =
-          url;
-
-
-        link.download =
-          `9-vues-${selectedSupport}.zip`;
-
-
-        document.body.appendChild(
-          link
-        );
-
-
-        link.click();
-
-
-        link.remove();
-
-
-        setTimeout(
-          () =>
-            URL.revokeObjectURL(
-              url
-            ),
-          20000
-        );
-
-
-        setStatus(
-          "ZIP prêt : les 9 vues ont été téléchargées dans un seul fichier.",
-          100
-        );
-      }
-
-      catch (error) {
-
-        console.error(
-          error
-        );
-
-
-        setStatus(
-          `Erreur ZIP : ${
-            error?.message ||
-            String(error)
-          }`,
-          0
-        );
-      }
-
-      finally {
-
-        exportViewsBtn.disabled =
-          false;
-      }
-    }
-  );
-}
-
-
-/* =========================================
-   FORMAT VIDÉO
-========================================= */
-
-function chooseVideoMimeType() {
-
-  if (
-    typeof MediaRecorder ===
-    "undefined"
-  ) {
-
-    return null;
-  }
-
-
-  const types = [
-
-    "video/mp4;codecs=avc1.42E01E",
-
-    "video/mp4",
-
-    "video/webm;codecs=vp9",
-
-    "video/webm;codecs=vp8",
-
-    "video/webm"
-  ];
-
-
-  for (
-    const type of types
-  ) {
-
-    try {
-
-      if (
-        MediaRecorder
-          .isTypeSupported(
-            type
-          )
-      ) {
-
-        return type;
-      }
-    }
-
-    catch {}
-  }
-
-
-  return "";
-}
-
-
-/* =========================================
-   ENREGISTREMENT VIDÉO
-========================================= */
-
-async function recordSimulation() {
-
-  const canvas =
-    viewer.querySelector(
-      "canvas"
-    );
-
-
-  if (!canvas) {
-
-    throw new Error(
-      "Canvas 3D introuvable."
-    );
-  }
-
-
-  if (
-    typeof canvas.captureStream !==
-    "function"
-  ) {
-
-    throw new Error(
-      "L’enregistrement du canvas n’est pas pris en charge."
-    );
-  }
-
-
-  if (
-    typeof MediaRecorder ===
-    "undefined"
-  ) {
-
-    throw new Error(
-      "MediaRecorder n’est pas disponible."
-    );
-  }
-
-
-  const stream =
-    canvas.captureStream(
-      30
-    );
-
-
-  const mimeType =
-    chooseVideoMimeType();
-
-
-  let recorder;
-
-
-  try {
-
-    recorder =
-      new MediaRecorder(
-        stream,
-
-        mimeType
-          ? {
-              mimeType,
-
-              videoBitsPerSecond:
-                6000000
-            }
-          : {
-              videoBitsPerSecond:
-                6000000
-            }
-      );
-  }
-
-  catch {
-
-    recorder =
-      new MediaRecorder(
-        stream
-      );
-  }
-
-
-  const chunks =
-    [];
-
-
-  recorder.ondataavailable =
-    event => {
-
-      if (
-        event.data &&
-        event.data.size >
-        0
-      ) {
-
-        chunks.push(
-          event.data
-        );
-      }
+    const done = () => {
+      video.removeEventListener('seeked', done);
+      resolve();
     };
 
+    video.addEventListener('seeked', done);
+  });
+}
 
-  const completed =
-    new Promise(
-      (
-        resolve,
-        reject
-      ) => {
+/*
+====================================================
+CAPTURE IMAGE
+====================================================
+*/
 
-        recorder.onstop =
-          resolve;
+async function captureFrame(video, time, analysisSize = null) {
+  video.pause();
 
+  video.currentTime = clamp(
+    time,
+    0,
+    Math.max(0, video.duration - 0.001)
+  );
 
-        recorder.onerror =
-          event =>
-            reject(
-              event.error ||
-              new Error(
-                "Erreur vidéo."
-              )
-            );
-      }
+  await waitForSeek(video);
+
+  const canvas = document.createElement('canvas');
+
+  let width = video.videoWidth;
+  let height = video.videoHeight;
+
+  if (analysisSize) {
+    const ratio = width / height;
+
+    if (width >= height) {
+      width = analysisSize;
+      height = Math.round(analysisSize / ratio);
+    } else {
+      height = analysisSize;
+      width = Math.round(analysisSize * ratio);
+    }
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  ctx.drawImage(video, 0, 0, width, height);
+
+  return canvas;
+}
+
+/*
+====================================================
+MESURE DE DIFFÉRENCE ENTRE DEUX IMAGES
+====================================================
+*/
+
+function calculateFrameDifference(canvasA, canvasB) {
+  const ctxA = canvasA.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  const ctxB = canvasB.getContext('2d', {
+    willReadFrequently: true
+  });
+
+  const width = Math.min(canvasA.width, canvasB.width);
+  const height = Math.min(canvasA.height, canvasB.height);
+
+  const dataA = ctxA.getImageData(
+    0,
+    0,
+    width,
+    height
+  ).data;
+
+  const dataB = ctxB.getImageData(
+    0,
+    0,
+    width,
+    height
+  ).data;
+
+  let totalDifference = 0;
+
+  const pixelCount = width * height;
+
+  /*
+   * On saute quelques pixels pour accélérer l'analyse.
+   */
+
+  const step = 4 * 4;
+
+  let samples = 0;
+
+  for (let i = 0; i < dataA.length; i += step) {
+    const dr = Math.abs(dataA[i] - dataB[i]);
+    const dg = Math.abs(dataA[i + 1] - dataB[i + 1]);
+    const db = Math.abs(dataA[i + 2] - dataB[i + 2]);
+
+    const diff = (dr + dg + db) / 3;
+
+    totalDifference += diff;
+
+    samples++;
+  }
+
+  return totalDifference / Math.max(samples, 1);
+}
+
+/*
+====================================================
+ÉVALUATION D'UNE SÉQUENCE DE 9 VUES
+====================================================
+*/
+
+async function evaluateSequence(start, end) {
+  const interval = (end - start) / (NUMBER_OF_VIEWS - 1);
+
+  const frames = [];
+  const times = [];
+
+  for (let i = 0; i < NUMBER_OF_VIEWS; i++) {
+    const time = start + interval * i;
+
+    times.push(time);
+
+    const frame = await captureFrame(
+      loadedVideo,
+      time,
+      160
     );
 
+    frames.push(frame);
+  }
 
-  recorder.start();
+  const differences = [];
 
+  for (let i = 1; i < frames.length; i++) {
+    const difference = calculateFrameDifference(
+      frames[i - 1],
+      frames[i]
+    );
 
-  const duration =
-    6000;
+    differences.push(difference);
+  }
 
+  /*
+   * Objectif :
+   *
+   * - mouvement présent
+   * - mais pas de gros saut
+   * - variations régulières
+   */
 
-  const startTime =
-    performance.now();
+  const average =
+    differences.reduce((sum, value) => sum + value, 0) /
+    differences.length;
 
+  const maximum = Math.max(...differences);
+  const minimum = Math.min(...differences);
 
-  await new Promise(
-    resolve => {
+  const variance =
+    differences.reduce(
+      (sum, value) =>
+        sum + Math.pow(value - average, 2),
+      0
+    ) / differences.length;
 
-      const update =
-        () => {
+  const standardDeviation = Math.sqrt(variance);
 
-          const elapsed =
-            performance.now() -
-            startTime;
+  /*
+   * Très peu de différence = vidéo presque immobile.
+   */
 
+  const noMovementPenalty =
+    average < 2.5
+      ? (2.5 - average) * 15
+      : 0;
 
-          const percent =
-            Math.min(
-              100,
-              Math.round(
-                elapsed /
-                duration *
-                100
-              )
-            );
+  /*
+   * Trop de mouvement = risque de saut.
+   */
 
+  const excessiveMovementPenalty =
+    average > 22
+      ? (average - 22) * 4
+      : 0;
 
-          setStatus(
-            `Enregistrement vidéo… ${percent}%`,
-            percent
-          );
+  /*
+   * Un seul très gros changement est mauvais.
+   */
 
+  const jumpPenalty =
+    maximum > average * 1.8
+      ? (maximum - average * 1.8) * 6
+      : 0;
 
-          if (
-            elapsed <
-            duration
-          ) {
+  /*
+   * Variation irrégulière entre les vues.
+   */
 
-            requestAnimationFrame(
-              update
-            );
-          }
+  const irregularityPenalty =
+    standardDeviation * 4;
 
-          else {
+  /*
+   * On récompense un petit mouvement continu.
+   */
 
-            resolve();
-          }
-        };
+  const movementReward =
+    average >= 3 && average <= 18
+      ? average * 0.7
+      : 0;
 
+  const score =
+    100
+    - noMovementPenalty
+    - excessiveMovementPenalty
+    - jumpPenalty
+    - irregularityPenalty
+    + movementReward;
 
-      requestAnimationFrame(
-        update
+  return {
+    start,
+    end,
+    duration: end - start,
+    times,
+    differences,
+    averageDifference: average,
+    maxDifference: maximum,
+    minDifference: minimum,
+    standardDeviation,
+    score
+  };
+}
+
+/*
+====================================================
+RECHERCHE DU MEILLEUR PASSAGE
+====================================================
+*/
+
+async function findBestSequence() {
+  if (!loadedVideo) {
+    throw new Error('Charge d’abord une vidéo.');
+  }
+
+  const selectedDuration =
+    selectionEnd - selectionStart;
+
+  if (selectedDuration < 0.7) {
+    throw new Error(
+      'La sélection est trop courte.'
+    );
+  }
+
+  /*
+   * Durées candidates.
+   *
+   * Pour 9 vues lenticulaires,
+   * environ 1 à 2 secondes donne généralement
+   * un mouvement beaucoup plus contrôlable
+   * qu'utiliser directement les 5 secondes.
+   */
+
+  const candidateDurations = [
+    1.0,
+    1.25,
+    1.5,
+    1.75,
+    2.0
+  ].filter(
+    (duration) =>
+      duration <= selectedDuration
+  );
+
+  /*
+   * Si la sélection utilisateur est très courte,
+   * on l'utilise directement.
+   */
+
+  if (!candidateDurations.length) {
+    candidateDurations.push(selectedDuration);
+  }
+
+  let best = null;
+
+  let tested = 0;
+
+  for (const duration of candidateDurations) {
+    const available =
+      selectedDuration - duration;
+
+    /*
+     * On analyse environ 12 positions
+     * par durée.
+     */
+
+    const positionCount =
+      available <= 0
+        ? 1
+        : 12;
+
+    for (
+      let index = 0;
+      index < positionCount;
+      index++
+    ) {
+      const ratio =
+        positionCount === 1
+          ? 0
+          : index / (positionCount - 1);
+
+      const start =
+        selectionStart +
+        available * ratio;
+
+      const end =
+        start + duration;
+
+      setStatus(
+        `Analyse du mouvement… ${tested + 1}`
       );
+
+      const result =
+        await evaluateSequence(start, end);
+
+      tested++;
+
+      if (
+        !best ||
+        result.score > best.score
+      ) {
+        best = result;
+      }
+
+      /*
+       * Laisse respirer l'interface.
+       */
+
+      await sleep(5);
     }
-  );
+  }
 
+  return best;
+}
 
-  recorder.stop();
+/*
+====================================================
+EXTRACTION DES 9 VUES HD
+====================================================
+*/
 
+async function extractFinalViews(sequence) {
+  const results = [];
 
-  await completed;
-
-
-  stream
-    .getTracks()
-    .forEach(
-      track =>
-        track.stop()
+  for (
+    let i = 0;
+    i < NUMBER_OF_VIEWS;
+    i++
+  ) {
+    setStatus(
+      `Extraction HD : vue ${i + 1}/${NUMBER_OF_VIEWS}`
     );
 
+    const canvas =
+      await captureFrame(
+        loadedVideo,
+        sequence.times[i]
+      );
 
-  const actualType =
-    recorder.mimeType ||
-    mimeType ||
-    "video/webm";
+    const blob = await new Promise(
+      (resolve) =>
+        canvas.toBlob(
+          resolve,
+          'image/png',
+          1
+        )
+    );
 
+    results.push({
+      index: i + 1,
+      time: sequence.times[i],
+      canvas,
+      blob
+    });
+  }
 
-  return new Blob(
-    chunks,
-    {
-      type:
-        actualType
-    }
-  );
+  return results;
 }
 
+/*
+====================================================
+ANALYSE + EXTRACTION
+====================================================
+*/
 
-/* =========================================
-   EXPORT VIDÉO
-========================================= */
+async function findAndExtractBestSequence() {
+  if (!loadedVideo) {
+    throw new Error(
+      'Aucune vidéo chargée.'
+    );
+  }
 
-if (exportVideoBtn) {
+  extractedViews = [];
 
-  exportVideoBtn.addEventListener(
-    "click",
-    async () => {
+  renderViewsPreview();
 
-      exportVideoBtn.disabled =
-        true;
+  setStatus(
+    'Recherche automatique du passage le plus fluide…'
+  );
 
+  const best =
+    await findBestSequence();
 
-      try {
+  if (!best) {
+    throw new Error(
+      'Impossible de trouver un passage utilisable.'
+    );
+  }
 
-        setStatus(
-          "Préparation de l’enregistrement…",
-          0
-        );
+  bestSequenceInfo = best;
 
+  setStatus(
+    `Meilleur passage trouvé : ` +
+    `${formatTime(best.start)} s → ` +
+    `${formatTime(best.end)} s ` +
+    `(${formatTime(best.duration)} s). ` +
+    `Extraction des 9 vues…`
+  );
 
-        const videoBlob =
-          await recordSimulation();
+  extractedViews =
+    await extractFinalViews(best);
 
+  renderViewsPreview();
 
-        if (videoUrl) {
+  setStatus(
+    `✓ 9 vues extraites\n` +
+    `Passage retenu : ` +
+    `${formatTime(best.start)} → ` +
+    `${formatTime(best.end)} s\n` +
+    `Durée : ${formatTime(best.duration)} s\n` +
+    `Score de fluidité : ${best.score.toFixed(1)}`
+  );
 
-          URL.revokeObjectURL(
-            videoUrl
-          );
+  return extractedViews;
+}
+
+/*
+====================================================
+APERÇU DES 9 VUES
+====================================================
+*/
+
+function renderViewsPreview() {
+  const container = $('viewsPreview');
+
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  extractedViews.forEach((view) => {
+    const wrapper =
+      document.createElement('div');
+
+    wrapper.style.position = 'relative';
+
+    const img =
+      document.createElement('img');
+
+    img.src =
+      view.canvas.toDataURL('image/jpeg', 0.8);
+
+    img.style.width = '100%';
+    img.style.display = 'block';
+    img.style.borderRadius = '6px';
+
+    const label =
+      document.createElement('div');
+
+    label.textContent =
+      `${view.index} — ${formatTime(view.time)}s`;
+
+    label.style.fontSize = '11px';
+    label.style.textAlign = 'center';
+    label.style.marginTop = '3px';
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(label);
+
+    container.appendChild(wrapper);
+  });
+}
+
+/*
+====================================================
+ZIP DES 9 VUES
+====================================================
+*/
+
+async function downloadViewsZip() {
+  if (!extractedViews.length) {
+    await findAndExtractBestSequence();
+  }
+
+  if (typeof JSZip === 'undefined') {
+    throw new Error(
+      'JSZip n’est pas chargé.'
+    );
+  }
+
+  const zip = new JSZip();
+
+  extractedViews.forEach((view) => {
+    const number =
+      String(view.index).padStart(2, '0');
+
+    zip.file(
+      `vue-${number}.png`,
+      view.blob
+    );
+  });
+
+  const manifest = {
+    version: 2,
+
+    type: 'animation-lenticulaire',
+
+    views: NUMBER_OF_VIEWS,
+
+    sourceSelection: {
+      start: selectionStart,
+      end: selectionEnd,
+      duration:
+        selectionEnd - selectionStart
+    },
+
+    automaticSequence: bestSequenceInfo
+      ? {
+          start: bestSequenceInfo.start,
+          end: bestSequenceInfo.end,
+          duration:
+            bestSequenceInfo.duration,
+
+          score:
+            bestSequenceInfo.score,
+
+          averageDifference:
+            bestSequenceInfo.averageDifference,
+
+          maxDifference:
+            bestSequenceInfo.maxDifference,
+
+          standardDeviation:
+            bestSequenceInfo.standardDeviation,
+
+          frameTimes:
+            bestSequenceInfo.times
         }
+      : null,
 
+    generatedAt:
+      new Date().toISOString()
+  };
 
-        videoUrl =
-          URL.createObjectURL(
-            videoBlob
-          );
+  zip.file(
+    'manifest.json',
+    JSON.stringify(
+      manifest,
+      null,
+      2
+    )
+  );
 
+  const blob =
+    await zip.generateAsync({
+      type: 'blob'
+    });
 
-        const isMp4 =
-          videoBlob.type.includes(
-            "mp4"
-          );
+  const url =
+    URL.createObjectURL(blob);
 
+  const link =
+    document.createElement('a');
 
-        const extension =
-          isMp4
-            ? "mp4"
-            : "webm";
+  link.href = url;
 
+  link.download =
+    '9-vues-animation-lenticulaire.zip';
 
-        downloadVideo.href =
-          videoUrl;
+  document.body.appendChild(link);
 
+  link.click();
 
-        downloadVideo.download =
-          `simulation-${selectedSupport}.${extension}`;
+  link.remove();
 
+  setTimeout(
+    () => URL.revokeObjectURL(url),
+    5000
+  );
+}
 
-        downloadVideo.textContent =
-          isMp4
-            ? "Télécharger la simulation MP4"
-            : "Télécharger la simulation vidéo";
+/*
+====================================================
+BOUTONS EXISTANTS
+====================================================
+*/
 
-
-        downloadVideo.style.display =
-          "block";
-
-
+if (animExtract) {
+  animExtract.addEventListener(
+    'click',
+    async () => {
+      try {
+        await findAndExtractBestSequence();
+      } catch (error) {
+        console.error(error);
         setStatus(
-          isMp4
-            ? "Simulation MP4 prête."
-            : "Simulation vidéo prête.",
-          100
+          `Erreur : ${error.message}`
         );
-      }
-
-      catch (error) {
-
-        console.error(
-          error
-        );
-
-
-        setStatus(
-          `Erreur vidéo : ${
-            error?.message ||
-            String(error)
-          }`,
-          0
-        );
-      }
-
-      finally {
-
-        exportVideoBtn.disabled =
-          false;
       }
     }
   );
 }
 
+if (animDownloadZip) {
+  animDownloadZip.addEventListener(
+    'click',
+    async () => {
+      try {
+        await downloadViewsZip();
+      } catch (error) {
+        console.error(error);
+        setStatus(
+          `Erreur : ${error.message}`
+        );
+      }
+    }
+  );
+}
 
-/* =========================================
-   INITIALISATION
-========================================= */
+/*
+====================================================
+STATUT
+====================================================
+*/
 
-selectSupport(
-  selectedSupport
-);
+function setStatus(message) {
+  const status =
+    $('analysisStatus');
+
+  if (status) {
+    status.innerText = message;
+  }
+
+  console.log(message);
+}
+
+/*
+====================================================
+AFFICHAGE MODE
+====================================================
+*/
+
+function updateModeDisplay() {
+  if (!animControls) return;
+
+  const animationEnabled =
+    modeAnim?.checked ||
+    modeAnim?.value === 'animation';
+
+  animControls.style.display =
+    animationEnabled
+      ? ''
+      : 'none';
+
+  if (animationEnabled) {
+    ensureAnimationUI();
+  }
+}
+
+if (modeAnim) {
+  modeAnim.addEventListener(
+    'change',
+    updateModeDisplay
+  );
+}
+
+if (mode3d) {
+  mode3d.addEventListener(
+    'change',
+    updateModeDisplay
+  );
+}
+
+ensureAnimationUI();
+updateModeDisplay();
