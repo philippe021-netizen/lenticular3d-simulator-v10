@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LentiPrint Lab — Relief 3D V3.3.21 + Carte pro 3D</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:1120px;margin:auto;padding:22px}
+h1{margin:0 0 8px}.sub{color:#555;margin-bottom:16px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{border:1px solid #ccc;background:#fff;color:#111;padding:10px 14px;border-radius:999px;font-weight:750;cursor:pointer}
+.tab.active{background:#111;color:#fff;border-color:#111}
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border:1px solid #ddd;border-radius:18px;padding:18px}
+.grid{display:grid;grid-template-columns:340px 1fr;gap:18px}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+label{font-size:13px;font-weight:700;display:block;margin:13px 0 6px}
+input[type=file],button,select{font:inherit}
+input[type=range]{width:100%}
+select{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;background:#fff}
+button{border:0;border-radius:12px;padding:12px 15px;font-weight:750;background:#111;color:#fff;margin:8px 6px 0 0}
+button.secondary{background:#e8e8e8;color:#111}button:disabled{opacity:.45}
+.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;white-space:pre-wrap;font-size:13px}
+#view{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:4/3;object-fit:contain}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.small{font-size:12px;color:#666;line-height:1.4;margin-top:8px}
+.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:8px}
+.support-stage{
+  min-height:620px;border-radius:18px;background:
+  radial-gradient(circle at 50% 38%,#f6f6f6 0,#e9e9e9 55%,#dddddd 100%);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative
+}
+.product{position:relative;transform-style:preserve-3d;will-change:transform}
+.card-product{
+  width:min(78vw,620px);aspect-ratio:85.60/53.98;border-radius:28px;overflow:hidden;
+  background:#0b3d91;box-shadow:0 28px 70px #0003, inset 0 0 0 2px #ffffff40;
+}
+.card-product::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(115deg,#ffffff00 20%,#ffffff32 48%,#ffffff00 70%);
+  transform:translateX(-120%);
+  animation:shine 4.5s ease-in-out infinite;
+}
+.medal-product{
+  width:min(68vw,470px);aspect-ratio:1;border-radius:50%;
+  background:linear-gradient(145deg,#d7d7d7,#f9f9f9 35%,#bcbcbc);
+  padding:18px;box-shadow:0 28px 70px #0003;
+}
+.medal-product::before{
+  content:"";position:absolute;width:66px;height:48px;border:16px solid #c5c5c5;border-bottom:0;
+  border-radius:36px 36px 0 0;left:50%;top:-48px;transform:translateX(-50%);z-index:-1
+}
+.medal-inner{width:100%;height:100%;border-radius:50%;overflow:hidden;background:#111}
+.support-canvas{width:100%;height:100%;display:block}
+.support-note{position:absolute;left:18px;bottom:16px;background:#0009;color:#fff;padding:8px 11px;border-radius:999px;font-size:12px}
+@keyframes shine{0%,35%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
+
+.pro-stage{position:relative;border-radius:16px;background:#111;overflow:hidden}
+#proCanvas{width:100%;display:block;touch-action:none;background:#111}
+.pro-overlay{position:absolute;inset:0;pointer-events:none}
+.pro-box{position:absolute;border:2px solid #fff;border-radius:6px;box-shadow:0 0 0 1px #0008}
+.pro-box.logo{border-style:solid}.pro-box.title{border-style:dashed}.pro-box.text{border-style:dotted}
+.pro-box.qr{border-width:3px}.pro-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.pro-item{border:1px solid #ddd;border-radius:12px;padding:10px;background:#fafafa}
+.pro-item-top{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.pro-item select{width:auto;min-width:120px;padding:7px}
+.pro-item input[type=range]{margin-top:8px}
+.pro-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pro-hint{font-size:12px;color:#666;margin-top:8px}
+
+
+.pro-stage.selecting{outline:3px solid var(--viz-accent,#0a84ff);outline-offset:3px}
+#proSelection{
+  position:absolute;
+  border:3px solid #0a84ff;
+  background:rgba(10,132,255,.12);
+  border-radius:8px;
+  display:none;
+  pointer-events:none;
+  z-index:20;
+}
+#proSelection.active{display:block}
+#proSelectBanner{
+  display:none;
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:#e8f2ff;
+  color:#0b3d78;
+  font-weight:700;
+}
+#proSelectBanner.active{display:block}
+
+
+.simple-product{
+  background:transparent !important;
+  box-shadow:none !important;
+  border:none !important;
+}
+.simple-product.card-product{
+  border-radius:22px;
+}
+.simple-product.medal-product{
+  border-radius:50%;
+}
+.simple-product #supportCanvas{
+  display:block;
+  width:100%;
+  height:100%;
+}
+.simple-product.safe-zone::after{
+  content:"";
+  position:absolute;
+  inset:7%;
+  border:2px dashed rgba(255,255,255,.85);
+  border-radius:inherit;
+  pointer-events:none;
+}
+
+
+/* V3.3.21 — trois supports physiques réellement séparés */
+.support-object{
+  position:relative;
+  transform-style:preserve-3d;
+  transform-origin:50% 50%;
+  overflow:visible !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  will-change:transform;
+}
+.support-template{position:relative;width:100%;height:100%;overflow:visible}
+.support-template[hidden]{display:none !important}
+.support-canvas{width:100%;height:100%;display:block}
+.support-window{position:absolute;overflow:hidden;background:#eee}
+.acrylic-shell{
+  position:absolute;
+  background:linear-gradient(145deg,rgba(255,255,255,.95),rgba(220,226,232,.72) 42%,rgba(255,255,255,.92));
+  box-shadow:0 18px 42px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.94), inset 0 0 0 5px rgba(110,120,130,.18)
+}
+.acrylic-shell::after{content:"";position:absolute;inset:7px;border:1px solid rgba(80,90,100,.28);border-radius:inherit;pointer-events:none}
+.metal-ring{position:absolute;width:84px;height:84px;border-radius:50%;border:8px solid #a8a8a8;background:transparent;box-shadow:inset 2px 2px 3px rgba(255,255,255,.95),inset -2px -2px 4px rgba(55,55,55,.45),0 5px 12px rgba(0,0,0,.17);z-index:5}
+.metal-link{position:absolute;width:26px;height:34px;border-radius:14px;border:6px solid #9d9d9d;background:transparent;box-shadow:inset 1px 1px 2px rgba(255,255,255,.9);z-index:6}
+
+/* Porte-clé vertical */
+.keychain-vertical-object{width:min(46vw,310px);aspect-ratio:2/3;margin-top:112px}
+.kv-shell{inset:0;border-radius:18px;padding:10px}
+.kv-window{inset:10px;border-radius:11px}
+.kv-ring{left:50%;top:-110px;transform:translateX(-50%)}
+.kv-link{left:50%;top:-34px;transform:translateX(-50%)}
+
+/* Porte-clé horizontal */
+.keychain-horizontal-object{width:min(64vw,500px);aspect-ratio:3/2;margin-left:124px}
+.kh-shell{inset:0;border-radius:18px;padding:10px}
+.kh-window{inset:10px;border-radius:11px}
+.kh-ring{left:-116px;top:50%;transform:translateY(-50%)}
+.kh-link{left:-34px;top:50%;transform:translateY(-50%) rotate(90deg)}
+
+/* Médaillon rond dédié — aucun shell rectangle */
+.medallion-object{width:min(58vw,400px);aspect-ratio:1/1;margin-top:112px}
+.medallion-shell{position:absolute;inset:0;border-radius:50%;padding:16px;background:linear-gradient(145deg,#d8d8d8,#fbfbfb 36%,#bcbcbc);box-shadow:0 22px 50px rgba(0,0,0,.20),inset 0 0 0 2px rgba(255,255,255,.75)}
+.medallion-window{inset:16px;border-radius:50%;background:#eee}
+.md-ring{left:50%;top:-112px;transform:translateX(-50%)}
+.md-link{left:50%;top:-36px;transform:translateX(-50%)}
+
+/* Mode simple : scène neutre, jamais de grand cadre noir */
+.simple-product{box-shadow:none !important;background:transparent !important}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LentiPrint Lab — Relief 3D V3.3.21</h1>
+  <div class="sub">Relief 3D local + rendu support + mode Carte pro 3D multicouche — 3 supports séparés, médaillon indépendant, rotation objet complet.</div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="relief">Relief 3D</button>
+    <button class="tab" data-tab="support">Rendu support</button>
+    <button class="tab" data-tab="pro">Carte pro 3D</button>
+  </div>
+
+  <section id="panel-relief" class="panel active">
+    <div class="card grid">
+      <section>
+        <label>Photo</label>
+        <input id="file" type="file" accept="image/*">
+
+        <label>Force profondeur sujet</label>
+        <div class="row"><span>Volume interne</span><b id="subjectOut">0.30</b></div>
+        <input id="subjectDepth" type="range" min="0.10" max="0.55" step="0.01" value="0.30">
+
+        <label>Force profondeur fond</label>
+        <div class="row"><span>Décor</span><b id="bgOut">0.10</b></div>
+        <input id="bgDepth" type="range" min="0.02" max="0.25" step="0.01" value="0.10">
+
+        <label>Amplitude</label>
+        <div class="row"><span>Micro-orbite</span><b id="angleOut">±4°</b></div>
+        <input id="angle" type="range" min="2" max="8" step="1" value="4">
+
+        <label>Protection contours</label>
+        <div class="row"><span>Cheveux / détails fins</span><b id="edgeOut">84%</b></div>
+        <input id="edgeProtect" type="range" min="55" max="95" step="1" value="84">
+
+
+        <div style="margin-top:18px;padding:14px;border:1px solid #d8d8d8;border-radius:14px;background:#fafafa">
+          <strong>Préparer la photo au format produit</strong>
+          <div class="small" style="margin-top:5px">
+            Pour une carte, le programme teste d’abord horizontal et vertical. L’IA n’étend le décor que si l’orientation choisie ne suffit pas.
+          </div>
+
+          <label>Format cible</label>
+          <select id="prepareTarget">
+            <option value="card">Carte portefeuille</option>
+            <option value="square">Carré — médaillon / magnet</option>
+          </select>
+
+          <label>Orientation carte</label>
+          <select id="cardOrientation">
+            <option value="auto">Automatique — recommandé</option>
+            <option value="landscape">Horizontale — 85,6 × 54 mm</option>
+            <option value="portrait">Verticale — 54 × 85,6 mm</option>
+          </select>
+
+          <div id="orientationAdvice" class="status">
+            Le programme choisira l’orientation qui conserve le plus de photo avant de proposer l’extension IA.
+          </div>
+
+          <label>Créativité de l’extension IA</label>
+          <div class="row"><span>Conserver le décor</span><b id="prepareCreativityOut">0.25</b></div>
+          <input id="prepareCreativity" type="range" min="0" max="0.6" step="0.05" value="0.25">
+
+          <button id="prepareOutpaint" class="secondary">Étendre le décor avec IA</button>
+          <button id="prepareReset" class="secondary" disabled>Revenir à l’original</button>
+
+          <div id="prepareStatus" class="status">Optionnel — utile si le format source ne convient pas au support.</div>
+        </div>
+
+        <button id="build">Créer le relief 3D local</button>
+        <button id="export" class="secondary" disabled>Exporter 9 vues</button>
+        <button id="download" class="secondary" disabled>Télécharger ZIP</button>
+
+        <div id="status" class="status">Choisis une photo.</div>
+        <div class="small">Premier lancement : le navigateur télécharge les modèles IA locaux. Aucun crédit PixVerse ni clé Stability n’est nécessaire.</div>
+      </section>
+
+      <section>
+        <canvas id="view" width="1024" height="768"></canvas>
+        <div id="frames" class="frames"></div>
+      </section>
+    </div>
+  </section>
+
+  <section id="panel-support" class="panel">
+    <div class="card grid">
+      <section>
+        <label>Source du rendu</label>
+        <select id="supportSource">
+          <option value="auto">Automatique</option>
+          <option value="relief">Relief photo</option>
+          <option value="pro">Carte pro 3D</option>
+        </select>
+
+        <label>Mode d’aperçu</label>
+        <select id="supportViewMode">
+          <option value="simple">Simulation simple — recommandé</option>
+          <option value="product">Présentation produit</option>
+        </select>
+
+        <label>Support</label>
+        <select id="supportType">
+          <option value="keychain-vertical">Porte-clé rectangle vertical — recommandé portrait</option>
+          <option value="keychain-horizontal">Porte-clé rectangle horizontal — recommandé paysage</option>
+          <option value="medal">Médaillon rond — recommandé gros plan</option>
+        </select>
+
+        <label id="supportMaskLabel">Affichage du masque</label>
+        <select id="supportMaskMode">
+          <option value="support">Support complet</option>
+          <option value="image">Image seule</option>
+          <option value="safe">Support + zone de sécurité</option>
+        </select>
+
+        <label>Cadrage</label>
+        <select id="supportFit">
+          <option value="preserve">Préserver le sujet — recommandé</option>
+          <option value="contain">Adapter — image entière</option>
+          <option value="cover">Remplir — plein cadre</option>
+        </select>
+
+        <label>Marge autour du sujet</label>
+        <div class="row"><span>Sécurité tête / oreilles</span><b id="supportMarginOut">14%</b></div>
+        <input id="supportMargin" type="range" min="6" max="28" step="1" value="14">
+
+        <label>Zoom</label>
+        <div class="row"><span>Taille de l’image</span><b id="supportZoomOut">100%</b></div>
+        <input id="supportZoom" type="range" min="70" max="160" step="1" value="100">
+
+        <label>Position horizontale</label>
+        <div class="row"><span>Gauche / droite</span><b id="supportXOut">0%</b></div>
+        <input id="supportX" type="range" min="-40" max="40" step="1" value="0">
+
+        <label>Position verticale</label>
+        <div class="row"><span>Haut / bas</span><b id="supportYOut">0%</b></div>
+        <input id="supportY" type="range" min="-40" max="40" step="1" value="0">
+
+        <label>Rotation du support</label>
+        <div class="row"><span>Effet de présentation</span><b id="supportAngleOut">±8°</b></div>
+        <input id="supportAngle" type="range" min="0" max="14" step="1" value="6">
+
+        <label>Vitesse</label>
+        <div class="row"><span>Aller-retour</span><b id="supportSpeedOut">5.0 s</b></div>
+        <input id="supportSpeed" type="range" min="3" max="8" step="0.5" value="5">
+
+        <button id="supportPlay">Lancer l’aperçu support</button>
+        <button id="supportStop" class="secondary">Stop</button>
+
+        <div id="supportStatus" class="status">Crée d’abord le relief 3D dans le premier onglet.</div>
+        <div class="small">Cet onglet sépare désormais la simulation technique simple de la présentation produit. En mode « Préserver le sujet », le rendu utilise toujours le fond sans sujet puis superpose le sujet une seule fois, avec exactement le même zoom et le même centrage. Cela évite le dédoublement sur les photos normales comme sur les photos préparées. Il ne modifie pas les 9 vues de production.</div>
+      </section>
+
+      <section>
+        <div class="support-stage">
+          <div id="product" class="product support-object keychain-vertical-object">
+            <div id="keychainVerticalTemplate" class="support-template keychain-vertical-template">
+              <div class="metal-ring kv-ring"></div>
+              <div class="metal-link kv-link"></div>
+              <div class="acrylic-shell kv-shell">
+                <div class="support-window kv-window">
+                  <canvas id="supportCanvas" class="support-canvas" width="800" height="1200"></canvas>
+                </div>
+              </div>
+            </div>
+
+            <div id="keychainHorizontalTemplate" class="support-template keychain-horizontal-template" hidden>
+              <div class="metal-ring kh-ring"></div>
+              <div class="metal-link kh-link"></div>
+              <div class="acrylic-shell kh-shell">
+                <div class="support-window kh-window"></div>
+              </div>
+            </div>
+
+            <div id="medallionTemplate" class="support-template medallion-template" hidden>
+              <div class="metal-ring md-ring"></div>
+              <div class="metal-link md-link"></div>
+              <div class="medallion-shell">
+                <div class="support-window medallion-window"></div>
+              </div>
+            </div>
+          </div>
+          <div class="support-note">Simulation support — rotation de l’objet complet</div>
+        </div>
+      </section>
+    </div>
+  </section>
+  <section id="panel-pro" class="panel">
+    <div class="card grid">
+      <section>
+        <label>Maquette de carte</label>
+        <input id="proFile" type="file" accept="image/*">
+
+        <div class="pro-actions">
+          <button id="proAnalyze">Analyser la carte</button>
+          <button id="proAddZone" class="secondary">Ajouter une zone</button>
+          <button id="proCancelZone" class="secondary" style="display:none">Annuler la sélection</button>
+          <button id="proPreview" class="secondary" disabled>Aperçu 3D</button>
+          <button id="proExport" class="secondary" disabled>Exporter 9 vues</button>
+          <button id="proDownload" class="secondary" disabled>Télécharger ZIP</button>
+        </div>
+
+        <label>Amplitude générale</label>
+        <div class="row"><span>Parallaxe maximum</span><b id="proAmpOut">10 px</b></div>
+        <input id="proAmp" type="range" min="4" max="16" step="1" value="10">
+
+        <div id="proSelectBanner">Mode sélection actif — trace maintenant un rectangle sur le logo ou la zone voulue.</div>
+        <div id="proStatus" class="status">Importe une carte. Analyse automatique : texte + QR. Le logo peut être ajouté/corrigé manuellement.</div>
+        <div class="pro-hint">
+          Après analyse, touche « Ajouter une zone », puis trace un rectangle autour d’un logo ou d’un élément graphique.
+          Chaque bloc peut être classé Logo / Titre / Texte / QR et recevoir sa propre profondeur.
+        </div>
+
+        <div id="proList" class="pro-list"></div>
+      </section>
+
+      <section>
+        <div class="pro-stage">
+          <canvas id="proCanvas" width="1200" height="756"></canvas>
+          <div id="proOverlay" class="pro-overlay"></div>
+          <div id="proSelection"></div>
+        </div>
+        <div class="small">Le QR est verrouillé plat par défaut. Les petits textes restent très peu mobiles. Le fond original reste fixe pendant l’aperçu.</div>
+      </section>
+    </div>
+  </section>
+
+</div>
+
+<script type="module" src="./relief-engine-v3321.js"></script>
+</body>
+</html>
