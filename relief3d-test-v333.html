@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>LentiPrint Lab — Relief 3D V3.3.3 + Carte pro 3D</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:1120px;margin:auto;padding:22px}
+h1{margin:0 0 8px}.sub{color:#555;margin-bottom:16px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{border:1px solid #ccc;background:#fff;color:#111;padding:10px 14px;border-radius:999px;font-weight:750;cursor:pointer}
+.tab.active{background:#111;color:#fff;border-color:#111}
+.panel{display:none}.panel.active{display:block}
+.card{background:#fff;border:1px solid #ddd;border-radius:18px;padding:18px}
+.grid{display:grid;grid-template-columns:340px 1fr;gap:18px}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+label{font-size:13px;font-weight:700;display:block;margin:13px 0 6px}
+input[type=file],button,select{font:inherit}
+input[type=range]{width:100%}
+select{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;background:#fff}
+button{border:0;border-radius:12px;padding:12px 15px;font-weight:750;background:#111;color:#fff;margin:8px 6px 0 0}
+button.secondary{background:#e8e8e8;color:#111}button:disabled{opacity:.45}
+.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;white-space:pre-wrap;font-size:13px}
+#view{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:4/3;object-fit:contain}
+.row{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.small{font-size:12px;color:#666;line-height:1.4;margin-top:8px}
+.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:8px}
+.support-stage{
+  min-height:620px;border-radius:18px;background:
+  radial-gradient(circle at 50% 38%,#f6f6f6 0,#e9e9e9 55%,#dddddd 100%);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative
+}
+.product{position:relative;transform-style:preserve-3d;will-change:transform}
+.card-product{
+  width:min(78vw,620px);aspect-ratio:85.60/53.98;border-radius:28px;overflow:hidden;
+  background:#0b3d91;box-shadow:0 28px 70px #0003, inset 0 0 0 2px #ffffff40;
+}
+.card-product::after{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(115deg,#ffffff00 20%,#ffffff32 48%,#ffffff00 70%);
+  transform:translateX(-120%);
+  animation:shine 4.5s ease-in-out infinite;
+}
+.medal-product{
+  width:min(68vw,470px);aspect-ratio:1;border-radius:50%;
+  background:linear-gradient(145deg,#d7d7d7,#f9f9f9 35%,#bcbcbc);
+  padding:18px;box-shadow:0 28px 70px #0003;
+}
+.medal-product::before{
+  content:"";position:absolute;width:66px;height:48px;border:16px solid #c5c5c5;border-bottom:0;
+  border-radius:36px 36px 0 0;left:50%;top:-48px;transform:translateX(-50%);z-index:-1
+}
+.medal-inner{width:100%;height:100%;border-radius:50%;overflow:hidden;background:#111}
+.support-canvas{width:100%;height:100%;display:block}
+.support-note{position:absolute;left:18px;bottom:16px;background:#0009;color:#fff;padding:8px 11px;border-radius:999px;font-size:12px}
+@keyframes shine{0%,35%{transform:translateX(-120%)}60%,100%{transform:translateX(120%)}}
+
+.pro-stage{position:relative;border-radius:16px;background:#111;overflow:hidden}
+#proCanvas{width:100%;display:block;touch-action:none;background:#111}
+.pro-overlay{position:absolute;inset:0;pointer-events:none}
+.pro-box{position:absolute;border:2px solid #fff;border-radius:6px;box-shadow:0 0 0 1px #0008}
+.pro-box.logo{border-style:solid}.pro-box.title{border-style:dashed}.pro-box.text{border-style:dotted}
+.pro-box.qr{border-width:3px}.pro-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.pro-item{border:1px solid #ddd;border-radius:12px;padding:10px;background:#fafafa}
+.pro-item-top{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.pro-item select{width:auto;min-width:120px;padding:7px}
+.pro-item input[type=range]{margin-top:8px}
+.pro-actions{display:flex;gap:8px;flex-wrap:wrap}
+.pro-hint{font-size:12px;color:#666;margin-top:8px}
+
+
+.pro-stage.selecting{outline:3px solid var(--viz-accent,#0a84ff);outline-offset:3px}
+#proSelection{
+  position:absolute;
+  border:3px solid #0a84ff;
+  background:rgba(10,132,255,.12);
+  border-radius:8px;
+  display:none;
+  pointer-events:none;
+  z-index:20;
+}
+#proSelection.active{display:block}
+#proSelectBanner{
+  display:none;
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:#e8f2ff;
+  color:#0b3d78;
+  font-weight:700;
+}
+#proSelectBanner.active{display:block}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>LentiPrint Lab — Relief 3D V3.3.3</h1>
+  <div class="sub">Relief 3D local + rendu support + mode Carte pro 3D multicouche — liaison Carte pro → Rendu support ajoutée.</div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="relief">Relief 3D</button>
+    <button class="tab" data-tab="support">Rendu support</button>
+    <button class="tab" data-tab="pro">Carte pro 3D</button>
+  </div>
+
+  <section id="panel-relief" class="panel active">
+    <div class="card grid">
+      <section>
+        <label>Photo</label>
+        <input id="file" type="file" accept="image/*">
+
+        <label>Force profondeur sujet</label>
+        <div class="row"><span>Volume interne</span><b id="subjectOut">0.30</b></div>
+        <input id="subjectDepth" type="range" min="0.10" max="0.55" step="0.01" value="0.30">
+
+        <label>Force profondeur fond</label>
+        <div class="row"><span>Décor</span><b id="bgOut">0.10</b></div>
+        <input id="bgDepth" type="range" min="0.02" max="0.25" step="0.01" value="0.10">
+
+        <label>Amplitude</label>
+        <div class="row"><span>Micro-orbite</span><b id="angleOut">±4°</b></div>
+        <input id="angle" type="range" min="2" max="8" step="1" value="4">
+
+        <label>Protection contours</label>
+        <div class="row"><span>Cheveux / détails fins</span><b id="edgeOut">84%</b></div>
+        <input id="edgeProtect" type="range" min="55" max="95" step="1" value="84">
+
+        <button id="build">Créer le relief 3D local</button>
+        <button id="export" class="secondary" disabled>Exporter 9 vues</button>
+        <button id="download" class="secondary" disabled>Télécharger ZIP</button>
+
+        <div id="status" class="status">Choisis une photo.</div>
+        <div class="small">Premier lancement : le navigateur télécharge les modèles IA locaux. Aucun crédit PixVerse ni clé Stability n’est nécessaire.</div>
+      </section>
+
+      <section>
+        <canvas id="view" width="1024" height="768"></canvas>
+        <div id="frames" class="frames"></div>
+      </section>
+    </div>
+  </section>
+
+  <section id="panel-support" class="panel">
+    <div class="card grid">
+      <section>
+        <label>Source du rendu</label>
+        <select id="supportSource">
+          <option value="relief">Relief photo</option>
+          <option value="pro">Carte pro 3D</option>
+        </select>
+
+        <label>Support</label>
+        <select id="supportType">
+          <option value="card">Carte format portefeuille</option>
+          <option value="medal">Médaillon rond</option>
+        </select>
+
+        <label>Rotation du support</label>
+        <div class="row"><span>Effet de présentation</span><b id="supportAngleOut">±8°</b></div>
+        <input id="supportAngle" type="range" min="0" max="14" step="1" value="8">
+
+        <label>Vitesse</label>
+        <div class="row"><span>Aller-retour</span><b id="supportSpeedOut">5.0 s</b></div>
+        <input id="supportSpeed" type="range" min="3" max="8" step="0.5" value="5">
+
+        <button id="supportPlay">Lancer l’aperçu support</button>
+        <button id="supportStop" class="secondary">Stop</button>
+
+        <div id="supportStatus" class="status">Crée d’abord le relief 3D dans le premier onglet.</div>
+        <div class="small">Cet onglet est uniquement une simulation visuelle du produit fini. Il peut utiliser le Relief photo ou la Carte pro 3D et ne modifie pas les 9 vues exportées.</div>
+      </section>
+
+      <section>
+        <div class="support-stage">
+          <div id="product" class="product card-product">
+            <canvas id="supportCanvas" class="support-canvas" width="1200" height="760"></canvas>
+          </div>
+          <div class="support-note">Aperçu marketing — pas fichier de production</div>
+        </div>
+      </section>
+    </div>
+  </section>
+  <section id="panel-pro" class="panel">
+    <div class="card grid">
+      <section>
+        <label>Maquette de carte</label>
+        <input id="proFile" type="file" accept="image/*">
+
+        <div class="pro-actions">
+          <button id="proAnalyze">Analyser la carte</button>
+          <button id="proAddZone" class="secondary">Ajouter une zone</button>
+          <button id="proCancelZone" class="secondary" style="display:none">Annuler la sélection</button>
+          <button id="proPreview" class="secondary" disabled>Aperçu 3D</button>
+          <button id="proExport" class="secondary" disabled>Exporter 9 vues</button>
+          <button id="proDownload" class="secondary" disabled>Télécharger ZIP</button>
+        </div>
+
+        <label>Amplitude générale</label>
+        <div class="row"><span>Parallaxe maximum</span><b id="proAmpOut">10 px</b></div>
+        <input id="proAmp" type="range" min="4" max="16" step="1" value="10">
+
+        <div id="proSelectBanner">Mode sélection actif — trace maintenant un rectangle sur le logo ou la zone voulue.</div>
+        <div id="proStatus" class="status">Importe une carte. Analyse automatique : texte + QR. Le logo peut être ajouté/corrigé manuellement.</div>
+        <div class="pro-hint">
+          Après analyse, touche « Ajouter une zone », puis trace un rectangle autour d’un logo ou d’un élément graphique.
+          Chaque bloc peut être classé Logo / Titre / Texte / QR et recevoir sa propre profondeur.
+        </div>
+
+        <div id="proList" class="pro-list"></div>
+      </section>
+
+      <section>
+        <div class="pro-stage">
+          <canvas id="proCanvas" width="1200" height="756"></canvas>
+          <div id="proOverlay" class="pro-overlay"></div>
+          <div id="proSelection"></div>
+        </div>
+        <div class="small">Le QR est verrouillé plat par défaut. Les petits textes restent très peu mobiles. Le fond original reste fixe pendant l’aperçu.</div>
+      </section>
+    </div>
+  </section>
+
+</div>
+
+<script type="module" src="./relief-engine-v333.js"></script>
+</body>
+</html>
