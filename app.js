@@ -1,2197 +1,2198 @@
-/* =========================================================
-   HAPPYHOLO / LENTICULAR LAB
-   app.js — VERSION 12
-   ---------------------------------------------------------
-   - Mode photo / 3D
-   - Mode animation / vidéo
-   - Vidéo source jusqu'à la durée disponible
-   - Zone de travail limitée à 5 secondes maximum
-   - Recherche automatique de la meilleure micro-séquence
-   - 9 vues exactement
-   - Analyse du mouvement lenticulaire utile
-   - Direction dominante
-   - Régularité des déplacements
-   - Pénalisation des retours / à-coups
-   - Pénalisation des changements de scène
-   - Extraction PNG
-   - Téléchargement ZIP
-   ========================================================= */
+/* ============================================================
+   HAPPYHOLO / LENTIPRINT
+   CORRECTION MANUELLE DU SUJET — MODULE V13
+   ------------------------------------------------------------
+   À COLLER TOUT À LA FIN DU app.js ACTUEL.
+
+   Ce module crée automatiquement :
+   - bouton "Corriger le sujet"
+   - éditeur plein écran
+   - Ajouter au masque
+   - Gomme / retirer
+   - Zoom + / -
+   - Pinch zoom iPad
+   - déplacement
+   - loupe de précision
+   - taille pinceau
+   - opacité masque
+   - Undo / Redo
+   - réinitialisation
+   - validation
+   - souris / doigt / Apple Pencil
+
+   Aucun HTML supplémentaire nécessaire.
+   Aucun CSS supplémentaire nécessaire.
+   ============================================================ */
 
 (() => {
   "use strict";
 
-  /* =========================================================
-     OUTILS DOM
-     ========================================================= */
+  /* ============================================================
+     SÉCURITÉ : NE PAS INITIALISER 2 FOIS
+     ============================================================ */
 
-  const $ = id => document.getElementById(id);
-
-  const imageInput = $("imageInput");
-
-  const mode3d = $("mode3d");
-  const modeAnim = $("modeAnim");
-
-  const animControls = $("animationControls");
-
-  const generateBtn = $("generateBtn");
-  const exportVideoBtn = $("exportVideoBtn");
-  const exportViewsBtn = $("exportViewsBtn");
-
-  const downloadVideo = $("downloadVideo");
-
-  const animGenerate = $("animGenerate");
-  const animExtract = $("animExtract");
-  const animDownloadZip = $("animDownloadZip");
-
-  /*
-    Ces éléments sont facultatifs.
-
-    Le JavaScript fonctionne même si certains n'existent
-    pas encore dans le HTML.
-  */
-
-  const preview = $("preview");
-  const videoPreview = $("videoPreview");
-
-  const animStatus =
-    $("animStatus") ||
-    $("status") ||
-    $("animationStatus");
-
-  const animProgress =
-    $("animProgress") ||
-    $("progress");
-
-  const animStart =
-    $("animStart") ||
-    $("clipStart") ||
-    $("videoStart");
-
-  const animEnd =
-    $("animEnd") ||
-    $("clipEnd") ||
-    $("videoEnd");
-
-  const animDuration =
-    $("animDuration") ||
-    $("clipDuration");
-
-  const animStartLabel =
-    $("animStartLabel") ||
-    $("startLabel");
-
-  const animEndLabel =
-    $("animEndLabel") ||
-    $("endLabel");
-
-  const animDurationLabel =
-    $("animDurationLabel") ||
-    $("durationLabel");
-
-  const viewsContainer =
-    $("viewsContainer") ||
-    $("animationViews") ||
-    $("viewsPreview");
-
-  /* =========================================================
-     CONSTANTES
-     ========================================================= */
-
-  const VIEW_COUNT = 9;
-
-  /*
-    L'utilisateur peut sélectionner au maximum
-    5 secondes dans une vidéo longue.
-  */
-
-  const MAX_WORKING_CLIP = 5.0;
-
-  /*
-    Durées testées pour trouver la meilleure micro-animation.
-
-    On cherche une séquence assez courte pour produire
-    un lenticulaire propre.
-
-    0,40 → 1,00 seconde.
-  */
-
-  const ANALYSIS_DURATIONS = [
-    0.40,
-    0.50,
-    0.60,
-    0.70,
-    0.80,
-    0.90,
-    1.00
-  ];
-
-  /*
-    Résolution basse utilisée uniquement pour analyser
-    les mouvements.
-
-    L'extraction finale conserve la résolution vidéo.
-  */
-
-  const ANALYSIS_WIDTH = 96;
-  const ANALYSIS_HEIGHT = 96;
-
-  /*
-    Déplacement maximum recherché entre deux images
-    de l'analyse basse résolution.
-  */
-
-  const MAX_SHIFT_X = 12;
-  const MAX_SHIFT_Y = 8;
-
-  /*
-    Nombre maximal de positions candidates analysées.
-
-    Permet d'éviter une analyse inutilement longue.
-  */
-
-  const MAX_CANDIDATES = 34;
-
-  /* =========================================================
-     ÉTAT
-     ========================================================= */
-
-  let currentFile = null;
-  let currentObjectURL = null;
-
-  let sourceVideo = null;
-
-  let sourceDuration = 0;
-
-  let workingStart = 0;
-  let workingEnd = 0;
-
-  let bestSequence = null;
-
-  let extractedViews = [];
-
-  let analysisRunning = false;
-
-  /* =========================================================
-     CANVAS D'ANALYSE
-     ========================================================= */
-
-  const analysisCanvas = document.createElement("canvas");
-
-  analysisCanvas.width = ANALYSIS_WIDTH;
-  analysisCanvas.height = ANALYSIS_HEIGHT;
-
-  const analysisCtx = analysisCanvas.getContext("2d", {
-    willReadFrequently: true
-  });
-
-  /* =========================================================
-     AFFICHAGE
-     ========================================================= */
-
-  function setStatus(message) {
-    if (animStatus) {
-      animStatus.textContent = message;
-    }
-
-    console.log("[LENTI]", message);
+  if (window.HappyHoloMaskEditorInstalled) {
+    console.log("[MASK] Module déjà installé.");
+    return;
   }
 
-  function setProgress(value) {
-    const v = Math.max(0, Math.min(100, value));
+  window.HappyHoloMaskEditorInstalled = true;
 
-    if (!animProgress) return;
+  /* ============================================================
+     ÉTAT GLOBAL DU MODULE
+     ============================================================ */
 
-    if (
-      animProgress.tagName &&
-      animProgress.tagName.toLowerCase() === "progress"
-    ) {
-      animProgress.value = v;
-      animProgress.max = 100;
-    } else {
-      animProgress.style.width = `${v}%`;
-      animProgress.textContent = `${Math.round(v)}%`;
-    }
-  }
+  const state = {
+    sourceImage: null,
 
-  function formatTime(seconds) {
-    if (!Number.isFinite(seconds)) return "0.00 s";
+    imageCanvas: null,
+    imageCtx: null,
 
-    return `${seconds.toFixed(2)} s`;
-  }
+    maskCanvas: null,
+    maskCtx: null,
 
-  function updateTimeLabels() {
-    if (animStartLabel) {
-      animStartLabel.textContent = formatTime(workingStart);
-    }
+    displayCanvas: null,
+    displayCtx: null,
 
-    if (animEndLabel) {
-      animEndLabel.textContent = formatTime(workingEnd);
-    }
+    loupeCanvas: null,
+    loupeCtx: null,
 
-    if (animDurationLabel) {
-      animDurationLabel.textContent =
-        formatTime(workingEnd - workingStart);
-    }
+    modal: null,
 
-    if (animDuration) {
-      if ("value" in animDuration) {
-        animDuration.value =
-          (workingEnd - workingStart).toFixed(2);
-      }
-    }
-  }
+    tool: "add",
 
-  /* =========================================================
-     MODE PHOTO / ANIMATION
-     ========================================================= */
+    brushSize: 35,
+    hardness: 0.85,
+    maskOpacity: 0.45,
 
-  function updateModeUI() {
-    const animationMode =
-      modeAnim &&
-      (
-        modeAnim.checked ||
-        modeAnim.classList.contains("active")
-      );
+    zoom: 1,
+    minZoom: 0.1,
+    maxZoom: 12,
 
-    if (animControls) {
-      animControls.style.display =
-        animationMode ? "" : "none";
-    }
-  }
+    panX: 0,
+    panY: 0,
 
-  if (mode3d) {
-    mode3d.addEventListener("change", updateModeUI);
-    mode3d.addEventListener("click", updateModeUI);
-  }
+    pointerX: 0,
+    pointerY: 0,
 
-  if (modeAnim) {
-    modeAnim.addEventListener("change", updateModeUI);
-    modeAnim.addEventListener("click", updateModeUI);
-  }
+    drawing: false,
+    panning: false,
 
-  updateModeUI();
+    lastImageX: 0,
+    lastImageY: 0,
 
-  /* =========================================================
-     NETTOYAGE
-     ========================================================= */
+    panStartX: 0,
+    panStartY: 0,
 
-  function resetAnimationState() {
-    bestSequence = null;
+    history: [],
+    redo: [],
 
-    extractedViews.forEach(view => {
-      if (view.url) {
-        URL.revokeObjectURL(view.url);
-      }
-    });
+    maxHistory: 20,
 
-    extractedViews = [];
+    showMask: true,
+    loupeEnabled: true,
+    loupeZoom: 4,
 
-    if (viewsContainer) {
-      viewsContainer.innerHTML = "";
-    }
+    initialMaskSnapshot: null,
 
-    setProgress(0);
+    pointers: new Map(),
+    pinchStartDistance: 0,
+    pinchStartZoom: 1,
+    pinchCenterX: 0,
+    pinchCenterY: 0
+  };
 
-    if (animDownloadZip) {
-      animDownloadZip.disabled = true;
-    }
+  /* ============================================================
+     PETITS OUTILS
+     ============================================================ */
 
-    if (animExtract) {
-      animExtract.disabled = true;
-    }
-  }
+  const clamp = (v, min, max) =>
+    Math.max(min, Math.min(max, v));
 
-  /* =========================================================
-     CHARGEMENT FICHIER
-     ========================================================= */
+  function create(tag, props = {}, parent = null) {
+    const el = document.createElement(tag);
 
-  if (imageInput) {
-    imageInput.addEventListener("change", async event => {
-      const file = event.target.files?.[0];
-
-      if (!file) return;
-
-      currentFile = file;
-
-      resetAnimationState();
-
-      if (currentObjectURL) {
-        URL.revokeObjectURL(currentObjectURL);
-        currentObjectURL = null;
-      }
-
-      currentObjectURL = URL.createObjectURL(file);
-
-      if (file.type.startsWith("video/")) {
-        await loadVideo(file);
-      } else if (file.type.startsWith("image/")) {
-        loadImage(file);
+    Object.entries(props).forEach(([key, value]) => {
+      if (key === "style") {
+        Object.assign(el.style, value);
+      } else if (key === "className") {
+        el.className = value;
+      } else if (key === "text") {
+        el.textContent = value;
+      } else if (key === "html") {
+        el.innerHTML = value;
       } else {
-        setStatus("Format de fichier non reconnu.");
+        el[key] = value;
       }
     });
-  }
 
-  /* =========================================================
-     IMAGE
-     ========================================================= */
-
-  function loadImage(file) {
-    setStatus("Image chargée.");
-
-    if (!preview) return;
-
-    if (preview.tagName.toLowerCase() === "img") {
-      preview.src = currentObjectURL;
-    } else {
-      preview.innerHTML = "";
-
-      const img = document.createElement("img");
-      img.src = currentObjectURL;
-      img.alt = "Image source";
-      img.style.maxWidth = "100%";
-
-      preview.appendChild(img);
+    if (parent) {
+      parent.appendChild(el);
     }
+
+    return el;
   }
 
-  /* =========================================================
-     VIDÉO
-     ========================================================= */
-
-  async function loadVideo(file) {
-    setStatus("Chargement de la vidéo…");
-
-    sourceVideo =
-      videoPreview ||
-      document.createElement("video");
-
-    sourceVideo.preload = "auto";
-    sourceVideo.muted = true;
-    sourceVideo.playsInline = true;
-
-    sourceVideo.src = currentObjectURL;
-
-    await waitForVideoMetadata(sourceVideo);
-
-    sourceDuration = sourceVideo.duration || 0;
-
-    /*
-      Par défaut :
-      on prend les 5 premières secondes maximum.
-
-      L'utilisateur peut ensuite déplacer la plage.
-    */
-
-    workingStart = 0;
-
-    workingEnd = Math.min(
-      sourceDuration,
-      MAX_WORKING_CLIP
+  function button(text, parent, onClick, accent = false) {
+    const b = create(
+      "button",
+      {
+        type: "button",
+        text,
+        style: {
+          border: accent
+            ? "1px solid #42a5ff"
+            : "1px solid #444",
+          background: accent
+            ? "#1677d2"
+            : "#242424",
+          color: "#fff",
+          borderRadius: "10px",
+          padding: "10px 14px",
+          fontSize: "15px",
+          fontWeight: "600",
+          cursor: "pointer",
+          minHeight: "42px",
+          touchAction: "manipulation"
+        }
+      },
+      parent
     );
 
-    configureTimelineInputs();
+    b.addEventListener("click", onClick);
 
-    updateTimeLabels();
-
-    setStatus(
-      `Vidéo chargée — ${formatTime(sourceDuration)}. ` +
-      `Zone de travail : ${formatTime(workingEnd - workingStart)} maximum.`
-    );
-
-    if (animGenerate) {
-      animGenerate.disabled = false;
-    }
+    return b;
   }
 
-  function waitForVideoMetadata(video) {
-    return new Promise((resolve, reject) => {
+  /* ============================================================
+     TROUVER L'IMAGE ACTUELLE DU SITE
+     ============================================================ */
+
+  function findCurrentImage() {
+    const preview =
+      document.getElementById("preview");
+
+    if (preview) {
       if (
-        video.readyState >= 1 &&
-        Number.isFinite(video.duration)
+        preview.tagName &&
+        preview.tagName.toLowerCase() === "img" &&
+        preview.src
       ) {
-        resolve();
-        return;
+        return preview;
       }
 
-      const onLoaded = () => {
-        cleanup();
-        resolve();
-      };
+      const img =
+        preview.querySelector?.("img");
 
-      const onError = () => {
-        cleanup();
-        reject(
-          new Error("Impossible de lire la vidéo.")
+      if (img && img.src) {
+        return img;
+      }
+    }
+
+    /*
+      Recherche de secours :
+      première image utilisable de grande taille.
+    */
+
+    const candidates =
+      [...document.images].filter(img => {
+        return (
+          img.src &&
+          img.complete &&
+          img.naturalWidth > 200 &&
+          img.naturalHeight > 200
         );
-      };
+      });
 
-      const cleanup = () => {
-        video.removeEventListener(
-          "loadedmetadata",
-          onLoaded
-        );
+    return candidates[0] || null;
+  }
 
-        video.removeEventListener(
-          "error",
-          onError
-        );
-      };
+  /* ============================================================
+     OUVERTURE
+     ============================================================ */
 
-      video.addEventListener(
-        "loadedmetadata",
-        onLoaded
+  async function openEditor() {
+    const img = findCurrentImage();
+
+    if (!img) {
+      alert(
+        "Charge d'abord une photo avant de corriger le sujet."
       );
-
-      video.addEventListener(
-        "error",
-        onError
-      );
-    });
-  }
-
-  /* =========================================================
-     PLAGE VIDÉO
-     ========================================================= */
-
-  function configureTimelineInputs() {
-    if (animStart) {
-      animStart.min = 0;
-      animStart.max = sourceDuration;
-      animStart.step = 0.01;
-      animStart.value = workingStart;
-    }
-
-    if (animEnd) {
-      animEnd.min = 0;
-      animEnd.max = sourceDuration;
-      animEnd.step = 0.01;
-      animEnd.value = workingEnd;
-    }
-  }
-
-  function normalizeWorkingRange(changed) {
-    if (!sourceVideo) return;
-
-    let start = animStart
-      ? Number(animStart.value)
-      : workingStart;
-
-    let end = animEnd
-      ? Number(animEnd.value)
-      : workingEnd;
-
-    start = Math.max(
-      0,
-      Math.min(start, sourceDuration)
-    );
-
-    end = Math.max(
-      0,
-      Math.min(end, sourceDuration)
-    );
-
-    /*
-      Minimum raisonnable.
-    */
-
-    const minimumDuration = 0.40;
-
-    if (changed === "start") {
-      if (end - start > MAX_WORKING_CLIP) {
-        end = start + MAX_WORKING_CLIP;
-      }
-
-      if (end - start < minimumDuration) {
-        end = Math.min(
-          sourceDuration,
-          start + minimumDuration
-        );
-      }
-    }
-
-    if (changed === "end") {
-      if (end - start > MAX_WORKING_CLIP) {
-        start = end - MAX_WORKING_CLIP;
-      }
-
-      if (end - start < minimumDuration) {
-        start = Math.max(
-          0,
-          end - minimumDuration
-        );
-      }
-    }
-
-    /*
-      Sécurité absolue :
-      jamais plus de 5 secondes.
-    */
-
-    if (end - start > MAX_WORKING_CLIP) {
-      end = start + MAX_WORKING_CLIP;
-    }
-
-    workingStart = start;
-    workingEnd = end;
-
-    if (animStart) {
-      animStart.value = workingStart;
-    }
-
-    if (animEnd) {
-      animEnd.value = workingEnd;
-    }
-
-    updateTimeLabels();
-
-    resetAnimationState();
-
-    if (animGenerate) {
-      animGenerate.disabled = false;
-    }
-  }
-
-  if (animStart) {
-    animStart.addEventListener("input", () => {
-      normalizeWorkingRange("start");
-    });
-  }
-
-  if (animEnd) {
-    animEnd.addEventListener("input", () => {
-      normalizeWorkingRange("end");
-    });
-  }
-
-  /* =========================================================
-     POSITIONNEMENT VIDÉO
-     ========================================================= */
-
-  function seekVideo(video, time) {
-    return new Promise((resolve, reject) => {
-      const target = Math.max(
-        0,
-        Math.min(
-          time,
-          Math.max(0, video.duration - 0.001)
-        )
-      );
-
-      if (
-        Math.abs(video.currentTime - target) < 0.002
-      ) {
-        resolve();
-        return;
-      }
-
-      const onSeeked = () => {
-        cleanup();
-        resolve();
-      };
-
-      const onError = () => {
-        cleanup();
-        reject(
-          new Error("Erreur pendant le déplacement vidéo.")
-        );
-      };
-
-      const cleanup = () => {
-        video.removeEventListener(
-          "seeked",
-          onSeeked
-        );
-
-        video.removeEventListener(
-          "error",
-          onError
-        );
-      };
-
-      video.addEventListener(
-        "seeked",
-        onSeeked,
-        { once: true }
-      );
-
-      video.addEventListener(
-        "error",
-        onError,
-        { once: true }
-      );
-
-      video.currentTime = target;
-    });
-  }
-
-  /* =========================================================
-     CAPTURE D'UNE IMAGE BASSE RÉSOLUTION
-     POUR ANALYSE
-     ========================================================= */
-
-  async function captureAnalysisFrame(time) {
-    await seekVideo(sourceVideo, time);
-
-    analysisCtx.drawImage(
-      sourceVideo,
-      0,
-      0,
-      ANALYSIS_WIDTH,
-      ANALYSIS_HEIGHT
-    );
-
-    const imageData = analysisCtx.getImageData(
-      0,
-      0,
-      ANALYSIS_WIDTH,
-      ANALYSIS_HEIGHT
-    );
-
-    const data = imageData.data;
-
-    const gray = new Uint8Array(
-      ANALYSIS_WIDTH * ANALYSIS_HEIGHT
-    );
-
-    /*
-      Conversion luminance.
-    */
-
-    for (
-      let i = 0, j = 0;
-      i < data.length;
-      i += 4, j++
-    ) {
-      gray[j] =
-        0.299 * data[i] +
-        0.587 * data[i + 1] +
-        0.114 * data[i + 2];
-    }
-
-    return gray;
-  }
-
-  /* =========================================================
-     ESTIMATION DU DÉPLACEMENT ENTRE DEUX IMAGES
-     ========================================================= */
-
-  function estimateShift(frameA, frameB) {
-    let bestScore = Infinity;
-    let bestDx = 0;
-    let bestDy = 0;
-
-    /*
-      On ignore un peu les bords pour éviter que
-      les changements extérieurs dominent le résultat.
-    */
-
-    const marginX = MAX_SHIFT_X + 6;
-    const marginY = MAX_SHIFT_Y + 6;
-
-    /*
-      Pas de 2 pixels pour accélérer l'analyse.
-    */
-
-    const sampleStep = 2;
-
-    for (
-      let dy = -MAX_SHIFT_Y;
-      dy <= MAX_SHIFT_Y;
-      dy++
-    ) {
-      for (
-        let dx = -MAX_SHIFT_X;
-        dx <= MAX_SHIFT_X;
-        dx++
-      ) {
-        let difference = 0;
-        let count = 0;
-
-        for (
-          let y = marginY;
-          y < ANALYSIS_HEIGHT - marginY;
-          y += sampleStep
-        ) {
-          const shiftedY = y + dy;
-
-          for (
-            let x = marginX;
-            x < ANALYSIS_WIDTH - marginX;
-            x += sampleStep
-          ) {
-            const shiftedX = x + dx;
-
-            const a =
-              frameA[
-                y * ANALYSIS_WIDTH + x
-              ];
-
-            const b =
-              frameB[
-                shiftedY * ANALYSIS_WIDTH +
-                shiftedX
-              ];
-
-            difference += Math.abs(a - b);
-            count++;
-          }
-        }
-
-        if (!count) continue;
-
-        const score = difference / count;
-
-        if (score < bestScore) {
-          bestScore = score;
-          bestDx = dx;
-          bestDy = dy;
-        }
-      }
-    }
-
-    return {
-      dx: bestDx,
-      dy: bestDy,
-      error: bestScore
-    };
-  }
-
-  /* =========================================================
-     DIFFÉRENCE VISUELLE BRUTE
-     ========================================================= */
-
-  function frameDifference(frameA, frameB) {
-    let total = 0;
-
-    const step = 4;
-
-    for (
-      let i = 0;
-      i < frameA.length;
-      i += step
-    ) {
-      total += Math.abs(
-        frameA[i] - frameB[i]
-      );
-    }
-
-    return (
-      total /
-      Math.ceil(frameA.length / step)
-    );
-  }
-
-  /* =========================================================
-     MATHS
-     ========================================================= */
-
-  function mean(values) {
-    if (!values.length) return 0;
-
-    return (
-      values.reduce(
-        (sum, value) => sum + value,
-        0
-      ) / values.length
-    );
-  }
-
-  function standardDeviation(values) {
-    if (!values.length) return 0;
-
-    const avg = mean(values);
-
-    const variance =
-      mean(
-        values.map(value => {
-          const d = value - avg;
-          return d * d;
-        })
-      );
-
-    return Math.sqrt(variance);
-  }
-
-  function vectorLength(x, y) {
-    return Math.sqrt(x * x + y * y);
-  }
-
-  function clamp(value, min, max) {
-    return Math.max(
-      min,
-      Math.min(max, value)
-    );
-  }
-
-  /* =========================================================
-     ANALYSE D'UNE SÉQUENCE DE 9 VUES
-     ========================================================= */
-
-  async function analyseSequence(start, duration) {
-    const interval =
-      duration / (VIEW_COUNT - 1);
-
-    const times = [];
-
-    for (let i = 0; i < VIEW_COUNT; i++) {
-      times.push(
-        start + interval * i
-      );
-    }
-
-    const frames = [];
-
-    for (let i = 0; i < VIEW_COUNT; i++) {
-      frames.push(
-        await captureAnalysisFrame(times[i])
-      );
-    }
-
-    const shifts = [];
-    const differences = [];
-
-    /*
-      Analyse chaque transition.
-    */
-
-    for (
-      let i = 0;
-      i < VIEW_COUNT - 1;
-      i++
-    ) {
-      const shift = estimateShift(
-        frames[i],
-        frames[i + 1]
-      );
-
-      shifts.push(shift);
-
-      differences.push(
-        frameDifference(
-          frames[i],
-          frames[i + 1]
-        )
-      );
-    }
-
-    /* =====================================================
-       1 — DÉPLACEMENT DE CHAQUE PAS
-       ===================================================== */
-
-    const stepLengths = shifts.map(s =>
-      vectorLength(s.dx, s.dy)
-    );
-
-    const averageStep = mean(stepLengths);
-
-    const stepDeviation =
-      standardDeviation(stepLengths);
-
-    /*
-      Plus cette valeur est proche de 1,
-      plus la vitesse est régulière.
-    */
-
-    const regularity =
-      averageStep > 0
-        ? clamp(
-            1 -
-            stepDeviation /
-              (averageStep + 0.001),
-            0,
-            1
-          )
-        : 0;
-
-    /* =====================================================
-       2 — DÉPLACEMENT TOTAL
-       ===================================================== */
-
-    let totalDx = 0;
-    let totalDy = 0;
-
-    for (const shift of shifts) {
-      totalDx += shift.dx;
-      totalDy += shift.dy;
-    }
-
-    const netTravel = vectorLength(
-      totalDx,
-      totalDy
-    );
-
-    const travelledDistance =
-      stepLengths.reduce(
-        (sum, v) => sum + v,
-        0
-      );
-
-    /*
-      Ratio fondamental.
-
-      1.0 =
-      mouvement parfaitement progressif.
-
-      0 =
-      beaucoup de mouvement mais on revient
-      presque au point de départ.
-    */
-
-    const travelRatio =
-      travelledDistance > 0
-        ? netTravel /
-          travelledDistance
-        : 0;
-
-    /* =====================================================
-       3 — DIRECTION DOMINANTE
-       ===================================================== */
-
-    let dominantX =
-      Math.abs(totalDx) >=
-      Math.abs(totalDy);
-
-    let directionReversals = 0;
-
-    let previousSign = 0;
-
-    for (const shift of shifts) {
-      const component =
-        dominantX
-          ? shift.dx
-          : shift.dy;
-
-      const sign =
-        Math.abs(component) < 0.5
-          ? 0
-          : Math.sign(component);
-
-      if (
-        sign !== 0 &&
-        previousSign !== 0 &&
-        sign !== previousSign
-      ) {
-        directionReversals++;
-      }
-
-      if (sign !== 0) {
-        previousSign = sign;
-      }
-    }
-
-    /*
-      Score directionnel.
-
-      1 = jamais de retour.
-    */
-
-    const directionScore =
-      clamp(
-        1 -
-          directionReversals /
-            (VIEW_COUNT - 2),
-        0,
-        1
-      );
-
-    /* =====================================================
-       4 — HORIZONTALITÉ
-       ===================================================== */
-
-    /*
-      Pour un lenticulaire à lentilles verticales,
-      le mouvement horizontal est généralement
-      le plus intéressant.
-
-      On ne supprime pas complètement un mouvement
-      vertical, mais on privilégie clairement X.
-    */
-
-    const horizontalRatio =
-      netTravel > 0
-        ? Math.abs(totalDx) /
-          (
-            Math.abs(totalDx) +
-            Math.abs(totalDy) +
-            0.001
-          )
-        : 0;
-
-    /* =====================================================
-       5 — CHANGEMENT DE SCÈNE / MOUVEMENT PARASITE
-       ===================================================== */
-
-    const avgDifference =
-      mean(differences);
-
-    const differenceDeviation =
-      standardDeviation(differences);
-
-    /*
-      Une variation brutale de différence visuelle
-      indique souvent :
-      - changement de scène,
-      - gros mouvement caméra,
-      - flash,
-      - objet qui traverse l'image.
-    */
-
-    const visualInstability =
-      avgDifference > 0
-        ? differenceDeviation /
-          avgDifference
-        : 0;
-
-    const visualStability =
-      clamp(
-        1 - visualInstability,
-        0,
-        1
-      );
-
-    /* =====================================================
-       6 — ERREUR DE CORRÉLATION
-       ===================================================== */
-
-    const correlationErrors =
-      shifts.map(s => s.error);
-
-    const averageCorrelationError =
-      mean(correlationErrors);
-
-    /*
-      Plus l'erreur est élevée,
-      moins les images se ressemblent après compensation
-      du déplacement.
-
-      Donc moins le mouvement ressemble à une
-      progression lenticulaire propre.
-    */
-
-    const correlationScore =
-      clamp(
-        1 -
-          averageCorrelationError /
-            70,
-        0,
-        1
-      );
-
-    /* =====================================================
-       7 — AMPLITUDE UTILE
-       ===================================================== */
-
-    /*
-      Un mouvement trop faible ne donnera quasiment
-      aucun effet.
-
-      Un mouvement gigantesque donnera des sauts.
-
-      Zone cible dans notre analyse 96 px :
-      environ 6 à 35 px de déplacement net.
-    */
-
-    let amplitudeScore = 0;
-
-    if (netTravel < 2) {
-      amplitudeScore =
-        netTravel / 2 * 0.2;
-    } else if (netTravel < 6) {
-      amplitudeScore =
-        0.2 +
-        ((netTravel - 2) / 4) * 0.5;
-    } else if (netTravel <= 30) {
-      amplitudeScore = 1;
-    } else if (netTravel <= 50) {
-      amplitudeScore =
-        1 -
-        ((netTravel - 30) / 20) *
-          0.6;
-    } else {
-      amplitudeScore = 0.25;
-    }
-
-    amplitudeScore =
-      clamp(amplitudeScore, 0, 1);
-
-    /* =====================================================
-       8 — VITESSE ENTRE LES IMAGES
-       ===================================================== */
-
-    /*
-      On cherche des pas ni trop petits
-      ni trop importants.
-    */
-
-    let stepSizeScore;
-
-    if (averageStep < 0.5) {
-      stepSizeScore = 0;
-    } else if (averageStep < 1.5) {
-      stepSizeScore =
-        (averageStep - 0.5) / 1;
-    } else if (averageStep <= 5.5) {
-      stepSizeScore = 1;
-    } else if (averageStep <= 9) {
-      stepSizeScore =
-        1 -
-        ((averageStep - 5.5) / 3.5) *
-          0.7;
-    } else {
-      stepSizeScore = 0.2;
-    }
-
-    stepSizeScore =
-      clamp(stepSizeScore, 0, 1);
-
-    /* =====================================================
-       9 — SCORE GLOBAL LENTICULAIRE
-       ===================================================== */
-
-    /*
-      Pondérations V12.
-
-      Le critère n°1 n'est plus :
-      "il y a beaucoup de mouvement".
-
-      C'est :
-      "le mouvement est progressif et exploitable".
-    */
-
-    let score = 0;
-
-    score += travelRatio * 30;
-    score += regularity * 20;
-    score += directionScore * 14;
-    score += horizontalRatio * 10;
-    score += amplitudeScore * 10;
-    score += stepSizeScore * 7;
-    score += visualStability * 5;
-    score += correlationScore * 4;
-
-    /* =====================================================
-       PÉNALITÉS FORTES
-       ===================================================== */
-
-    /*
-      Retour arrière important.
-    */
-
-    if (travelRatio < 0.35) {
-      score -= 20;
-    } else if (travelRatio < 0.50) {
-      score -= 10;
-    }
-
-    /*
-      Trop de changements de direction.
-    */
-
-    score -= directionReversals * 5;
-
-    /*
-      Animation presque immobile.
-    */
-
-    if (netTravel < 2) {
-      score -= 20;
-    }
-
-    /*
-      Image complètement instable.
-    */
-
-    if (visualInstability > 1.25) {
-      score -= 12;
-    }
-
-    /*
-      Mouvement extrêmement irrégulier.
-    */
-
-    if (
-      averageStep > 0 &&
-      stepDeviation >
-        averageStep * 0.85
-    ) {
-      score -= 12;
-    }
-
-    return {
-      start,
-      end: start + duration,
-      duration,
-      times,
-
-      score,
-
-      shifts,
-
-      averageStep,
-      stepDeviation,
-
-      regularity,
-
-      totalDx,
-      totalDy,
-
-      netTravel,
-      travelledDistance,
-      travelRatio,
-
-      dominantAxis:
-        dominantX ? "horizontal" : "vertical",
-
-      directionReversals,
-      directionScore,
-
-      horizontalRatio,
-
-      avgDifference,
-      visualStability,
-
-      averageCorrelationError,
-      correlationScore,
-
-      amplitudeScore,
-      stepSizeScore
-    };
-  }
-
-  /* =========================================================
-     CRÉATION DES POSITIONS CANDIDATES
-     ========================================================= */
-
-  function createCandidateStarts(
-    rangeStart,
-    rangeEnd,
-    duration
-  ) {
-    const available =
-      rangeEnd -
-      rangeStart -
-      duration;
-
-    if (available <= 0) {
-      return [rangeStart];
-    }
-
-    /*
-      Plus la zone est longue, plus on teste
-      de positions.
-    */
-
-    let count = Math.ceil(
-      available / 0.10
-    ) + 1;
-
-    count = Math.min(
-      MAX_CANDIDATES,
-      Math.max(2, count)
-    );
-
-    const starts = [];
-
-    for (let i = 0; i < count; i++) {
-      const ratio =
-        count === 1
-          ? 0
-          : i / (count - 1);
-
-      starts.push(
-        rangeStart +
-        available * ratio
-      );
-    }
-
-    return starts;
-  }
-
-  /* =========================================================
-     RECHERCHE AUTOMATIQUE
-     ========================================================= */
-
-  async function findBestSequence() {
-    if (!sourceVideo) {
-      throw new Error(
-        "Aucune vidéo chargée."
-      );
-    }
-
-    if (analysisRunning) {
-      return bestSequence;
-    }
-
-    analysisRunning = true;
-
-    resetAnimationState();
-
-    setStatus(
-      "Recherche de la meilleure séquence lenticulaire…"
-    );
-
-    setProgress(1);
-
-    try {
-      const rangeDuration =
-        workingEnd - workingStart;
-
-      let candidateDefinitions = [];
-
-      for (
-        const duration of ANALYSIS_DURATIONS
-      ) {
-        if (
-          duration >
-          rangeDuration + 0.001
-        ) {
-          continue;
-        }
-
-        const starts =
-          createCandidateStarts(
-            workingStart,
-            workingEnd,
-            duration
-          );
-
-        for (const start of starts) {
-          candidateDefinitions.push({
-            start,
-            duration
-          });
-        }
-      }
-
-      /*
-        On limite le nombre global de candidats
-        pour garder l'application fluide.
-      */
-
-      if (
-        candidateDefinitions.length >
-        MAX_CANDIDATES
-      ) {
-        const reduced = [];
-
-        const last =
-          candidateDefinitions.length - 1;
-
-        for (
-          let i = 0;
-          i < MAX_CANDIDATES;
-          i++
-        ) {
-          const index =
-            Math.round(
-              (i /
-                (MAX_CANDIDATES - 1)) *
-                last
-            );
-
-          reduced.push(
-            candidateDefinitions[index]
-          );
-        }
-
-        candidateDefinitions = reduced;
-      }
-
-      let best = null;
-
-      for (
-        let i = 0;
-        i < candidateDefinitions.length;
-        i++
-      ) {
-        const candidate =
-          candidateDefinitions[i];
-
-        const result =
-          await analyseSequence(
-            candidate.start,
-            candidate.duration
-          );
-
-        if (
-          !best ||
-          result.score > best.score
-        ) {
-          best = result;
-        }
-
-        const progress =
-          5 +
-          ((i + 1) /
-            candidateDefinitions.length) *
-            85;
-
-        setProgress(progress);
-      }
-
-      if (!best) {
-        throw new Error(
-          "Aucune séquence exploitable trouvée."
-        );
-      }
-
-      bestSequence = best;
-
-      setProgress(100);
-
-      printAnalysis(best);
-
-      if (animExtract) {
-        animExtract.disabled = false;
-      }
-
-      return best;
-    } finally {
-      analysisRunning = false;
-    }
-  }
-
-  /* =========================================================
-     RÉSULTAT ANALYSE
-     ========================================================= */
-
-  function printAnalysis(result) {
-    const quality =
-      getQualityLabel(result);
-
-    const message =
-      `${quality} — ` +
-      `séquence ${result.start.toFixed(3)} s → ` +
-      `${result.end.toFixed(3)} s ` +
-      `(${result.duration.toFixed(2)} s). ` +
-      `Score ${result.score.toFixed(1)} / 100 — ` +
-      `progression ${(result.travelRatio * 100).toFixed(0)} % — ` +
-      `régularité ${(result.regularity * 100).toFixed(0)} %.`;
-
-    setStatus(message);
-
-    console.table({
-      debut: result.start.toFixed(3),
-      fin: result.end.toFixed(3),
-      duree: result.duration.toFixed(3),
-
-      score: result.score.toFixed(2),
-
-      pasMoyen:
-        result.averageStep.toFixed(2),
-
-      deviation:
-        result.stepDeviation.toFixed(2),
-
-      regularite:
-        result.regularity.toFixed(3),
-
-      deplacementX:
-        result.totalDx.toFixed(2),
-
-      deplacementY:
-        result.totalDy.toFixed(2),
-
-      deplacementNet:
-        result.netTravel.toFixed(2),
-
-      distanceTotale:
-        result.travelledDistance.toFixed(2),
-
-      travelRatio:
-        result.travelRatio.toFixed(3),
-
-      axe:
-        result.dominantAxis,
-
-      retours:
-        result.directionReversals,
-
-      horizontal:
-        result.horizontalRatio.toFixed(3),
-
-      stabiliteVisuelle:
-        result.visualStability.toFixed(3)
-    });
-
-    console.table(
-      result.shifts.map(
-        (shift, index) => ({
-          transition:
-            `${index + 1} → ${index + 2}`,
-
-          dx: shift.dx,
-          dy: shift.dy,
-
-          distance:
-            vectorLength(
-              shift.dx,
-              shift.dy
-            ).toFixed(2),
-
-          erreur:
-            shift.error.toFixed(2)
-        })
-      )
-    );
-  }
-
-  function getQualityLabel(result) {
-    /*
-      On ne se contente pas du score global.
-
-      Certaines conditions sont obligatoires.
-    */
-
-    if (
-      result.travelRatio >= 0.72 &&
-      result.regularity >= 0.65 &&
-      result.directionReversals <= 1 &&
-      result.score >= 65
-    ) {
-      return "Excellent mouvement lenticulaire";
-    }
-
-    if (
-      result.travelRatio >= 0.55 &&
-      result.regularity >= 0.48 &&
-      result.score >= 52
-    ) {
-      return "Bon mouvement lenticulaire";
-    }
-
-    if (
-      result.travelRatio >= 0.40 &&
-      result.score >= 40
-    ) {
-      return "Mouvement lenticulaire acceptable";
-    }
-
-    return "Mouvement lenticulaire faible";
-  }
-
-  /* =========================================================
-     BOUTON ANALYSER / GÉNÉRER
-     ========================================================= */
-
-  if (animGenerate) {
-    animGenerate.addEventListener(
-      "click",
-      async () => {
-        try {
-          animGenerate.disabled = true;
-
-          await findBestSequence();
-        } catch (error) {
-          console.error(error);
-
-          setStatus(
-            error.message ||
-            "Erreur pendant l'analyse."
-          );
-        } finally {
-          animGenerate.disabled = false;
-        }
-      }
-    );
-  }
-
-  /* =========================================================
-     EXTRACTION PLEINE RÉSOLUTION
-     ========================================================= */
-
-  async function captureFullResolutionFrame(time) {
-    await seekVideo(
-      sourceVideo,
-      time
-    );
-
-    const width =
-      sourceVideo.videoWidth;
-
-    const height =
-      sourceVideo.videoHeight;
-
-    if (!width || !height) {
-      throw new Error(
-        "Résolution vidéo indisponible."
-      );
-    }
-
-    /*
-      Sortie carrée.
-
-      On conserve le principe utilisé pour
-      nos 772 × 772 précédents.
-
-      Ici on utilise la plus petite dimension
-      de la vidéo pour obtenir un carré sans
-      déformation.
-    */
-
-    const sourceSize =
-      Math.min(width, height);
-
-    const sx =
-      (width - sourceSize) / 2;
-
-    const sy =
-      (height - sourceSize) / 2;
-
-    /*
-      772 × 772 :
-      format déjà utilisé dans nos ZIP.
-    */
-
-    const outputSize = 772;
-
-    const canvas =
-      document.createElement("canvas");
-
-    canvas.width = outputSize;
-    canvas.height = outputSize;
-
-    const ctx =
-      canvas.getContext("2d");
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
-
-    ctx.drawImage(
-      sourceVideo,
-
-      sx,
-      sy,
-      sourceSize,
-      sourceSize,
-
-      0,
-      0,
-      outputSize,
-      outputSize
-    );
-
-    const blob =
-      await canvasToBlob(
-        canvas,
-        "image/png",
-        1
-      );
-
-    return {
-      canvas,
-      blob
-    };
-  }
-
-  function canvasToBlob(
-    canvas,
-    type = "image/png",
-    quality = 1
-  ) {
-    return new Promise(
-      (resolve, reject) => {
-        canvas.toBlob(
-          blob => {
-            if (!blob) {
-              reject(
-                new Error(
-                  "Impossible de créer l'image."
-                )
-              );
-
-              return;
-            }
-
-            resolve(blob);
-          },
-          type,
-          quality
-        );
-      }
-    );
-  }
-
-  /* =========================================================
-     EXTRACTION DES 9 VUES
-     ========================================================= */
-
-  async function extractNineViews() {
-    if (!sourceVideo) {
-      throw new Error(
-        "Aucune vidéo chargée."
-      );
-    }
-
-    if (!bestSequence) {
-      await findBestSequence();
-    }
-
-    extractedViews.forEach(view => {
-      if (view.url) {
-        URL.revokeObjectURL(view.url);
-      }
-    });
-
-    extractedViews = [];
-
-    if (viewsContainer) {
-      viewsContainer.innerHTML = "";
-    }
-
-    setStatus(
-      "Extraction des 9 vues haute qualité…"
-    );
-
-    setProgress(0);
-
-    for (
-      let i = 0;
-      i < VIEW_COUNT;
-      i++
-    ) {
-      const time =
-        bestSequence.times[i];
-
-      const captured =
-        await captureFullResolutionFrame(
-          time
-        );
-
-      const filename =
-        `vue-${String(i + 1).padStart(2, "0")}.png`;
-
-      const url =
-        URL.createObjectURL(
-          captured.blob
-        );
-
-      const view = {
-        index: i + 1,
-        time,
-        filename,
-        blob: captured.blob,
-        url,
-        canvas: captured.canvas
-      };
-
-      extractedViews.push(view);
-
-      addViewPreview(view);
-
-      setProgress(
-        ((i + 1) / VIEW_COUNT) * 100
-      );
-    }
-
-    if (animDownloadZip) {
-      animDownloadZip.disabled = false;
-    }
-
-    setStatus(
-      `9 vues extraites — ` +
-      `${bestSequence.start.toFixed(3)} s → ` +
-      `${bestSequence.end.toFixed(3)} s.`
-    );
-
-    return extractedViews;
-  }
-
-  /* =========================================================
-     PRÉVISUALISATION DES 9 VUES
-     ========================================================= */
-
-  function addViewPreview(view) {
-    if (!viewsContainer) return;
-
-    const item =
-      document.createElement("div");
-
-    item.className = "view-item";
-
-    const img =
-      document.createElement("img");
-
-    img.src = view.url;
-    img.alt = `Vue ${view.index}`;
-
-    img.style.width = "100%";
-    img.style.display = "block";
-
-    const caption =
-      document.createElement("div");
-
-    caption.className =
-      "view-caption";
-
-    caption.textContent =
-      `Vue ${view.index} — ${view.time.toFixed(3)} s`;
-
-    item.appendChild(img);
-    item.appendChild(caption);
-
-    viewsContainer.appendChild(item);
-  }
-
-  if (animExtract) {
-    animExtract.addEventListener(
-      "click",
-      async () => {
-        try {
-          animExtract.disabled = true;
-
-          await extractNineViews();
-        } catch (error) {
-          console.error(error);
-
-          setStatus(
-            error.message ||
-            "Erreur pendant l'extraction."
-          );
-        } finally {
-          animExtract.disabled = false;
-        }
-      }
-    );
-  }
-
-  /* =========================================================
-     ZIP
-     ========================================================= */
-
-  async function downloadViewsZip() {
-    if (
-      extractedViews.length !==
-      VIEW_COUNT
-    ) {
-      await extractNineViews();
-    }
-
-    if (
-      typeof JSZip === "undefined"
-    ) {
-      /*
-        Si JSZip n'est pas chargé,
-        on télécharge les images séparément.
-      */
-
-      setStatus(
-        "JSZip absent — téléchargement des 9 PNG séparément."
-      );
-
-      for (
-        const view of extractedViews
-      ) {
-        downloadBlob(
-          view.blob,
-          view.filename
-        );
-
-        await sleep(120);
-      }
-
       return;
     }
 
-    setStatus(
-      "Création du ZIP…"
-    );
-
-    const zip =
-      new JSZip();
-
-    for (
-      const view of extractedViews
-    ) {
-      zip.file(
-        view.filename,
-        view.blob
-      );
-    }
-
-    /*
-      Fichier texte avec les paramètres
-      de l'extraction.
-    */
-
-    const info = createExtractionInfo();
-
-    zip.file(
-      "analyse-lenticulaire.txt",
-      info
-    );
-
-    const blob =
-      await zip.generateAsync({
-        type: "blob",
-        compression: "DEFLATE",
-        compressionOptions: {
-          level: 6
-        }
+    if (!img.complete) {
+      await new Promise(resolve => {
+        img.addEventListener(
+          "load",
+          resolve,
+          { once: true }
+        );
       });
-
-    downloadBlob(
-      blob,
-      "9-vues-animation-lenticulaire.zip"
-    );
-
-    setStatus(
-      "ZIP des 9 vues téléchargé."
-    );
-  }
-
-  function createExtractionInfo() {
-    if (!bestSequence) {
-      return "";
     }
 
-    const lines = [
-      "HAPPYHOLO / LENTICULAR LAB",
-      "VERSION ALGORITHME : 12",
-      "",
-      `Nombre de vues : ${VIEW_COUNT}`,
-      `Résolution : 772 × 772 px`,
-      "",
-      `Début : ${bestSequence.start.toFixed(3)} s`,
-      `Fin : ${bestSequence.end.toFixed(3)} s`,
-      `Durée : ${bestSequence.duration.toFixed(3)} s`,
-      "",
-      `Score : ${bestSequence.score.toFixed(2)}`,
-      `Déplacement moyen : ${bestSequence.averageStep.toFixed(2)}`,
-      `Régularité : ${bestSequence.regularity.toFixed(3)}`,
-      `Déplacement X : ${bestSequence.totalDx.toFixed(2)}`,
-      `Déplacement Y : ${bestSequence.totalDy.toFixed(2)}`,
-      `Déplacement net : ${bestSequence.netTravel.toFixed(2)}`,
-      `Distance parcourue : ${bestSequence.travelledDistance.toFixed(2)}`,
-      `Travel ratio : ${bestSequence.travelRatio.toFixed(3)}`,
-      `Axe dominant : ${bestSequence.dominantAxis}`,
-      `Retours direction : ${bestSequence.directionReversals}`,
-      `Horizontal ratio : ${bestSequence.horizontalRatio.toFixed(3)}`,
-      `Stabilité visuelle : ${bestSequence.visualStability.toFixed(3)}`,
-      "",
-      "TIMINGS DES 9 VUES"
-    ];
+    state.sourceImage = img;
 
-    bestSequence.times.forEach(
-      (time, index) => {
-        lines.push(
-          `Vue ${String(index + 1).padStart(2, "0")} : ${time.toFixed(3)} s`
-        );
-      }
-    );
+    buildEditorIfNeeded();
 
-    lines.push(
-      "",
-      "DÉPLACEMENTS ENTRE VUES"
-    );
+    prepareImageAndMask();
 
-    bestSequence.shifts.forEach(
-      (shift, index) => {
-        lines.push(
-          `${index + 1} → ${index + 2} : ` +
-          `dx=${shift.dx}, ` +
-          `dy=${shift.dy}, ` +
-          `distance=${vectorLength(
-            shift.dx,
-            shift.dy
-          ).toFixed(2)}`
-        );
-      }
-    );
+    state.modal.style.display = "flex";
 
-    return lines.join("\n");
-  }
+    document.body.style.overflow = "hidden";
 
-  if (animDownloadZip) {
-    animDownloadZip.addEventListener(
-      "click",
-      async () => {
-        try {
-          animDownloadZip.disabled = true;
-
-          await downloadViewsZip();
-        } catch (error) {
-          console.error(error);
-
-          setStatus(
-            error.message ||
-            "Erreur pendant la création du ZIP."
-          );
-        } finally {
-          animDownloadZip.disabled = false;
-        }
-      }
-    );
-  }
-
-  /* =========================================================
-     TÉLÉCHARGEMENT
-     ========================================================= */
-
-  function downloadBlob(blob, filename) {
-    const url =
-      URL.createObjectURL(blob);
-
-    const a =
-      document.createElement("a");
-
-    a.href = url;
-    a.download = filename;
-
-    document.body.appendChild(a);
-
-    a.click();
-
-    a.remove();
-
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-    }, 2000);
-  }
-
-  function sleep(ms) {
-    return new Promise(resolve => {
-      setTimeout(resolve, ms);
+    requestAnimationFrame(() => {
+      resizeDisplayCanvas();
+      fitImage();
+      render();
     });
   }
 
-  /* =========================================================
-     EXPORT DES VUES
-     Compatibilité avec ancien bouton
-     ========================================================= */
+  /* ============================================================
+     CRÉATION DE L'INTERFACE
+     ============================================================ */
 
-  if (
-    exportViewsBtn &&
-    exportViewsBtn !== animDownloadZip
-  ) {
-    exportViewsBtn.addEventListener(
-      "click",
-      async () => {
-        try {
-          await downloadViewsZip();
-        } catch (error) {
-          console.error(error);
+  function buildEditorIfNeeded() {
+    if (state.modal) return;
 
-          setStatus(
-            error.message ||
-            "Erreur export vues."
-          );
+    /* ---------- Overlay plein écran ---------- */
+
+    const modal = create(
+      "div",
+      {
+        style: {
+          position: "fixed",
+          inset: "0",
+          zIndex: "999999",
+          background: "#0d0d0f",
+          display: "none",
+          flexDirection: "column",
+          color: "#fff",
+          fontFamily:
+            "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
         }
-      }
+      },
+      document.body
     );
-  }
 
-  /* =========================================================
-     BOUTON PRINCIPAL
-     ========================================================= */
+    state.modal = modal;
 
-  if (generateBtn) {
-    generateBtn.addEventListener(
-      "click",
-      async () => {
-        /*
-          En mode animation,
-          le bouton principal lance maintenant
-          la recherche automatique.
-        */
+    /* ---------- Barre supérieure ---------- */
 
-        const animationMode =
-          modeAnim &&
-          (
-            modeAnim.checked ||
-            modeAnim.classList.contains("active")
-          );
+    const topbar = create(
+      "div",
+      {
+        style: {
+          minHeight: "62px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "8px 12px",
+          background: "#19191c",
+          borderBottom: "1px solid #333",
+          flexWrap: "wrap"
+        }
+      },
+      modal
+    );
 
-        if (
-          animationMode &&
-          sourceVideo
-        ) {
-          try {
-            generateBtn.disabled = true;
+    button(
+      "← Retour",
+      topbar,
+      closeEditor
+    );
 
-            await findBestSequence();
+    create(
+      "div",
+      {
+        text: "Correction du sujet",
+        style: {
+          fontSize: "18px",
+          fontWeight: "700",
+          flex: "1",
+          minWidth: "150px"
+        }
+      },
+      topbar
+    );
 
-            await extractNineViews();
-          } catch (error) {
-            console.error(error);
+    const undoBtn =
+      button("↶ Annuler", topbar, undo);
 
-            setStatus(
-              error.message ||
-              "Erreur de génération."
-            );
-          } finally {
-            generateBtn.disabled = false;
+    const redoBtn =
+      button("↷ Refaire", topbar, redo);
+
+    button(
+      "✓ Valider",
+      topbar,
+      validateMask,
+      true
+    );
+
+    state.undoBtn = undoBtn;
+    state.redoBtn = redoBtn;
+
+    /* ---------- Corps ---------- */
+
+    const body = create(
+      "div",
+      {
+        style: {
+          flex: "1",
+          minHeight: "0",
+          display: "flex",
+          position: "relative",
+          overflow: "hidden"
+        }
+      },
+      modal
+    );
+
+    /* ---------- Outils gauche ---------- */
+
+    const tools = create(
+      "div",
+      {
+        style: {
+          width: "150px",
+          maxWidth: "32vw",
+          background: "#171719",
+          borderRight: "1px solid #333",
+          padding: "10px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+          overflowY: "auto",
+          zIndex: "4"
+        }
+      },
+      body
+    );
+
+    const addBtn =
+      button(
+        "＋ Ajouter",
+        tools,
+        () => setTool("add"),
+        true
+      );
+
+    const eraseBtn =
+      button(
+        "⌫ Gomme",
+        tools,
+        () => setTool("erase")
+      );
+
+    const panBtn =
+      button(
+        "✋ Déplacer",
+        tools,
+        () => setTool("pan")
+      );
+
+    state.addBtn = addBtn;
+    state.eraseBtn = eraseBtn;
+    state.panBtn = panBtn;
+
+    create(
+      "div",
+      {
+        text: "Zoom",
+        style: {
+          marginTop: "8px",
+          opacity: ".7",
+          fontSize: "12px",
+          textTransform: "uppercase"
+        }
+      },
+      tools
+    );
+
+    button(
+      "＋ Zoom",
+      tools,
+      () => zoomAtCenter(1.35)
+    );
+
+    button(
+      "− Zoom",
+      tools,
+      () => zoomAtCenter(1 / 1.35)
+    );
+
+    button(
+      "Ajuster",
+      tools,
+      fitImage
+    );
+
+    button(
+      "100 %",
+      tools,
+      () => setZoomAtCenter(1)
+    );
+
+    button(
+      "🔍 Loupe",
+      tools,
+      toggleLoupe
+    );
+
+    button(
+      "Réinitialiser",
+      tools,
+      resetMask
+    );
+
+    /* ---------- Zone centrale ---------- */
+
+    const workArea = create(
+      "div",
+      {
+        style: {
+          flex: "1",
+          minWidth: "0",
+          minHeight: "0",
+          position: "relative",
+          overflow: "hidden",
+          background:
+            "repeating-conic-gradient(#222 0 25%,#191919 0 50%) 50% / 24px 24px"
+        }
+      },
+      body
+    );
+
+    const canvas = create(
+      "canvas",
+      {
+        style: {
+          position: "absolute",
+          inset: "0",
+          width: "100%",
+          height: "100%",
+          cursor: "crosshair",
+          touchAction: "none"
+        }
+      },
+      workArea
+    );
+
+    state.displayCanvas = canvas;
+
+    state.displayCtx =
+      canvas.getContext(
+        "2d",
+        { alpha: true }
+      );
+
+    /* ---------- Loupe ---------- */
+
+    const loupeWrap = create(
+      "div",
+      {
+        style: {
+          position: "absolute",
+          right: "14px",
+          top: "14px",
+          width: "190px",
+          height: "190px",
+          maxWidth: "38vw",
+          maxHeight: "38vw",
+          background: "#000",
+          border: "2px solid #fff",
+          borderRadius: "50%",
+          overflow: "hidden",
+          boxShadow:
+            "0 4px 25px rgba(0,0,0,.6)",
+          zIndex: "5",
+          pointerEvents: "none"
+        }
+      },
+      workArea
+    );
+
+    const loupeCanvas =
+      create(
+        "canvas",
+        {
+          width: 380,
+          height: 380,
+          style: {
+            width: "100%",
+            height: "100%"
           }
+        },
+        loupeWrap
+      );
+
+    state.loupeWrap = loupeWrap;
+    state.loupeCanvas = loupeCanvas;
+    state.loupeCtx =
+      loupeCanvas.getContext("2d");
+
+    /* ---------- Barre basse ---------- */
+
+    const bottom = create(
+      "div",
+      {
+        style: {
+          background: "#19191c",
+          borderTop: "1px solid #333",
+          padding: "9px 12px",
+          display: "flex",
+          alignItems: "center",
+          gap: "14px",
+          flexWrap: "wrap"
         }
+      },
+      modal
+    );
+
+    addSlider(
+      bottom,
+      "Pinceau",
+      3,
+      120,
+      state.brushSize,
+      value => {
+        state.brushSize =
+          Number(value);
+        render();
       }
     );
-  }
 
-  /* =========================================================
-     EXPORT VIDÉO
-     ---------------------------------------------------------
-     On ne modifie pas ici l'ancien système vidéo
-     si le HTML possède déjà son propre lien / endpoint.
-     ========================================================= */
+    addSlider(
+      bottom,
+      "Dureté",
+      10,
+      100,
+      Math.round(
+        state.hardness * 100
+      ),
+      value => {
+        state.hardness =
+          Number(value) / 100;
+      }
+    );
 
-  if (exportVideoBtn) {
-    exportVideoBtn.addEventListener(
-      "click",
+    addSlider(
+      bottom,
+      "Masque",
+      10,
+      90,
+      Math.round(
+        state.maskOpacity * 100
+      ),
+      value => {
+        state.maskOpacity =
+          Number(value) / 100;
+        render();
+      }
+    );
+
+    const maskToggle =
+      button(
+        "👁 Masque",
+        bottom,
+        () => {
+          state.showMask =
+            !state.showMask;
+          render();
+        }
+      );
+
+    state.maskToggle = maskToggle;
+
+    /* ---------- Canvas internes ---------- */
+
+    state.imageCanvas =
+      document.createElement("canvas");
+
+    state.imageCtx =
+      state.imageCanvas.getContext("2d");
+
+    state.maskCanvas =
+      document.createElement("canvas");
+
+    state.maskCtx =
+      state.maskCanvas.getContext(
+        "2d",
+        { willReadFrequently: true }
+      );
+
+    bindPointerEvents();
+
+    window.addEventListener(
+      "resize",
       () => {
         if (
-          downloadVideo &&
-          downloadVideo.href
+          state.modal &&
+          state.modal.style.display !== "none"
         ) {
-          downloadVideo.click();
+          resizeDisplayCanvas();
+          render();
         }
+      }
+    );
+
+    updateToolButtons();
+  }
+
+  function addSlider(
+    parent,
+    label,
+    min,
+    max,
+    value,
+    callback
+  ) {
+    const wrap = create(
+      "label",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          fontSize: "13px"
+        }
+      },
+      parent
+    );
+
+    create(
+      "span",
+      {
+        text: label,
+        style: {
+          minWidth: "55px"
+        }
+      },
+      wrap
+    );
+
+    const input = create(
+      "input",
+      {
+        type: "range",
+        min,
+        max,
+        value,
+        style: {
+          width: "120px",
+          maxWidth: "22vw"
+        }
+      },
+      wrap
+    );
+
+    input.addEventListener(
+      "input",
+      () => callback(input.value)
+    );
+
+    return input;
+  }
+
+  /* ============================================================
+     IMAGE ET MASQUE
+     ============================================================ */
+
+  function prepareImageAndMask() {
+    const img = state.sourceImage;
+
+    const w =
+      img.naturalWidth ||
+      img.width;
+
+    const h =
+      img.naturalHeight ||
+      img.height;
+
+    state.imageCanvas.width = w;
+    state.imageCanvas.height = h;
+
+    state.maskCanvas.width = w;
+    state.maskCanvas.height = h;
+
+    state.imageCtx.clearRect(
+      0,
+      0,
+      w,
+      h
+    );
+
+    state.imageCtx.drawImage(
+      img,
+      0,
+      0,
+      w,
+      h
+    );
+
+    state.maskCtx.clearRect(
+      0,
+      0,
+      w,
+      h
+    );
+
+    /*
+      IMPORTANT :
+      si un masque précédent a déjà été validé,
+      on le recharge.
+    */
+
+    if (
+      window.validatedMaskCanvas &&
+      window.validatedMaskCanvas.width
+    ) {
+      state.maskCtx.drawImage(
+        window.validatedMaskCanvas,
+        0,
+        0,
+        w,
+        h
+      );
+    } else {
+      /*
+        En attendant le raccordement exact
+        au masque automatique de ton moteur 3D,
+        on crée un masque plein.
+
+        La gomme permet déjà de retirer
+        les zones non souhaitées.
+
+        Dès qu'on branche le masque auto,
+        celui-ci remplacera ce masque plein.
+      */
+
+      state.maskCtx.fillStyle =
+        "#fff";
+
+      state.maskCtx.fillRect(
+        0,
+        0,
+        w,
+        h
+      );
+    }
+
+    state.history = [];
+    state.redo = [];
+
+    saveHistory();
+
+    state.initialMaskSnapshot =
+      cloneImageData(
+        state.history[0]
+      );
+  }
+
+  /* ============================================================
+     REDIMENSION DE L'AFFICHAGE
+     ============================================================ */
+
+  function resizeDisplayCanvas() {
+    if (!state.displayCanvas) return;
+
+    const rect =
+      state.displayCanvas
+        .getBoundingClientRect();
+
+    const dpr =
+      window.devicePixelRatio || 1;
+
+    state.displayCanvas.width =
+      Math.max(
+        1,
+        Math.round(
+          rect.width * dpr
+        )
+      );
+
+    state.displayCanvas.height =
+      Math.max(
+        1,
+        Math.round(
+          rect.height * dpr
+        )
+      );
+  }
+
+  /* ============================================================
+     FIT / ZOOM
+     ============================================================ */
+
+  function fitImage() {
+    if (
+      !state.imageCanvas.width ||
+      !state.displayCanvas
+    ) {
+      return;
+    }
+
+    const rect =
+      state.displayCanvas
+        .getBoundingClientRect();
+
+    const scaleX =
+      rect.width /
+      state.imageCanvas.width;
+
+    const scaleY =
+      rect.height /
+      state.imageCanvas.height;
+
+    state.zoom =
+      Math.min(
+        scaleX,
+        scaleY
+      ) * 0.94;
+
+    state.panX =
+      (
+        rect.width -
+        state.imageCanvas.width *
+          state.zoom
+      ) / 2;
+
+    state.panY =
+      (
+        rect.height -
+        state.imageCanvas.height *
+          state.zoom
+      ) / 2;
+
+    render();
+  }
+
+  function zoomAtCenter(factor) {
+    const rect =
+      state.displayCanvas
+        .getBoundingClientRect();
+
+    setZoom(
+      state.zoom * factor,
+      rect.width / 2,
+      rect.height / 2
+    );
+  }
+
+  function setZoomAtCenter(value) {
+    const rect =
+      state.displayCanvas
+        .getBoundingClientRect();
+
+    setZoom(
+      value,
+      rect.width / 2,
+      rect.height / 2
+    );
+  }
+
+  function setZoom(
+    newZoom,
+    screenX,
+    screenY
+  ) {
+    const oldZoom =
+      state.zoom;
+
+    newZoom =
+      clamp(
+        newZoom,
+        state.minZoom,
+        state.maxZoom
+      );
+
+    const imageX =
+      (
+        screenX -
+        state.panX
+      ) / oldZoom;
+
+    const imageY =
+      (
+        screenY -
+        state.panY
+      ) / oldZoom;
+
+    state.zoom =
+      newZoom;
+
+    state.panX =
+      screenX -
+      imageX *
+        newZoom;
+
+    state.panY =
+      screenY -
+      imageY *
+        newZoom;
+
+    render();
+  }
+
+  /* ============================================================
+     CONVERSION COORDONNÉES
+     ============================================================ */
+
+  function screenToImage(x, y) {
+    return {
+      x:
+        (x - state.panX) /
+        state.zoom,
+
+      y:
+        (y - state.panY) /
+        state.zoom
+    };
+  }
+
+  /* ============================================================
+     PINCEAU
+     ============================================================ */
+
+  function paintSegment(
+    screenX1,
+    screenY1,
+    screenX2,
+    screenY2
+  ) {
+    if (
+      state.tool !== "add" &&
+      state.tool !== "erase"
+    ) {
+      return;
+    }
+
+    const p1 =
+      screenToImage(
+        screenX1,
+        screenY1
+      );
+
+    const p2 =
+      screenToImage(
+        screenX2,
+        screenY2
+      );
+
+    const distance =
+      Math.hypot(
+        p2.x - p1.x,
+        p2.y - p1.y
+      );
+
+    const step =
+      Math.max(
+        1,
+        state.brushSize * 0.18
+      );
+
+    const count =
+      Math.max(
+        1,
+        Math.ceil(
+          distance / step
+        )
+      );
+
+    for (
+      let i = 0;
+      i <= count;
+      i++
+    ) {
+      const t = i / count;
+
+      paintDot(
+        p1.x +
+          (p2.x - p1.x) * t,
+
+        p1.y +
+          (p2.y - p1.y) * t
+      );
+    }
+
+    render();
+  }
+
+  function paintDot(x, y) {
+    const radius =
+      state.brushSize / 2;
+
+    const ctx =
+      state.maskCtx;
+
+    ctx.save();
+
+    if (
+      state.tool === "erase"
+    ) {
+      ctx.globalCompositeOperation =
+        "destination-out";
+    } else {
+      ctx.globalCompositeOperation =
+        "source-over";
+    }
+
+    const innerRadius =
+      radius *
+      clamp(
+        state.hardness,
+        0.05,
+        1
+      );
+
+    const g =
+      ctx.createRadialGradient(
+        x,
+        y,
+        innerRadius,
+        x,
+        y,
+        radius
+      );
+
+    if (
+      state.tool === "erase"
+    ) {
+      g.addColorStop(
+        0,
+        "rgba(0,0,0,1)"
+      );
+
+      g.addColorStop(
+        Math.min(
+          0.99,
+          state.hardness
+        ),
+        "rgba(0,0,0,1)"
+      );
+
+      g.addColorStop(
+        1,
+        "rgba(0,0,0,0)"
+      );
+    } else {
+      g.addColorStop(
+        0,
+        "rgba(255,255,255,1)"
+      );
+
+      g.addColorStop(
+        Math.min(
+          0.99,
+          state.hardness
+        ),
+        "rgba(255,255,255,1)"
+      );
+
+      g.addColorStop(
+        1,
+        "rgba(255,255,255,0)"
+      );
+    }
+
+    ctx.fillStyle = g;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      x,
+      y,
+      radius,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  /* ============================================================
+     RENDER PRINCIPAL
+     ============================================================ */
+
+  function render() {
+    if (
+      !state.displayCanvas ||
+      !state.imageCanvas
+    ) {
+      return;
+    }
+
+    const ctx =
+      state.displayCtx;
+
+    const canvas =
+      state.displayCanvas;
+
+    const dpr =
+      window.devicePixelRatio || 1;
+
+    /*
+      Tout le dessin est effectué
+      dans les coordonnées CSS.
+    */
+
+    ctx.setTransform(
+      dpr,
+      0,
+      0,
+      dpr,
+      0,
+      0
+    );
+
+    const rect =
+      canvas.getBoundingClientRect();
+
+    ctx.clearRect(
+      0,
+      0,
+      rect.width,
+      rect.height
+    );
+
+    ctx.save();
+
+    ctx.translate(
+      state.panX,
+      state.panY
+    );
+
+    ctx.scale(
+      state.zoom,
+      state.zoom
+    );
+
+    ctx.drawImage(
+      state.imageCanvas,
+      0,
+      0
+    );
+
+    if (state.showMask) {
+      drawMaskOverlay(ctx);
+    }
+
+    ctx.restore();
+
+    drawBrushCursor(ctx);
+
+    if (
+      state.loupeEnabled
+    ) {
+      renderLoupe();
+    }
+
+    updateHistoryButtons();
+  }
+
+  function drawMaskOverlay(ctx) {
+    const temp =
+      document.createElement(
+        "canvas"
+      );
+
+    temp.width =
+      state.maskCanvas.width;
+
+    temp.height =
+      state.maskCanvas.height;
+
+    const t =
+      temp.getContext("2d");
+
+    t.fillStyle =
+      `rgba(0,170,255,${state.maskOpacity})`;
+
+    t.fillRect(
+      0,
+      0,
+      temp.width,
+      temp.height
+    );
+
+    t.globalCompositeOperation =
+      "destination-in";
+
+    t.drawImage(
+      state.maskCanvas,
+      0,
+      0
+    );
+
+    ctx.drawImage(
+      temp,
+      0,
+      0
+    );
+  }
+
+  function drawBrushCursor(ctx) {
+    if (
+      state.tool !== "add" &&
+      state.tool !== "erase"
+    ) {
+      return;
+    }
+
+    ctx.save();
+
+    ctx.beginPath();
+
+    /*
+      La taille du pinceau représente
+      une taille IMAGE, donc elle grossit
+      avec le zoom.
+    */
+
+    const radius =
+      state.brushSize *
+      state.zoom /
+      2;
+
+    ctx.arc(
+      state.pointerX,
+      state.pointerY,
+      radius,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.lineWidth = 2;
+
+    ctx.strokeStyle =
+      state.tool === "erase"
+        ? "#ff5252"
+        : "#22e67b";
+
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  /* ============================================================
+     LOUPE
+     ============================================================ */
+
+  function renderLoupe() {
+    if (
+      !state.loupeCtx ||
+      !state.loupeCanvas
+    ) {
+      return;
+    }
+
+    const ctx =
+      state.loupeCtx;
+
+    const canvas =
+      state.loupeCanvas;
+
+    const p =
+      screenToImage(
+        state.pointerX,
+        state.pointerY
+      );
+
+    const visibleImageSize =
+      canvas.width /
+      state.loupeZoom;
+
+    const sx =
+      p.x -
+      visibleImageSize / 2;
+
+    const sy =
+      p.y -
+      visibleImageSize / 2;
+
+    ctx.clearRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    ctx.drawImage(
+      state.imageCanvas,
+      sx,
+      sy,
+      visibleImageSize,
+      visibleImageSize,
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+
+    if (state.showMask) {
+      const temp =
+        document.createElement(
+          "canvas"
+        );
+
+      temp.width =
+        canvas.width;
+
+      temp.height =
+        canvas.height;
+
+      const t =
+        temp.getContext("2d");
+
+      t.drawImage(
+        state.maskCanvas,
+        sx,
+        sy,
+        visibleImageSize,
+        visibleImageSize,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      t.globalCompositeOperation =
+        "source-in";
+
+      t.fillStyle =
+        `rgba(0,170,255,${state.maskOpacity})`;
+
+      t.fillRect(
+        0,
+        0,
+        temp.width,
+        temp.height
+      );
+
+      ctx.drawImage(
+        temp,
+        0,
+        0
+      );
+    }
+
+    const centerX =
+      canvas.width / 2;
+
+    const centerY =
+      canvas.height / 2;
+
+    /*
+      Réticule
+    */
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      centerX - 28,
+      centerY
+    );
+
+    ctx.lineTo(
+      centerX + 28,
+      centerY
+    );
+
+    ctx.moveTo(
+      centerX,
+      centerY - 28
+    );
+
+    ctx.lineTo(
+      centerX,
+      centerY + 28
+    );
+
+    ctx.strokeStyle =
+      "rgba(255,255,255,.95)";
+
+    ctx.lineWidth = 2;
+
+    ctx.stroke();
+
+    /*
+      Cercle pinceau dans la loupe
+    */
+
+    if (
+      state.tool === "add" ||
+      state.tool === "erase"
+    ) {
+      const radius =
+        state.brushSize *
+        state.loupeZoom /
+        2;
+
+      ctx.beginPath();
+
+      ctx.arc(
+        centerX,
+        centerY,
+        radius,
+        0,
+        Math.PI * 2
+      );
+
+      ctx.strokeStyle =
+        state.tool === "erase"
+          ? "#ff5252"
+          : "#22e67b";
+
+      ctx.lineWidth = 3;
+
+      ctx.stroke();
+    }
+  }
+
+  function toggleLoupe() {
+    state.loupeEnabled =
+      !state.loupeEnabled;
+
+    if (state.loupeWrap) {
+      state.loupeWrap.style.display =
+        state.loupeEnabled
+          ? "block"
+          : "none";
+    }
+
+    render();
+  }
+
+  /* ============================================================
+     OUTILS
+     ============================================================ */
+
+  function setTool(tool) {
+    state.tool = tool;
+
+    if (
+      state.displayCanvas
+    ) {
+      state.displayCanvas.style.cursor =
+        tool === "pan"
+          ? "grab"
+          : "crosshair";
+    }
+
+    updateToolButtons();
+    render();
+  }
+
+  function updateToolButtons() {
+    const entries = [
+      ["add", state.addBtn],
+      ["erase", state.eraseBtn],
+      ["pan", state.panBtn]
+    ];
+
+    entries.forEach(
+      ([tool, btn]) => {
+        if (!btn) return;
+
+        const active =
+          state.tool === tool;
+
+        btn.style.background =
+          active
+            ? "#1677d2"
+            : "#242424";
+
+        btn.style.borderColor =
+          active
+            ? "#42a5ff"
+            : "#444";
       }
     );
   }
 
-  /* =========================================================
-     API PUBLIQUE POUR DEBUG
-     ========================================================= */
+  /* ============================================================
+     HISTORIQUE
+     ============================================================ */
 
-  window.LentiApp = {
-    version: 12,
+  function cloneImageData(data) {
+    return new ImageData(
+      new Uint8ClampedArray(
+        data.data
+      ),
+      data.width,
+      data.height
+    );
+  }
 
-    getBestSequence() {
-      return bestSequence;
-    },
+  function saveHistory() {
+    const w =
+      state.maskCanvas.width;
 
-    getExtractedViews() {
-      return extractedViews;
-    },
+    const h =
+      state.maskCanvas.height;
 
-    getWorkingRange() {
-      return {
-        start: workingStart,
-        end: workingEnd,
-        duration:
-          workingEnd - workingStart
+    if (!w || !h) return;
+
+    const snapshot =
+      state.maskCtx.getImageData(
+        0,
+        0,
+        w,
+        h
+      );
+
+    state.history.push(
+      snapshot
+    );
+
+    if (
+      state.history.length >
+      state.maxHistory
+    ) {
+      state.history.shift();
+    }
+
+    state.redo = [];
+
+    updateHistoryButtons();
+  }
+
+  function undo() {
+    if (
+      state.history.length <= 1
+    ) {
+      return;
+    }
+
+    const current =
+      state.history.pop();
+
+    state.redo.push(current);
+
+    const previous =
+      state.history[
+        state.history.length - 1
+      ];
+
+    state.maskCtx.putImageData(
+      previous,
+      0,
+      0
+    );
+
+    render();
+  }
+
+  function redo() {
+    if (!state.redo.length) {
+      return;
+    }
+
+    const snapshot =
+      state.redo.pop();
+
+    state.history.push(
+      snapshot
+    );
+
+    state.maskCtx.putImageData(
+      snapshot,
+      0,
+      0
+    );
+
+    render();
+  }
+
+  function updateHistoryButtons() {
+    if (state.undoBtn) {
+      state.undoBtn.disabled =
+        state.history.length <= 1;
+
+      state.undoBtn.style.opacity =
+        state.undoBtn.disabled
+          ? ".4"
+          : "1";
+    }
+
+    if (state.redoBtn) {
+      state.redoBtn.disabled =
+        state.redo.length === 0;
+
+      state.redoBtn.style.opacity =
+        state.redoBtn.disabled
+          ? ".4"
+          : "1";
+    }
+  }
+
+  function resetMask() {
+    if (
+      !confirm(
+        "Revenir au masque d'origine ?"
+      )
+    ) {
+      return;
+    }
+
+    if (
+      !state.initialMaskSnapshot
+    ) {
+      return;
+    }
+
+    state.maskCtx.putImageData(
+      state.initialMaskSnapshot,
+      0,
+      0
+    );
+
+    state.history = [];
+    state.redo = [];
+
+    saveHistory();
+    render();
+  }
+
+  /* ============================================================
+     POINTER / SOURIS / PENCIL / TOUCH
+     ============================================================ */
+
+  function bindPointerEvents() {
+    const canvas =
+      state.displayCanvas;
+
+    canvas.addEventListener(
+      "pointerdown",
+      e => {
+        e.preventDefault();
+
+        canvas.setPointerCapture?.(
+          e.pointerId
+        );
+
+        const pos =
+          pointerPosition(e);
+
+        state.pointerX = pos.x;
+        state.pointerY = pos.y;
+
+        state.pointers.set(
+          e.pointerId,
+          pos
+        );
+
+        /*
+          2 doigts = pinch / déplacement
+        */
+
+        if (
+          state.pointers.size >= 2
+        ) {
+          startPinch();
+          state.drawing = false;
+          return;
+        }
+
+        if (
+          state.tool === "pan"
+        ) {
+          state.panning = true;
+
+          state.panStartX =
+            pos.x -
+            state.panX;
+
+          state.panStartY =
+            pos.y -
+            state.panY;
+
+          return;
+        }
+
+        state.drawing = true;
+
+        state.lastImageX =
+          pos.x;
+
+        state.lastImageY =
+          pos.y;
+
+        paintSegment(
+          pos.x,
+          pos.y,
+          pos.x,
+          pos.y
+        );
+      }
+    );
+
+    canvas.addEventListener(
+      "pointermove",
+      e => {
+        const pos =
+          pointerPosition(e);
+
+        state.pointerX = pos.x;
+        state.pointerY = pos.y;
+
+        if (
+          state.pointers.has(
+            e.pointerId
+          )
+        ) {
+          state.pointers.set(
+            e.pointerId,
+            pos
+          );
+        }
+
+        if (
+          state.pointers.size >= 2
+        ) {
+          handlePinch();
+          return;
+        }
+
+        if (
+          state.panning
+        ) {
+          state.panX =
+            pos.x -
+            state.panStartX;
+
+          state.panY =
+            pos.y -
+            state.panStartY;
+
+          render();
+          return;
+        }
+
+        if (
+          state.drawing
+        ) {
+          paintSegment(
+            state.lastImageX,
+            state.lastImageY,
+            pos.x,
+            pos.y
+          );
+
+          state.lastImageX =
+            pos.x;
+
+          state.lastImageY =
+            pos.y;
+
+          return;
+        }
+
+        render();
+      }
+    );
+
+    const finish =
+      e => {
+        const wasDrawing =
+          state.drawing;
+
+        state.pointers.delete(
+          e.pointerId
+        );
+
+        state.drawing = false;
+        state.panning = false;
+
+        if (wasDrawing) {
+          saveHistory();
+        }
+
+        render();
       };
+
+    canvas.addEventListener(
+      "pointerup",
+      finish
+    );
+
+    canvas.addEventListener(
+      "pointercancel",
+      finish
+    );
+
+    /*
+      Zoom molette Mac / PC
+    */
+
+    canvas.addEventListener(
+      "wheel",
+      e => {
+        e.preventDefault();
+
+        const pos =
+          pointerPosition(e);
+
+        const factor =
+          e.deltaY < 0
+            ? 1.15
+            : 1 / 1.15;
+
+        setZoom(
+          state.zoom * factor,
+          pos.x,
+          pos.y
+        );
+      },
+      { passive: false }
+    );
+  }
+
+  function pointerPosition(e) {
+    const rect =
+      state.displayCanvas
+        .getBoundingClientRect();
+
+    return {
+      x:
+        e.clientX -
+        rect.left,
+
+      y:
+        e.clientY -
+        rect.top
+    };
+  }
+
+  /* ============================================================
+     PINCH IPAD
+     ============================================================ */
+
+  function startPinch() {
+    const pts =
+      [...state.pointers.values()];
+
+    if (pts.length < 2) return;
+
+    const a = pts[0];
+    const b = pts[1];
+
+    state.pinchStartDistance =
+      Math.hypot(
+        b.x - a.x,
+        b.y - a.y
+      );
+
+    state.pinchStartZoom =
+      state.zoom;
+
+    state.pinchCenterX =
+      (a.x + b.x) / 2;
+
+    state.pinchCenterY =
+      (a.y + b.y) / 2;
+  }
+
+  function handlePinch() {
+    const pts =
+      [...state.pointers.values()];
+
+    if (pts.length < 2) return;
+
+    const a = pts[0];
+    const b = pts[1];
+
+    const distance =
+      Math.hypot(
+        b.x - a.x,
+        b.y - a.y
+      );
+
+    if (
+      !state.pinchStartDistance
+    ) {
+      startPinch();
+      return;
+    }
+
+    const factor =
+      distance /
+      state.pinchStartDistance;
+
+    const centerX =
+      (a.x + b.x) / 2;
+
+    const centerY =
+      (a.y + b.y) / 2;
+
+    setZoom(
+      state.pinchStartZoom *
+        factor,
+      centerX,
+      centerY
+    );
+  }
+
+  /* ============================================================
+     VALIDATION
+     ============================================================ */
+
+  function validateMask() {
+    const result =
+      document.createElement(
+        "canvas"
+      );
+
+    result.width =
+      state.maskCanvas.width;
+
+    result.height =
+      state.maskCanvas.height;
+
+    result
+      .getContext("2d")
+      .drawImage(
+        state.maskCanvas,
+        0,
+        0
+      );
+
+    /*
+      C'est CE canvas que le moteur 3D
+      utilisera ensuite.
+    */
+
+    window.validatedMaskCanvas =
+      result;
+
+    /*
+      Événement permettant au moteur 3D
+      ou à une future version de réagir.
+    */
+
+    window.dispatchEvent(
+      new CustomEvent(
+        "happyholo-mask-validated",
+        {
+          detail: {
+            maskCanvas: result
+          }
+        }
+      )
+    );
+
+    console.log(
+      "[MASK] Masque validé :",
+      result.width,
+      "x",
+      result.height
+    );
+
+    closeEditor();
+
+    /*
+      Petit retour visible
+    */
+
+    showTemporaryMessage(
+      "✓ Correction du sujet enregistrée"
+    );
+  }
+
+  function closeEditor() {
+    if (!state.modal) return;
+
+    state.modal.style.display =
+      "none";
+
+    document.body.style.overflow =
+      "";
+  }
+
+  /* ============================================================
+     MESSAGE DE CONFIRMATION
+     ============================================================ */
+
+  function showTemporaryMessage(text) {
+    const toast =
+      create(
+        "div",
+        {
+          text,
+          style: {
+            position: "fixed",
+            left: "50%",
+            bottom: "30px",
+            transform:
+              "translateX(-50%)",
+            zIndex: "1000000",
+            padding: "12px 18px",
+            borderRadius: "12px",
+            background: "#1677d2",
+            color: "#fff",
+            fontWeight: "700",
+            boxShadow:
+              "0 5px 25px rgba(0,0,0,.4)"
+          }
+        },
+        document.body
+      );
+
+    setTimeout(
+      () => toast.remove(),
+      1800
+    );
+  }
+
+  /* ============================================================
+     BOUTON DANS LE SITE EXISTANT
+     ============================================================ */
+
+  function installMainButton() {
+    if (
+      document.getElementById(
+        "happyholoMaskEditButton"
+      )
+    ) {
+      return;
+    }
+
+    const btn =
+      create(
+        "button",
+        {
+          id:
+            "happyholoMaskEditButton",
+
+          type: "button",
+
+          text:
+            "✏️ Corriger le sujet",
+
+          style: {
+            width: "100%",
+            marginTop: "10px",
+            padding: "12px 14px",
+            border: "1px solid #4b8ccc",
+            borderRadius: "10px",
+            background:
+              "linear-gradient(180deg,#207bc5,#155d9b)",
+            color: "#fff",
+            fontWeight: "700",
+            fontSize: "15px",
+            cursor: "pointer"
+          }
+        }
+      );
+
+    btn.addEventListener(
+      "click",
+      openEditor
+    );
+
+    /*
+      On essaie d'insérer le bouton
+      au meilleur endroit du panneau 3D.
+    */
+
+    const candidates = [
+      document.getElementById(
+        "generateBtn"
+      ),
+      document.getElementById(
+        "exportViewsBtn"
+      ),
+      document.getElementById(
+        "preview"
+      )
+    ].filter(Boolean);
+
+    if (candidates.length) {
+      const target =
+        candidates[0];
+
+      if (
+        target.parentElement
+      ) {
+        target.parentElement
+          .insertBefore(
+            btn,
+            target.nextSibling
+          );
+
+        return;
+      }
+    }
+
+    /*
+      Secours :
+      bouton flottant.
+    */
+
+    btn.style.position =
+      "fixed";
+
+    btn.style.right =
+      "15px";
+
+    btn.style.bottom =
+      "15px";
+
+    btn.style.width =
+      "auto";
+
+    btn.style.zIndex =
+      "9999";
+
+    document.body.appendChild(
+      btn
+    );
+  }
+
+  /* ============================================================
+     API PUBLIQUE
+     ============================================================ */
+
+  window.HappyHoloMaskEditor = {
+    open: openEditor,
+
+    getMask() {
+      return (
+        window.validatedMaskCanvas ||
+        null
+      );
     },
 
-    analyse: findBestSequence,
-
-    extract: extractNineViews,
-
-    downloadZip: downloadViewsZip
+    clear() {
+      window.validatedMaskCanvas =
+        null;
+    }
   };
 
-  /* =========================================================
+  /* ============================================================
      INITIALISATION
-     ========================================================= */
+     ============================================================ */
 
-  if (animDownloadZip) {
-    animDownloadZip.disabled = true;
+  function init() {
+    installMainButton();
+
+    console.log(
+      "[MASK] HappyHolo Mask Editor V13 prêt."
+    );
   }
 
-  if (animExtract) {
-    animExtract.disabled = true;
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+    document.addEventListener(
+      "DOMContentLoaded",
+      init
+    );
+  } else {
+    init();
   }
-
-  setStatus("Prêt.");
 
 })();
