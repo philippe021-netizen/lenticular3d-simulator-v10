@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>LentiPrint Lab — Relief 3D V3.1 local</title>
+<title>LentiPrint Lab — Relief 3D V3.1.1 local</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
@@ -23,8 +23,8 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 </head>
 <body>
 <div class="wrap">
-<h1>LentiPrint Lab — Relief 3D V3.1 local</h1>
-<div class="sub">Photo → détourage local → fond reconstruit localement → profondeur séparée → 9 vues. Aucun PixVerse, aucune API payante.</div>
+<h1>LentiPrint Lab — Relief 3D V3.1.1 local</h1>
+<div class="sub">Photo → détourage local → correction manuelle du masque → fond reconstruit localement → profondeur séparée → 9 vues. Aucun PixVerse, aucune API payante.</div>
 
 <div class="card grid">
 <section>
@@ -32,16 +32,16 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 <input id="file" type="file" accept="image/*">
 
 <label>Force profondeur sujet</label>
-<div class="row"><span>Volume interne</span><b id="subjectOut">0.30</b></div>
-<input id="subjectDepth" type="range" min="0.10" max="0.55" step="0.01" value="0.30">
+<div class="row"><span>Volume interne</span><b id="subjectOut">0.48</b></div>
+<input id="subjectDepth" type="range" min="0.10" max="0.55" step="0.01" value="0.48">
 
 <label>Force profondeur fond</label>
 <div class="row"><span>Décor</span><b id="bgOut">0.10</b></div>
 <input id="bgDepth" type="range" min="0.02" max="0.25" step="0.01" value="0.10">
 
 <label>Amplitude</label>
-<div class="row"><span>Micro-orbite</span><b id="angleOut">±4°</b></div>
-<input id="angle" type="range" min="2" max="8" step="1" value="4">
+<div class="row"><span>Parallaxe</span><b id="angleOut">±7°</b></div>
+<input id="angle" type="range" min="2" max="8" step="1" value="7">
 
 <label>Protection contours</label>
 <div class="row"><span>Cheveux / détails fins</span><b id="edgeOut">84%</b></div>
@@ -53,8 +53,8 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 
 <div id="status" class="status">Choisis une photo.</div>
 <div class="small">
-Premier lancement : le navigateur doit télécharger les modèles IA locaux, donc cela peut être plus long.
-Ensuite aucun crédit ni clé API n’est nécessaire.
+Après le détourage automatique, l’éditeur de masque s’ouvre pour corriger précisément le sujet.<br>
+Premier lancement : le navigateur télécharge les modèles IA locaux. Ensuite aucun crédit ni clé API n’est nécessaire.
 </div>
 </section>
 
@@ -65,7 +65,8 @@ Ensuite aucun crédit ni clé API n’est nécessaire.
 </div>
 </div>
 
-<script type="module" src="./relief-engine-v31.js"></script>
-<script src="v311-monotonic-patch.js"></script>
+<script src="./relief-engine-v31.js"></script>
+<script src="./mask-editor-v31-fluid.js"></script>
+<script src="./v311-monotonic-patch.js"></script>
 </body>
 </html>

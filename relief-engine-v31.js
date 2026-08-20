@@ -99,6 +99,9 @@ async function localRemoveBackground(file){
   return result;
 }
 
+// Expose la fonction pour l'éditeur de masque chargé après ce script.
+window.localRemoveBackground = localRemoveBackground;
+
 /* =========================================================
    2 — ALPHA / MASQUE
 ========================================================= */
@@ -158,7 +161,6 @@ async function reconstructBackground(original, alphaCanvas){
   const alphaCtx=alphaCanvas.getContext('2d',{willReadFrequently:true});
   const alpha=alphaCtx.getImageData(0,0,alphaCanvas.width,alphaCanvas.height).data;
 
-  // redimension alpha si nécessaire
   let mask;
   if(alphaCanvas.width===w && alphaCanvas.height===h){
     mask=new Uint8Array(w*h);
@@ -172,7 +174,6 @@ async function reconstructBackground(original, alphaCanvas){
     for(let i=0;i<w*h;i++) mask[i]=ad[i*4];
   }
 
-  // dilate mask so hair fringe is also removed
   const dilated=new Uint8Array(mask);
   const r=5;
   for(let y=0;y<h;y++){
@@ -190,7 +191,6 @@ async function reconstructBackground(original, alphaCanvas){
   const filled=new Uint8Array(w*h);
   for(let i=0;i<w*h;i++) filled[i]=dilated[i]<30 ? 1 : 0;
 
-  // propagation multi-pass depuis l'extérieur vers l'intérieur
   const passes=42;
   for(let pass=0;pass<passes;pass++){
     let changed=0;
@@ -209,9 +209,7 @@ async function reconstructBackground(original, alphaCanvas){
           sb+=data[ni*4+2];
           n++;
         }
-        if(n>=2){
-          next.push([idx,sr/n,sg/n,sb/n]);
-        }
+        if(n>=2) next.push([idx,sr/n,sg/n,sb/n]);
       }
     }
 
@@ -228,11 +226,9 @@ async function reconstructBackground(original, alphaCanvas){
       setStatus(`2/5 Reconstruction locale du fond… passe ${pass+1}/${passes}`);
       await sleep(0);
     }
-
     if(!changed) break;
   }
 
-  // dernier secours pour petits trous
   for(let i=0;i<w*h;i++){
     if(filled[i]) continue;
     data[i*4]=data[Math.max(0,i-1)*4];
@@ -243,7 +239,6 @@ async function reconstructBackground(original, alphaCanvas){
 
   x.putImageData(img,0,0);
 
-  // lissage modéré du fond reconstruit
   const blurred=document.createElement('canvas');
   blurred.width=w;blurred.height=h;
   const bx=blurred.getContext('2d');
@@ -255,8 +250,6 @@ async function reconstructBackground(original, alphaCanvas){
   out.width=w;out.height=h;
   const ox=out.getContext('2d');
   ox.drawImage(c,0,0);
-
-  // uniquement dans la zone retirée, fond légèrement lissé
   ox.save();
   ox.globalCompositeOperation='source-over';
 
@@ -291,13 +284,11 @@ let estimator=null;
 
 async function getEstimator(){
   if(estimator) return estimator;
-
   setStatus('3/5 Chargement de Depth Anything…');
 
   const {pipeline,env}=await import(
     'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm'
   );
-
   env.allowLocalModels=false;
 
   estimator=await pipeline(
@@ -305,7 +296,6 @@ async function getEstimator(){
     'onnx-community/depth-anything-v2-small',
     {dtype:'q4'}
   );
-
   return estimator;
 }
 
@@ -371,12 +361,10 @@ function renderAt(norm,target=view){
   const subK=Number(subjectDepth.value)/0.30;
   const protect=Number(edgeProtect.value)/100;
 
-  // Fond : mouvement faible.
   const fb=fitCover(backgroundImg,W,H);
   const bgShift=norm*6*amplitude*bgK;
   x.drawImage(backgroundImg,fb.x+bgShift,fb.y,fb.w,fb.h);
 
-  // Sujet détouré sur canvas temporaire.
   const tmp=document.createElement('canvas');
   tmp.width=W;tmp.height=H;
   const tx=tmp.getContext('2d');
@@ -385,11 +373,7 @@ function renderAt(norm,target=view){
   tx.drawImage(subjectImg,fs.x,fs.y,fs.w,fs.h);
 
   const subShift=norm*18*amplitude*subK;
-
-  // Déformation interne limitée : 96 bandes verticales.
-  // Le déplacement principal est une translation du sujet entier.
   const strips=96;
-  const sw=W/strips;
 
   let depthData=null;
   try{
@@ -409,18 +393,12 @@ function renderAt(norm,target=view){
       d=depthData[(dy*subjectDepthCanvas.width+dx)*4]/255;
     }
 
-    // Très faible différentiel interne pour éviter les cheveux qui bavent.
     const local=(d-.5)*2;
     const internal=subShift*local*(0.10*(1-protect)+0.025);
 
-    x.drawImage(
-      tmp,
-      sx,0,ww,H,
-      sx+subShift+internal,0,ww+1,H
-    );
+    x.drawImage(tmp,sx,0,ww,H,sx+subShift+internal,0,ww+1,H);
   }
 
-  // Overlay stabilisateur des contours.
   x.globalAlpha=0.24+protect*0.28;
   x.drawImage(tmp,subShift,0);
   x.globalAlpha=1;
@@ -439,20 +417,14 @@ function startPreview(){
   anim=requestAnimationFrame(loop);
 }
 
-/* =========================================================
-   UI
-========================================================= */
-
 file.addEventListener('change',async()=>{
   sourceFile=file.files?.[0]||null;
-
   exported=[];
   exportBtn.disabled=true;
   downloadBtn.disabled=true;
   framesEl.innerHTML='';
 
   if(!sourceFile) return;
-
   sourceImg=await fileToImage(sourceFile);
 
   const ratio=sourceImg.naturalWidth/sourceImg.naturalHeight;
@@ -461,7 +433,6 @@ file.addEventListener('change',async()=>{
 
   const c=view.getContext('2d');
   c.clearRect(0,0,view.width,view.height);
-
   const f=fitContain(sourceImg,view.width,view.height);
   c.drawImage(sourceImg,f.x,f.y,f.w,f.h);
 
@@ -479,35 +450,20 @@ buildBtn.addEventListener('click',async()=>{
   downloadBtn.disabled=true;
 
   try{
-    const subjectBlob=await localRemoveBackground(sourceFile);
+    const subjectBlob=await window.localRemoveBackground(sourceFile);
     subjectImg=await blobToImage(subjectBlob);
 
     subjectAlphaCanvas=makeAlphaCanvas(subjectImg);
 
-    const backgroundBlob=await reconstructBackground(
-      sourceImg,
-      subjectAlphaCanvas
-    );
-
+    const backgroundBlob=await reconstructBackground(sourceImg,subjectAlphaCanvas);
     backgroundImg=await blobToImage(backgroundBlob);
 
-    subjectDepthCanvas=await estimateDepth(
-      subjectImg,
-      '4/5 Analyse de profondeur du sujet…'
-    );
-
-    backgroundDepthCanvas=await estimateDepth(
-      backgroundImg,
-      '5/5 Analyse de profondeur du fond…'
-    );
+    subjectDepthCanvas=await estimateDepth(subjectImg,'4/5 Analyse de profondeur du sujet…');
+    backgroundDepthCanvas=await estimateDepth(backgroundImg,'5/5 Analyse de profondeur du fond…');
 
     startPreview();
-
     exportBtn.disabled=false;
-
-    setStatus(
-      'V3.1 prête — détourage, fond et profondeur calculés localement.'
-    );
+    setStatus('V3.1 prête — détourage, fond et profondeur calculés localement.');
   }catch(e){
     console.error(e);
     setStatus('ERREUR : '+(e?.message||String(e)));
@@ -520,7 +476,6 @@ exportBtn.addEventListener('click',async()=>{
   if(!subjectImg||!backgroundImg) return;
 
   cancelAnimationFrame(anim);
-
   exported=[];
   framesEl.innerHTML='';
 
@@ -534,14 +489,12 @@ exportBtn.addEventListener('click',async()=>{
     c.height=view.height;
 
     renderAt(poses[i],c);
-
     const b=await canvasToBlob(c);
     exported.push(b);
 
     const im=new Image();
     im.src=URL.createObjectURL(b);
     framesEl.appendChild(im);
-
     await sleep(25);
   }
 
@@ -554,32 +507,24 @@ downloadBtn.addEventListener('click',async()=>{
   if(exported.length!==9) return;
 
   const zip=new JSZip();
+  exported.forEach((b,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,b));
 
-  exported.forEach((b,i)=>{
-    zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,b);
-  });
-
-  zip.file(
-    'manifest.json',
-    JSON.stringify({
-      generator:'LentiPrint Relief 3D V3.1 local',
-      localSegmentation:true,
-      externalPaidApi:false,
-      views:9,
-      angle:Number(angle.value),
-      subjectDepth:Number(subjectDepth.value),
-      backgroundDepth:Number(bgDepth.value),
-      edgeProtection:Number(edgeProtect.value)
-    },null,2)
-  );
+  zip.file('manifest.json',JSON.stringify({
+    generator:'LentiPrint Relief 3D V3.1 local',
+    localSegmentation:true,
+    externalPaidApi:false,
+    views:9,
+    angle:Number(angle.value),
+    subjectDepth:Number(subjectDepth.value),
+    backgroundDepth:Number(bgDepth.value),
+    edgeProtection:Number(edgeProtect.value)
+  },null,2));
 
   const b=await zip.generateAsync({type:'blob'});
-
   const u=URL.createObjectURL(b);
   const a=document.createElement('a');
   a.href=u;
   a.download='9-vues-relief-3d-v31-local.zip';
   a.click();
-
   setTimeout(()=>URL.revokeObjectURL(u),1500);
 });
