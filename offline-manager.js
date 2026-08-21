@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const PACK_VERSION = 'happyholo-offline-v1.10';
+  const PACK_VERSION = 'happyholo-offline-v1.11';
   const PACK_KEY = `${PACK_VERSION}:ready`;
   const $ = s => document.querySelector(s);
 

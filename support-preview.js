@@ -1,17 +1,18 @@
-/* HappyHolo V3.1.8 — Rendu support restauré sans toucher au moteur Relief 3D */
+/* HappyHolo V3.1.11 — Rendu support animé relié au vrai moteur Relief 3D */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
   const file = $('#file');
-  if (!file) return;
+  const view = $('#view');
+  if (!file || !view) return;
 
-  let img = null, objectUrl = null, raf = 0, running = false, start = 0;
+  let uploadedImage = null, objectUrl = null, raf = 0, running = false, start = 0;
   const state = {support:'keychain-vertical', fit:'preserve', margin:14, zoom:100, x:0, y:0, rot:6, speed:5};
 
   const host = document.createElement('section');
   host.className = 'support-card';
   host.innerHTML = `
-    <div class="support-head"><div><h2>Rendu support</h2><p>Simulation simple — cadrage et rotation du support complet.</p></div><span class="support-badge">Aperçu</span></div>
+    <div class="support-head"><div><h2>Rendu support</h2><p>Simulation animée — rotation du support + effet lenticulaire synchronisé.</p></div><span class="support-badge">Aperçu</span></div>
     <div class="support-grid">
       <div class="support-controls">
         <label>Support</label>
@@ -43,11 +44,14 @@
       <div class="support-stage-wrap">
         <div class="support-stage">
           <div id="productObject" class="product-object keychain-vertical">
-            <div class="ring"></div><div class="link"></div><div class="shell"><div class="image-window"><img id="supportImage" alt="Aperçu"></div></div>
+            <div class="ring"></div>
+            <div class="link"></div>
+            <div class="shell"><div class="image-window"><canvas id="supportCanvas"></canvas></div></div>
           </div>
           <div id="supportEmpty" class="support-empty">Charge une photo pour afficher le support.</div>
         </div>
         <div id="supportRecommendation" class="support-note">Portrait → porte-clé vertical recommandé.</div>
+        <div id="supportHint" class="support-note">Astuce : crée le relief 3D local, puis lance l’aperçu pour voir la rotation et l’effet.</div>
       </div>
     </div>`;
 
@@ -55,53 +59,128 @@
   mainCard?.insertAdjacentElement('afterend', host);
 
   const type=$('#supportType'), fit=$('#supportFit'), margin=$('#supportMargin'), zoom=$('#supportZoom'), xp=$('#supportX'), yp=$('#supportY'), rot=$('#supportRot'), speed=$('#supportSpeed');
-  const product=$('#productObject'), simg=$('#supportImage'), empty=$('#supportEmpty');
+  const product=$('#productObject'), supportCanvas=$('#supportCanvas'), empty=$('#supportEmpty'), stage=$('.support-stage');
+  const sctx=supportCanvas.getContext('2d');
+  const scene=document.createElement('canvas');
+  const sceneCtx=scene.getContext('2d');
+  let resizeObserver = null;
 
-  function updateText(){
-    $('#marginOut').textContent=`${state.margin}%`; $('#zoomOut').textContent=`${state.zoom}%`; $('#xOut').textContent=`${state.x}%`; $('#yOut').textContent=`${state.y}%`; $('#rotOut').textContent=`±${state.rot}°`; $('#speedOut').textContent=`${state.speed.toFixed(1)} s`;
+  function reliefReady(){
+    try{ return typeof renderAt === 'function' && !!document.querySelector('#export') && !document.querySelector('#export').disabled; }
+    catch(_){ return false; }
   }
-  function applyImage(){
-    if(!img) return;
-    const pad = state.fit==='preserve' ? state.margin : 0;
-    const base = state.fit==='contain' ? 'contain' : 'cover';
-    simg.style.objectFit=base;
-    simg.style.width=`${100+state.zoom-100}%`; simg.style.height=`${100+state.zoom-100}%`;
-    simg.style.left=`${state.x}%`; simg.style.top=`${state.y}%`;
-    simg.style.transform='translate(-50%,-50%)';
-    simg.style.padding=`${pad}%`;
+  function updateText(){
+    $('#marginOut').textContent=`${state.margin}%`;
+    $('#zoomOut').textContent=`${state.zoom}%`;
+    $('#xOut').textContent=`${state.x}%`;
+    $('#yOut').textContent=`${state.y}%`;
+    $('#rotOut').textContent=`±${state.rot}°`;
+    $('#speedOut').textContent=`${state.speed.toFixed(1)} s`;
+  }
+  function syncCanvasSize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const rect = supportCanvas.getBoundingClientRect();
+    const w = Math.max(2, Math.round(rect.width * dpr));
+    const h = Math.max(2, Math.round(rect.height * dpr));
+    if (supportCanvas.width !== w || supportCanvas.height !== h){
+      supportCanvas.width = w; supportCanvas.height = h;
+    }
+    scene.width = 1024;
+    scene.height = Math.round(1024 * (h / w || 1));
+  }
+  function fitRect(sw,sh,dw,dh){
+    let scale;
+    if(state.fit==='contain' || state.fit==='preserve') scale = Math.min(dw/sw, dh/sh);
+    else scale = Math.max(dw/sw, dh/sh);
+    scale *= (state.zoom/100);
+    if(state.fit==='preserve') scale *= Math.max(0.55, 1 - state.margin/100);
+    const w = sw * scale, h = sh * scale;
+    const dx = (dw-w)/2 + (state.x/100)*dw*0.5;
+    const dy = (dh-h)/2 + (state.y/100)*dh*0.5;
+    return {dx,dy,w,h};
+  }
+  function drawUploadedFallback(){
+    syncCanvasSize();
+    sctx.clearRect(0,0,supportCanvas.width,supportCanvas.height);
+    if(!uploadedImage) return;
+    const r = fitRect(uploadedImage.naturalWidth, uploadedImage.naturalHeight, supportCanvas.width, supportCanvas.height);
+    sctx.drawImage(uploadedImage, r.dx, r.dy, r.w, r.h);
+  }
+  function drawReliefFrame(norm){
+    syncCanvasSize();
+    if(reliefReady()){
+      sceneCtx.clearRect(0,0,scene.width,scene.height);
+      try { renderAt(norm, scene); }
+      catch(e){ console.warn('[support-preview] renderAt failed', e); drawUploadedFallback(); return; }
+      sctx.clearRect(0,0,supportCanvas.width,supportCanvas.height);
+      const r = fitRect(scene.width, scene.height, supportCanvas.width, supportCanvas.height);
+      sctx.drawImage(scene, r.dx, r.dy, r.w, r.h);
+    } else if (view && view.width && view.height) {
+      sctx.clearRect(0,0,supportCanvas.width,supportCanvas.height);
+      const r = fitRect(view.width, view.height, supportCanvas.width, supportCanvas.height);
+      sctx.drawImage(view, r.dx, r.dy, r.w, r.h);
+    } else {
+      drawUploadedFallback();
+    }
   }
   function applySupport(){
     product.className=`product-object ${state.support}`;
-    updateText(); applyImage();
+    updateText();
+    drawReliefFrame(0);
   }
   function tick(ts){
     if(!running) return;
-    if(!start) start=ts;
-    const p=(ts-start)/(state.speed*1000);
-    const a=Math.sin(p*Math.PI*2)*state.rot;
-    product.style.transform=`perspective(900px) rotateY(${a}deg)`;
-    raf=requestAnimationFrame(tick);
+    if(!start) start = ts;
+    const phase = Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);
+    product.style.transform = `perspective(900px) rotateY(${phase * state.rot}deg)`;
+    drawReliefFrame(phase);
+    raf = requestAnimationFrame(tick);
   }
-  function play(){running=true;start=0;cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
-  function stop(){running=false;cancelAnimationFrame(raf);product.style.transform='perspective(900px) rotateY(0deg)';}
+  function play(){
+    if(!uploadedImage && !reliefReady()) return;
+    running = true; start = 0; cancelAnimationFrame(raf); raf = requestAnimationFrame(tick);
+  }
+  function stop(){
+    running = false; cancelAnimationFrame(raf); product.style.transform='perspective(900px) rotateY(0deg)'; drawReliefFrame(0);
+  }
+  function maybeAutoplay(){ if(reliefReady()) play(); else drawReliefFrame(0); }
 
   [type,fit,margin,zoom,xp,yp,rot,speed].forEach(el=>el.addEventListener('input',()=>{
-    state.support=type.value; state.fit=fit.value; state.margin=Number(margin.value); state.zoom=Number(zoom.value); state.x=Number(xp.value); state.y=Number(yp.value); state.rot=Number(rot.value); state.speed=Number(speed.value); applySupport();
+    state.support=type.value; state.fit=fit.value; state.margin=Number(margin.value); state.zoom=Number(zoom.value); state.x=Number(xp.value); state.y=Number(yp.value); state.rot=Number(rot.value); state.speed=Number(speed.value);
+    applySupport();
+    if(running){ cancelAnimationFrame(raf); raf=requestAnimationFrame(tick); }
   }));
-  $('#supportPlay').addEventListener('click',play); $('#supportStop').addEventListener('click',stop);
+  $('#supportPlay').addEventListener('click', play);
+  $('#supportStop').addEventListener('click', stop);
 
   file.addEventListener('change',()=>{
-    const f=file.files?.[0]; if(!f) return;
-    if(objectUrl) URL.revokeObjectURL(objectUrl); objectUrl=URL.createObjectURL(f);
-    const probe=new Image();
-    probe.onload=()=>{
-      img=probe; simg.src=objectUrl; empty.style.display='none';
-      const r=probe.naturalWidth/probe.naturalHeight;
-      if(r>1.12){ type.value='keychain-horizontal'; state.support=type.value; $('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.'; }
+    const f = file.files?.[0]; if(!f) return;
+    if(objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = URL.createObjectURL(f);
+    const probe = new Image();
+    probe.onload = ()=>{
+      uploadedImage = probe; empty.style.display='none';
+      const r = probe.naturalWidth/probe.naturalHeight;
+      if(r > 1.12){ type.value='keychain-horizontal'; state.support=type.value; $('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.'; }
       else { type.value='keychain-vertical'; state.support=type.value; $('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.'; }
       applySupport();
     };
-    probe.src=objectUrl;
+    probe.src = objectUrl;
   });
+
+  // Auto-start once the main relief build finishes.
+  const exportBtn = document.querySelector('#export');
+  if(exportBtn){
+    const obs = new MutationObserver(()=>{ if(!exportBtn.disabled) maybeAutoplay(); });
+    obs.observe(exportBtn, {attributes:true, attributeFilter:['disabled']});
+  }
+
+  if('ResizeObserver' in window){
+    resizeObserver = new ResizeObserver(()=>{ drawReliefFrame(0); if(running){ cancelAnimationFrame(raf); raf=requestAnimationFrame(tick); } });
+    resizeObserver.observe(stage);
+  } else {
+    window.addEventListener('resize', ()=>{ drawReliefFrame(0); if(running){ cancelAnimationFrame(raf); raf=requestAnimationFrame(tick); } });
+  }
+
   applySupport();
 })();
