@@ -1,204 +1,67 @@
-// HappyHolo / LentiPrint — V3.1.1
-// Export support-aware + 75 LPI + correction monotonic.
-// Ce patch est chargé APRES relief-engine-v31.js.
-
+// HappyHolo Relief 3D — V3.1.7 porte-clé vertical production export
+// - 9 vues normalisées en 1024 × 1536 px (ratio 2:3, recadrage centré, sans déformation)
+// - vue 06 = milieu exact entre vues 05 et 07
+// - taille physique cible 40 × 60 mm ; lenticulaire 75 LPI
 (() => {
-  const exportBtn = document.querySelector('#export');
   const downloadBtn = document.querySelector('#download');
   const framesEl = document.querySelector('#frames');
-  const controlsSection = document.querySelector('.card.grid > section:first-child');
+  if (!downloadBtn || !framesEl) return;
 
-  if (!exportBtn || !downloadBtn || !framesEl) return;
+  const OUT_W = 1024;
+  const OUT_H = 1536;
+  const WIDTH_MM = 40;
+  const HEIGHT_MM = 60;
+  const LPI = 75;
+  // pHYs décrit la densité du raster pour retrouver 40 × 60 mm à l'impression.
+  const PPM_X = Math.round(OUT_W / (WIDTH_MM / 1000));
+  const PPM_Y = Math.round(OUT_H / (HEIGHT_MM / 1000));
 
-  const PRINT_LPI = 75;
-
-  const PRESETS = {
-    medallion30: {
-      label: 'Médaillon rond Ø30 mm',
-      product: 'medaillon',
-      orientation: 'carre',
-      widthPx: 1024,
-      heightPx: 1024,
-      widthMm: 30,
-      heightMm: 30
-    },
-
-    keychainVertical: {
-      label: 'Porte-clé rectangle vertical — 2:3',
-      product: 'porte-cle',
-      orientation: 'vertical',
-      widthPx: 1024,
-      heightPx: 1536,
-      widthMm: null,
-      heightMm: null
-    },
-
-    keychainHorizontal: {
-      label: 'Porte-clé rectangle horizontal — 3:2',
-      product: 'porte-cle',
-      orientation: 'horizontal',
-      widthPx: 1536,
-      heightPx: 1024,
-      widthMm: null,
-      heightMm: null
-    },
-
-    cardHorizontal: {
-      label: 'Carte CR80 horizontale — 85,6 × 54 mm',
-      product: 'carte-cr80',
-      orientation: 'horizontal',
-      widthPx: 1536,
-      heightPx: 969,
-      widthMm: 85.6,
-      heightMm: 54
-    },
-
-    cardVertical: {
-      label: 'Carte CR80 verticale — 54 × 85,6 mm',
-      product: 'carte-cr80',
-      orientation: 'vertical',
-      widthPx: 969,
-      heightPx: 1536,
-      widthMm: 54,
-      heightMm: 85.6
-    }
-  };
-
-  let selectedPresetKey = 'keychainVertical';
-
-  // =========================================================
-  // 1 — CHOIX DU SUPPORT
-  // =========================================================
-
-  function installSupportSelector() {
-    if (document.querySelector('#outputSupport')) return;
-
-    const wrap = document.createElement('div');
-
-    wrap.id = 'outputSupportWrap';
-
-    wrap.innerHTML = `
-      <label for="outputSupport">
-        Support / format de sortie
-      </label>
-
-      <select
-        id="outputSupport"
-        style="
-          width:100%;
-          font:inherit;
-          padding:11px;
-          border:1px solid #ccc;
-          border-radius:11px;
-          background:#fff;
-        "
-      >
-        <option value="keychainVertical">
-          Porte-clé rectangle vertical — 2:3
-        </option>
-
-        <option value="keychainHorizontal">
-          Porte-clé rectangle horizontal — 3:2
-        </option>
-
-        <option value="medallion30">
-          Médaillon rond Ø30 mm — 1:1
-        </option>
-
-        <option value="cardHorizontal">
-          Carte CR80 horizontale — 85,6 × 54 mm
-        </option>
-
-        <option value="cardVertical">
-          Carte CR80 verticale — 54 × 85,6 mm
-        </option>
-      </select>
-
-      <div
-        id="outputSupportInfo"
-        class="small"
-        style="margin-top:6px"
-      ></div>
-    `;
-
-    if (controlsSection) {
-      const firstButton = controlsSection.querySelector('button');
-
-      if (firstButton) {
-        controlsSection.insertBefore(wrap, firstButton);
-      } else {
-        controlsSection.appendChild(wrap);
-      }
-    }
-
-    const select = document.querySelector('#outputSupport');
-    const info = document.querySelector('#outputSupportInfo');
-
-    function refresh() {
-      selectedPresetKey = select.value;
-
-      const p = PRESETS[selectedPresetKey];
-
-      const physicalText =
-        p.widthMm && p.heightMm
-          ? ` · ${p.widthMm} × ${p.heightMm} mm`
-          : ' · dimensions physiques porte-clé à confirmer';
-
-      info.textContent =
-        `${p.widthPx} × ${p.heightPx} px · ` +
-        `${PRINT_LPI} LPI · 9 vues${physicalText}`;
-    }
-
-    select.addEventListener('change', refresh);
-
-    refresh();
-  }
-
-  installSupportSelector();
-
-  // =========================================================
-  // 2 — OUTILS
-  // =========================================================
-
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  function blobToImage(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
+      img.src = url;
+    });
   }
 
   function canvasToBlob(canvas) {
     return new Promise((resolve, reject) => {
       canvas.toBlob(
-        blob => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(
-              new Error('Impossible de créer le PNG.')
-            );
-          }
-        },
+        (b) => b ? resolve(b) : reject(new Error('Impossible de créer le PNG.')),
         'image/png'
       );
     });
   }
 
-  function blobToImage(blob) {
-    return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(blob);
+  async function normalizeBlob(blob) {
+    const img = await blobToImage(blob);
+    const c = document.createElement('canvas');
+    c.width = OUT_W;
+    c.height = OUT_H;
+    const x = c.getContext('2d', { alpha: true });
+    if (!x) throw new Error('Canvas 2D indisponible.');
 
-      const img = new Image();
+    // "cover" : conserve les proportions et recadre au centre.
+    // Aucun étirement : le sujet ne change pas de forme.
+    const sw = img.naturalWidth || img.width;
+    const sh = img.naturalHeight || img.height;
+    const scale = Math.max(OUT_W / sw, OUT_H / sh);
+    const dw = sw * scale;
+    const dh = sh * scale;
+    const dx = (OUT_W - dw) / 2;
+    const dy = (OUT_H - dh) / 2;
 
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        resolve(img);
-      };
-
-      img.onerror = e => {
-        URL.revokeObjectURL(url);
-        reject(e);
-      };
-
-      img.src = url;
-    });
+    x.clearRect(0, 0, OUT_W, OUT_H);
+    x.drawImage(img, dx, dy, dw, dh);
+    return canvasToBlob(c);
   }
 
   async function buildMiddleBlob(leftBlob, rightBlob) {
@@ -207,439 +70,136 @@
       blobToImage(rightBlob)
     ]);
 
-    if (
-      left.naturalWidth !== right.naturalWidth ||
-      left.naturalHeight !== right.naturalHeight
-    ) {
-      throw new Error(
-        'Les vues 05 et 07 n’ont pas le même format.'
+    const c = document.createElement('canvas');
+    c.width = OUT_W;
+    c.height = OUT_H;
+    const x = c.getContext('2d', { alpha: true });
+    if (!x) throw new Error('Canvas 2D indisponible.');
+
+    x.clearRect(0, 0, OUT_W, OUT_H);
+    x.drawImage(left, 0, 0, OUT_W, OUT_H);
+    x.globalAlpha = 0.5;
+    x.drawImage(right, 0, 0, OUT_W, OUT_H);
+    x.globalAlpha = 1;
+
+    return canvasToBlob(c);
+  }
+
+  function writeU32BE(arr, offset, value) {
+    arr[offset] = (value >>> 24) & 255;
+    arr[offset + 1] = (value >>> 16) & 255;
+    arr[offset + 2] = (value >>> 8) & 255;
+    arr[offset + 3] = value & 255;
+  }
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) {
+      crc ^= bytes[i];
+      for (let k = 0; k < 8; k++) {
+        crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+      }
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  async function addPngPhysicalSize(blob, ppmX = PPM_X, ppmY = PPM_Y) {
+    const src = new Uint8Array(await blob.arrayBuffer());
+    if (src.length < 33 || src[0] !== 137 || src[1] !== 80 || src[2] !== 78 || src[3] !== 71) {
+      return blob;
+    }
+
+    // pHYs : 4 longueur + 4 type + 9 données + 4 CRC = 21 octets
+    const chunk = new Uint8Array(21);
+    writeU32BE(chunk, 0, 9);
+    chunk.set([112, 72, 89, 115], 4); // "pHYs"
+    writeU32BE(chunk, 8, ppmX);
+    writeU32BE(chunk, 12, ppmY);
+    chunk[16] = 1; // unité = mètre
+    writeU32BE(chunk, 17, crc32(chunk.slice(4, 17)));
+
+    // Insère pHYs juste après IHDR (signature 8 + chunk IHDR 25 = offset 33).
+    const out = new Uint8Array(src.length + chunk.length);
+    out.set(src.slice(0, 33), 0);
+    out.set(chunk, 33);
+    out.set(src.slice(33), 33 + chunk.length);
+    return new Blob([out], { type: 'image/png' });
+  }
+
+  downloadBtn.addEventListener('click', async (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    const imgs = Array.from(framesEl.querySelectorAll('img'));
+    if (imgs.length !== 9) {
+      alert('Il faut d’abord générer les 9 vues.');
+      return;
+    }
+
+    downloadBtn.disabled = true;
+
+    try {
+      const rawBlobs = await Promise.all(
+        imgs.map(async img => {
+          const r = await fetch(img.src);
+          if (!r.ok) throw new Error(`Impossible de lire une vue (${r.status}).`);
+          return r.blob();
+        })
       );
-    }
 
-    const canvas = document.createElement('canvas');
+      let blobs = await Promise.all(rawBlobs.map(normalizeBlob));
 
-    canvas.width = left.naturalWidth;
-    canvas.height = left.naturalHeight;
+      // Passage 05 → 06 → 07 strictement régulier.
+      blobs[5] = await buildMiddleBlob(blobs[4], blobs[6]);
 
-    const ctx = canvas.getContext('2d');
+      // Inscription de la résolution physique dans chaque PNG.
+      blobs = await Promise.all(blobs.map(b => addPngDpi(b)));
 
-    ctx.drawImage(
-      left,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
+      const zip = new JSZip();
+      blobs.forEach((b, i) => {
+        zip.file(`vue-${String(i + 1).padStart(2, '0')}.png`, b);
+      });
 
-    ctx.globalAlpha = 0.5;
+      const angle = document.querySelector('#angle');
+      const subjectDepth = document.querySelector('#subjectDepth');
+      const bgDepth = document.querySelector('#bgDepth');
+      const edgeProtect = document.querySelector('#edgeProtect');
 
-    ctx.drawImage(
-      right,
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-
-    ctx.globalAlpha = 1;
-
-    return canvasToBlob(canvas);
-  }
-
-  function setLocalStatus(text) {
-    const status = document.querySelector('#status');
-
-    if (status) {
-      status.textContent = text;
-    }
-  }
-
-  function currentPreset() {
-    return (
-      PRESETS[selectedPresetKey] ||
-      PRESETS.keychainVertical
-    );
-  }
-
-  // =========================================================
-  // 3 — EXPORT 9 VUES AU FORMAT DU SUPPORT
-  // =========================================================
-
-  exportBtn.addEventListener(
-    'click',
-    async event => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-
-      if (typeof window.renderAt !== 'function') {
-        setLocalStatus(
-          'Erreur : fonction de rendu V3.1 introuvable.'
-        );
-
-        return;
-      }
-
-      const p = currentPreset();
-
-      const poses = [
-        -1,
-        -0.75,
-        -0.5,
-        -0.25,
-        0,
-        0.25,
-        0.5,
-        0.75,
-        1
-      ];
-
-      exportBtn.disabled = true;
-      downloadBtn.disabled = true;
-
-      framesEl.innerHTML = '';
-
-      const blobs = [];
-
-      try {
-        if (
-          typeof window.cancelAnimationFrame === 'function' &&
-          window.anim
-        ) {
-          cancelAnimationFrame(window.anim);
-        }
-
-        for (let i = 0; i < 9; i++) {
-          setLocalStatus(
-            `Export ${i + 1}/9 — ` +
-            `${p.label} — ` +
-            `${p.widthPx} × ${p.heightPx} px`
-          );
-
-          const canvas =
-            document.createElement('canvas');
-
-          canvas.width = p.widthPx;
-          canvas.height = p.heightPx;
-
-          window.renderAt(
-            poses[i],
-            canvas
-          );
-
-          const blob =
-            await canvasToBlob(canvas);
-
-          blobs.push(blob);
-
-          const img = new Image();
-
-          img.src =
-            URL.createObjectURL(blob);
-
-          img.alt =
-            `Vue ${i + 1}`;
-
-          img.dataset.exportWidth =
-            String(p.widthPx);
-
-          img.dataset.exportHeight =
-            String(p.heightPx);
-
-          framesEl.appendChild(img);
-
-          await sleep(20);
-        }
-
-        // -----------------------------------------------------
-        // Correction monotonic V3.1.1
-        //
-        // Vue 06 = interpolation exacte 50 %
-        // entre vues 05 et 07.
-        // -----------------------------------------------------
-
-        blobs[5] =
-          await buildMiddleBlob(
-            blobs[4],
-            blobs[6]
-          );
-
-        const previewImages =
-          framesEl.querySelectorAll('img');
-
-        const view6 =
-          previewImages[5];
-
-        if (view6) {
-          try {
-            URL.revokeObjectURL(
-              view6.src
-            );
-          } catch (_) {}
-
-          view6.src =
-            URL.createObjectURL(
-              blobs[5]
-            );
-        }
-
-        // Stockage du véritable export.
-        window.__LENTIPRINT_V311_EXPORT__ = {
-          blobs,
-          presetKey: selectedPresetKey
-        };
-
-        downloadBtn.disabled = false;
-
-        setLocalStatus(
-          `9 vues prêtes — ` +
-          `${p.label} — ` +
-          `${p.widthPx} × ${p.heightPx} px — ` +
-          `${PRINT_LPI} LPI.`
-        );
-
-        if (
-          typeof window.startPreview === 'function'
-        ) {
-          try {
-            window.startPreview();
-          } catch (_) {}
-        }
-
-      } catch (e) {
-        console.error(e);
-
-        setLocalStatus(
-          'Erreur export : ' +
-          (e?.message || String(e))
-        );
-      } finally {
-        exportBtn.disabled = false;
-      }
-    },
-    true
-  );
-
-  // =========================================================
-  // 4 — CRÉATION DU ZIP FINAL
-  // =========================================================
-
-  downloadBtn.addEventListener(
-    'click',
-    async event => {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-
-      const data =
-        window.__LENTIPRINT_V311_EXPORT__;
-
-      if (
-        !data ||
-        !Array.isArray(data.blobs) ||
-        data.blobs.length !== 9
-      ) {
-        alert(
-          'Il faut d’abord exporter les 9 vues.'
-        );
-
-        return;
-      }
-
-      if (
-        typeof JSZip === 'undefined'
-      ) {
-        alert(
-          'JSZip est indisponible.'
-        );
-
-        return;
-      }
-
-      const p =
-        PRESETS[data.presetKey] ||
-        currentPreset();
-
-      const blobs =
-        [...data.blobs];
-
-      downloadBtn.disabled = true;
-
-      try {
-        const zip =
-          new JSZip();
-
-        blobs.forEach(
-          (blob, i) => {
-            zip.file(
-              `vue-${String(i + 1)
-                .padStart(2, '0')}.png`,
-              blob
-            );
-          }
-        );
-
-        const angle =
-          document.querySelector('#angle');
-
-        const subjectDepth =
-          document.querySelector(
-            '#subjectDepth'
-          );
-
-        const bgDepth =
-          document.querySelector(
-            '#bgDepth'
-          );
-
-        const edgeProtect =
-          document.querySelector(
-            '#edgeProtect'
-          );
-
-        const manifest = {
-          generator:
-            'HappyHolo Relief 3D V3.1.1 support-aware monotonic',
-
+      zip.file(
+        'manifest.json',
+        JSON.stringify({
+          generator: 'HappyHolo Relief 3D V3.1.7 porte-clé vertical',
           localSegmentation: true,
-
           externalPaidApi: false,
+          views: 9,
+          widthPx: OUT_W,
+          heightPx: OUT_H,
+          lpi: LPI,
+          widthMm: WIDTH_MM,
+          heightMm: HEIGHT_MM,
+          pngPixelsPerMeterX: PPM_X,
+          pngPixelsPerMeterY: PPM_Y,
+          resizeMode: 'center-cover-no-distortion',
+          monotonicCorrection: 'view-06 midpoint of views 05 and 07',
+          angle: Number(angle?.value ?? 7),
+          subjectDepth: Number(subjectDepth?.value ?? 0.48),
+          backgroundDepth: Number(bgDepth?.value ?? 0.10),
+          edgeProtection: Number(edgeProtect?.value ?? 84)
+        }, null, 2)
+      );
 
-          lenticular: {
-            lpi: PRINT_LPI,
-            views: 9
-          },
-
-          product: p.product,
-
-          productLabel: p.label,
-
-          orientation:
-            p.orientation,
-
-          physicalFormat: {
-            widthMm:
-              p.widthMm,
-
-            heightMm:
-              p.heightMm,
-
-            source:
-              p.widthMm &&
-              p.heightMm
-                ? 'validated-preset'
-                : 'physical-size-not-yet-locked'
-          },
-
-          imageFormat: {
-            widthPx:
-              p.widthPx,
-
-            heightPx:
-              p.heightPx,
-
-            ratio:
-              Number(
-                (
-                  p.widthPx /
-                  p.heightPx
-                ).toFixed(6)
-              )
-          },
-
-          monotonicCorrection:
-            'view-06 midpoint of views 05 and 07',
-
-          settings: {
-            angle:
-              Number(
-                angle?.value ?? 7
-              ),
-
-            subjectDepth:
-              Number(
-                subjectDepth?.value ??
-                0.48
-              ),
-
-            backgroundDepth:
-              Number(
-                bgDepth?.value ??
-                0.10
-              ),
-
-            edgeProtection:
-              Number(
-                edgeProtect?.value ??
-                84
-              )
-          }
-        };
-
-        zip.file(
-          'manifest.json',
-          JSON.stringify(
-            manifest,
-            null,
-            2
-          )
-        );
-
-        const out =
-          await zip.generateAsync({
-            type: 'blob',
-            compression:
-              'DEFLATE',
-
-            compressionOptions: {
-              level: 6
-            }
-          });
-
-        const url =
-          URL.createObjectURL(out);
-
-        const a =
-          document.createElement('a');
-
-        a.href = url;
-
-        a.download =
-          `9-vues-` +
-          `${p.product}-` +
-          `${p.orientation}-` +
-          `75lpi-v311.zip`;
-
-        document.body.appendChild(a);
-
-        a.click();
-
-        a.remove();
-
-        setTimeout(
-          () =>
-            URL.revokeObjectURL(
-              url
-            ),
-          4000
-        );
-
-        setLocalStatus(
-          `ZIP prêt — ` +
-          `${p.label} — ` +
-          `${PRINT_LPI} LPI — ` +
-          `9 vues.`
-        );
-
-      } catch (e) {
-        console.error(e);
-
-        alert(
-          'Erreur ZIP : ' +
-          (e?.message || String(e))
-        );
-      } finally {
-        downloadBtn.disabled = false;
-      }
-    },
-    true
-  );
+      const out = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const url = URL.createObjectURL(out);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = '9-vues-porte-cle-vertical-75lpi-v317.zip';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (e) {
+      console.error(e);
+      alert('Erreur export V3.1.7 : ' + (e?.message || String(e)));
+    } finally {
+      downloadBtn.disabled = false;
+    }
+  }, true);
 })();
