@@ -1,4 +1,4 @@
-// HappyHolo Relief 3D — V3.1.7 porte-clé vertical production export
+// HappyHolo Relief 3D — V3.1.8 porte-clé vertical production export
 // - 9 vues normalisées en 1024 × 1536 px (ratio 2:3, recadrage centré, sans déformation)
 // - vue 06 = milieu exact entre vues 05 et 07
 // - taille physique cible 40 × 60 mm ; lenticulaire 75 LPI
@@ -153,7 +153,7 @@
       blobs[5] = await buildMiddleBlob(blobs[4], blobs[6]);
 
       // Inscription de la résolution physique dans chaque PNG.
-      blobs = await Promise.all(blobs.map(b => addPngDpi(b)));
+      blobs = await Promise.all(blobs.map(b => addPngPhysicalSize(b)));
 
       const zip = new JSZip();
       blobs.forEach((b, i) => {
@@ -168,7 +168,7 @@
       zip.file(
         'manifest.json',
         JSON.stringify({
-          generator: 'HappyHolo Relief 3D V3.1.7 porte-clé vertical',
+          generator: 'HappyHolo Relief 3D V3.1.8 porte-clé vertical',
           localSegmentation: true,
           externalPaidApi: false,
           views: 9,
@@ -192,12 +192,12 @@
       const url = URL.createObjectURL(out);
       const a = document.createElement('a');
       a.href = url;
-      a.download = '9-vues-porte-cle-vertical-75lpi-v317.zip';
+      a.download = '9-vues-porte-cle-vertical-75lpi-v318.zip';
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch (e) {
       console.error(e);
-      alert('Erreur export V3.1.7 : ' + (e?.message || String(e)));
+      alert('Erreur export V3.1.8 : ' + (e?.message || String(e)));
     } finally {
       downloadBtn.disabled = false;
     }

@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>HappyHolo — Relief 3D V3.1.7 offline</title>
+<title>HappyHolo — Relief 3D V3.1.8 offline</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
@@ -23,11 +23,13 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 .row{display:flex;justify-content:space-between;gap:12px;font-size:13px}
 .small{font-size:12px;color:#666;line-height:1.4;margin-top:8px}
 .frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:8px}
+
+.support-card{margin-top:18px;background:#fff;border:1px solid #ddd;border-radius:18px;padding:18px}.support-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.support-head h2{margin:0 0 4px}.support-head p{margin:0;color:#666}.support-badge{background:#e7f7eb;color:#17652c;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:800}.support-grid{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-top:16px}.support-controls select{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;background:#fff}.support-controls label{display:flex;justify-content:space-between;gap:10px}.support-stage-wrap{min-width:0}.support-stage{min-height:470px;border-radius:16px;background:#ececea;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}.support-empty{position:absolute;color:#666}.product-object{position:relative;transform-style:preserve-3d;will-change:transform;display:flex;flex-direction:column;align-items:center}.product-object .ring{width:64px;height:64px;border:8px solid #a7a7a7;border-radius:50%;box-shadow:inset 0 0 0 2px #eee}.product-object .link{width:16px;height:28px;border:5px solid #999;border-radius:10px;margin-top:-5px}.product-object .shell{background:linear-gradient(145deg,#fafafa,#c9c9c9);padding:7px;border-radius:15px;box-shadow:0 12px 26px #0003}.image-window{position:relative;overflow:hidden;background:#ddd;width:100%;height:100%}.image-window img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}.keychain-vertical .shell{width:220px;height:330px}.keychain-horizontal{flex-direction:row;gap:0}.keychain-horizontal .ring{margin-right:-2px}.keychain-horizontal .link{width:28px;height:16px;margin:0 -2px 0 0}.keychain-horizontal .shell{width:330px;height:220px}.medallion-round .shell{width:245px;height:245px;border-radius:50%;padding:9px}.medallion-round .image-window{border-radius:50%}.support-note{margin-top:10px;padding:10px;border-radius:10px;background:#f3f3f3;font-size:13px}@media(max-width:800px){.support-grid{grid-template-columns:1fr}.support-stage{min-height:390px}.keychain-vertical .shell{width:180px;height:270px}.keychain-horizontal .shell{width:270px;height:180px}.medallion-round .shell{width:210px;height:210px}}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1>HappyHolo — Relief 3D V3.1.7 offline</h1>
+<h1>HappyHolo — Relief 3D V3.1.8 offline</h1>
 <div class="sub">Photo → détourage local → correction doigt/Pencil → fond reconstruit localement → profondeur séparée → 9 vues.</div>
 <div class="card grid">
 <section>
@@ -60,5 +62,6 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 <script src="./mask-editor-v315-panfix.js"></script>
 <script src="./v311-monotonic-patch.js"></script>
 <script src="./offline-manager.js"></script>
+<script src="./support-preview.js"></script>
 </body>
 </html>
