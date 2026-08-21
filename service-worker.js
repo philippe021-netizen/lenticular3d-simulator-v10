@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.3';
+const CACHE_VERSION = 'happyholo-offline-v1.4';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -6,7 +6,7 @@ let happyHoloMode = 'connected';
 const APP_SHELL = [
   './relief3d-test-v31.html',
   './relief-engine-v31.js',
-  './mask-editor-v313-fluid.js',
+  './mask-editor-v314-touchfix.js',
   './v311-monotonic-patch.js',
   './offline-manager.js',
   './manifest.webmanifest'
@@ -30,7 +30,10 @@ self.addEventListener('install',e=>{
 self.addEventListener('activate',e=>{
   e.waitUntil(
     caches.keys()
-      .then(keys=>Promise.all(keys.filter(k=>k.startsWith('happyholo-offline-') && k!==APP_CACHE && k!==RUNTIME_CACHE).map(k=>caches.delete(k))))
+      .then(keys=>Promise.all(
+        keys.filter(k=>k.startsWith('happyholo-offline-') && k!==APP_CACHE && k!==RUNTIME_CACHE)
+            .map(k=>caches.delete(k))
+      ))
       .then(()=>self.clients.claim())
   );
 });
@@ -66,7 +69,9 @@ self.addEventListener('fetch',e=>{
   }
 
   if(!cacheable(url)){
-    if(happyHoloMode==='local') e.respondWith(new Response('Bloqué par MODE LOCAL HappyHolo.',{status:503}));
+    if(happyHoloMode==='local'){
+      e.respondWith(new Response('Bloqué par MODE LOCAL HappyHolo.',{status:503}));
+    }
     return;
   }
 
