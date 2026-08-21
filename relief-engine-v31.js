@@ -73,10 +73,13 @@ function fitCover(img,W,H){
 /* 1 — DETOURAGE LOCAL */
 async function localRemoveBackground(file){
   setStatus('1/5 Chargement du moteur de détourage local…');
-  const mod = await import('https://esm.sh/@imgly/background-removal');
+  const mod = await import('https://esm.sh/@imgly/background-removal@1.7.0');
   const removeBackground = mod.removeBackground || mod.default;
   if(typeof removeBackground!=='function') throw new Error('Moteur de détourage local indisponible.');
   const result = await removeBackground(file,{
+    publicPath:'https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/',
+    device:'cpu',
+    model:'isnet_quint8',
     progress:(key,current,total)=>{
       if(Number.isFinite(current) && Number.isFinite(total) && total>0){
         setStatus(`1/5 Détourage local… ${Math.round(current/total*100)}%`);
