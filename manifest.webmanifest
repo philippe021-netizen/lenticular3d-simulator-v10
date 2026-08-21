@@ -1,0 +1,11 @@
+{
+  "name": "HappyHolo Local",
+  "short_name": "HappyHolo",
+  "description": "Outil personnel HappyHolo de préparation lenticulaire sur iPad.",
+  "start_url": "./relief3d-test-v31.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#f4f4f2",
+  "theme_color": "#111111"
+}

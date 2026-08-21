@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>LentiPrint Lab — Relief 3D V3.1.1 local</title>
+<meta name="theme-color" content="#111111">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>HappyHolo — Relief 3D V3.1.2 offline</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
@@ -23,8 +27,8 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 </head>
 <body>
 <div class="wrap">
-<h1>LentiPrint Lab — Relief 3D V3.1.1 local</h1>
-<div class="sub">Photo → détourage local → correction manuelle du masque → fond reconstruit localement → profondeur séparée → 9 vues. Aucun PixVerse, aucune API payante.</div>
+<h1>HappyHolo — Relief 3D V3.1.2 offline</h1>
+<div class="sub">Photo → détourage local → correction doigt/Pencil → fond reconstruit localement → profondeur séparée → 9 vues. Aucun crédit ni clé API.</div>
 
 <div class="card grid">
 <section>
@@ -53,8 +57,8 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 
 <div id="status" class="status">Choisis une photo.</div>
 <div class="small">
-Après le détourage automatique, l’éditeur de masque s’ouvre pour corriger précisément le sujet.<br>
-Premier lancement : le navigateur télécharge les modèles IA locaux. Ensuite aucun crédit ni clé API n’est nécessaire.
+Le détourage et la profondeur fonctionnent localement sur l’iPad une fois le pack hors ligne préparé.<br>
+Le mode hors ligne est destiné aux fonctions réellement réalisables sans serveur.
 </div>
 </section>
 
@@ -68,5 +72,6 @@ Premier lancement : le navigateur télécharge les modèles IA locaux. Ensuite a
 <script src="./relief-engine-v31.js"></script>
 <script src="./mask-editor-v31-fluid.js"></script>
 <script src="./v311-monotonic-patch.js"></script>
+<script src="./offline-manager.js"></script>
 </body>
 </html>
