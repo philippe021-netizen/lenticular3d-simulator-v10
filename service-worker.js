@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.1';
+const CACHE_VERSION = 'happyholo-offline-v1.2';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -7,7 +7,7 @@ let happyHoloMode = 'connected';
 const APP_SHELL = [
   './relief3d-test-v31.html',
   './relief-engine-v31.js',
-  './mask-editor-v31-fluid.js',
+  './mask-editor-v312-ipad.js',
   './v311-monotonic-patch.js',
   './offline-manager.js',
   './manifest.webmanifest'
@@ -54,7 +54,6 @@ self.addEventListener('activate', event => {
 async function cacheOnly(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
-
   return new Response(
     'HappyHolo est en MODE LOCAL et cette ressource n’est pas présente dans le pack hors ligne.',
     {status: 503, headers:{'Content-Type':'text/plain; charset=utf-8'}}
@@ -64,7 +63,6 @@ async function cacheOnly(request) {
 async function cacheFirstConnected(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
-
   const response = await fetch(request);
   if (response && (response.ok || response.type === 'opaque')) {
     const cache = await caches.open(RUNTIME_CACHE);
@@ -74,14 +72,11 @@ async function cacheFirstConnected(request) {
 }
 
 async function navigationResponse(request) {
-  // La navigation de la page HappyHolo elle-même peut utiliser le réseau en mode connecté.
-  // En mode local, on force la copie locale.
   if (happyHoloMode === 'local') {
     return (await caches.match(request)) ||
            (await caches.match('./relief3d-test-v31.html')) ||
            new Response('HappyHolo hors ligne indisponible.', {status:503});
   }
-
   try {
     const response = await fetch(request);
     if (response && response.ok) {
@@ -99,7 +94,6 @@ async function navigationResponse(request) {
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
-
   const url = new URL(request.url);
 
   if (request.mode === 'navigate') {
@@ -108,14 +102,10 @@ self.addEventListener('fetch', event => {
   }
 
   if (!isCacheableHost(url)) {
-    // En mode LOCAL, aucun appel externe non explicitement autorisé.
     if (happyHoloMode === 'local') {
-      event.respondWith(
-        new Response('Bloqué par le MODE LOCAL HappyHolo.', {
-          status:503,
-          headers:{'Content-Type':'text/plain; charset=utf-8'}
-        })
-      );
+      event.respondWith(new Response('Bloqué par le MODE LOCAL HappyHolo.', {
+        status:503, headers:{'Content-Type':'text/plain; charset=utf-8'}
+      }));
     }
     return;
   }
@@ -129,21 +119,14 @@ self.addEventListener('fetch', event => {
 
 self.addEventListener('message', event => {
   const data = event.data || {};
-
   if (data.type === 'SET_HAPPYHOLO_MODE') {
     happyHoloMode = data.mode === 'local' ? 'local' : 'connected';
     return;
   }
-
   if (data.type === 'CACHE_APP_SHELL') {
     event.waitUntil(
       caches.open(APP_CACHE)
         .then(cache => cache.addAll(APP_SHELL))
-        .then(() => {
-          if (event.source) {
-            event.source.postMessage({type:'APP_SHELL_CACHED'});
-          }
-        })
     );
   }
 });
