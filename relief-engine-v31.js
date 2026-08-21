@@ -237,6 +237,7 @@ function startPreview(){
 
 file.addEventListener('change',async()=>{
   sourceFile=file.files?.[0]||null; exported=[]; exportBtn.disabled=true; downloadBtn.disabled=true; framesEl.innerHTML='';
+  window.HappyHoloReliefState=null;
   if(!sourceFile) return;
   sourceImg=await fileToImage(sourceFile);
   const ratio=sourceImg.naturalWidth/sourceImg.naturalHeight;
@@ -255,6 +256,8 @@ buildBtn.addEventListener('click',async()=>{
     const backgroundBlob=await reconstructBackground(sourceImg,subjectAlphaCanvas); backgroundImg=await blobToImage(backgroundBlob);
     subjectDepthCanvas=await estimateDepth(subjectImg,'4/5 Analyse de profondeur du sujet…');
     backgroundDepthCanvas=await estimateDepth(backgroundImg,'5/5 Analyse de profondeur du fond…');
+    window.HappyHoloReliefState={sourceImg,subjectImg,backgroundImg,subjectDepthCanvas,backgroundDepthCanvas,view};
+    window.dispatchEvent(new CustomEvent('happyholo-relief-ready'));
     startPreview(); exportBtn.disabled=false; setStatus('V3.1 prête — détourage, fond et profondeur calculés localement.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
