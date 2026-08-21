@@ -1,6 +1,8 @@
-const CACHE_VERSION = 'happyholo-offline-v1';
+const CACHE_VERSION = 'happyholo-offline-v1.1';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+
+let happyHoloMode = 'connected';
 
 const APP_SHELL = [
   './relief3d-test-v31.html',
@@ -21,6 +23,11 @@ const CACHEABLE_HOSTS = [
   'cdn-lfs-us-1.huggingface.co',
   'cdn-lfs-eu-1.huggingface.co'
 ];
+
+function isCacheableHost(url) {
+  return url.origin === self.location.origin ||
+    CACHEABLE_HOSTS.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`));
+}
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -44,12 +51,17 @@ self.addEventListener('activate', event => {
   );
 });
 
-function shouldCache(url) {
-  return url.origin === self.location.origin ||
-    CACHEABLE_HOSTS.some(host => url.hostname === host || url.hostname.endsWith(`.${host}`));
+async function cacheOnly(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  return new Response(
+    'HappyHolo est en MODE LOCAL et cette ressource n’est pas présente dans le pack hors ligne.',
+    {status: 503, headers:{'Content-Type':'text/plain; charset=utf-8'}}
+  );
 }
 
-async function cacheFirst(request) {
+async function cacheFirstConnected(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
 
@@ -61,7 +73,15 @@ async function cacheFirst(request) {
   return response;
 }
 
-async function networkFirstNavigation(request) {
+async function navigationResponse(request) {
+  // La navigation de la page HappyHolo elle-même peut utiliser le réseau en mode connecté.
+  // En mode local, on force la copie locale.
+  if (happyHoloMode === 'local') {
+    return (await caches.match(request)) ||
+           (await caches.match('./relief3d-test-v31.html')) ||
+           new Response('HappyHolo hors ligne indisponible.', {status:503});
+  }
+
   try {
     const response = await fetch(request);
     if (response && response.ok) {
@@ -69,7 +89,7 @@ async function networkFirstNavigation(request) {
       cache.put('./relief3d-test-v31.html', response.clone()).catch(() => {});
     }
     return response;
-  } catch (error) {
+  } catch (_) {
     return (await caches.match(request)) ||
            (await caches.match('./relief3d-test-v31.html')) ||
            Response.error();
@@ -83,24 +103,47 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
 
   if (request.mode === 'navigate') {
-    event.respondWith(networkFirstNavigation(request));
+    event.respondWith(navigationResponse(request));
     return;
   }
 
-  if (shouldCache(url)) {
-    event.respondWith(cacheFirst(request));
+  if (!isCacheableHost(url)) {
+    // En mode LOCAL, aucun appel externe non explicitement autorisé.
+    if (happyHoloMode === 'local') {
+      event.respondWith(
+        new Response('Bloqué par le MODE LOCAL HappyHolo.', {
+          status:503,
+          headers:{'Content-Type':'text/plain; charset=utf-8'}
+        })
+      );
+    }
+    return;
   }
+
+  event.respondWith(
+    happyHoloMode === 'local'
+      ? cacheOnly(request)
+      : cacheFirstConnected(request)
+  );
 });
 
 self.addEventListener('message', event => {
   const data = event.data || {};
-  if (data.type !== 'CACHE_APP_SHELL') return;
 
-  event.waitUntil(
-    caches.open(APP_CACHE)
-      .then(cache => cache.addAll(APP_SHELL))
-      .then(() => {
-        if (event.source) event.source.postMessage({type:'APP_SHELL_CACHED'});
-      })
-  );
+  if (data.type === 'SET_HAPPYHOLO_MODE') {
+    happyHoloMode = data.mode === 'local' ? 'local' : 'connected';
+    return;
+  }
+
+  if (data.type === 'CACHE_APP_SHELL') {
+    event.waitUntil(
+      caches.open(APP_CACHE)
+        .then(cache => cache.addAll(APP_SHELL))
+        .then(() => {
+          if (event.source) {
+            event.source.postMessage({type:'APP_SHELL_CACHED'});
+          }
+        })
+    );
+  }
 });
