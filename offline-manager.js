@@ -187,6 +187,11 @@
     });
   }
 
+  async function sleepMemoryGap() {
+    // Laisse Safari terminer les tâches WASM et rendre la mémoire récupérable.
+    await new Promise(resolve => setTimeout(resolve, 350));
+  }
+
   async function warmBackgroundRemoval(testBlob, setStep) {
     setStep('Téléchargement du moteur de détourage…');
 
@@ -212,18 +217,20 @@
 
     env.allowLocalModels = false;
 
-    const estimator = await pipeline(
-      'depth-estimation',
-      'onnx-community/depth-anything-v2-small',
-      {dtype:'q4'}
-    );
-
+    let estimator = null;
     const url = URL.createObjectURL(testBlob);
     try {
+      estimator = await pipeline(
+        'depth-estimation',
+        'onnx-community/depth-anything-v2-small',
+        {dtype:'q4'}
+      );
       setStep('Vérification du moteur de profondeur…');
       await estimator(url);
     } finally {
       URL.revokeObjectURL(url);
+      try { await estimator?.dispose?.(); } catch (_) {}
+      estimator = null;
     }
   }
 
@@ -257,20 +264,24 @@
         navigator.serviceWorker.controller.postMessage({type:'CACHE_APP_SHELL'});
       }
 
-      setStep('Mise en cache des bibliothèques principales…');
-      await Promise.allSettled([
-        fetch('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', {mode:'cors'}),
-        import('https://esm.sh/@imgly/background-removal'),
-        import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm')
-      ]);
+      // Préparation séquentielle pour limiter le pic mémoire sur Safari/iPad.
+      // Ne pas importer simultanément les deux moteurs ONNX/WASM.
+      setStep('Mise en cache de JSZip…');
+      try { await fetch('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', {mode:'cors'}); } catch (_) {}
 
       const testBlob = await tinyTestBlob();
 
-      await warmBackgroundRemoval(testBlob, setStep);
+      // Depth Anything d'abord : c'est le moteur le plus sensible au manque de mémoire.
+      // warmDepthModel libère explicitement la pipeline après le test.
       await warmDepthModel(testBlob, setStep);
+      await sleepMemoryGap();
+
+      // Puis seulement le détourage.
+      await warmBackgroundRemoval(testBlob, setStep);
+      await sleepMemoryGap();
 
       localStorage.setItem(PACK_KEY, new Date().toISOString());
-      await updatePackStatus('Vérification réussie : détourage et profondeur ont fonctionné localement.');
+      await updatePackStatus('Pack hors ligne vérifié : détourage et profondeur sont prêts.');
 
     } catch (error) {
       console.error('[OFFLINE]', error);
