@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const PACK_VERSION = 'happyholo-offline-v1.12';
+  const PACK_VERSION = 'happyholo-offline-v1.13';
   const PACK_KEY = `${PACK_VERSION}:ready`;
   const $ = s => document.querySelector(s);
 
@@ -25,76 +25,25 @@
   }
 
   function buildOfflineUI() {
+    const existingBanner = $('#networkModeBanner');
+    const existingCard = $('#offlinePackCard');
+    const existingPrepare = $('#prepareOfflinePack');
+    if (existingBanner && existingCard && existingPrepare) {
+      existingPrepare.addEventListener('click', prepareOfflinePack);
+      updateNetworkBanner();
+      updatePackStatus();
+      return;
+    }
+
     const wrap = $('.wrap') || document.body;
-
-    const banner = make('div', {
-      id: 'networkModeBanner',
-      style: {
-        position: 'sticky',
-        top: '0',
-        zIndex: '99990',
-        margin: '0 0 14px',
-        padding: '14px 16px',
-        borderRadius: '14px',
-        fontSize: '18px',
-        fontWeight: '900',
-        textAlign: 'center',
-        letterSpacing: '.02em',
-        boxShadow: '0 3px 16px #0002'
-      }
-    });
-
-    wrap.insertBefore(banner, wrap.firstChild);
-
-    const card = make('div', {
-      id: 'offlinePackCard',
-      style: {
-        background: '#fff',
-        border: '2px solid #111',
-        borderRadius: '18px',
-        padding: '16px',
-        margin: '0 0 16px'
-      }
-    });
-
-    const sub = $('.sub');
-    if (sub && sub.parentNode) sub.parentNode.insertBefore(card, sub.nextSibling);
-    else wrap.insertBefore(card, banner.nextSibling);
-
-    make('div', {
-      text: 'Pack de secours iPad',
-      style: {fontSize:'18px', fontWeight:'850', marginBottom:'6px'}
-    }, card);
-
-    make('div', {
-      text: 'À préparer une fois avec une bonne connexion. Ensuite le détourage, la profondeur, le masque et les 9 vues restent disponibles hors ligne.',
-      style: {fontSize:'13px', lineHeight:'1.45', color:'#444'}
-    }, card);
-
-    const controls = make('div', {
-      style: {display:'flex', gap:'8px', flexWrap:'wrap', marginTop:'10px'}
-    }, card);
-
-    const prepare = make('button', {
-      id: 'prepareOfflinePack',
-      type: 'button',
-      text: 'Télécharger / vérifier le pack hors ligne'
-    }, controls);
-
-    const status = make('div', {
-      id: 'offlinePackStatus',
-      text: 'Vérification…',
-      style: {
-        marginTop:'10px',
-        padding:'10px',
-        borderRadius:'10px',
-        background:'#f2f2f2',
-        fontSize:'13px',
-        whiteSpace:'pre-wrap'
-      }
-    }, card);
-
-    prepare.addEventListener('click', prepareOfflinePack);
+    const banner = make('div', {id:'networkModeBanner'}, wrap);
+    banner.style.cssText='position:sticky;top:0;z-index:99990;margin:0 0 14px;padding:14px 16px;border-radius:14px;font-size:18px;font-weight:900;text-align:center;';
+    const card = make('div', {id:'offlinePackCard'}, wrap);
+    card.style.cssText='background:#fff;border:2px solid #111;border-radius:18px;padding:16px;margin:0 0 16px';
+    make('div',{text:'Pack de secours iPad'},card);
+    const prepare=make('button',{id:'prepareOfflinePack',type:'button',text:'Télécharger / vérifier le pack hors ligne'},card);
+    make('div',{id:'offlinePackStatus',text:'Vérification…'},card);
+    prepare.addEventListener('click',prepareOfflinePack);
     updateNetworkBanner();
     updatePackStatus();
   }

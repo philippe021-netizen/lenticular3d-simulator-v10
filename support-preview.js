@@ -1,4 +1,4 @@
-/* HappyHolo V3.1.12 — simulation lenticulaire multi-couches de profondeur */
+/* HappyHolo V3.1.13 — simulation lenticulaire multi-couches de profondeur */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -81,10 +81,10 @@
     for(const l of reliefLayers.sub){const z=(l.depth-.5)*2;const shift=norm*(12+13*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);}
     ctx.restore();
   }
-  function tick(ts){if(!running)return;if(!start)start=ts;if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}lastFrame=ts;const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);product.style.transform=`perspective(900px) rotateY(${phase*state.rot}deg)`;draw(phase);raf=requestAnimationFrame(tick);}
-  function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
-  function stop(){running=false;cancelAnimationFrame(raf);product.style.transform='perspective(900px) rotateY(0deg)';draw(0);}
-  function apply(){product.className=`product-object ${state.support}`;updateText();draw(0);if(running){start=0;}}
+  function tick(ts){if(!running)return;if(!start)start=ts;if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}lastFrame=ts;const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);draw(phase);raf=requestAnimationFrame(tick);}
+  function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);product.classList.add('support-playing');cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
+  function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');product.style.transform='perspective(620px) rotateY(0deg) translateX(0)';draw(0);}
+  function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0);if(running){start=0;}}
 
   [type,fit,margin,zoom,xp,yp,rot,speed].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;apply();}));
   $('#supportPlay').addEventListener('click',play);$('#supportStop').addEventListener('click',stop);
