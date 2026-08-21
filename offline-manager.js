@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const PACK_VERSION = 'happyholo-offline-v1.7';
+  const PACK_VERSION = 'happyholo-offline-v1.10';
   const PACK_KEY = `${PACK_VERSION}:ready`;
   const $ = s => document.querySelector(s);
 
@@ -260,33 +260,32 @@
         try { await navigator.storage.persist(); } catch (_) {}
       }
 
+      // IMPORTANT iPad/Safari : ne pas lancer les pipelines IA ici.
+      // Les tests WASM/ONNX simultanés ou successifs peuvent dépasser la mémoire WebAssembly.
+      // Le service worker met l'application et les dépendances en cache au fil de leur vrai usage.
+      setStep('Mise en cache de l’application…');
       if (navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({type:'CACHE_APP_SHELL'});
       }
 
-      // Préparation séquentielle pour limiter le pic mémoire sur Safari/iPad.
-      // Ne pas importer simultanément les deux moteurs ONNX/WASM.
-      setStep('Mise en cache de JSZip…');
-      try { await fetch('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', {mode:'cors'}); } catch (_) {}
+      // JSZip est léger et peut être préchargé sans créer de session WASM.
+      try {
+        await fetch('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', {mode:'cors'});
+      } catch (_) {}
 
-      const testBlob = await tinyTestBlob();
-
-      // Depth Anything d'abord : c'est le moteur le plus sensible au manque de mémoire.
-      // warmDepthModel libère explicitement la pipeline après le test.
-      await warmDepthModel(testBlob, setStep);
-      await sleepMemoryGap();
-
-      // Puis seulement le détourage.
-      await warmBackgroundRemoval(testBlob, setStep);
-      await sleepMemoryGap();
+      // Laisse le service worker finir l'écriture du shell avant de valider.
+      await new Promise(resolve => setTimeout(resolve, 900));
 
       localStorage.setItem(PACK_KEY, new Date().toISOString());
-      await updatePackStatus('Pack hors ligne vérifié : détourage et profondeur sont prêts.');
+      await updatePackStatus(
+        'Application hors ligne prête. Les moteurs IA ne sont plus testés ici pour éviter le dépassement mémoire sur iPad. ' +
+        'Pour mettre aussi chaque moteur IA en cache, utilise une fois le détourage et la profondeur en mode connecté ; leurs fichiers seront alors conservés par le cache runtime.'
+      );
 
     } catch (error) {
       console.error('[OFFLINE]', error);
       out.textContent =
-        `Pack incomplet.\n${error?.message || error}\nRelance la préparation avec une connexion stable.`;
+        `Pack application incomplet.\n${error?.message || error}\nRelance la préparation avec une connexion stable.`;
     } finally {
       preparing = false;
       button.disabled = false;
