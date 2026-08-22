@@ -1124,4 +1124,5 @@
   setTimeout(ensureControlPanel,300);
 
   console.log('[HAPPYHOLO] V3.2.6 rendu multi-profondeur + aperçu actions visible actif');
+   
 })();
