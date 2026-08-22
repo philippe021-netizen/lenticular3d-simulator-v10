@@ -1,6 +1,7 @@
-/* HappyHolo — éditeur de masque V3.1.4 iPad
-   Correctif coordonnées doigt / Apple Pencil :
-   tous les calculs utilisent désormais le rectangle réel du canvas d'édition.
+/* HappyHolo — éditeur de masque V3.1.6 iPad
+   Correctif coordonnées doigt / Apple Pencil
+   + baguette magique couleur (zone connectée / couleurs similaires)
+   + retouche manuelle au doigt / Apple Pencil conservée
 */
 (() => {
   'use strict';
@@ -18,6 +19,9 @@
   let pointers=new Map(), pinchDist=0, pinchZoom=1, activePanPointer=null;
   let baseDirty=true, maskDirty=true;
   let renderRAF=0, loupeRAF=0, lastLoupe=0;
+  let originalImageData=null, originalPixels=null;
+  let wandTolerance=34, wandMode='connected', wandAction='add';
+  let tapCandidate=false, tapPointerId=null, tapStartX=0, tapStartY=0;
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
@@ -66,19 +70,59 @@
     const body=el('div',{style:{display:'flex',flex:'1',minHeight:'0',overflow:'hidden'}},modal);
 
     const tools=el('div',{style:{
-      width:'150px',maxWidth:'34vw',padding:'10px',background:'#17171a',
+      width:'168px',maxWidth:'36vw',padding:'10px',background:'#17171a',
       borderRight:'1px solid #333',display:'flex',flexDirection:'column',
       gap:'8px',overflowY:'auto'
     }},body);
 
     modal._add=button('＋ Ajouter',tools,()=>setTool('add'),true);
     modal._erase=button('⌫ Gomme',tools,()=>setTool('erase'));
+    modal._wand=button('🪄 Baguette',tools,()=>setTool('wand'));
     modal._pan=button('✋ Déplacer',tools,()=>setTool('pan'));
     button('＋ Zoom',tools,()=>setZoom(zoom*1.35));
     button('− Zoom',tools,()=>setZoom(zoom/1.35));
     button('Ajuster',tools,fit);
     button('100 %',tools,()=>setZoom(1));
     button('Réinit. masque',tools,resetMask);
+
+    const wandCard=el('div',{style:{
+      marginTop:'2px',padding:'10px',border:'1px solid #3b3b3f',borderRadius:'12px',
+      background:'#1e1e22',display:'flex',flexDirection:'column',gap:'8px'
+    }},tools);
+    el('div',{text:'Baguette',style:{fontSize:'13px',fontWeight:'800',opacity:'.95'}},wandCard);
+
+    const actionLab=el('label',{text:'Action',style:{fontSize:'12px',fontWeight:'700'}},wandCard);
+    modal._wandAction=el('select',{style:{
+      width:'100%',padding:'10px',borderRadius:'10px',border:'1px solid #555',
+      background:'#101014',color:'#fff',font:'inherit'
+    }},wandCard);
+    modal._wandAction.appendChild(new Option('Ajouter au masque','add'));
+    modal._wandAction.appendChild(new Option('Retirer du masque','erase'));
+    modal._wandAction.value=wandAction;
+    modal._wandAction.addEventListener('change',()=>{
+      wandAction=modal._wandAction.value==='erase'?'erase':'add';
+      requestRender(false,true);
+    });
+
+    const modeLab=el('label',{text:'Portée',style:{fontSize:'12px',fontWeight:'700'}},wandCard);
+    modal._wandMode=el('select',{style:{
+      width:'100%',padding:'10px',borderRadius:'10px',border:'1px solid #555',
+      background:'#101014',color:'#fff',font:'inherit'
+    }},wandCard);
+    modal._wandMode.appendChild(new Option('Zone connectée','connected'));
+    modal._wandMode.appendChild(new Option('Toutes couleurs similaires','global'));
+    modal._wandMode.value=wandMode;
+    modal._wandMode.addEventListener('change',()=>{ wandMode=modal._wandMode.value; });
+
+    const tolWrap=el('label',{style:{display:'flex',flexDirection:'column',gap:'6px'}},wandCard);
+    modal._wandTolLabel=el('div',{text:`Tolérance ${wandTolerance}`,style:{fontSize:'12px',fontWeight:'700'}},tolWrap);
+    modal._wandTolerance=el('input',{type:'range',min:0,max:120,value:wandTolerance,style:{width:'100%'}},tolWrap);
+    modal._wandTolerance.addEventListener('input',()=>{
+      wandTolerance=Number(modal._wandTolerance.value);
+      modal._wandTolLabel.textContent=`Tolérance ${wandTolerance}`;
+    });
+
+    modal._wandHint=el('div',{text:'Touchez une couleur pour sélectionner. Le pinceau reste disponible pour les retouches.',style:{fontSize:'11px',opacity:'.82',lineHeight:'1.35'}},wandCard);
 
     work=el('div',{style:{
       position:'relative',flex:'1',minWidth:'0',minHeight:'0',overflow:'hidden',
@@ -134,7 +178,7 @@
       requestLoupe(true);
     });
 
-    el('span',{text:'Vert = ajouter • Rouge = retirer • 2 doigts = zoom',style:{
+    modal._statusText=el('span',{text:'Vert = ajouter • Rouge = retirer • 2 doigts = zoom',style:{
       fontSize:'12px',opacity:'.75'
     }},bottom);
 
@@ -154,14 +198,32 @@
     return editCanvas.getBoundingClientRect();
   }
 
-  function setTool(t){
-    tool=t;
-    [['add',modal._add],['erase',modal._erase],['pan',modal._pan]].forEach(([k,b])=>{
-      const active=k===t;
+  function updateToolUI(){
+    const entries=[['add',modal._add],['erase',modal._erase],['wand',modal._wand],['pan',modal._pan]];
+    entries.forEach(([k,b])=>{
+      const active=k===tool;
       b.style.background=active?'#0a84ff':'#242424';
       b.style.borderColor=active?'#0a84ff':'#444';
     });
+
+    const wandOn=tool==='wand';
+    modal._wandAction.disabled=!wandOn;
+    modal._wandMode.disabled=!wandOn;
+    modal._wandTolerance.disabled=!wandOn;
+    modal._wandHint.style.opacity=wandOn?'.95':'.55';
+
+    if(modal._statusText){
+      if(tool==='wand') modal._statusText.textContent='Baguette : toucher pour sélectionner • 2 doigts = zoom';
+      else if(tool==='pan') modal._statusText.textContent='Déplacer : glisser pour translater l’image';
+      else modal._statusText.textContent='Vert = ajouter • Rouge = retirer • 2 doigts = zoom';
+    }
+  }
+
+  function setTool(t){
+    tool=t;
+    updateToolUI();
     requestRender(false,true);
+    requestLoupe(true);
   }
 
   function resize(){
@@ -291,19 +353,31 @@
     );
 
     if(tool!=='pan' && pointers.size<2){
-      const radiusCss=Math.max(5,brush*zoom/2);
-
-      editCtx.beginPath();
-      editCtx.ellipse(
-        pointerX*sx,
-        pointerY*sy,
-        radiusCss*sx,
-        radiusCss*sy,
-        0,0,Math.PI*2
-      );
-      editCtx.lineWidth=2*Math.max(sx,sy);
-      editCtx.strokeStyle=tool==='erase'?'#ff5252':'#22e67b';
-      editCtx.stroke();
+      if(tool==='wand'){
+        const px=pointerX*sx, py=pointerY*sy;
+        editCtx.beginPath();
+        editCtx.moveTo(px-18*sx,py); editCtx.lineTo(px+18*sx,py);
+        editCtx.moveTo(px,py-18*sy); editCtx.lineTo(px,py+18*sy);
+        editCtx.lineWidth=2*Math.max(sx,sy);
+        editCtx.strokeStyle=wandAction==='erase'?'#ff6b6b':'#7ef3ac';
+        editCtx.stroke();
+        editCtx.beginPath();
+        editCtx.arc(px,py,8*Math.max(sx,sy),0,Math.PI*2);
+        editCtx.stroke();
+      }else{
+        const radiusCss=Math.max(5,brush*zoom/2);
+        editCtx.beginPath();
+        editCtx.ellipse(
+          pointerX*sx,
+          pointerY*sy,
+          radiusCss*sx,
+          radiusCss*sy,
+          0,0,Math.PI*2
+        );
+        editCtx.lineWidth=2*Math.max(sx,sy);
+        editCtx.strokeStyle=tool==='erase'?'#ff5252':'#22e67b';
+        editCtx.stroke();
+      }
     }
   }
 
@@ -354,8 +428,6 @@
 
   function pos(e){
     const r=rect();
-
-    // Conversion explicite du point écran vers les coordonnées CSS du canvas.
     return {
       x:(e.clientX-r.left) * (r.width / Math.max(1,r.width)),
       y:(e.clientY-r.top)  * (r.height / Math.max(1,r.height))
@@ -390,6 +462,90 @@
         a.y+(b.y-a.y)*t
       );
     }
+  }
+
+  function colorDistanceSq(i, tr, tg, tb){
+    const dr=originalPixels[i]-tr;
+    const dg=originalPixels[i+1]-tg;
+    const db=originalPixels[i+2]-tb;
+    return dr*dr + dg*dg + db*db;
+  }
+
+  function applyMaskIndices(selected){
+    const img=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+    const data=img.data;
+    for(let i=0;i<selected.length;i++){
+      const idx=selected[i];
+      const o=idx*4;
+      data[o]=255;
+      data[o+1]=255;
+      data[o+2]=255;
+      data[o+3]=wandAction==='erase'?0:255;
+    }
+    mctx.putImageData(img,0,0);
+    maskDirty=true;
+  }
+
+  function buildConnectedSelection(seedX,seedY,tolSq){
+    const w=originalCanvas.width, h=originalCanvas.height;
+    const total=w*h;
+    const sx=clamp(Math.round(seedX),0,w-1);
+    const sy=clamp(Math.round(seedY),0,h-1);
+    const seedIndex=sy*w+sx;
+    const base=seedIndex*4;
+    const tr=originalPixels[base], tg=originalPixels[base+1], tb=originalPixels[base+2];
+    const visited=new Uint8Array(total);
+    const queue=new Int32Array(total);
+    let qh=0, qt=0;
+    const selected=[];
+
+    queue[qt++]=seedIndex;
+    visited[seedIndex]=1;
+
+    while(qh<qt){
+      const idx=queue[qh++];
+      const off=idx*4;
+      if(colorDistanceSq(off,tr,tg,tb)>tolSq) continue;
+      selected.push(idx);
+
+      const x=idx%w;
+      const y=(idx/w)|0;
+      let n;
+      if(x>0){ n=idx-1; if(!visited[n]){ visited[n]=1; queue[qt++]=n; } }
+      if(x<w-1){ n=idx+1; if(!visited[n]){ visited[n]=1; queue[qt++]=n; } }
+      if(y>0){ n=idx-w; if(!visited[n]){ visited[n]=1; queue[qt++]=n; } }
+      if(y<h-1){ n=idx+w; if(!visited[n]){ visited[n]=1; queue[qt++]=n; } }
+    }
+
+    return selected;
+  }
+
+  function buildGlobalSelection(seedX,seedY,tolSq){
+    const w=originalCanvas.width, h=originalCanvas.height;
+    const sx=clamp(Math.round(seedX),0,w-1);
+    const sy=clamp(Math.round(seedY),0,h-1);
+    const seedIndex=(sy*w+sx)*4;
+    const tr=originalPixels[seedIndex], tg=originalPixels[seedIndex+1], tb=originalPixels[seedIndex+2];
+    const selected=[];
+    for(let i=0;i<w*h;i++){
+      const off=i*4;
+      if(colorDistanceSq(off,tr,tg,tb)<=tolSq) selected.push(i);
+    }
+    return selected;
+  }
+
+  function applyWandAt(cssX, cssY){
+    if(!originalPixels || !originalCanvas.width || !originalCanvas.height) return;
+    const q=toImage(cssX,cssY);
+    const tolSq=Math.max(0,wandTolerance*wandTolerance*3.2);
+    const selected = wandMode==='global'
+      ? buildGlobalSelection(q.x,q.y,tolSq)
+      : buildConnectedSelection(q.x,q.y,tolSq);
+    if(!selected.length) return;
+    applyMaskIndices(selected);
+    snapshot();
+    requestRender(false,true);
+    requestLoupe(true);
   }
 
   function snapshot(){
@@ -446,8 +602,6 @@
       pointerX=p.x;
       pointerY=p.y;
 
-      // En mode Déplacer : un seul pointeur pilote la translation.
-      // Aucun geste de pincement ne peut déclencher un zoom.
       if(tool==='pan'){
         if(activePanPointer!==null && activePanPointer!==e.pointerId) return;
         activePanPointer=e.pointerId;
@@ -456,6 +610,7 @@
         editCanvas.setPointerCapture?.(e.pointerId);
         panning=true;
         drawing=false;
+        tapCandidate=false;
         startPanX=p.x-panX;
         startPanY=p.y-panY;
         return;
@@ -470,6 +625,19 @@
         pinchZoom=zoom;
         drawing=false;
         panning=false;
+        tapCandidate=false;
+        return;
+      }
+
+      if(tool==='wand'){
+        tapCandidate=true;
+        tapPointerId=e.pointerId;
+        tapStartX=p.x;
+        tapStartY=p.y;
+        drawing=false;
+        panning=false;
+        requestRender(false,true);
+        requestLoupe();
         return;
       }
 
@@ -497,7 +665,6 @@
         pointerX=p.x;
         pointerY=p.y;
 
-        // Déplacer = translation stricte. Pas de pinch/zoom dans ce mode.
         if(tool==='pan'){
           if(e.pointerId!==activePanPointer || !panning) continue;
           panX=p.x-startPanX;
@@ -509,6 +676,10 @@
 
         if(pointers.has(e.pointerId)){
           pointers.set(e.pointerId,p);
+        }
+
+        if(tool==='wand' && tapCandidate && e.pointerId===tapPointerId){
+          if(Math.hypot(p.x-tapStartX,p.y-tapStartY)>8) tapCandidate=false;
         }
 
         if(pointers.size>=2) continue;
@@ -542,6 +713,7 @@
 
     const end=e=>{
       const wasDrawing=drawing;
+      const shouldApplyWand = tool==='wand' && tapCandidate && e.pointerId===tapPointerId && pointers.size<=1;
 
       pointers.delete(e.pointerId);
 
@@ -553,6 +725,12 @@
       drawing=false;
 
       if(wasDrawing) snapshot();
+      if(shouldApplyWand) applyWandAt(pointerX,pointerY);
+
+      if(e.pointerId===tapPointerId){
+        tapCandidate=false;
+        tapPointerId=null;
+      }
 
       requestRender(false,true);
       requestLoupe(true);
@@ -627,7 +805,7 @@
       if(typeof sourceImg!=='undefined' && sourceImg){
         original=sourceImg;
       }
-    }catch(_){}
+    }catch(_){ }
 
     if(!original) original=segmented;
 
@@ -638,6 +816,8 @@
     originalCanvas.height=h;
     octx.clearRect(0,0,w,h);
     octx.drawImage(original,0,0,w,h);
+    originalImageData=octx.getImageData(0,0,w,h);
+    originalPixels=originalImageData.data;
 
     maskCanvas.width=w;
     maskCanvas.height=h;
@@ -668,6 +848,11 @@
 
     history=[];
     redoStack=[];
+    pointers.clear();
+    drawing=false;
+    panning=false;
+    tapCandidate=false;
+    tapPointerId=null;
     baseDirty=true;
     maskDirty=true;
 
@@ -696,5 +881,5 @@
     return corrected;
   };
 
-  console.log('[HAPPYHOLO] éditeur masque V3.1.5 déplacement iPad actif');
+  console.log('[HAPPYHOLO] éditeur masque V3.1.6 baguette + retouche doigt/Pencil actif');
 })();
