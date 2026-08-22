@@ -676,7 +676,7 @@
 })();
 
 
-/* ===== HappyHolo V3.2.5 — aperçu actions par sélection + rendu multi-profondeur ===== */
+/* ===== HappyHolo V3.2.6 — aperçu actions visible + rendu multi-profondeur ===== */
 (() => {
   'use strict';
 
@@ -865,6 +865,135 @@
     return s;
   }
 
+  let mainActionPreviewModal=null, mainActionPreviewCanvas=null, mainActionPreviewCtx=null, mainActionPreviewRAF=0;
+
+  function stopMainActionPreview(){
+    cancelAnimationFrame(mainActionPreviewRAF); mainActionPreviewRAF=0;
+    if(mainActionPreviewModal) mainActionPreviewModal.style.display='none';
+  }
+
+  function ensureMainActionPreviewUI(){
+    if(mainActionPreviewModal) return;
+    mainActionPreviewModal=document.createElement('div');
+    mainActionPreviewModal.id='happyHoloMainActionPreview';
+    Object.assign(mainActionPreviewModal.style,{position:'fixed',inset:'0',zIndex:'1000002',background:'rgba(8,8,10,.96)',display:'none',flexDirection:'column',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif',color:'#fff'});
+
+    const top=document.createElement('div');
+    Object.assign(top.style,{display:'flex',alignItems:'center',gap:'10px',padding:'10px 12px',background:'#17171a',borderBottom:'1px solid #333'});
+    const back=document.createElement('button');
+    back.type='button'; back.textContent='← Retour';
+    Object.assign(back.style,{padding:'10px 14px',borderRadius:'10px',border:'1px solid #555',background:'#26262a',color:'#fff',fontWeight:'800'});
+    back.addEventListener('click',stopMainActionPreview);
+    const title=document.createElement('div');
+    title.textContent='Aperçu action';
+    Object.assign(title.style,{fontWeight:'850',fontSize:'17px',flex:'1'});
+    mainActionPreviewModal._title=title;
+    const stop=document.createElement('button');
+    stop.type='button'; stop.textContent='■ Stop';
+    Object.assign(stop.style,{padding:'10px 14px',borderRadius:'10px',border:'1px solid #7a3434',background:'#3a2020',color:'#fff',fontWeight:'800'});
+    stop.addEventListener('click',()=>{ cancelAnimationFrame(mainActionPreviewRAF); mainActionPreviewRAF=0; });
+    top.append(back,title,stop);
+
+    const body=document.createElement('div');
+    Object.assign(body.style,{flex:'1',minHeight:'0',display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'});
+    mainActionPreviewCanvas=document.createElement('canvas');
+    Object.assign(mainActionPreviewCanvas.style,{maxWidth:'100%',maxHeight:'100%',borderRadius:'14px',background:'#111',boxShadow:'0 12px 40px rgba(0,0,0,.5)'});
+    mainActionPreviewCtx=mainActionPreviewCanvas.getContext('2d');
+    body.appendChild(mainActionPreviewCanvas);
+
+    const foot=document.createElement('div');
+    foot.textContent='Aperçu local de l’action : mouvement + intensité. Les 9 vues ne sont pas encore générées.';
+    Object.assign(foot.style,{padding:'9px 12px 13px',textAlign:'center',fontSize:'11px',opacity:'.75'});
+
+    mainActionPreviewModal.append(top,body,foot);
+    document.body.appendChild(mainActionPreviewModal);
+  }
+
+  function drawActionTransform(ctx,layer,s,t,W,H){
+    const intensity=clamp(Number(s.intensity||50)/100,.1,1);
+    const action=s.action||'none';
+    const phase=Math.sin(t*Math.PI*2);
+    const pulse=(1-Math.cos(t*Math.PI*2))/2;
+    let rot=0,sx=1,sy=1,dx=0,dy=0,flash=0;
+
+    if(action==='person_wink' || action==='cat_blink') sy=1-pulse*.055*intensity;
+    else if(action==='person_smile'){ sy=1+phase*.018*intensity; sx=1+pulse*.012*intensity; }
+    else if(action==='person_kiss'){ sx=1+pulse*.028*intensity; sy=1+pulse*.028*intensity; dy=-pulse*3*intensity; }
+    else if(action==='cat_meow' || action==='dog_bark'){ sy=1+phase*.026*intensity; dx=phase*2*intensity; }
+    else if(action==='dog_tilt') rot=phase*5*intensity;
+    else if(action==='pivot'){ rot=phase*6*intensity; sx=1-Math.abs(phase)*.05*intensity; }
+    else if(action==='headlight') flash=pulse>.68?.68*intensity:0;
+    else if(action==='indicator') flash=(Math.sin(t*Math.PI*6)>0?.48:0)*intensity;
+    else if(action==='logo_shine'){ flash=(.10+.28*pulse)*intensity; dx=phase*1.5*intensity; }
+
+    ctx.save();
+    ctx.translate(W/2+dx,H/2+dy);
+    ctx.rotate(rot*Math.PI/180);
+    ctx.scale(sx,sy);
+    ctx.drawImage(layer,-W/2,-H/2,W,H);
+    ctx.restore();
+
+    if(flash>0){
+      ctx.save();
+      ctx.globalCompositeOperation='screen';
+      ctx.globalAlpha=flash;
+      ctx.filter='brightness(2.1) saturate(1.15)';
+      ctx.drawImage(layer,0,0,W,H);
+      ctx.restore();
+    }
+  }
+
+  function openMainActionPreview(indices,titleText){
+    const selections=plan();
+    const src=sourceImage();
+    if(!src || !selections.length) return;
+    ensureMainActionPreviewUI();
+
+    const valid=indices.filter(i=>selections[i]);
+    if(!valid.length) return;
+    const maxSide=1050;
+    const sw=src.naturalWidth||src.width||1, sh=src.naturalHeight||src.height||1;
+    const scale=Math.min(1,maxSide/Math.max(sw,sh));
+    const W=Math.max(2,Math.round(sw*scale)), H=Math.max(2,Math.round(sh*scale));
+    mainActionPreviewCanvas.width=W; mainActionPreviewCanvas.height=H;
+
+    // Layer exclusif de chaque sélection, déjà aligné sur le cadrage de production.
+    const layers=new Map();
+    selections.forEach((s,i)=>layers.set(i,getExclusiveLayer(i,W,H)));
+
+    mainActionPreviewModal._title.textContent=titleText||'Aperçu action';
+    mainActionPreviewModal.style.display='flex';
+    cancelAnimationFrame(mainActionPreviewRAF);
+    const start=performance.now();
+
+    const frame=(now)=>{
+      if(mainActionPreviewModal.style.display==='none') return;
+      const t=((now-start)%2400)/2400;
+      const x=mainActionPreviewCtx;
+      x.clearRect(0,0,W,H);
+
+      // Fond reconstruit quand il est disponible : évite le sujet doublé.
+      const bg=bgImage();
+      if(bg){
+        const f=fitCoverLocal(bg,W,H);
+        x.drawImage(bg,f.x,f.y,f.w,f.h);
+      }else{
+        const f=fitCoverLocal(src,W,H);
+        x.drawImage(src,f.x,f.y,f.w,f.h);
+      }
+
+      // Toutes les sélections restent visibles. Seules celles demandées sont animées.
+      selections.forEach((s,i)=>{
+        const layer=layers.get(i); if(!layer) return;
+        if(valid.includes(i) && (s.action||'none')!=='none') drawActionTransform(x,layer,s,t,W,H);
+        else x.drawImage(layer,0,0,W,H);
+      });
+
+      mainActionPreviewRAF=requestAnimationFrame(frame);
+    };
+    mainActionPreviewRAF=requestAnimationFrame(frame);
+  }
+
   function ensureControlPanel(){
     const selections=plan();
     if(!selections.length) return;
@@ -934,9 +1063,38 @@
       asel.addEventListener('change',()=>{s.action=asel.value;});
       awrap.appendChild(asel);
 
+      const intensityLine=document.createElement('div');
+      Object.assign(intensityLine.style,{display:'flex',alignItems:'center',gap:'8px',marginTop:'7px'});
+      const intensityLabel=document.createElement('span');
+      intensityLabel.textContent='Intensité';
+      Object.assign(intensityLabel.style,{fontSize:'10px',color:'#666',minWidth:'48px'});
+      const intensity=document.createElement('input');
+      intensity.type='range'; intensity.min='10'; intensity.max='100'; intensity.step='5'; intensity.value=Number(s.intensity||50);
+      intensity.style.flex='1';
+      const intensityOut=document.createElement('b');
+      intensityOut.textContent=`${Number(s.intensity||50)}%`;
+      Object.assign(intensityOut.style,{fontSize:'10px',minWidth:'34px',textAlign:'right'});
+      intensity.addEventListener('input',()=>{ s.intensity=Number(intensity.value); intensityOut.textContent=`${s.intensity}%`; });
+      intensityLine.append(intensityLabel,intensity,intensityOut);
+      awrap.appendChild(intensityLine);
+
+      const actionButtons=document.createElement('div');
+      Object.assign(actionButtons.style,{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'7px',marginTop:'8px'});
+      const oneBtn=document.createElement('button');
+      oneBtn.type='button'; oneBtn.textContent='▶ Voir cette action';
+      const allBtn=document.createElement('button');
+      allBtn.type='button'; allBtn.textContent='▶ Voir toutes';
+      for(const b of [oneBtn,allBtn]) Object.assign(b.style,{minHeight:'38px',padding:'8px 10px',borderRadius:'10px',border:'1px solid #222',fontWeight:'800',fontSize:'11px',cursor:'pointer'});
+      Object.assign(oneBtn.style,{background:'#111',color:'#fff'});
+      Object.assign(allBtn.style,{background:'#f1f1f1',color:'#111'});
+      oneBtn.addEventListener('click',()=>openMainActionPreview([i],`Aperçu — ${s.name||`Sélection ${i+1}`}`));
+      allBtn.addEventListener('click',()=>openMainActionPreview(selections.map((_,j)=>j),'Aperçu — toutes les actions'));
+      actionButtons.append(oneBtn,allBtn);
+      awrap.appendChild(actionButtons);
+
       const sub=document.createElement('div');
-      sub.textContent='Action mémorisée — moteur animation à brancher séparément.';
-      Object.assign(sub.style,{fontSize:'10px',color:'#777',marginTop:'4px'});
+      sub.textContent='Aperçu local immédiat avant génération des 9 vues.';
+      Object.assign(sub.style,{fontSize:'10px',color:'#777',marginTop:'5px'});
       awrap.appendChild(sub);
       row.appendChild(awrap);
 
@@ -965,5 +1123,5 @@
   // Au cas où le plan existe déjà lors d'un rechargement partiel.
   setTimeout(ensureControlPanel,300);
 
-  console.log('[HAPPYHOLO] V3.2.5 rendu multi-profondeur + aperçu actions actif');
+  console.log('[HAPPYHOLO] V3.2.6 rendu multi-profondeur + aperçu actions visible actif');
 })();
