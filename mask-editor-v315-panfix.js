@@ -883,4 +883,3 @@
 
   console.log('[HAPPYHOLO] éditeur masque V3.1.6 baguette + retouche doigt/Pencil actif');
 })();
-
