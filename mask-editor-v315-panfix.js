@@ -247,6 +247,127 @@
     planTiming=makeSelect(card);
     [['Toute la séquence','all'],['Vues 1–3','1-3'],['Vues 4–6','4-6'],['Vues 7–9','7-9']].forEach(([t,v])=>planTiming.appendChild(new Option(t,v)));
     planTiming.addEventListener('change',()=>{ const s=selections[activeSelection]; if(s) s.timing=planTiming.value; });
+
+    const previewRow=el('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'7px',marginTop:'3px'}},card);
+    const one=button('▶ Voir cette sélection',previewRow,()=>openActionPreview(false),true);
+    one.style.padding='9px 7px'; one.style.minHeight='40px'; one.style.fontSize='11px';
+    const all=button('▶ Voir toutes les actions',previewRow,()=>openActionPreview(true));
+    all.style.padding='9px 7px'; all.style.minHeight='40px'; all.style.fontSize='11px';
+    el('div',{text:'Aperçu local instantané : permet de contrôler le sens et l’intensité avant de valider.',style:{fontSize:'9px',opacity:'.65',lineHeight:'1.25'}},card);
+  }
+
+  let actionPreviewModal=null, actionPreviewCanvas=null, actionPreviewCtx=null, actionPreviewRAF=0;
+
+  function maskedLayerForSelection(sel,W,H){
+    if(!sel?.mask || !originalCanvas?.width) return null;
+    const c=document.createElement('canvas'); c.width=W; c.height=H;
+    const x=c.getContext('2d');
+    x.drawImage(originalCanvas,0,0,W,H);
+    const mc=document.createElement('canvas'); mc.width=sel.mask.width; mc.height=sel.mask.height;
+    mc.getContext('2d').putImageData(sel.mask,0,0);
+    x.globalCompositeOperation='destination-in';
+    x.drawImage(mc,0,0,mc.width,mc.height,0,0,W,H);
+    x.globalCompositeOperation='source-over';
+    return c;
+  }
+
+  function drawActionLayer(ctx,layer,sel,t,W,H){
+    const intensity=clamp(Number(sel.intensity||50)/100,.1,1);
+    const a=sel.action||'none';
+    const phase=Math.sin(t*Math.PI*2);
+    const pulse=(1-Math.cos(t*Math.PI*2))/2;
+    let rot=0, sx=1, sy=1, dx=0, dy=0, alpha=1, flash=0;
+
+    if(a==='person_wink' || a==='cat_blink'){
+      sy=1-(pulse*.055*intensity);
+    }else if(a==='person_smile'){
+      sy=1+(phase*.018*intensity); sx=1+(pulse*.012*intensity);
+    }else if(a==='person_kiss'){
+      sx=1+(pulse*.022*intensity); sy=1+(pulse*.022*intensity); dy=-pulse*2*intensity;
+    }else if(a==='cat_meow' || a==='dog_bark'){
+      sy=1+(phase*.025*intensity); dx=phase*1.5*intensity;
+    }else if(a==='dog_tilt'){
+      rot=phase*4.5*intensity;
+    }else if(a==='pivot'){
+      rot=phase*5.5*intensity; sx=1-Math.abs(phase)*.045*intensity;
+    }else if(a==='headlight'){
+      flash=pulse>.72 ? .55*intensity : 0;
+    }else if(a==='indicator'){
+      flash=(Math.sin(t*Math.PI*6)>0 ? .38 : 0)*intensity;
+    }else if(a==='logo_shine'){
+      flash=(.10+.25*pulse)*intensity; dx=phase*1.2*intensity;
+    }
+
+    ctx.save();
+    ctx.translate(W/2+dx,H/2+dy);
+    ctx.rotate(rot*Math.PI/180);
+    ctx.scale(sx,sy);
+    ctx.globalAlpha=alpha;
+    ctx.drawImage(layer,-W/2,-H/2,W,H);
+    ctx.restore();
+
+    if(flash>0){
+      ctx.save();
+      ctx.globalCompositeOperation='screen';
+      ctx.globalAlpha=flash;
+      ctx.filter='brightness(1.9) saturate(1.15)';
+      ctx.drawImage(layer,0,0,W,H);
+      ctx.restore();
+    }
+  }
+
+  function closeActionPreview(){
+    cancelAnimationFrame(actionPreviewRAF); actionPreviewRAF=0;
+    if(actionPreviewModal) actionPreviewModal.style.display='none';
+  }
+
+  function ensureActionPreviewUI(){
+    if(actionPreviewModal) return;
+    actionPreviewModal=el('div',{style:{position:'fixed',inset:'0',zIndex:'1000001',background:'rgba(5,5,8,.96)',display:'none',flexDirection:'column',color:'#fff',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'}},document.body);
+    const bar=el('div',{style:{display:'flex',gap:'10px',alignItems:'center',padding:'10px 12px',background:'#17171a',borderBottom:'1px solid #333'}},actionPreviewModal);
+    button('← Retour',bar,closeActionPreview);
+    actionPreviewModal._title=el('div',{text:'Aperçu action',style:{fontWeight:'850',fontSize:'17px',flex:'1'}},bar);
+    actionPreviewModal._hint=el('div',{text:'Aperçu local',style:{fontSize:'11px',opacity:'.7'}},bar);
+    const body=el('div',{style:{flex:'1',minHeight:'0',display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}},actionPreviewModal);
+    actionPreviewCanvas=el('canvas',{style:{maxWidth:'100%',maxHeight:'100%',borderRadius:'12px',background:'#111',boxShadow:'0 12px 40px rgba(0,0,0,.45)'}},body);
+    actionPreviewCtx=actionPreviewCanvas.getContext('2d');
+    const foot=el('div',{style:{padding:'8px 12px 12px',textAlign:'center',fontSize:'11px',opacity:'.72'}},actionPreviewModal);
+    foot.textContent='Cet aperçu vérifie le mouvement choisi. La génération finale des 9 vues reste séparée.';
+  }
+
+  function openActionPreview(showAll){
+    saveActiveSelection();
+    ensureActionPreviewUI();
+    if(!originalCanvas?.width || !selections.length) return;
+    const maxW=Math.min(1100,originalCanvas.width);
+    const scale=maxW/originalCanvas.width;
+    const W=Math.round(originalCanvas.width*scale), H=Math.round(originalCanvas.height*scale);
+    actionPreviewCanvas.width=W; actionPreviewCanvas.height=H;
+    const indices=showAll ? selections.map((_,i)=>i) : [activeSelection];
+    const layers=new Map(indices.map(i=>[i,maskedLayerForSelection(selections[i],W,H)]));
+    actionPreviewModal._title.textContent=showAll?'Aperçu — toutes les actions':`Aperçu — ${selections[activeSelection]?.name||'sélection'}`;
+    actionPreviewModal.style.display='flex';
+    cancelAnimationFrame(actionPreviewRAF);
+    const start=performance.now();
+    const frame=(now)=>{
+      if(actionPreviewModal.style.display==='none') return;
+      const tt=((now-start)%2400)/2400;
+      const x=actionPreviewCtx;
+      x.clearRect(0,0,W,H);
+      x.drawImage(originalCanvas,0,0,W,H);
+
+      // Retire d'abord les zones animées de l'image fixe pour éviter le dédoublement.
+      for(const i of indices){
+        const layer=layers.get(i); if(!layer) continue;
+        x.save(); x.globalCompositeOperation='destination-out'; x.drawImage(layer,0,0,W,H); x.restore();
+      }
+      for(const i of indices){
+        const layer=layers.get(i); if(!layer) continue;
+        drawActionLayer(x,layer,selections[i],tt,W,H);
+      }
+      actionPreviewRAF=requestAnimationFrame(frame);
+    };
+    actionPreviewRAF=requestAnimationFrame(frame);
   }
 
   function buildUI(){
@@ -551,11 +672,11 @@
     return corrected;
   };
 
-  console.log('[HAPPYHOLO] éditeur V3.2.4 multi-sélections + mémoire + rendu multi-profondeur actif');
+  console.log('[HAPPYHOLO] éditeur V3.2.5 multi-sélections + aperçu actions + mémoire actif');
 })();
 
 
-/* ===== HappyHolo V3.2.4 — rendu multi-profondeur + réglages après validation ===== */
+/* ===== HappyHolo V3.2.5 — aperçu actions par sélection + rendu multi-profondeur ===== */
 (() => {
   'use strict';
 
@@ -844,6 +965,5 @@
   // Au cas où le plan existe déjà lors d'un rechargement partiel.
   setTimeout(ensureControlPanel,300);
 
-  console.log('[HAPPYHOLO] V3.2.4 rendu multi-profondeur + réglages permanents actif');
-   
+  console.log('[HAPPYHOLO] V3.2.5 rendu multi-profondeur + aperçu actions actif');
 })();
