@@ -845,4 +845,5 @@
   setTimeout(ensureControlPanel,300);
 
   console.log('[HAPPYHOLO] V3.2.4 rendu multi-profondeur + réglages permanents actif');
+   
 })();
