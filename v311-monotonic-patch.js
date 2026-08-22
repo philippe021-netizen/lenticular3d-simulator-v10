@@ -1,20 +1,58 @@
-// HappyHolo Relief 3D — V3.1.8 porte-clé vertical production export
-// - 9 vues normalisées en 1024 × 1536 px (ratio 2:3, recadrage centré, sans déformation)
-// - vue 06 = milieu exact entre vues 05 et 07
-// - taille physique cible 40 × 60 mm ; lenticulaire 75 LPI
+// HappyHolo Relief 3D — V3.2.0 export multi-supports
+// Objectif : un seul exporteur de production pour les modèles à venir.
+// - ne remplace plus artificiellement la vue 06 par un fondu 50/50
+// - normalise automatiquement le format selon le support choisi
+// - conserve les 9 vues générées par le moteur, sans dédoublement ajouté par le patch
+// - ajoute la taille physique dans les PNG et un manifest détaillé
 (() => {
+  'use strict';
+
   const downloadBtn = document.querySelector('#download');
   const framesEl = document.querySelector('#frames');
   if (!downloadBtn || !framesEl) return;
 
-  const OUT_W = 1024;
-  const OUT_H = 1536;
-  const WIDTH_MM = 40;
-  const HEIGHT_MM = 60;
-  const LPI = 75;
-  // pHYs décrit la densité du raster pour retrouver 40 × 60 mm à l'impression.
-  const PPM_X = Math.round(OUT_W / (WIDTH_MM / 1000));
-  const PPM_Y = Math.round(OUT_H / (HEIGHT_MM / 1000));
+  const VERSION = 'V3.2.0';
+  const DEFAULT_LPI = 75;
+
+  const PROFILES = {
+    'keychain-vertical': {
+      support: 'keychain-vertical',
+      label: 'Porte-clé rectangle vertical',
+      widthPx: 1024,
+      heightPx: 1536,
+      widthMm: 40,
+      heightMm: 60,
+      lpi: DEFAULT_LPI,
+      resizeMode: 'center-cover-no-distortion',
+      cropShape: 'rect',
+      filename: '9-vues-porte-cle-vertical-75lpi-v320.zip'
+    },
+    'keychain-horizontal': {
+      support: 'keychain-horizontal',
+      label: 'Porte-clé rectangle horizontal',
+      widthPx: 1536,
+      heightPx: 1024,
+      widthMm: 60,
+      heightMm: 40,
+      lpi: DEFAULT_LPI,
+      resizeMode: 'center-cover-no-distortion',
+      cropShape: 'rect',
+      filename: '9-vues-porte-cle-horizontal-75lpi-v320.zip'
+    },
+    'medallion-round': {
+      support: 'medallion-round',
+      label: 'Médaillon rond',
+      widthPx: 1024,
+      heightPx: 1024,
+      widthMm: 30,
+      heightMm: 30,
+      diameterMm: 30,
+      lpi: DEFAULT_LPI,
+      resizeMode: 'center-cover-no-distortion',
+      cropShape: 'circle',
+      filename: '9-vues-medallion-rond-75lpi-v320.zip'
+    }
+  };
 
   function blobToImage(blob) {
     return new Promise((resolve, reject) => {
@@ -41,47 +79,56 @@
     });
   }
 
-  async function normalizeBlob(blob) {
-    const img = await blobToImage(blob);
-    const c = document.createElement('canvas');
-    c.width = OUT_W;
-    c.height = OUT_H;
-    const x = c.getContext('2d', { alpha: true });
-    if (!x) throw new Error('Canvas 2D indisponible.');
-
-    // "cover" : conserve les proportions et recadre au centre.
-    // Aucun étirement : le sujet ne change pas de forme.
-    const sw = img.naturalWidth || img.width;
-    const sh = img.naturalHeight || img.height;
-    const scale = Math.max(OUT_W / sw, OUT_H / sh);
-    const dw = sw * scale;
-    const dh = sh * scale;
-    const dx = (OUT_W - dw) / 2;
-    const dy = (OUT_H - dh) / 2;
-
-    x.clearRect(0, 0, OUT_W, OUT_H);
-    x.drawImage(img, dx, dy, dw, dh);
-    return canvasToBlob(c);
+  function coverRect(sw, sh, dw, dh) {
+    const scale = Math.max(dw / sw, dh / sh);
+    const w = sw * scale;
+    const h = sh * scale;
+    return {
+      x: (dw - w) / 2,
+      y: (dh - h) / 2,
+      w,
+      h
+    };
   }
 
-  async function buildMiddleBlob(leftBlob, rightBlob) {
-    const [left, right] = await Promise.all([
-      blobToImage(leftBlob),
-      blobToImage(rightBlob)
-    ]);
+  function getSelectedProfile() {
+    const supportType = document.querySelector('#supportType')?.value;
+    if (supportType && PROFILES[supportType]) return PROFILES[supportType];
 
+    const firstImg = framesEl.querySelector('img');
+    if (firstImg) {
+      const sw = firstImg.naturalWidth || firstImg.width || 1;
+      const sh = firstImg.naturalHeight || firstImg.height || 1;
+      return sw >= sh ? PROFILES['keychain-horizontal'] : PROFILES['keychain-vertical'];
+    }
+    return PROFILES['keychain-vertical'];
+  }
+
+  async function normalizeBlob(blob, profile) {
+    const img = await blobToImage(blob);
     const c = document.createElement('canvas');
-    c.width = OUT_W;
-    c.height = OUT_H;
+    c.width = profile.widthPx;
+    c.height = profile.heightPx;
     const x = c.getContext('2d', { alpha: true });
     if (!x) throw new Error('Canvas 2D indisponible.');
 
-    x.clearRect(0, 0, OUT_W, OUT_H);
-    x.drawImage(left, 0, 0, OUT_W, OUT_H);
-    x.globalAlpha = 0.5;
-    x.drawImage(right, 0, 0, OUT_W, OUT_H);
-    x.globalAlpha = 1;
+    x.clearRect(0, 0, c.width, c.height);
+    if (profile.cropShape === 'circle') {
+      x.save();
+      x.beginPath();
+      x.arc(c.width / 2, c.height / 2, Math.min(c.width, c.height) / 2, 0, Math.PI * 2);
+      x.closePath();
+      x.clip();
+    }
 
+    const sw = img.naturalWidth || img.width;
+    const sh = img.naturalHeight || img.height;
+    const r = coverRect(sw, sh, c.width, c.height);
+    x.drawImage(img, r.x, r.y, r.w, r.h);
+
+    if (profile.cropShape === 'circle') {
+      x.restore();
+    }
     return canvasToBlob(c);
   }
 
@@ -103,101 +150,116 @@
     return (crc ^ 0xffffffff) >>> 0;
   }
 
-  async function addPngPhysicalSize(blob, ppmX = PPM_X, ppmY = PPM_Y) {
+  async function addPngPhysicalSize(blob, profile) {
+    const ppmX = Math.round(profile.widthPx / (profile.widthMm / 1000));
+    const ppmY = Math.round(profile.heightPx / (profile.heightMm / 1000));
     const src = new Uint8Array(await blob.arrayBuffer());
     if (src.length < 33 || src[0] !== 137 || src[1] !== 80 || src[2] !== 78 || src[3] !== 71) {
-      return blob;
+      return { blob, ppmX, ppmY };
     }
 
-    // pHYs : 4 longueur + 4 type + 9 données + 4 CRC = 21 octets
     const chunk = new Uint8Array(21);
     writeU32BE(chunk, 0, 9);
-    chunk.set([112, 72, 89, 115], 4); // "pHYs"
+    chunk.set([112, 72, 89, 115], 4); // pHYs
     writeU32BE(chunk, 8, ppmX);
     writeU32BE(chunk, 12, ppmY);
-    chunk[16] = 1; // unité = mètre
+    chunk[16] = 1;
     writeU32BE(chunk, 17, crc32(chunk.slice(4, 17)));
 
-    // Insère pHYs juste après IHDR (signature 8 + chunk IHDR 25 = offset 33).
     const out = new Uint8Array(src.length + chunk.length);
     out.set(src.slice(0, 33), 0);
     out.set(chunk, 33);
     out.set(src.slice(33), 33 + chunk.length);
-    return new Blob([out], { type: 'image/png' });
+    return {
+      blob: new Blob([out], { type: 'image/png' }),
+      ppmX,
+      ppmY
+    };
+  }
+
+  async function collectFrameBlobs() {
+    const imgs = Array.from(framesEl.querySelectorAll('img'));
+    if (imgs.length !== 9) throw new Error('Il faut d’abord générer les 9 vues.');
+    return Promise.all(
+      imgs.map(async (img) => {
+        const r = await fetch(img.src);
+        if (!r.ok) throw new Error(`Impossible de lire une vue (${r.status}).`);
+        return r.blob();
+      })
+    );
+  }
+
+  function setStatusMessage(message) {
+    const status = document.querySelector('#status');
+    if (status) status.textContent = message;
   }
 
   downloadBtn.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopImmediatePropagation();
-
-    const imgs = Array.from(framesEl.querySelectorAll('img'));
-    if (imgs.length !== 9) {
-      alert('Il faut d’abord générer les 9 vues.');
-      return;
-    }
-
     downloadBtn.disabled = true;
 
     try {
-      const rawBlobs = await Promise.all(
-        imgs.map(async img => {
-          const r = await fetch(img.src);
-          if (!r.ok) throw new Error(`Impossible de lire une vue (${r.status}).`);
-          return r.blob();
-        })
-      );
+      const profile = getSelectedProfile();
+      setStatusMessage(`Préparation de l’export ${profile.label}…`);
 
-      let blobs = await Promise.all(rawBlobs.map(normalizeBlob));
+      const rawBlobs = await collectFrameBlobs();
+      const normalized = await Promise.all(rawBlobs.map((b) => normalizeBlob(b, profile)));
 
-      // Passage 05 → 06 → 07 strictement régulier.
-      blobs[5] = await buildMiddleBlob(blobs[4], blobs[6]);
-
-      // Inscription de la résolution physique dans chaque PNG.
-      blobs = await Promise.all(blobs.map(b => addPngPhysicalSize(b)));
-
-      const zip = new JSZip();
-      blobs.forEach((b, i) => {
-        zip.file(`vue-${String(i + 1).padStart(2, '0')}.png`, b);
-      });
+      // Correction structurelle : on conserve la vraie vue 06 générée par le moteur.
+      // On ne réinjecte plus aucun fondu 50/50 entre les vues 05 et 07.
+      const withPhys = await Promise.all(normalized.map((b) => addPngPhysicalSize(b, profile)));
+      const blobs = withPhys.map(x => x.blob);
+      const ppmX = withPhys[0]?.ppmX ?? null;
+      const ppmY = withPhys[0]?.ppmY ?? null;
 
       const angle = document.querySelector('#angle');
       const subjectDepth = document.querySelector('#subjectDepth');
       const bgDepth = document.querySelector('#bgDepth');
       const edgeProtect = document.querySelector('#edgeProtect');
+      const zip = new JSZip();
 
-      zip.file(
-        'manifest.json',
-        JSON.stringify({
-          generator: 'HappyHolo Relief 3D V3.1.8 porte-clé vertical',
-          localSegmentation: true,
-          externalPaidApi: false,
-          views: 9,
-          widthPx: OUT_W,
-          heightPx: OUT_H,
-          lpi: LPI,
-          widthMm: WIDTH_MM,
-          heightMm: HEIGHT_MM,
-          pngPixelsPerMeterX: PPM_X,
-          pngPixelsPerMeterY: PPM_Y,
-          resizeMode: 'center-cover-no-distortion',
-          monotonicCorrection: 'view-06 midpoint of views 05 and 07',
-          angle: Number(angle?.value ?? 7),
-          subjectDepth: Number(subjectDepth?.value ?? 0.48),
-          backgroundDepth: Number(bgDepth?.value ?? 0.10),
-          edgeProtection: Number(edgeProtect?.value ?? 84)
-        }, null, 2)
-      );
+      blobs.forEach((b, i) => {
+        zip.file(`vue-${String(i + 1).padStart(2, '0')}.png`, b);
+      });
+
+      zip.file('manifest.json', JSON.stringify({
+        generator: `HappyHolo Relief 3D ${VERSION} export multi-supports`,
+        localSegmentation: true,
+        externalPaidApi: false,
+        views: 9,
+        support: profile.support,
+        supportLabel: profile.label,
+        widthPx: profile.widthPx,
+        heightPx: profile.heightPx,
+        widthMm: profile.widthMm,
+        heightMm: profile.heightMm,
+        diameterMm: profile.diameterMm ?? null,
+        lpi: profile.lpi,
+        pngPixelsPerMeterX: ppmX,
+        pngPixelsPerMeterY: ppmY,
+        resizeMode: profile.resizeMode,
+        cropShape: profile.cropShape,
+        monotonicCorrection: 'disabled-bad-midpoint-blend-removed',
+        view06Policy: 'keep-native-rendered-view',
+        angle: Number(angle?.value ?? 7),
+        subjectDepth: Number(subjectDepth?.value ?? 0.48),
+        backgroundDepth: Number(bgDepth?.value ?? 0.10),
+        edgeProtection: Number(edgeProtect?.value ?? 84)
+      }, null, 2));
 
       const out = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
       const url = URL.createObjectURL(out);
       const a = document.createElement('a');
       a.href = url;
-      a.download = '9-vues-porte-cle-vertical-75lpi-v318.zip';
+      a.download = profile.filename;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
+      setStatusMessage(`Export prêt : ${profile.label}, ${profile.widthPx} × ${profile.heightPx}, ${profile.lpi} LPI.`);
     } catch (e) {
       console.error(e);
-      alert('Erreur export V3.1.8 : ' + (e?.message || String(e)));
+      alert('Erreur export multi-supports : ' + (e?.message || String(e)));
+      setStatusMessage('Erreur export : ' + (e?.message || String(e)));
     } finally {
       downloadBtn.disabled = false;
     }
