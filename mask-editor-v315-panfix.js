@@ -551,5 +551,298 @@
     return corrected;
   };
 
-  console.log('[HAPPYHOLO] éditeur V3.2.3 multi-sélections + baguette + protection mémoire 1280 actif');
+  console.log('[HAPPYHOLO] éditeur V3.2.4 multi-sélections + mémoire + rendu multi-profondeur actif');
+})();
+
+
+/* ===== HappyHolo V3.2.4 — rendu multi-profondeur + réglages après validation ===== */
+(() => {
+  'use strict';
+
+  let originalRenderAt = null;
+  try {
+    if (typeof renderAt === 'function') originalRenderAt = renderAt;
+  } catch (_) {}
+
+  const actionOptions = [
+    ['Aucune action','none'],
+    ['Personne — clin d’œil','person_wink'],
+    ['Personne — sourire léger','person_smile'],
+    ['Personne — petit bisou','person_kiss'],
+    ['Chat — clignement lent','cat_blink'],
+    ['Chat — miaulement','cat_meow'],
+    ['Chien — tête penchée','dog_tilt'],
+    ['Chien — petit aboiement','dog_bark'],
+    ['Moto/voiture — appel de phare','headlight'],
+    ['Moto/voiture — clignotant','indicator'],
+    ['Logo — brillance','logo_shine'],
+    ['Objet/logo — pivot léger','pivot']
+  ];
+
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+  function plan(){
+    return Array.isArray(window.happyHoloSelectionPlan)
+      ? window.happyHoloSelectionPlan
+      : [];
+  }
+
+  function clearCaches(){
+    for(const s of plan()){
+      delete s._maskSourceCanvas;
+      delete s._maskTargets;
+      delete s._layers;
+    }
+  }
+
+  function fitCoverLocal(img,W,H){
+    const iw=img.naturalWidth||img.width||1;
+    const ih=img.naturalHeight||img.height||1;
+    const sc=Math.max(W/iw,H/ih);
+    const w=iw*sc,h=ih*sc;
+    return {x:(W-w)/2,y:(H-h)/2,w,h};
+  }
+
+  function sourceImage(){
+    try { if(typeof sourceImg!=='undefined' && sourceImg) return sourceImg; } catch(_){}
+    return window.HappyHoloReliefState?.sourceImg || null;
+  }
+
+  function bgImage(){
+    try { if(typeof backgroundImg!=='undefined' && backgroundImg) return backgroundImg; } catch(_){}
+    return window.HappyHoloReliefState?.backgroundImg || null;
+  }
+
+  function getMaskSourceCanvas(s){
+    if(s._maskSourceCanvas) return s._maskSourceCanvas;
+    const m=s.mask;
+    if(!m || !m.width || !m.height || !m.data) return null;
+    const c=document.createElement('canvas');
+    c.width=m.width; c.height=m.height;
+    c.getContext('2d').putImageData(m,0,0);
+    s._maskSourceCanvas=c;
+    return c;
+  }
+
+  function getMaskTarget(s,W,H){
+    s._maskTargets ||= new Map();
+    const key=`${W}x${H}`;
+    if(s._maskTargets.has(key)) return s._maskTargets.get(key);
+
+    const src=sourceImage();
+    const mc=getMaskSourceCanvas(s);
+    if(!src || !mc) return null;
+
+    const c=document.createElement('canvas');
+    c.width=W;c.height=H;
+    const x=c.getContext('2d');
+    const f=fitCoverLocal(src,W,H);
+    x.drawImage(mc,0,0,mc.width,mc.height,f.x,f.y,f.w,f.h);
+    s._maskTargets.set(key,c);
+    return c;
+  }
+
+  function getExclusiveLayer(index,W,H){
+    const selections=plan();
+    const s=selections[index];
+    if(!s) return null;
+
+    s._layers ||= new Map();
+    const key=`${W}x${H}|${selections.length}`;
+    if(s._layers.has(key)) return s._layers.get(key);
+
+    const src=sourceImage();
+    const ownMask=getMaskTarget(s,W,H);
+    if(!src || !ownMask) return null;
+
+    const c=document.createElement('canvas');
+    c.width=W;c.height=H;
+    const x=c.getContext('2d');
+    const f=fitCoverLocal(src,W,H);
+
+    x.drawImage(src,f.x,f.y,f.w,f.h);
+    x.globalCompositeOperation='destination-in';
+    x.drawImage(ownMask,0,0);
+
+    // Une sélection créée plus tard prend la priorité dans les zones de recouvrement.
+    for(let j=index+1;j<selections.length;j++){
+      const later=getMaskTarget(selections[j],W,H);
+      if(!later) continue;
+      x.globalCompositeOperation='destination-out';
+      x.drawImage(later,0,0);
+    }
+    x.globalCompositeOperation='source-over';
+
+    s._layers.set(key,c);
+    return c;
+  }
+
+  function multiRenderAt(norm,target){
+    const selections=plan();
+    if(selections.length<2 || !sourceImage() || !bgImage()){
+      if(originalRenderAt) return originalRenderAt(norm,target);
+      return;
+    }
+
+    try{
+      if(!target){
+        if(typeof view!=='undefined') target=view;
+        else target=window.HappyHoloReliefState?.view;
+      }
+    }catch(_){
+      target=window.HappyHoloReliefState?.view;
+    }
+    if(!target) return;
+
+    const x=target.getContext('2d');
+    const W=target.width,H=target.height;
+    x.clearRect(0,0,W,H);
+
+    let amplitude=1.75,bgD=.10;
+    try{
+      if(typeof angle!=='undefined') amplitude=Number(angle.value)/4;
+      if(typeof bgDepth!=='undefined') bgD=Number(bgDepth.value);
+    }catch(_){}
+
+    const bg=bgImage();
+    const fb=fitCoverLocal(bg,W,H);
+    const bgShift=norm*6*amplitude*(bgD/.10);
+    x.drawImage(bg,fb.x+bgShift,fb.y,fb.w,fb.h);
+
+    // Les plans les plus éloignés sont dessinés d'abord.
+    const order=selections
+      .map((s,i)=>({s,i,d:Number(s.depth)||0}))
+      .sort((a,b)=>a.d-b.d);
+
+    for(const it of order){
+      const layer=getExclusiveLayer(it.i,W,H);
+      if(!layer) continue;
+
+      // Échelle compatible avec le réglage historique 0,48.
+      const k=clamp((Number(it.s.depth)||0.02)/0.30,0.05,3);
+      const shift=norm*18*amplitude*k;
+      x.drawImage(layer,shift,0);
+
+      // léger renfort anti-trous, volontairement discret
+      x.globalAlpha=.18;
+      x.drawImage(layer,shift*.985,0);
+      x.globalAlpha=1;
+    }
+  }
+
+  if(originalRenderAt){
+    try { renderAt = multiRenderAt; } catch(_){}
+    try { window.renderAt = multiRenderAt; } catch(_){}
+  }
+
+  function makeSelect(){
+    const s=document.createElement('select');
+    Object.assign(s.style,{
+      width:'100%',padding:'9px 10px',border:'1px solid #ccc',
+      borderRadius:'10px',background:'#fff',font:'inherit'
+    });
+    return s;
+  }
+
+  function ensureControlPanel(){
+    const selections=plan();
+    if(!selections.length) return;
+
+    let card=document.getElementById('happyHoloSelectionControls');
+    if(!card){
+      card=document.createElement('div');
+      card.id='happyHoloSelectionControls';
+      Object.assign(card.style,{
+        background:'#fff',border:'2px solid #111',borderRadius:'18px',
+        padding:'16px',margin:'16px 0'
+      });
+
+      const main=document.querySelector('.card.grid');
+      if(main?.parentNode) main.parentNode.insertBefore(card,main.nextSibling);
+      else document.body.appendChild(card);
+    }
+
+    card.innerHTML='';
+
+    const head=document.createElement('div');
+    Object.assign(head.style,{display:'flex',justifyContent:'space-between',gap:'12px',alignItems:'center',marginBottom:'8px'});
+    const title=document.createElement('div');
+    title.innerHTML='<div style="font-size:19px;font-weight:850">Réglages par sélection</div><div style="font-size:12px;color:#666;margin-top:2px">Les changements de profondeur sont visibles immédiatement dans l’aperçu 3D et seront repris dans les 9 vues.</div>';
+    head.appendChild(title);
+    const badge=document.createElement('span');
+    badge.textContent=`${selections.length} plan${selections.length>1?'s':''}`;
+    Object.assign(badge.style,{background:'#e7f7eb',color:'#17652c',padding:'6px 9px',borderRadius:'999px',fontSize:'12px',fontWeight:'800'});
+    head.appendChild(badge);
+    card.appendChild(head);
+
+    selections.forEach((s,i)=>{
+      const row=document.createElement('div');
+      Object.assign(row.style,{
+        display:'grid',gridTemplateColumns:'150px minmax(180px,1fr) minmax(180px,1fr)',
+        gap:'12px',alignItems:'end',padding:'12px 0',
+        borderTop:i?'1px solid #ddd':'0'
+      });
+
+      const name=document.createElement('div');
+      name.innerHTML=`<b>${s.name||`Sélection ${i+1}`}</b><div style="font-size:11px;color:#777;margin-top:4px">Plan ${i+1}</div>`;
+      row.appendChild(name);
+
+      const dwrap=document.createElement('label');
+      dwrap.style.margin='0';
+      const dh=document.createElement('div');
+      Object.assign(dh.style,{display:'flex',justifyContent:'space-between',fontSize:'12px',marginBottom:'5px'});
+      const dt=document.createElement('span');dt.textContent='Profondeur';
+      const dv=document.createElement('b');dv.textContent=Number(s.depth||0).toFixed(2);
+      dh.append(dt,dv); dwrap.appendChild(dh);
+      const dr=document.createElement('input');
+      dr.type='range';dr.min='.02';dr.max='.80';dr.step='.01';dr.value=s.depth||.35;dr.style.width='100%';
+      dr.addEventListener('input',()=>{
+        s.depth=Number(dr.value);dv.textContent=s.depth.toFixed(2);
+      });
+      dwrap.appendChild(dr);
+      row.appendChild(dwrap);
+
+      const awrap=document.createElement('div');
+      const alab=document.createElement('div');
+      alab.textContent='Action';
+      Object.assign(alab.style,{fontSize:'12px',fontWeight:'700',marginBottom:'5px'});
+      awrap.appendChild(alab);
+      const asel=makeSelect();
+      actionOptions.forEach(([t,v])=>asel.appendChild(new Option(t,v)));
+      asel.value=s.action||'none';
+      asel.addEventListener('change',()=>{s.action=asel.value;});
+      awrap.appendChild(asel);
+
+      const sub=document.createElement('div');
+      sub.textContent='Action mémorisée — moteur animation à brancher séparément.';
+      Object.assign(sub.style,{fontSize:'10px',color:'#777',marginTop:'4px'});
+      awrap.appendChild(sub);
+      row.appendChild(awrap);
+
+      card.appendChild(row);
+    });
+
+    // Responsive iPad étroit
+    if(window.innerWidth<850){
+      card.querySelectorAll(':scope > div').forEach(()=>{});
+      for(const row of card.children){
+        if(row.style?.display==='grid') row.style.gridTemplateColumns='1fr';
+      }
+    }
+  }
+
+  window.addEventListener('happyholo:selection-plan',()=>{
+    clearCaches();
+    setTimeout(ensureControlPanel,0);
+  });
+
+  window.addEventListener('happyholo-relief-ready',()=>{
+    clearCaches();
+    ensureControlPanel();
+  });
+
+  // Au cas où le plan existe déjà lors d'un rechargement partiel.
+  setTimeout(ensureControlPanel,300);
+
+  console.log('[HAPPYHOLO] V3.2.4 rendu multi-profondeur + réglages permanents actif');
 })();
