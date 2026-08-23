@@ -31,26 +31,87 @@
     ctx.restore();
   }
 
-  function drawHeadlight(ctx,layer,phase,intensity,W,H,zone){
+  function drawHeadlight(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on'){
+    // V3.3.0 : par défaut, l'appel de phare doit être VISIBILE.
+    // On part donc d'un phare quasi éteint puis on monte jusqu'au plein phare.
+    // Tout reste ultra localisé à l'optique : pas d'éclaircissement du pilote ni de la carrosserie.
     ctx.drawImage(layer,0,0,W,H);
     const z=zonePx(zone,W,H); if(!z) return;
-    const p=phase;
+
+    const p=clamp(phase,0,1);
+    const k=clamp(intensity,0.1,1);
     const cx=z.x+z.w/2, cy=z.y+z.h/2;
-    const r=Math.max(10,Math.max(z.w,z.h)*(.65+1.25*p));
+    const rx=Math.max(4,z.w*.50), ry=Math.max(4,z.h*.50);
+
+    // 1) État de base / assombrissement local du phare.
+    // En mode visible (par défaut), le phare est quasi éteint au repos pour que l'appel soit net.
+    const dimAlpha = mode==='off_to_on'
+      ? clamp((0.86 - 0.80*p) * (0.65 + 0.35*k), 0, 0.92)
+      : clamp((0.10 - 0.08*p) * k, 0, 0.12);
+    if(dimAlpha>0.001){
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+      ctx.clip();
+      const dg=ctx.createRadialGradient(cx,cy,0,cx,cy,Math.max(rx,ry));
+      dg.addColorStop(0,`rgba(0,0,0,${Math.min(0.95,dimAlpha)})`);
+      dg.addColorStop(.75,`rgba(0,0,0,${Math.max(0,dimAlpha*.70)})`);
+      dg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=dg;
+      ctx.fillRect(z.x-rx*.2,z.y-ry*.2,z.w+rx*.4,z.h+ry*.4);
+      ctx.restore();
+    }
+
+    // 2) Montée lumineuse : plus franche en mode visible, plus douce en mode réaliste.
+    const flash = mode==='off_to_on'
+      ? Math.pow(p, 1.10) * (0.70 + 0.30*k)
+      : Math.pow(p, 1.25) * (0.45 + 0.25*k);
+    if(flash<=0.001) return;
+
+    // Surintensité interne : contenue dans l'optique.
     ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+    ctx.clip();
     ctx.globalCompositeOperation='screen';
-    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
-    const a=.18+.72*p*intensity;
-    g.addColorStop(0,`rgba(255,255,255,${Math.min(.98,a)})`);
-    g.addColorStop(.28,`rgba(255,248,210,${a*.72})`);
-    g.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.fillStyle=g;
-    ctx.fillRect(cx-r,cy-r,r*2,r*2);
-    ctx.globalAlpha=.20+.55*p*intensity;
-    ctx.filter=`brightness(${1.5+2.2*p*intensity})`;
+    ctx.globalAlpha=(mode==='off_to_on'?0.88:0.34)*flash;
+    ctx.filter=`brightness(${1 + (mode==='off_to_on'?4.8:2.0)*flash}) contrast(${1 + .18*flash}) saturate(${1 - .10*flash})`;
     ctx.drawImage(layer,z.x,z.y,z.w,z.h,z.x,z.y,z.w,z.h);
     ctx.restore();
+    ctx.filter='none';
+
+    // 3) Cœur lumineux très visible au pic.
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+    ctx.clip();
+    ctx.globalCompositeOperation='screen';
+    const coreR=Math.max(4,Math.min(z.w,z.h)*(mode==='off_to_on'?.64:.52));
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,coreR);
+    const a=(mode==='off_to_on'?0.96:0.60)*flash;
+    g.addColorStop(0,`rgba(255,255,255,${Math.min(.98,a)})`);
+    g.addColorStop(.26,`rgba(255,252,236,${Math.min(.86,a*.82)})`);
+    g.addColorStop(.58,`rgba(244,248,255,${Math.min(.28,a*.36)})`);
+    g.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=g;
+    ctx.fillRect(z.x-rx*.2,z.y-ry*.2,z.w+rx*.4,z.h+ry*.4);
+    ctx.restore();
+
+    // 4) Halo externe : court, mais bien visible au pic en mode off->on.
+    const glowScale = mode==='off_to_on' ? (1.24 + .16*flash) : 1.10;
+    const glowRx=rx*glowScale, glowRy=ry*glowScale;
+    ctx.save();
+    ctx.globalCompositeOperation='screen';
+    ctx.globalAlpha=(mode==='off_to_on'?0.22:0.08)*flash;
+    const eg=ctx.createRadialGradient(cx,cy,Math.min(rx,ry)*.52,cx,cy,Math.max(glowRx,glowRy));
+    eg.addColorStop(0,'rgba(255,248,228,.72)');
+    eg.addColorStop(.60,'rgba(248,250,255,.12)');
+    eg.addColorStop(1,'rgba(255,255,255,0)');
+    ctx.fillStyle=eg;
+    ctx.fillRect(cx-glowRx,cy-glowRy,glowRx*2,glowRy*2);
+    ctx.restore();
   }
+
 
   // Déformation locale simple : des bandes horizontales de la zone œil convergent
   // vers la ligne de paupière. Le reste du visage reste absolument fixe.
@@ -82,7 +143,7 @@
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
-    if(action==='headlight') return drawHeadlight(ctx,layer,phase,intensity,W,H,s.actionZone);
+    if(action==='headlight') return drawHeadlight(ctx,layer,phase,intensity,W,H,s.actionZone,s.headlightMode||'off_to_on');
     if(action==='person_wink') return drawWink(ctx,layer,phase,intensity,W,H,s.actionZone);
     ctx.drawImage(layer,0,0,W,H);
   }
@@ -103,6 +164,5 @@
   }
 
   window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover};
-  console.log('[HAPPYHOLO] action-preview-engine V3.2.7 OFFLINE actif');
+  console.log('[HAPPYHOLO] action-preview-engine V3.3.0 OFFLINE actif · appel de phare visible');
 })();
-
