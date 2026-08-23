@@ -31,6 +31,44 @@
     ctx.restore();
   }
 
+
+  function paintZoneMask(zone,W,H){
+    if(!zone || zone.kind!=='paint' || !Array.isArray(zone.strokes)) return null;
+    const sourceW=Math.max(1,Number(zone.sourceW)||W), sourceH=Math.max(1,Number(zone.sourceH)||H);
+    const sc=Math.max(W/sourceW,H/sourceH), fw=sourceW*sc,fh=sourceH*sc,fx=(W-fw)/2,fy=(H-fh)/2;
+    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.lineCap='round';x.lineJoin='round';
+    for(const st of zone.strokes){
+      const pts=Array.isArray(st.points)?st.points:[];if(!pts.length)continue;
+      x.save();x.globalCompositeOperation=st.erase?'destination-out':'source-over';x.strokeStyle='#fff';x.fillStyle='#fff';
+      const brushSource=(Number(st.size)||.02)*Math.max(sourceW,sourceH);x.lineWidth=Math.max(2,brushSource*sc);
+      const map=p=>[fx+p[0]*fw,fy+p[1]*fh];const p0=map(pts[0]);x.beginPath();x.moveTo(p0[0],p0[1]);
+      if(pts.length===1){x.arc(p0[0],p0[1],x.lineWidth/2,0,Math.PI*2);x.fill();}
+      else{for(let i=1;i<pts.length;i++){const q=map(pts[i]);x.lineTo(q[0],q[1]);}x.stroke();}
+      x.restore();
+    }
+    return c;
+  }
+
+  function applyMaskedOverlay(ctx,mask,drawFn,alpha=1,composite='source-over'){
+    const W=mask.width,H=mask.height,tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;const t=tmp.getContext('2d');
+    drawFn(t);t.globalCompositeOperation='destination-in';t.drawImage(mask,0,0);t.globalCompositeOperation='source-over';
+    ctx.save();ctx.globalAlpha=alpha;ctx.globalCompositeOperation=composite;ctx.drawImage(tmp,0,0);ctx.restore();
+  }
+
+  function drawHeadlightPaint(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on'){
+    const mask=paintZoneMask(zone,W,H);if(!mask)return;
+    const p=clamp(phase,0,1),k=clamp(intensity,.1,1);
+    const dimAlpha=mode==='off_to_on'?clamp((.90-.86*p)*(.70+.30*k),0,.94):clamp((.10-.08*p)*k,0,.12);
+    if(dimAlpha>.001) applyMaskedOverlay(ctx,mask,t=>{t.fillStyle='#000';t.fillRect(0,0,W,H);},dimAlpha,'source-over');
+    const flash=mode==='off_to_on'?Math.pow(p,1.05)*(.72+.28*k):Math.pow(p,1.25)*(.45+.25*k);
+    if(flash<=.001)return;
+    applyMaskedOverlay(ctx,mask,t=>{t.save();t.filter=`brightness(${1+5.2*flash}) contrast(${1+.18*flash}) saturate(${1-.12*flash})`;t.drawImage(layer,0,0,W,H);t.restore();},mode==='off_to_on'?.92*flash:.36*flash,'screen');
+    applyMaskedOverlay(ctx,mask,t=>{t.fillStyle='rgba(255,252,238,1)';t.fillRect(0,0,W,H);},(mode==='off_to_on'?.72:.30)*flash,'screen');
+    // halo doux dérivé du masque exact, sans éclairer tout le véhicule
+    const glow=document.createElement('canvas');glow.width=W;glow.height=H;const g=glow.getContext('2d');g.save();g.filter=`blur(${Math.max(3,Math.round(Math.min(W,H)*.006))}px)`;g.drawImage(mask,0,0);g.restore();g.globalCompositeOperation='source-in';g.fillStyle='rgba(255,248,230,1)';g.fillRect(0,0,W,H);
+    ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(mode==='off_to_on'?.16:.06)*flash;ctx.drawImage(glow,0,0);ctx.restore();
+  }
+
   function drawHeadlight(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on',alreadyDrawn=false){
     // V3.3.0 : par défaut, l'appel de phare doit être VISIBILE.
     // On part donc d'un phare quasi éteint puis on monte jusqu'au plein phare.
@@ -147,7 +185,7 @@
       const zones=Array.isArray(s.actionZones)&&s.actionZones.length?s.actionZones:(s.actionZone?[s.actionZone]:[]);
       ctx.drawImage(layer,0,0,W,H);
       if(!zones.length) return;
-      for(const z of zones) drawHeadlight(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on',true);
+      for(const z of zones){if(z?.kind==='paint') drawHeadlightPaint(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on');else drawHeadlight(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on',true);}
       return;
     }
     if(action==='person_wink') return drawWink(ctx,layer,phase,intensity,W,H,s.actionZone);
@@ -170,5 +208,5 @@
   }
 
   window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover};
-  console.log('[HAPPYHOLO] action-preview-engine V3.3.4 OFFLINE actif · multi-zones plein phare');
+  console.log('[HAPPYHOLO] action-preview-engine V3.3.5 OFFLINE actif · masques libres multi-zones plein phare');
 })();
