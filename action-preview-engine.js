@@ -166,3 +166,4 @@
   window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover};
   console.log('[HAPPYHOLO] action-preview-engine V3.3.0 OFFLINE actif · appel de phare visible');
 })();
+
