@@ -1124,5 +1124,109 @@
   setTimeout(ensureControlPanel,300);
 
   console.log('[HAPPYHOLO] V3.2.6 rendu multi-profondeur + aperçu actions visible actif');
-   
+})();
+
+/* ===== HappyHolo V3.2.7 — vrai aperçu OFFLINE 7 frames ===== */
+(() => {
+  'use strict';
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const enabledActions=new Set(['none','person_wink','headlight','pivot']);
+  let zoneModal=null,zoneCanvas=null,zoneCtx=null,zoneResolve=null,drag=null;
+
+  function plan(){return Array.isArray(window.happyHoloSelectionPlan)?window.happyHoloSelectionPlan:[];}
+  function src(){try{if(typeof sourceImg!=='undefined'&&sourceImg)return sourceImg;}catch(_){} return window.HappyHoloReliefState?.sourceImg||null;}
+  function bg(){try{if(typeof backgroundImg!=='undefined'&&backgroundImg)return backgroundImg;}catch(_){} return window.HappyHoloReliefState?.backgroundImg||null;}
+  function fit(img,W,H){const iw=img.naturalWidth||img.width||1,ih=img.naturalHeight||img.height||1,sc=Math.max(W/iw,H/ih),w=iw*sc,h=ih*sc;return{x:(W-w)/2,y:(H-h)/2,w,h};}
+
+  function maskCanvas(s,W,H){
+    const m=s?.mask;if(!m?.data)return null;
+    const raw=document.createElement('canvas');raw.width=m.width;raw.height=m.height;raw.getContext('2d').putImageData(m,0,0);
+    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const f=fit(src(),W,H);x.drawImage(raw,0,0,raw.width,raw.height,f.x,f.y,f.w,f.h);return c;
+  }
+  function layerFor(i,W,H){
+    const ss=plan(),s=ss[i],im=src(); if(!s||!im)return null;
+    const own=maskCanvas(s,W,H);if(!own)return null;
+    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d'),f=fit(im,W,H);x.drawImage(im,f.x,f.y,f.w,f.h);x.globalCompositeOperation='destination-in';x.drawImage(own,0,0);
+    for(let j=i+1;j<ss.length;j++){const later=maskCanvas(ss[j],W,H);if(later){x.globalCompositeOperation='destination-out';x.drawImage(later,0,0);}}
+    x.globalCompositeOperation='source-over';return c;
+  }
+  function baseFor(W,H){
+    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');const im=bg()||src();if(im){const f=fit(im,W,H);x.drawImage(im,f.x,f.y,f.w,f.h);}return c;
+  }
+
+  function ensureZoneUI(){
+    if(zoneModal)return;
+    zoneModal=document.createElement('div');Object.assign(zoneModal.style,{position:'fixed',inset:'0',zIndex:'1000008',background:'rgba(8,8,10,.97)',display:'none',flexDirection:'column',color:'#fff',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'});
+    const top=document.createElement('div');Object.assign(top.style,{padding:'10px 12px',display:'flex',gap:'10px',alignItems:'center',background:'#17171a'});
+    const title=document.createElement('b');title.textContent='Définir zone action';title.style.flex='1';zoneModal._title=title;
+    const cancel=document.createElement('button');cancel.textContent='Annuler';
+    const ok=document.createElement('button');ok.textContent='✓ Valider';
+    for(const b of[cancel,ok])Object.assign(b.style,{padding:'10px 14px',borderRadius:'10px',border:'1px solid #555',background:'#26262a',color:'#fff',fontWeight:'800'});
+    ok.style.background='#0a84ff';cancel.onclick=()=>finishZone(null);ok.onclick=()=>finishZone(drag?.rect||null);top.append(title,cancel,ok);
+    const body=document.createElement('div');Object.assign(body.style,{flex:'1',minHeight:'0',display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'});
+    zoneCanvas=document.createElement('canvas');Object.assign(zoneCanvas.style,{maxWidth:'100%',maxHeight:'100%',background:'#111',touchAction:'none',borderRadius:'12px'});zoneCtx=zoneCanvas.getContext('2d');body.appendChild(zoneCanvas);
+    const foot=document.createElement('div');foot.textContent='Trace un rectangle autour de l’œil ou du phare avec le doigt / Apple Pencil.';Object.assign(foot.style,{padding:'10px',textAlign:'center',fontSize:'12px',opacity:.8});
+    zoneModal.append(top,body,foot);document.body.appendChild(zoneModal);
+    const p=e=>{const r=zoneCanvas.getBoundingClientRect();return{x:(e.clientX-r.left)*zoneCanvas.width/r.width,y:(e.clientY-r.top)*zoneCanvas.height/r.height};};
+    zoneCanvas.onpointerdown=e=>{e.preventDefault();const a=p(e);drag={start:a,rect:null};zoneCanvas.setPointerCapture?.(e.pointerId);drawZone();};
+    zoneCanvas.onpointermove=e=>{if(!drag)return;e.preventDefault();const b=p(e),a=drag.start;drag.rect={x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(b.x-a.x),h:Math.abs(b.y-a.y)};drawZone();};
+  }
+  function drawZone(){
+    const im=src();if(!im)return;zoneCtx.clearRect(0,0,zoneCanvas.width,zoneCanvas.height);const f=fit(im,zoneCanvas.width,zoneCanvas.height);zoneCtx.drawImage(im,f.x,f.y,f.w,f.h);
+    if(drag?.rect){const r=drag.rect;zoneCtx.save();zoneCtx.strokeStyle='#00e5ff';zoneCtx.lineWidth=Math.max(2,zoneCanvas.width/300);zoneCtx.setLineDash([10,7]);zoneCtx.strokeRect(r.x,r.y,r.w,r.h);zoneCtx.fillStyle='rgba(0,229,255,.10)';zoneCtx.fillRect(r.x,r.y,r.w,r.h);zoneCtx.restore();}
+  }
+  function finishZone(rect){
+    zoneModal.style.display='none';const res=rect&&rect.w>8&&rect.h>8?{x:rect.x/zoneCanvas.width,y:rect.y/zoneCanvas.height,w:rect.w/zoneCanvas.width,h:rect.h/zoneCanvas.height}:null;
+    const cb=zoneResolve;zoneResolve=null;drag=null;cb?.(res);
+  }
+  function chooseZone(s,label){
+    ensureZoneUI();const im=src();if(!im)return Promise.resolve(null);const max=1000,sw=im.naturalWidth||im.width,sh=im.naturalHeight||im.height,sc=Math.min(1,max/Math.max(sw,sh));zoneCanvas.width=Math.round(sw*sc);zoneCanvas.height=Math.round(sh*sc);zoneModal._title.textContent=label;zoneModal.style.display='flex';drag=s.actionZone?{start:{x:s.actionZone.x*zoneCanvas.width,y:s.actionZone.y*zoneCanvas.height},rect:{x:s.actionZone.x*zoneCanvas.width,y:s.actionZone.y*zoneCanvas.height,w:s.actionZone.w*zoneCanvas.width,h:s.actionZone.h*zoneCanvas.height}}:null;drawZone();return new Promise(r=>zoneResolve=r);
+  }
+
+  function patchControls(){
+    const card=document.getElementById('happyHoloSelectionControls');if(!card)return;
+    const rows=[...card.children].filter(n=>n.style?.display==='grid');
+    rows.forEach((row,i)=>{
+      const s=plan()[i];if(!s)return;const selects=row.querySelectorAll('select');const asel=selects[selects.length-1];if(!asel)return;
+      [...asel.options].forEach(o=>{if(!enabledActions.has(o.value)){o.disabled=true;o.textContent=o.textContent+' — bientôt';}});
+      if(!enabledActions.has(asel.value)){s.action='none';asel.value='none';}
+      const awrap=asel.parentElement;
+      if(awrap.querySelector('.hh327-extra'))return;
+      const box=document.createElement('div');box.className='hh327-extra';Object.assign(box.style,{marginTop:'8px',paddingTop:'8px',borderTop:'1px dashed #ccc'});
+      const speedLine=document.createElement('div');Object.assign(speedLine.style,{display:'flex',gap:'8px',alignItems:'center'});const lab=document.createElement('span');lab.textContent='Vitesse';Object.assign(lab.style,{fontSize:'10px',color:'#666'});const speed=document.createElement('select');[['Rapide · 1 s',1000],['Normal · 2 s',2000],['Doux · 3 s',3000]].forEach(([t,v])=>speed.append(new Option(t,String(v))));speed.value=String(s.actionSpeed||2000);speed.onchange=()=>s.actionSpeed=Number(speed.value);Object.assign(speed.style,{flex:'1',padding:'6px',borderRadius:'8px'});speedLine.append(lab,speed);box.append(speedLine);
+      const zoneBtn=document.createElement('button');zoneBtn.type='button';Object.assign(zoneBtn.style,{width:'100%',marginTop:'7px',padding:'8px',borderRadius:'9px',border:'1px solid #888',background:'#fff',fontWeight:'750',fontSize:'11px'});
+      const update=()=>{const a=s.action;if(a==='person_wink'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone œil':'◎ Définir zone œil';}else if(a==='headlight'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone phare':'◎ Définir zone phare';}else zoneBtn.style.display='none';};
+      zoneBtn.onclick=async()=>{const a=s.action;if(a!=='person_wink'&&a!=='headlight')return;const z=await chooseZone(s,a==='person_wink'?'Zone du clin d’œil':'Zone de l’appel de phare');if(z){s.actionZone=z;update();}};
+      asel.addEventListener('change',()=>{s.action=asel.value;if(asel.value!=='person_wink'&&asel.value!=='headlight')delete s.actionZone;update();});box.append(zoneBtn);update();
+      const note=document.createElement('div');note.textContent='V3.2.7 OFFLINE · 7 images intermédiaires locales';Object.assign(note.style,{fontSize:'9px',color:'#167337',fontWeight:'800',marginTop:'6px'});box.append(note);awrap.append(box);
+    });
+  }
+
+  // Remplace le lecteur V3.2.6 par un lecteur de 7 frames réellement précalculées.
+  const oldOpen=window.openMainActionPreview;
+  function open327(indices,title){
+    const engine=window.HappyHoloActionPreviewEngine;if(!engine){alert('Moteur action-preview-engine.js non chargé.');return;}
+    const ss=plan(),im=src();if(!ss.length||!im)return;
+    const valid=indices.filter(i=>ss[i]);
+    for(const i of valid){const s=ss[i];if((s.action==='person_wink'||s.action==='headlight')&&!s.actionZone){alert(s.action==='person_wink'?'Définis d’abord la zone œil.':'Définis d’abord la zone phare.');return;}}
+    if(typeof ensureMainActionPreviewUI==='function')ensureMainActionPreviewUI();
+    // Les fonctions V3.2.6 sont lexicales; si elles ne sont pas accessibles, on réutilise son modal via le DOM.
+    let modal=document.getElementById('happyHoloMainActionPreview'),canvas=modal?.querySelector('canvas');
+    if(!modal||!canvas){ if(typeof oldOpen==='function')return oldOpen(indices,title); return; }
+    const W=Math.max(2,Math.round((im.naturalWidth||im.width)*Math.min(1,1050/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height)))),H=Math.max(2,Math.round((im.naturalHeight||im.height)*Math.min(1,1050/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height))));canvas.width=W;canvas.height=H;
+    const layers=new Map();ss.forEach((_,i)=>layers.set(i,layerFor(i,W,H)));const frames=engine.generateActionFrames({base:baseFor(W,H),layers,selections:ss,activeIndices:valid,W,H});window.happyHoloActionFrames={indices:valid,frames,selections:ss.map((s,i)=>({index:i,action:s.action,intensity:s.intensity,speed:s.actionSpeed||2000,zone:s.actionZone||null}))};
+    const titleEl=modal.querySelector('div[style*="font-weight: 850"],div[style*="font-weight:850"]');if(titleEl)titleEl.textContent=title||'Aperçu action';const foot=modal.lastElementChild;if(foot)foot.textContent='Aperçu OFFLINE — 7 images intermédiaires locales. Aucune API, aucun réseau.';modal.style.display='flex';
+    const x=canvas.getContext('2d');let raf=0,start=performance.now();const speed=Math.max(700,Math.min(...valid.map(i=>Number(ss[i].actionSpeed||2000))));
+    const loop=now=>{if(modal.style.display==='none')return;const cycle=((now-start)%speed)/speed;const idx=Math.min(6,Math.floor(cycle*7));x.clearRect(0,0,W,H);x.drawImage(frames[idx],0,0,W,H);raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);modal._hh327raf=raf;
+    const stop=[...modal.querySelectorAll('button')].find(b=>b.textContent.includes('Stop'));if(stop&&!stop._hh327){stop._hh327=true;stop.addEventListener('click',()=>{cancelAnimationFrame(modal._hh327raf||0);});}
+    const back=[...modal.querySelectorAll('button')].find(b=>b.textContent.includes('Retour'));if(back&&!back._hh327){back._hh327=true;back.addEventListener('click',()=>cancelAnimationFrame(modal._hh327raf||0));}
+  }
+
+  // On intercepte les boutons du panneau après chaque reconstruction.
+  function wireButtons(){
+    patchControls();const card=document.getElementById('happyHoloSelectionControls');if(!card)return;
+    const rows=[...card.children].filter(n=>n.style?.display==='grid');rows.forEach((row,i)=>{const btns=[...row.querySelectorAll('button')];const one=btns.find(b=>b.textContent.includes('Voir cette action'));const all=btns.find(b=>b.textContent.includes('Voir toutes'));if(one&&!one._hh327){one._hh327=true;one.addEventListener('click',e=>{e.stopImmediatePropagation();open327([i],`Aperçu — ${plan()[i]?.name||`Sélection ${i+1}`}`);},true);}if(all&&!all._hh327){all._hh327=true;all.addEventListener('click',e=>{e.stopImmediatePropagation();open327(plan().map((_,j)=>j),'Aperçu — toutes les actions');},true);}});
+  }
+  window.addEventListener('happyholo:selection-plan',()=>setTimeout(wireButtons,20));window.addEventListener('happyholo-relief-ready',()=>setTimeout(wireButtons,20));setTimeout(wireButtons,600);
+  console.log('[HAPPYHOLO] V3.2.7 OFFLINE · 7 frames · zones action actif');
 })();
