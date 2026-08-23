@@ -1,4 +1,4 @@
-/* HappyHolo V3.1.14 — simulation lenticulaire multi-couches de profondeur */
+/* HappyHolo V3.3.7 — simulation lenticulaire multi-couches + actions locales */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -12,7 +12,7 @@
   const host=document.createElement('section');
   host.className='support-card';
   host.innerHTML=`
-    <div class="support-head"><div><h2>Rendu support</h2><p>Simulation lenticulaire — couches de profondeur + rotation du support.</p></div><span class="support-badge">Aperçu 3D</span></div>
+    <div class="support-head"><div><h2>Rendu support</h2><p>Simulation lenticulaire — couches de profondeur + actions locales.</p></div><span class="support-badge">Aperçu 3D</span></div>
     <div class="support-grid">
       <div class="support-controls">
         <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round">Médaillon rond Ø30 mm</option></select>
@@ -25,7 +25,7 @@
         <label><span>Vitesse</span><b id="speedOut">5.0 s</b></label><input id="supportSpeed" type="range" min="2" max="8" value="5" step="0.5">
         <div><button id="supportPlay">Lancer l’aperçu</button><button id="supportStop" class="secondary">Stop</button></div>
       </div>
-      <div class="support-stage-wrap"><div class="support-stage"><div id="productObject" class="product-object keychain-vertical"><div class="ring"></div><div class="link"></div><div class="shell"><div class="image-window"><canvas id="supportCanvas"></canvas></div></div></div><div id="supportEmpty" class="support-empty">Charge une photo pour afficher le support.</div></div><div id="supportRecommendation" class="support-note">Portrait → porte-clé vertical recommandé.</div><div id="supportHint" class="support-note">Après « Créer le relief 3D local », l’aperçu utilise plusieurs plans de profondeur au lieu d’une image plate.</div></div>
+      <div class="support-stage-wrap"><div class="support-stage"><div id="productObject" class="product-object keychain-vertical"><div class="ring"></div><div class="link"></div><div class="shell"><div class="image-window"><canvas id="supportCanvas"></canvas></div></div></div><div id="supportEmpty" class="support-empty">Charge une photo pour afficher le support.</div></div><div id="supportRecommendation" class="support-note">Portrait → porte-clé vertical recommandé.</div><div id="supportHint" class="support-note">Après « Créer le relief 3D local », l’aperçu utilise plusieurs plans de profondeur. Les actions validées sont jouées dans ce même aperçu.</div></div>
     </div>`;
   document.querySelector('.card.grid')?.insertAdjacentElement('afterend',host);
 
@@ -56,7 +56,7 @@
 
   async function rebuildReliefLayers(){
     const token=++buildToken, rs=window.HappyHoloReliefState;
-    if(!rs?.subjectImg||!rs?.backgroundImg||!rs?.subjectDepthCanvas||!rs?.backgroundDepthCanvas){reliefLayers=null;draw(0);return;}
+    if(!rs?.subjectImg||!rs?.backgroundImg||!rs?.subjectDepthCanvas||!rs?.backgroundDepthCanvas){reliefLayers=null;draw(0,0);return;}
     $('#supportHint').textContent='Préparation des couches de profondeur…';
     await new Promise(r=>setTimeout(r,30));
     if(token!==buildToken)return;
@@ -65,32 +65,99 @@
     const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30);
     if(token!==buildToken)return;
     reliefLayers={w:SW,h:SH,bg,sub};
-    $('#supportHint').textContent='Aperçu 3D prêt — fond et sujet se déplacent selon leur profondeur.';
+    $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
     play();
   }
 
-  function drawFallback(){ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);}
-  function draw(norm){
+  function drawPaintMask(zone,W,H){
+    const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+    x.lineCap='round';x.lineJoin='round';
+    for(const st of (zone?.strokes||[])){
+      if(!st?.points?.length)continue;
+      x.save();x.globalCompositeOperation=st.erase?'destination-out':'source-over';
+      x.strokeStyle='#fff';x.fillStyle='#fff';x.lineWidth=Math.max(2,(Number(st.size)||.02)*Math.max(W,H));
+      const p0=st.points[0];x.beginPath();x.moveTo(p0[0]*W,p0[1]*H);
+      if(st.points.length===1){x.arc(p0[0]*W,p0[1]*H,x.lineWidth/2,0,Math.PI*2);x.fill();}
+      else{for(let i=1;i<st.points.length;i++){const p=st.points[i];x.lineTo(p[0]*W,p[1]*H);}x.stroke();}
+      x.restore();
+    }
+    return c;
+  }
+
+  function activeHeadlightSelection(){
+    const p=window.happyHoloSelectionPlan||[];
+    return p.find(s=>s?.action==='headlight' && Array.isArray(s.actionZones) && s.actionZones.length);
+  }
+
+  function applyHeadlights(r,pulse){
+    const s=activeHeadlightSelection();if(!s)return;
+    const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));
+    if(!zones.length)return;
+    const intensity=Math.max(.1,Math.min(1,Number(s.intensity||50)/100));
+    const mask=document.createElement('canvas');mask.width=canvas.width;mask.height=canvas.height;const mx=mask.getContext('2d');
+    for(const z of zones){
+      const zm=drawPaintMask(z,Math.max(2,Math.round(r.w)),Math.max(2,Math.round(r.h)));
+      mx.drawImage(zm,r.x,r.y,r.w,r.h);
+    }
+
+    // OFF/quasi-éteint -> ON : assombrissement local au repos.
+    if((s.headlightMode||'off_to_on')==='off_to_on'){
+      ctx.save();ctx.globalAlpha=(1-pulse)*.58*intensity;ctx.fillStyle='#000';ctx.globalCompositeOperation='source-over';
+      const dark=document.createElement('canvas');dark.width=canvas.width;dark.height=canvas.height;const dx=dark.getContext('2d');dx.fillStyle='#000';dx.fillRect(0,0,dark.width,dark.height);dx.globalCompositeOperation='destination-in';dx.drawImage(mask,0,0);ctx.drawImage(dark,0,0);ctx.restore();
+    }
+
+    // Éclaircissement local synchronisé de toutes les zones.
+    ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;
+    const light=document.createElement('canvas');light.width=canvas.width;light.height=canvas.height;const lx=light.getContext('2d');
+    lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,light.width,light.height);lx.globalCompositeOperation='destination-in';lx.drawImage(mask,0,0);
+    ctx.drawImage(light,0,0);ctx.restore();
+
+    // Petit halo uniquement au pic, sans éclairer toute la voiture.
+    if(pulse>.55){
+      ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(pulse-.55)*.55*intensity;
+      ctx.drawImage(light,-2,-2,canvas.width+4,canvas.height+4);ctx.restore();
+    }
+  }
+
+  function drawFallback(actionPulse=0){ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);applyHeadlights(r,actionPulse);}
+  function draw(norm,actionPulse=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(!reliefLayers){drawFallback();return;}
+    if(!reliefLayers){drawFallback(actionPulse);return;}
     const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
     ctx.save();ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
-    // Fond : petit déplacement, couches proches légèrement plus mobiles.
     for(const l of reliefLayers.bg){const z=(l.depth-.5)*2;const shift=norm*(4+5*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);}
-    // Sujet : parallax plus forte, chaque tranche de profondeur se déplace différemment.
     for(const l of reliefLayers.sub){const z=(l.depth-.5)*2;const shift=norm*(12+13*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);}
     ctx.restore();
+    applyHeadlights(r,actionPulse);
   }
-  function tick(ts){if(!running)return;if(!start)start=ts;if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}lastFrame=ts;const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);draw(phase);raf=requestAnimationFrame(tick);}
+
+  function headlightPulse(ts){
+    const s=activeHeadlightSelection();if(!s)return 0;
+    const ms=Math.max(800,Number(s.actionSpeed||2000));
+    const t=((ts-start)%ms)/ms;
+    // Une impulsion visible par cycle : repos -> pic -> repos.
+    return (1-Math.cos(t*Math.PI*2))/2;
+  }
+
+  function tick(ts){
+    if(!running)return;if(!start)start=ts;
+    if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}
+    lastFrame=ts;
+    const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);
+    draw(phase,headlightPulse(ts));
+    raf=requestAnimationFrame(tick);
+  }
   function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);product.classList.add('support-playing');cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
-  function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');product.style.transform='perspective(620px) rotateY(0deg) translateX(0)';draw(0);}
-  function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0);if(running){start=0;}}
+  function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');product.style.transform='perspective(620px) rotateY(0deg) translateX(0)';draw(0,0);}
+  function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0,0);if(running){start=0;}}
 
   [type,fit,margin,zoom,xp,yp,rot,speed].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;apply();}));
   $('#supportPlay').addEventListener('click',play);$('#supportStop').addEventListener('click',stop);
 
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
-  window.addEventListener('resize',()=>draw(0));
+  window.addEventListener('happyholo-action-plan-changed',()=>draw(0,0));
+  window.addEventListener('resize',()=>draw(0,0));
   apply();
+  console.log('[HAPPYHOLO] support-preview V3.3.7 · profondeur + appel de phare localisé');
 })();
