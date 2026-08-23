@@ -1262,6 +1262,7 @@
   */
   let hlModal=null,hlCanvas=null,hlCtx=null,hlResolve=null;
   let hlZones=[],hlActive=0,hlTool='add',hlBrush=28,hlDrawing=false,hlStroke=null;
+  let hlViewZoom=1,hlPanX=0,hlPanY=0,hlPanStart=null;
 
   function cloneHeadlightZones(zones){
     return (Array.isArray(zones)?zones:[]).map(z=>({
@@ -1298,52 +1299,72 @@
     },true);
     const add=hlButton('✚ Ajouter',()=>{hlTool='add';refreshHeadlightControls();});
     const erase=hlButton('⌫ Gomme',()=>{hlTool='erase';refreshHeadlightControls();});
+    const pan=hlButton('✋ Déplacer',()=>{hlTool='pan';refreshHeadlightControls();});
     const undo=hlButton('↶ Annuler trait',()=>{const z=hlZones[hlActive];if(z?.strokes?.length){z.strokes.pop();drawHeadlightEditor();}});
     const del=hlButton('Supprimer zone',()=>{if(!hlZones.length)return;hlZones.splice(hlActive,1);hlActive=Math.max(0,Math.min(hlActive,hlZones.length-1));refreshHeadlightControls();drawHeadlightEditor();});
+    const resetView=hlButton('⟳ Recentrer',()=>{hlViewZoom=1;hlPanX=0;hlPanY=0;if(hlModal._zoom){hlModal._zoom.value='100';hlModal._zoomOut.textContent='100%';}drawHeadlightEditor();});
     const sizeLabel=document.createElement('span');sizeLabel.textContent='Pinceau';Object.assign(sizeLabel.style,{fontSize:'11px',fontWeight:'700',marginLeft:'4px'});
-    const range=document.createElement('input');range.type='range';range.min='8';range.max='90';range.step='2';range.value=String(hlBrush);Object.assign(range.style,{width:'140px',accentColor:'#0a84ff'});range.oninput=()=>{hlBrush=Number(range.value);brushOut.textContent=`${hlBrush}px`;};
+    const range=document.createElement('input');range.type='range';range.min='8';range.max='90';range.step='2';range.value=String(hlBrush);Object.assign(range.style,{width:'120px',accentColor:'#0a84ff'});range.oninput=()=>{hlBrush=Number(range.value);brushOut.textContent=`${hlBrush}px`;};
     const brushOut=document.createElement('b');brushOut.textContent=`${hlBrush}px`;Object.assign(brushOut.style,{fontSize:'11px',minWidth:'38px'});
-    controls.append(newZone,add,erase,undo,del,sizeLabel,range,brushOut);
-    hlModal._add=add;hlModal._erase=erase;hlModal._newZone=newZone;hlModal._del=del;
+    const zoomLabel=document.createElement('span');zoomLabel.textContent='Zoom';Object.assign(zoomLabel.style,{fontSize:'11px',fontWeight:'700',marginLeft:'4px'});
+    const zoomRange=document.createElement('input');zoomRange.type='range';zoomRange.min='100';zoomRange.max='400';zoomRange.step='10';zoomRange.value='100';Object.assign(zoomRange.style,{width:'120px',accentColor:'#0a84ff'});
+    const zoomOut=document.createElement('b');zoomOut.textContent='100%';Object.assign(zoomOut.style,{fontSize:'11px',minWidth:'42px'});
+    zoomRange.oninput=()=>{
+      const oldZ=hlViewZoom,newZ=Number(zoomRange.value)/100;
+      const cx=hlCanvas.width/2,cy=hlCanvas.height/2;
+      const ix=(cx-hlPanX)/Math.max(.01,oldZ),iy=(cy-hlPanY)/Math.max(.01,oldZ);
+      hlViewZoom=newZ;hlPanX=cx-ix*newZ;hlPanY=cy-iy*newZ;
+      zoomOut.textContent=`${Math.round(newZ*100)}%`;drawHeadlightEditor();
+    };
+    controls.append(newZone,add,erase,pan,undo,del,resetView,sizeLabel,range,brushOut,zoomLabel,zoomRange,zoomOut);
+    hlModal._add=add;hlModal._erase=erase;hlModal._pan=pan;hlModal._newZone=newZone;hlModal._del=del;hlModal._zoom=zoomRange;hlModal._zoomOut=zoomOut;
 
     const zoneTabs=document.createElement('div');Object.assign(zoneTabs.style,{padding:'7px 10px',display:'flex',gap:'6px',background:'#17171a',overflowX:'auto'});hlModal._tabs=zoneTabs;
 
-    const body=document.createElement('div');Object.assign(body.style,{flex:'1',minHeight:'0',display:'flex',alignItems:'center',justifyContent:'center',padding:'8px',overflow:'hidden'});
-    hlCanvas=document.createElement('canvas');Object.assign(hlCanvas.style,{maxWidth:'100%',maxHeight:'100%',background:'#111',touchAction:'none',borderRadius:'10px'});hlCtx=hlCanvas.getContext('2d');body.append(hlCanvas);
+    const body=document.createElement('div');Object.assign(body.style,{flex:'1',minHeight:'0',display:'flex',alignItems:'center',justifyContent:'center',padding:'8px',overflow:'hidden'});hlModal._body=body;
+    hlCanvas=document.createElement('canvas');Object.assign(hlCanvas.style,{background:'#111',touchAction:'none',borderRadius:'10px',display:'block',flex:'0 0 auto'});hlCtx=hlCanvas.getContext('2d');body.append(hlCanvas);
     const foot=document.createElement('div');foot.textContent='Peins librement uniquement la surface des optiques de plein phare. Nouvelle zone pour chaque optique. Gomme pour corriger.';Object.assign(foot.style,{padding:'9px 12px',fontSize:'12px',textAlign:'center',background:'#151518',color:'#ddd'});
     hlModal.append(top,controls,zoneTabs,body,foot);document.body.appendChild(hlModal);
 
-    // V3.3.9 — calage stylet simplifié et plus fiable sur iPad Safari.
-    // On ignore offsetX/offsetY et on s'ancre uniquement sur le rectangle affiché du canvas.
+    // V3.4.0 — canvas interaction 1:1 : 1 pixel CSS = 1 unité canvas.
+    // Les traits sont ensuite convertis en coordonnées normalisées de l'image,
+    // en tenant compte du zoom et du déplacement de la vue.
     const point=e=>{
       const r=hlCanvas.getBoundingClientRect();
-      const scaleX=hlCanvas.width/Math.max(1,r.width);
-      const scaleY=hlCanvas.height/Math.max(1,r.height);
-      const x=Math.max(0,Math.min(hlCanvas.width,(e.clientX-r.left)*scaleX));
-      const y=Math.max(0,Math.min(hlCanvas.height,(e.clientY-r.top)*scaleY));
-      return {x,y};
+      return {x:e.clientX-r.left,y:e.clientY-r.top};
     };
+    const pointToImageNorm=p=>({
+      x:(p.x-hlPanX)/(hlCanvas.width*hlViewZoom),
+      y:(p.y-hlPanY)/(hlCanvas.height*hlViewZoom)
+    });
     hlCanvas.addEventListener('pointerdown',e=>{
-      e.preventDefault();if(!hlZones.length){alert('Appuie d’abord sur « Nouvelle zone ».');return;}
-      hlDrawing=true;
+      e.preventDefault();
       try{hlCanvas.setPointerCapture?.(e.pointerId);}catch(_){}
-      const p=point(e),im=src();
+      const p=point(e);
+      if(hlTool==='pan'){
+        hlDrawing=true;hlPanStart={x:p.x,y:p.y,panX:hlPanX,panY:hlPanY};return;
+      }
+      if(!hlZones.length){alert('Appuie d’abord sur « Nouvelle zone ».');return;}
+      const q=pointToImageNorm(p);
+      if(q.x<0||q.y<0||q.x>1||q.y>1)return;
+      hlDrawing=true;const im=src();
       const maxDim=Math.max(1,hlCanvas.width,hlCanvas.height);
-      hlStroke={erase:hlTool==='erase',size:hlBrush/maxDim,points:[[p.x/hlCanvas.width,p.y/hlCanvas.height]]};
+      hlStroke={erase:hlTool==='erase',size:hlBrush/(maxDim*hlViewZoom),points:[[q.x,q.y]]};
       hlZones[hlActive].sourceW=im?.naturalWidth||im?.width||hlCanvas.width;hlZones[hlActive].sourceH=im?.naturalHeight||im?.height||hlCanvas.height;
       hlZones[hlActive].strokes.push(hlStroke);drawHeadlightEditor();
     },{passive:false});
     hlCanvas.addEventListener('pointermove',e=>{
-      if(!hlDrawing||!hlStroke)return;
-      e.preventDefault();
-      const p=point(e),q=[p.x/hlCanvas.width,p.y/hlCanvas.height];
-      const last=hlStroke.points[hlStroke.points.length-1];
-      if(!last||Math.hypot((q[0]-last[0])*hlCanvas.width,(q[1]-last[1])*hlCanvas.height)>1.1){
-        hlStroke.points.push(q);
-        drawHeadlightEditor();
+      if(!hlDrawing)return;e.preventDefault();const p=point(e);
+      if(hlTool==='pan'&&hlPanStart){
+        hlPanX=hlPanStart.panX+(p.x-hlPanStart.x);hlPanY=hlPanStart.panY+(p.y-hlPanStart.y);drawHeadlightEditor();return;
       }
+      if(!hlStroke)return;const q=pointToImageNorm(p);
+      if(q.x<0||q.y<0||q.x>1||q.y>1)return;
+      const arr=[q.x,q.y],last=hlStroke.points[hlStroke.points.length-1];
+      const dx=(arr[0]-last[0])*hlCanvas.width*hlViewZoom,dy=(arr[1]-last[1])*hlCanvas.height*hlViewZoom;
+      if(Math.hypot(dx,dy)>1.1){hlStroke.points.push(arr);drawHeadlightEditor();}
     },{passive:false});
-    const end=e=>{if(!hlDrawing)return;hlDrawing=false;hlStroke=null;try{hlCanvas.releasePointerCapture?.(e.pointerId);}catch(_){}};
+    const end=e=>{if(!hlDrawing)return;hlDrawing=false;hlStroke=null;hlPanStart=null;try{hlCanvas.releasePointerCapture?.(e.pointerId);}catch(_){}};
     hlCanvas.addEventListener('pointerup',end);hlCanvas.addEventListener('pointercancel',end);
   }
 
@@ -1351,6 +1372,7 @@
     if(!hlModal)return;
     hlModal._add.style.background=hlTool==='add'?'#0a84ff':'#25252a';hlModal._add.style.color='#fff';
     hlModal._erase.style.background=hlTool==='erase'?'#b53a3a':'#25252a';hlModal._erase.style.color='#fff';
+    hlModal._pan.style.background=hlTool==='pan'?'#6b4fd3':'#25252a';hlModal._pan.style.color='#fff';
     hlModal._newZone.disabled=hlZones.length>=4;hlModal._newZone.style.opacity=hlZones.length>=4?'.45':'1';
     hlModal._del.disabled=!hlZones.length;hlModal._del.style.opacity=hlZones.length? '1':'.45';
     const tabs=hlModal._tabs;tabs.innerHTML='';
@@ -1374,11 +1396,14 @@
 
   function drawHeadlightEditor(){
     const im=src();if(!im||!hlCanvas)return;
-    hlCtx.clearRect(0,0,hlCanvas.width,hlCanvas.height);hlCtx.drawImage(im,0,0,hlCanvas.width,hlCanvas.height);
+    const vw=hlCanvas.width*hlViewZoom,vh=hlCanvas.height*hlViewZoom;
+    hlCtx.setTransform(1,0,0,1,0,0);hlCtx.clearRect(0,0,hlCanvas.width,hlCanvas.height);
+    hlCtx.drawImage(im,hlPanX,hlPanY,vw,vh);
     hlZones.forEach((z,i)=>{
       const mask=renderPaintZoneMask(z,hlCanvas.width,hlCanvas.height);
-      hlCtx.save();hlCtx.globalAlpha=i===hlActive?.42:.24;hlCtx.fillStyle=i===hlActive?'#00d4ff':'#ffb000';hlCtx.globalCompositeOperation='source-over';
-      const tint=document.createElement('canvas');tint.width=hlCanvas.width;tint.height=hlCanvas.height;const tx=tint.getContext('2d');tx.fillStyle=hlCtx.fillStyle;tx.fillRect(0,0,tint.width,tint.height);tx.globalCompositeOperation='destination-in';tx.drawImage(mask,0,0);hlCtx.drawImage(tint,0,0);hlCtx.restore();
+      const tint=document.createElement('canvas');tint.width=hlCanvas.width;tint.height=hlCanvas.height;const tx=tint.getContext('2d');
+      tx.fillStyle=i===hlActive?'#00d4ff':'#ffb000';tx.fillRect(0,0,tint.width,tint.height);tx.globalCompositeOperation='destination-in';tx.drawImage(mask,0,0);
+      hlCtx.save();hlCtx.globalAlpha=i===hlActive?.42:.24;hlCtx.drawImage(tint,hlPanX,hlPanY,vw,vh);hlCtx.restore();
     });
   }
 
@@ -1392,9 +1417,17 @@
 
   function chooseHeadlightMasks(existing=[]){
     ensureHeadlightMaskUI();const im=src();if(!im)return Promise.resolve(null);
-    const sw=im.naturalWidth||im.width||1,sh=im.naturalHeight||im.height||1,max=1100,sc=Math.min(1,max/Math.max(sw,sh));
-    hlCanvas.width=Math.max(2,Math.round(sw*sc));hlCanvas.height=Math.max(2,Math.round(sh*sc));
-    hlZones=cloneHeadlightZones(existing).slice(0,4);hlActive=Math.max(0,hlZones.length-1);hlTool='add';hlModal.style.display='flex';refreshHeadlightControls();drawHeadlightEditor();
+    hlModal.style.display='flex';
+    const sw=im.naturalWidth||im.width||1,sh=im.naturalHeight||im.height||1;
+    const body=hlModal._body,br=body.getBoundingClientRect();
+    const availW=Math.max(220,br.width-16),availH=Math.max(220,br.height-16);
+    const sc=Math.min(availW/sw,availH/sh,1);
+    const cw=Math.max(2,Math.floor(sw*sc)),ch=Math.max(2,Math.floor(sh*sc));
+    // Taille interne = taille CSS : aucun changement d'échelle pendant le geste.
+    hlCanvas.width=cw;hlCanvas.height=ch;hlCanvas.style.width=`${cw}px`;hlCanvas.style.height=`${ch}px`;
+    hlViewZoom=1;hlPanX=0;hlPanY=0;hlPanStart=null;
+    if(hlModal._zoom){hlModal._zoom.value='100';hlModal._zoomOut.textContent='100%';}
+    hlZones=cloneHeadlightZones(existing).slice(0,4);hlActive=Math.max(0,hlZones.length-1);hlTool='add';refreshHeadlightControls();drawHeadlightEditor();
     return new Promise(r=>hlResolve=r);
   }
 
@@ -1476,5 +1509,5 @@
     });
   }
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(wireButtons,20));window.addEventListener('happyholo-relief-ready',()=>setTimeout(wireButtons,20));setTimeout(wireButtons,600);
-  console.log('[HAPPYHOLO] V3.3.9 STABLE · stylet calage simple');
+  console.log('[HAPPYHOLO] V3.4.0 STABLE · stylet 1:1 + zoom + pan');
 })();
