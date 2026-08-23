@@ -1313,23 +1313,15 @@
     const foot=document.createElement('div');foot.textContent='Peins librement uniquement la surface des optiques de plein phare. Nouvelle zone pour chaque optique. Gomme pour corriger.';Object.assign(foot.style,{padding:'9px 12px',fontSize:'12px',textAlign:'center',background:'#151518',color:'#ddd'});
     hlModal.append(top,controls,zoneTabs,body,foot);document.body.appendChild(hlModal);
 
-    // V3.3.7 — coordonnées iPad/Pencil robustes.
-    // On travaille dans les pixels CSS locaux du canvas, puis on applique le ratio
-    // entre taille affichée et taille interne. Cela évite le décalage après mise à l'échelle.
+    // V3.3.9 — calage stylet simplifié et plus fiable sur iPad Safari.
+    // On ignore offsetX/offsetY et on s'ancre uniquement sur le rectangle affiché du canvas.
     const point=e=>{
-      const ev=(typeof e.getCoalescedEvents==='function' && e.getCoalescedEvents().length)
-        ? e.getCoalescedEvents()[e.getCoalescedEvents().length-1] : e;
       const r=hlCanvas.getBoundingClientRect();
-      const cssW=hlCanvas.clientWidth||r.width||1, cssH=hlCanvas.clientHeight||r.height||1;
-      let lx,ly;
-      if(Number.isFinite(ev.offsetX) && Number.isFinite(ev.offsetY) && ev.target===hlCanvas){
-        lx=ev.offsetX; ly=ev.offsetY;
-      }else{
-        lx=ev.clientX-r.left; ly=ev.clientY-r.top;
-      }
-      const x=Math.max(0,Math.min(hlCanvas.width, lx*(hlCanvas.width/cssW)));
-      const y=Math.max(0,Math.min(hlCanvas.height,ly*(hlCanvas.height/cssH)));
-      return{x,y};
+      const scaleX=hlCanvas.width/Math.max(1,r.width);
+      const scaleY=hlCanvas.height/Math.max(1,r.height);
+      const x=Math.max(0,Math.min(hlCanvas.width,(e.clientX-r.left)*scaleX));
+      const y=Math.max(0,Math.min(hlCanvas.height,(e.clientY-r.top)*scaleY));
+      return {x,y};
     };
     hlCanvas.addEventListener('pointerdown',e=>{
       e.preventDefault();if(!hlZones.length){alert('Appuie d’abord sur « Nouvelle zone ».');return;}
@@ -1344,16 +1336,12 @@
     hlCanvas.addEventListener('pointermove',e=>{
       if(!hlDrawing||!hlStroke)return;
       e.preventDefault();
-      const events=(typeof e.getCoalescedEvents==='function' && e.getCoalescedEvents().length)?e.getCoalescedEvents():[e];
-      let changed=false;
-      for(const ev of events){
-        const p=point(ev),q=[p.x/hlCanvas.width,p.y/hlCanvas.height];
-        const last=hlStroke.points[hlStroke.points.length-1];
-        if(!last||Math.hypot((q[0]-last[0])*hlCanvas.width,(q[1]-last[1])*hlCanvas.height)>1.25){
-          hlStroke.points.push(q);changed=true;
-        }
+      const p=point(e),q=[p.x/hlCanvas.width,p.y/hlCanvas.height];
+      const last=hlStroke.points[hlStroke.points.length-1];
+      if(!last||Math.hypot((q[0]-last[0])*hlCanvas.width,(q[1]-last[1])*hlCanvas.height)>1.1){
+        hlStroke.points.push(q);
+        drawHeadlightEditor();
       }
-      if(changed)drawHeadlightEditor();
     },{passive:false});
     const end=e=>{if(!hlDrawing)return;hlDrawing=false;hlStroke=null;try{hlCanvas.releasePointerCapture?.(e.pointerId);}catch(_){}};
     hlCanvas.addEventListener('pointerup',end);hlCanvas.addEventListener('pointercancel',end);
@@ -1488,5 +1476,5 @@
     });
   }
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(wireButtons,20));window.addEventListener('happyholo-relief-ready',()=>setTimeout(wireButtons,20));setTimeout(wireButtons,600);
-  console.log('[HAPPYHOLO] V3.3.7 STABLE · Pencil calé · masques libres');
+  console.log('[HAPPYHOLO] V3.3.9 STABLE · stylet calage simple');
 })();
