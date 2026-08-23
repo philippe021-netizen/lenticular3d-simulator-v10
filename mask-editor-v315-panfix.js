@@ -195,6 +195,8 @@
     planIntensity.value=s.intensity;
     planIntensityOut.textContent=`${s.intensity}%`;
     planTiming.value=s.timing;
+    // Le bouton zone est local à buildPlanCard ; un événement input force son rafraîchissement.
+    try{ planAction.dispatchEvent(new Event('input')); }catch(_){}
   }
 
   function buildPlanCard(parent){
@@ -231,7 +233,61 @@
       ['Chien — tête penchée','dog_tilt'],['Chien — petit aboiement','dog_bark'],['Moto/voiture — appel de phare','headlight'],
       ['Moto/voiture — clignotant','indicator'],['Logo — brillance','logo_shine'],['Objet/logo — pivot léger','pivot']
     ].forEach(([t,v])=>planAction.appendChild(new Option(t,v)));
-    planAction.addEventListener('change',()=>{ const s=selections[activeSelection]; if(s) s.action=planAction.value; });
+
+    // V3.3.2 — zone d'action accessible DIRECTEMENT dans l'éditeur,
+    // avant le bouton Valider. Plus de dépendance au panneau injecté après coup.
+    const editorZoneBtn=button('🎯 Définir zone phare',card,async()=>{
+      const s=selections[activeSelection];
+      if(!s || (s.action!=='headlight' && s.action!=='person_wink')) return;
+      if(typeof window.HappyHoloChooseActionZone!=='function'){
+        alert('Outil de zone action non chargé. Recharge la page puis réessaie.');
+        return;
+      }
+      const label=s.action==='headlight'
+        ? 'Zone précise de l’optique — serre le rectangle autour du verre du phare'
+        : 'Zone précise de l’œil — serre le rectangle autour de l’œil';
+      const z=await window.HappyHoloChooseActionZone(s,label);
+      if(z){
+        s.actionZone=z;
+        updateEditorZoneButton();
+      }
+    },true);
+    editorZoneBtn.style.width='100%';
+    editorZoneBtn.style.margin='2px 0 0';
+    editorZoneBtn.style.display='none';
+    editorZoneBtn.style.background='#0a84ff';
+
+    const updateEditorZoneButton=()=>{
+      const s=selections[activeSelection];
+      if(!s){ editorZoneBtn.style.display='none'; return; }
+      if(s.action==='headlight'){
+        editorZoneBtn.style.display='block';
+        editorZoneBtn.textContent=s.actionZone
+          ? '✓ Modifier zone phare'
+          : '🎯 Définir zone phare';
+      }else if(s.action==='person_wink'){
+        editorZoneBtn.style.display='block';
+        editorZoneBtn.textContent=s.actionZone
+          ? '✓ Modifier zone œil'
+          : '🎯 Définir zone œil';
+      }else{
+        editorZoneBtn.style.display='none';
+      }
+    };
+
+    planAction.addEventListener('change',()=>{
+      const s=selections[activeSelection];
+      if(!s) return;
+      const previous=s.action;
+      s.action=planAction.value;
+      if(previous!==s.action && s.action!=='headlight' && s.action!=='person_wink'){
+        delete s.actionZone;
+      }
+      updateEditorZoneButton();
+    });
+    // Au chargement / changement de sélection, le bouton doit refléter l'action courante.
+    planAction.addEventListener('input',updateEditorZoneButton);
+    setTimeout(updateEditorZoneButton,0);
 
     const intLab=el('label',{style:{display:'flex',flexDirection:'column',gap:'5px',fontSize:'11px'}},card);
     const intHead=el('div',{style:{display:'flex',justifyContent:'space-between'}},intLab);
@@ -1182,6 +1238,9 @@
   function chooseZone(s,label){
     ensureZoneUI();const im=src();if(!im)return Promise.resolve(null);const max=1000,sw=im.naturalWidth||im.width,sh=im.naturalHeight||im.height,sc=Math.min(1,max/Math.max(sw,sh));zoneCanvas.width=Math.round(sw*sc);zoneCanvas.height=Math.round(sh*sc);zoneModal._title.textContent=label;zoneModal.style.display='flex';drag=s.actionZone?{start:{x:s.actionZone.x*zoneCanvas.width,y:s.actionZone.y*zoneCanvas.height},rect:{x:s.actionZone.x*zoneCanvas.width,y:s.actionZone.y*zoneCanvas.height,w:s.actionZone.w*zoneCanvas.width,h:s.actionZone.h*zoneCanvas.height}}:null;drawZone();return new Promise(r=>zoneResolve=r);
   }
+
+  // Pont public : permet à l'éditeur de masque d'ouvrir la zone AVANT validation.
+  window.HappyHoloChooseActionZone=chooseZone;
 
   function patchControls(){
     const card=document.getElementById('happyHoloSelectionControls');if(!card)return;
