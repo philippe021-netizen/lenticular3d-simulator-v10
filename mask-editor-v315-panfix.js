@@ -1229,4 +1229,5 @@
   }
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(wireButtons,20));window.addEventListener('happyholo-relief-ready',()=>setTimeout(wireButtons,20));setTimeout(wireButtons,600);
   console.log('[HAPPYHOLO] V3.2.7 OFFLINE · 7 frames · zones action actif');
+   
 })();
