@@ -150,6 +150,7 @@
       action:'none',
       intensity:50,
       timing:'all',
+      actionZones:[],
       mask:blank,
       initialMask:cloneImageData(blank)
     });
@@ -234,44 +235,54 @@
       ['Moto/voiture — clignotant','indicator'],['Logo — brillance','logo_shine'],['Objet/logo — pivot léger','pivot']
     ].forEach(([t,v])=>planAction.appendChild(new Option(t,v)));
 
-    // V3.3.2 — zone d'action accessible DIRECTEMENT dans l'éditeur,
-    // avant le bouton Valider. Plus de dépendance au panneau injecté après coup.
-    const editorZoneBtn=button('🎯 Définir zone phare',card,async()=>{
+    // V3.3.4 — zones de plein phare accessibles DIRECTEMENT dans l'éditeur.
+    // Jusqu'à 4 zones synchronisées. Les antibrouillards ne sont pas inclus automatiquement.
+    const editorZoneWrap=el('div',{style:{display:'none',flexDirection:'column',gap:'6px'}},card);
+    const editorZoneBtn=button('＋ Ajouter zone plein phare (0/4)',editorZoneWrap,async()=>{
       const s=selections[activeSelection];
-      if(!s || (s.action!=='headlight' && s.action!=='person_wink')) return;
-      if(typeof window.HappyHoloChooseActionZone!=='function'){
-        alert('Outil de zone action non chargé. Recharge la page puis réessaie.');
+      if(!s) return;
+      if(s.action==='person_wink'){
+        if(typeof window.HappyHoloChooseActionZone!=='function'){ alert('Outil de zone action non chargé. Recharge la page puis réessaie.'); return; }
+        const z=await window.HappyHoloChooseActionZone({actionZone:s.actionZone||null},'Zone précise de l’œil');
+        if(z){ s.actionZone=z; updateEditorZoneButton(); }
         return;
       }
-      const label=s.action==='headlight'
-        ? 'Zone précise de l’optique — serre le rectangle autour du verre du phare'
-        : 'Zone précise de l’œil — serre le rectangle autour de l’œil';
-      const z=await window.HappyHoloChooseActionZone(s,label);
-      if(z){
-        s.actionZone=z;
-        updateEditorZoneButton();
-      }
+      if(s.action!=='headlight') return;
+      s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];
+      if(s.actionZones.length>=4){ alert('4 zones de plein phare maximum.'); return; }
+      if(typeof window.HappyHoloChooseActionZone!=='function'){ alert('Outil de zone action non chargé. Recharge la page puis réessaie.'); return; }
+      const z=await window.HappyHoloChooseActionZone({actionZone:null},`Zone plein phare ${s.actionZones.length+1} — serre autour de l’optique`);
+      if(z){ s.actionZones.push(z); updateEditorZoneButton(); }
     },true);
-    editorZoneBtn.style.width='100%';
-    editorZoneBtn.style.margin='2px 0 0';
-    editorZoneBtn.style.display='none';
-    editorZoneBtn.style.background='#0a84ff';
+    editorZoneBtn.style.width='100%'; editorZoneBtn.style.margin='2px 0 0'; editorZoneBtn.style.background='#0a84ff';
+
+    const editorZoneInfo=el('div',{text:'',style:{fontSize:'10px',color:'#cfcfcf',lineHeight:'1.3'}},editorZoneWrap);
+    const editorRemoveZoneBtn=button('− Supprimer dernière zone',editorZoneWrap,()=>{
+      const s=selections[activeSelection];
+      if(!s || !Array.isArray(s.actionZones) || !s.actionZones.length) return;
+      s.actionZones.pop();
+      updateEditorZoneButton();
+    });
+    editorRemoveZoneBtn.style.display='none'; editorRemoveZoneBtn.style.background='#3a3a3a'; editorRemoveZoneBtn.style.minHeight='36px'; editorRemoveZoneBtn.style.padding='8px';
 
     const updateEditorZoneButton=()=>{
       const s=selections[activeSelection];
-      if(!s){ editorZoneBtn.style.display='none'; return; }
+      if(!s){ editorZoneWrap.style.display='none'; return; }
       if(s.action==='headlight'){
-        editorZoneBtn.style.display='block';
-        editorZoneBtn.textContent=s.actionZone
-          ? '✓ Modifier zone phare'
-          : '🎯 Définir zone phare';
+        s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];
+        editorZoneWrap.style.display='flex';
+        editorZoneBtn.textContent=s.actionZones.length>=4?'✓ 4 zones plein phare définies':`＋ Ajouter zone plein phare (${s.actionZones.length}/4)`;
+        editorZoneInfo.textContent=s.actionZones.length
+          ? `${s.actionZones.length} zone${s.actionZones.length>1?'s':''} de plein phare synchronisée${s.actionZones.length>1?'s':''}.`
+          : 'Sélectionne uniquement les optiques de plein phare. 1 à 4 zones.';
+        editorRemoveZoneBtn.style.display=s.actionZones.length?'block':'none';
       }else if(s.action==='person_wink'){
-        editorZoneBtn.style.display='block';
-        editorZoneBtn.textContent=s.actionZone
-          ? '✓ Modifier zone œil'
-          : '🎯 Définir zone œil';
+        editorZoneWrap.style.display='flex';
+        editorZoneBtn.textContent=s.actionZone?'✓ Modifier zone œil':'🎯 Définir zone œil';
+        editorZoneInfo.textContent='Zone locale utilisée pour le clin d’œil.';
+        editorRemoveZoneBtn.style.display='none';
       }else{
-        editorZoneBtn.style.display='none';
+        editorZoneWrap.style.display='none';
       }
     };
 
@@ -280,12 +291,10 @@
       if(!s) return;
       const previous=s.action;
       s.action=planAction.value;
-      if(previous!==s.action && s.action!=='headlight' && s.action!=='person_wink'){
-        delete s.actionZone;
-      }
+      if(previous!==s.action && s.action!=='person_wink') delete s.actionZone;
+      if(previous!==s.action && s.action!=='headlight') s.actionZones=[];
       updateEditorZoneButton();
     });
-    // Au chargement / changement de sélection, le bouton doit refléter l'action courante.
     planAction.addEventListener('input',updateEditorZoneButton);
     setTimeout(updateEditorZoneButton,0);
 
@@ -1255,9 +1264,12 @@
       const speedLine=document.createElement('div');Object.assign(speedLine.style,{display:'flex',gap:'8px',alignItems:'center'});const lab=document.createElement('span');lab.textContent='Vitesse';Object.assign(lab.style,{fontSize:'10px',color:'#666'});const speed=document.createElement('select');[['Rapide · 1 s',1000],['Normal · 2 s',2000],['Doux · 3 s',3000]].forEach(([t,v])=>speed.append(new Option(t,String(v))));speed.value=String(s.actionSpeed||2000);speed.onchange=()=>s.actionSpeed=Number(speed.value);Object.assign(speed.style,{flex:'1',padding:'6px',borderRadius:'8px'});speedLine.append(lab,speed);box.append(speedLine);
       const headlightLine=document.createElement('div');Object.assign(headlightLine.style,{display:'none',gap:'8px',alignItems:'center',marginTop:'7px'});const hlab=document.createElement('span');hlab.textContent='Phare';Object.assign(hlab.style,{fontSize:'10px',color:'#666'});const hsel=document.createElement('select');[['Visible · quasi éteint → 100 %','off_to_on'],['Réaliste · déjà allumé → appel','already_on']].forEach(([t,v])=>hsel.append(new Option(t,v)));hsel.value=s.headlightMode||'off_to_on';s.headlightMode=hsel.value;hsel.onchange=()=>s.headlightMode=hsel.value;Object.assign(hsel.style,{flex:'1',padding:'6px',borderRadius:'8px'});headlightLine.append(hlab,hsel);box.append(headlightLine);
       const zoneBtn=document.createElement('button');zoneBtn.type='button';Object.assign(zoneBtn.style,{width:'100%',marginTop:'7px',padding:'10px',borderRadius:'9px',border:'1px solid #888',background:'#fff',color:'#111',fontWeight:'800',fontSize:'12px',minHeight:'42px'});
-      const update=()=>{const a=s.action;headlightLine.style.display=a==='headlight'?'flex':'none';if(a==='person_wink'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone œil':'◎ Définir zone œil';}else if(a==='headlight'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone précise du phare':'◎ Définir zone précise du phare';}else zoneBtn.style.display='none';};
-      zoneBtn.onclick=async()=>{const a=s.action;if(a!=='person_wink'&&a!=='headlight')return;const z=await chooseZone(s,a==='person_wink'?'Zone du clin d’œil':'Zone précise de l’optique (serrer autour du verre du phare)');if(z){s.actionZone=z;update();}};
-      asel.addEventListener('change',()=>{s.action=asel.value;if(asel.value!=='person_wink'&&asel.value!=='headlight')delete s.actionZone;update();});box.append(zoneBtn);update();
+      const zoneInfo=document.createElement('div');Object.assign(zoneInfo.style,{fontSize:'10px',color:'#555',marginTop:'5px',lineHeight:'1.3'});
+      const removeZoneBtn=document.createElement('button');removeZoneBtn.type='button';removeZoneBtn.textContent='− Supprimer dernière zone';Object.assign(removeZoneBtn.style,{display:'none',width:'100%',marginTop:'5px',padding:'8px',borderRadius:'9px',border:'1px solid #bbb',background:'#f3f3f3',color:'#222',fontWeight:'700',fontSize:'11px'});
+      const update=()=>{const a=s.action;headlightLine.style.display=a==='headlight'?'flex':'none';if(a==='person_wink'){zoneBtn.style.display='block';zoneInfo.style.display='none';removeZoneBtn.style.display='none';zoneBtn.textContent=s.actionZone?'✓ Modifier zone œil':'◎ Définir zone œil';}else if(a==='headlight'){s.actionZones=Array.isArray(s.actionZones)?s.actionZones:(s.actionZone?[s.actionZone]:[]);zoneBtn.style.display='block';zoneInfo.style.display='block';removeZoneBtn.style.display=s.actionZones.length?'block':'none';zoneBtn.textContent=s.actionZones.length>=4?'✓ 4 zones plein phare définies':`＋ Ajouter zone plein phare (${s.actionZones.length}/4)`;zoneInfo.textContent=s.actionZones.length?`${s.actionZones.length} zone${s.actionZones.length>1?'s':''} synchronisée${s.actionZones.length>1?'s':''} pour l’appel de phare.`:'Sélectionne uniquement les optiques de plein phare. 1 à 4 zones.';}else{zoneBtn.style.display='none';zoneInfo.style.display='none';removeZoneBtn.style.display='none';}};
+      zoneBtn.onclick=async()=>{const a=s.action;if(a==='person_wink'){const z=await chooseZone(s,'Zone du clin d’œil');if(z){s.actionZone=z;update();}return;}if(a!=='headlight')return;s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];if(s.actionZones.length>=4){alert('4 zones de plein phare maximum.');return;}const temp={actionZone:null};const z=await chooseZone(temp,`Zone plein phare ${s.actionZones.length+1} — serre autour de l’optique`);if(z){s.actionZones.push(z);update();}};
+      removeZoneBtn.onclick=()=>{if(!Array.isArray(s.actionZones)||!s.actionZones.length)return;s.actionZones.pop();update();};
+      asel.addEventListener('change',()=>{s.action=asel.value;if(asel.value!=='person_wink')delete s.actionZone;if(asel.value!=='headlight')s.actionZones=[];update();});box.append(zoneBtn,zoneInfo,removeZoneBtn);update();
       const note=document.createElement('div');note.textContent='V3.3.0 OFFLINE · 7 images intermédiaires locales';Object.assign(note.style,{fontSize:'9px',color:'#167337',fontWeight:'800',marginTop:'6px'});box.append(note);awrap.append(box);
     });
   }
@@ -1268,13 +1280,13 @@
     const engine=window.HappyHoloActionPreviewEngine;if(!engine){alert('Moteur action-preview-engine.js non chargé.');return;}
     const ss=plan(),im=src();if(!ss.length||!im)return;
     const valid=indices.filter(i=>ss[i]);
-    for(const i of valid){const s=ss[i];if((s.action==='person_wink'||s.action==='headlight')&&!s.actionZone){alert(s.action==='person_wink'?'Définis d’abord la zone œil.':'Définis d’abord une zone serrée autour du verre du phare.');return;}}
+    for(const i of valid){const s=ss[i];if(s.action==='person_wink'&&!s.actionZone){alert('Définis d’abord la zone œil.');return;}if(s.action==='headlight'&&!(Array.isArray(s.actionZones)&&s.actionZones.length)){alert('Définis d’abord au moins une zone de plein phare.');return;}}
     if(typeof ensureMainActionPreviewUI==='function')ensureMainActionPreviewUI();
     // Les fonctions V3.2.6 sont lexicales; si elles ne sont pas accessibles, on réutilise son modal via le DOM.
     let modal=document.getElementById('happyHoloMainActionPreview'),canvas=modal?.querySelector('canvas');
     if(!modal||!canvas){ if(typeof oldOpen==='function')return oldOpen(indices,title); return; }
     const W=Math.max(2,Math.round((im.naturalWidth||im.width)*Math.min(1,1050/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height)))),H=Math.max(2,Math.round((im.naturalHeight||im.height)*Math.min(1,1050/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height))));canvas.width=W;canvas.height=H;
-    const layers=new Map();ss.forEach((_,i)=>layers.set(i,layerFor(i,W,H)));const frames=engine.generateActionFrames({base:baseFor(W,H),layers,selections:ss,activeIndices:valid,W,H});window.happyHoloActionFrames={indices:valid,frames,selections:ss.map((s,i)=>({index:i,action:s.action,intensity:s.intensity,speed:s.actionSpeed||2000,zone:s.actionZone||null,headlightMode:s.headlightMode||'off_to_on'}))};
+    const layers=new Map();ss.forEach((_,i)=>layers.set(i,layerFor(i,W,H)));const frames=engine.generateActionFrames({base:baseFor(W,H),layers,selections:ss,activeIndices:valid,W,H});window.happyHoloActionFrames={indices:valid,frames,selections:ss.map((s,i)=>({index:i,action:s.action,intensity:s.intensity,speed:s.actionSpeed||2000,zone:s.actionZone||null,zones:Array.isArray(s.actionZones)?s.actionZones:[],headlightMode:s.headlightMode||'off_to_on'}))};
     const titleEl=modal.querySelector('div[style*="font-weight: 850"],div[style*="font-weight:850"]');if(titleEl)titleEl.textContent=title||'Aperçu action';const foot=modal.lastElementChild;if(foot)foot.textContent='Aperçu OFFLINE — 7 images intermédiaires locales. Aucune API, aucun réseau.';modal.style.display='flex';
     const x=canvas.getContext('2d');let raf=0,start=performance.now();const speed=Math.max(700,Math.min(...valid.map(i=>Number(ss[i].actionSpeed||2000))));
     const loop=now=>{if(modal.style.display==='none')return;const cycle=((now-start)%speed)/speed;const idx=Math.min(6,Math.floor(cycle*7));x.clearRect(0,0,W,H);x.drawImage(frames[idx],0,0,W,H);raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);modal._hh327raf=raf;
