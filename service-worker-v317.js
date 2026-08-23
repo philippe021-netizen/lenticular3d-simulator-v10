@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.18';
+const CACHE_VERSION = 'happyholo-offline-v1.19';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -26,7 +26,11 @@ function cacheable(url){
 }
 
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(APP_CACHE).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
+  e.waitUntil(
+    caches.open(APP_CACHE)
+      .then(c=>c.addAll(APP_SHELL))
+      .then(()=>self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate',e=>{
@@ -43,17 +47,6 @@ self.addEventListener('activate',e=>{
 async function cacheOnly(req){
   const c=await caches.match(req);
   return c || new Response('Ressource absente du pack local HappyHolo.',{status:503});
-}
-
-async function cacheFirst(req){
-  const c=await caches.match(req);
-  if(c) return c;
-  const r=await fetch(req);
-  if(r && (r.ok || r.type==='opaque')){
-    const cache=await caches.open(RUNTIME_CACHE);
-    cache.put(req,r.clone()).catch(()=>{});
-  }
-  return r;
 }
 
 async function networkFirst(req){
@@ -80,7 +73,7 @@ self.addEventListener('fetch',e=>{
     e.respondWith(
       happyHoloMode==='local'
         ? caches.match(req).then(r=>r || caches.match('./relief3d-test-v31.html'))
-        : fetch(req).catch(()=>caches.match(req).then(r=>r || caches.match('./relief3d-test-v31.html')))
+        : networkFirst(req).catch(()=>caches.match('./relief3d-test-v31.html'))
     );
     return;
   }
@@ -94,10 +87,8 @@ self.addEventListener('fetch',e=>{
 
   if(happyHoloMode==='local'){
     e.respondWith(cacheOnly(req));
-  }else if(url.origin===self.location.origin){
-    e.respondWith(cacheFirst(req));
   }else{
-    // En ligne : toujours réparer/rafraîchir les ressources IA externes avant le cache.
+    // V3.4.2 : connecté = réseau d'abord pour éviter les anciens JS après déploiement.
     e.respondWith(networkFirst(req));
   }
 });
