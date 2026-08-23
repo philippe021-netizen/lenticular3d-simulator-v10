@@ -1383,11 +1383,23 @@
     const card=document.getElementById('happyHoloSelectionControls');if(!card)return;
     const rows=[...card.children].filter(n=>n.style?.display==='grid');
     rows.forEach((row,i)=>{
-      const s=plan()[i];if(!s)return;const selects=row.querySelectorAll('select');const asel=selects[selects.length-1];if(!asel)return;
-      [...asel.options].forEach(o=>{if(!enabledActions.has(o.value)){o.disabled=true;o.textContent=o.textContent+' — bientôt';}});
+      const s=plan()[i];if(!s)return;
+      // V3.3.6 STABILITÉ : ne jamais prendre "le dernier select".
+      // Les extras ajoutent eux-mêmes Vitesse/Phare, donc le dernier select change.
+      // On identifie explicitement le vrai menu Action par la présence de l'option headlight.
+      const asel=[...row.querySelectorAll('select')].find(sel=>[...sel.options].some(o=>o.value==='headlight'));
+      if(!asel)return;
+      [...asel.options].forEach(o=>{
+        if(!enabledActions.has(o.value) && !o.dataset.hhDisabled){
+          o.disabled=true;
+          o.dataset.hhDisabled='1';
+          if(!o.textContent.includes('— bientôt')) o.textContent=o.textContent+' — bientôt';
+        }
+      });
       if(!enabledActions.has(asel.value)){s.action='none';asel.value='none';}
       const awrap=asel.parentElement;
-      if(awrap.querySelector('.hh327-extra'))return;
+      // Injection strictement idempotente : un seul bloc extras par menu Action.
+      if(awrap.querySelector(':scope > .hh327-extra'))return;
       const box=document.createElement('div');box.className='hh327-extra';Object.assign(box.style,{marginTop:'8px',paddingTop:'8px',borderTop:'1px dashed #ccc'});
       const speedLine=document.createElement('div');Object.assign(speedLine.style,{display:'flex',gap:'8px',alignItems:'center'});const lab=document.createElement('span');lab.textContent='Vitesse';Object.assign(lab.style,{fontSize:'10px',color:'#666'});const speed=document.createElement('select');[['Rapide · 1 s',1000],['Normal · 2 s',2000],['Doux · 3 s',3000]].forEach(([t,v])=>speed.append(new Option(t,String(v))));speed.value=String(s.actionSpeed||2000);speed.onchange=()=>s.actionSpeed=Number(speed.value);Object.assign(speed.style,{flex:'1',padding:'6px',borderRadius:'8px'});speedLine.append(lab,speed);box.append(speedLine);
       const headlightLine=document.createElement('div');Object.assign(headlightLine.style,{display:'none',gap:'8px',alignItems:'center',marginTop:'7px'});const hlab=document.createElement('span');hlab.textContent='Phare';Object.assign(hlab.style,{fontSize:'10px',color:'#666'});const hsel=document.createElement('select');[['Visible · quasi éteint → 100 %','off_to_on'],['Réaliste · déjà allumé → appel','already_on']].forEach(([t,v])=>hsel.append(new Option(t,v)));hsel.value=s.headlightMode||'off_to_on';s.headlightMode=hsel.value;hsel.onchange=()=>s.headlightMode=hsel.value;Object.assign(hsel.style,{flex:'1',padding:'6px',borderRadius:'8px'});headlightLine.append(hlab,hsel);box.append(headlightLine);
@@ -1425,8 +1437,24 @@
   // On intercepte les boutons du panneau après chaque reconstruction.
   function wireButtons(){
     patchControls();const card=document.getElementById('happyHoloSelectionControls');if(!card)return;
-    const rows=[...card.children].filter(n=>n.style?.display==='grid');rows.forEach((row,i)=>{const btns=[...row.querySelectorAll('button')];const one=btns.find(b=>b.textContent.includes('Voir cette action'));const all=btns.find(b=>b.textContent.includes('Voir toutes'));if(one&&!one._hh327){one._hh327=true;one.addEventListener('click',e=>{e.stopImmediatePropagation();open327([i],`Aperçu — ${plan()[i]?.name||`Sélection ${i+1}`}`);},true);}if(all&&!all._hh327){all._hh327=true;all.addEventListener('click',e=>{e.stopImmediatePropagation();open327(plan().map((_,j)=>j),'Aperçu — toutes les actions');},true);}});
+    const rows=[...card.children].filter(n=>n.style?.display==='grid');
+    rows.forEach((row,i)=>{
+      // Ne câble que les vraies lignes de sélection (celles qui possèdent le menu Action).
+      const actionSelect=[...row.querySelectorAll('select')].find(sel=>[...sel.options].some(o=>o.value==='headlight'));
+      if(!actionSelect)return;
+      const btns=[...row.querySelectorAll('button')];
+      const one=btns.find(b=>b.textContent.includes('Voir cette action'));
+      const all=btns.find(b=>b.textContent.includes('Voir toutes'));
+      if(one&&!one._hh327){
+        one._hh327=true;
+        one.addEventListener('click',e=>{e.stopImmediatePropagation();open327([i],`Aperçu — ${plan()[i]?.name||`Sélection ${i+1}`}`);},true);
+      }
+      if(all&&!all._hh327){
+        all._hh327=true;
+        all.addEventListener('click',e=>{e.stopImmediatePropagation();open327(plan().map((_,j)=>j),'Aperçu — toutes les actions');},true);
+      }
+    });
   }
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(wireButtons,20));window.addEventListener('happyholo-relief-ready',()=>setTimeout(wireButtons,20));setTimeout(wireButtons,600);
-  console.log('[HAPPYHOLO] V3.2.9 OFFLINE · appel de phare localisé actif');
+  console.log('[HAPPYHOLO] V3.3.6 STABLE · patchControls idempotent · masques libres');
 })();
