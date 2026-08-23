@@ -1194,11 +1194,12 @@
       if(awrap.querySelector('.hh327-extra'))return;
       const box=document.createElement('div');box.className='hh327-extra';Object.assign(box.style,{marginTop:'8px',paddingTop:'8px',borderTop:'1px dashed #ccc'});
       const speedLine=document.createElement('div');Object.assign(speedLine.style,{display:'flex',gap:'8px',alignItems:'center'});const lab=document.createElement('span');lab.textContent='Vitesse';Object.assign(lab.style,{fontSize:'10px',color:'#666'});const speed=document.createElement('select');[['Rapide · 1 s',1000],['Normal · 2 s',2000],['Doux · 3 s',3000]].forEach(([t,v])=>speed.append(new Option(t,String(v))));speed.value=String(s.actionSpeed||2000);speed.onchange=()=>s.actionSpeed=Number(speed.value);Object.assign(speed.style,{flex:'1',padding:'6px',borderRadius:'8px'});speedLine.append(lab,speed);box.append(speedLine);
+      const headlightLine=document.createElement('div');Object.assign(headlightLine.style,{display:'none',gap:'8px',alignItems:'center',marginTop:'7px'});const hlab=document.createElement('span');hlab.textContent='Phare';Object.assign(hlab.style,{fontSize:'10px',color:'#666'});const hsel=document.createElement('select');[['Visible · quasi éteint → 100 %','off_to_on'],['Réaliste · déjà allumé → appel','already_on']].forEach(([t,v])=>hsel.append(new Option(t,v)));hsel.value=s.headlightMode||'off_to_on';s.headlightMode=hsel.value;hsel.onchange=()=>s.headlightMode=hsel.value;Object.assign(hsel.style,{flex:'1',padding:'6px',borderRadius:'8px'});headlightLine.append(hlab,hsel);box.append(headlightLine);
       const zoneBtn=document.createElement('button');zoneBtn.type='button';Object.assign(zoneBtn.style,{width:'100%',marginTop:'7px',padding:'8px',borderRadius:'9px',border:'1px solid #888',background:'#fff',fontWeight:'750',fontSize:'11px'});
-      const update=()=>{const a=s.action;if(a==='person_wink'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone œil':'◎ Définir zone œil';}else if(a==='headlight'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone phare':'◎ Définir zone phare';}else zoneBtn.style.display='none';};
-      zoneBtn.onclick=async()=>{const a=s.action;if(a!=='person_wink'&&a!=='headlight')return;const z=await chooseZone(s,a==='person_wink'?'Zone du clin d’œil':'Zone de l’appel de phare');if(z){s.actionZone=z;update();}};
+      const update=()=>{const a=s.action;headlightLine.style.display=a==='headlight'?'flex':'none';if(a==='person_wink'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone œil':'◎ Définir zone œil';}else if(a==='headlight'){zoneBtn.style.display='block';zoneBtn.textContent=s.actionZone?'✓ Modifier zone précise du phare':'◎ Définir zone précise du phare';}else zoneBtn.style.display='none';};
+      zoneBtn.onclick=async()=>{const a=s.action;if(a!=='person_wink'&&a!=='headlight')return;const z=await chooseZone(s,a==='person_wink'?'Zone du clin d’œil':'Zone précise de l’optique (serrer autour du verre du phare)');if(z){s.actionZone=z;update();}};
       asel.addEventListener('change',()=>{s.action=asel.value;if(asel.value!=='person_wink'&&asel.value!=='headlight')delete s.actionZone;update();});box.append(zoneBtn);update();
-      const note=document.createElement('div');note.textContent='V3.2.7 OFFLINE · 7 images intermédiaires locales';Object.assign(note.style,{fontSize:'9px',color:'#167337',fontWeight:'800',marginTop:'6px'});box.append(note);awrap.append(box);
+      const note=document.createElement('div');note.textContent='V3.3.0 OFFLINE · 7 images intermédiaires locales';Object.assign(note.style,{fontSize:'9px',color:'#167337',fontWeight:'800',marginTop:'6px'});box.append(note);awrap.append(box);
     });
   }
 
@@ -1208,13 +1209,13 @@
     const engine=window.HappyHoloActionPreviewEngine;if(!engine){alert('Moteur action-preview-engine.js non chargé.');return;}
     const ss=plan(),im=src();if(!ss.length||!im)return;
     const valid=indices.filter(i=>ss[i]);
-    for(const i of valid){const s=ss[i];if((s.action==='person_wink'||s.action==='headlight')&&!s.actionZone){alert(s.action==='person_wink'?'Définis d’abord la zone œil.':'Définis d’abord la zone phare.');return;}}
+    for(const i of valid){const s=ss[i];if((s.action==='person_wink'||s.action==='headlight')&&!s.actionZone){alert(s.action==='person_wink'?'Définis d’abord la zone œil.':'Définis d’abord une zone serrée autour du verre du phare.');return;}}
     if(typeof ensureMainActionPreviewUI==='function')ensureMainActionPreviewUI();
     // Les fonctions V3.2.6 sont lexicales; si elles ne sont pas accessibles, on réutilise son modal via le DOM.
     let modal=document.getElementById('happyHoloMainActionPreview'),canvas=modal?.querySelector('canvas');
     if(!modal||!canvas){ if(typeof oldOpen==='function')return oldOpen(indices,title); return; }
     const W=Math.max(2,Math.round((im.naturalWidth||im.width)*Math.min(1,1050/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height)))),H=Math.max(2,Math.round((im.naturalHeight||im.height)*Math.min(1,1050/Math.max(im.naturalWidth||im.width,im.naturalHeight||im.height))));canvas.width=W;canvas.height=H;
-    const layers=new Map();ss.forEach((_,i)=>layers.set(i,layerFor(i,W,H)));const frames=engine.generateActionFrames({base:baseFor(W,H),layers,selections:ss,activeIndices:valid,W,H});window.happyHoloActionFrames={indices:valid,frames,selections:ss.map((s,i)=>({index:i,action:s.action,intensity:s.intensity,speed:s.actionSpeed||2000,zone:s.actionZone||null}))};
+    const layers=new Map();ss.forEach((_,i)=>layers.set(i,layerFor(i,W,H)));const frames=engine.generateActionFrames({base:baseFor(W,H),layers,selections:ss,activeIndices:valid,W,H});window.happyHoloActionFrames={indices:valid,frames,selections:ss.map((s,i)=>({index:i,action:s.action,intensity:s.intensity,speed:s.actionSpeed||2000,zone:s.actionZone||null,headlightMode:s.headlightMode||'off_to_on'}))};
     const titleEl=modal.querySelector('div[style*="font-weight: 850"],div[style*="font-weight:850"]');if(titleEl)titleEl.textContent=title||'Aperçu action';const foot=modal.lastElementChild;if(foot)foot.textContent='Aperçu OFFLINE — 7 images intermédiaires locales. Aucune API, aucun réseau.';modal.style.display='flex';
     const x=canvas.getContext('2d');let raf=0,start=performance.now();const speed=Math.max(700,Math.min(...valid.map(i=>Number(ss[i].actionSpeed||2000))));
     const loop=now=>{if(modal.style.display==='none')return;const cycle=((now-start)%speed)/speed;const idx=Math.min(6,Math.floor(cycle*7));x.clearRect(0,0,W,H);x.drawImage(frames[idx],0,0,W,H);raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);modal._hh327raf=raf;
@@ -1228,6 +1229,5 @@
     const rows=[...card.children].filter(n=>n.style?.display==='grid');rows.forEach((row,i)=>{const btns=[...row.querySelectorAll('button')];const one=btns.find(b=>b.textContent.includes('Voir cette action'));const all=btns.find(b=>b.textContent.includes('Voir toutes'));if(one&&!one._hh327){one._hh327=true;one.addEventListener('click',e=>{e.stopImmediatePropagation();open327([i],`Aperçu — ${plan()[i]?.name||`Sélection ${i+1}`}`);},true);}if(all&&!all._hh327){all._hh327=true;all.addEventListener('click',e=>{e.stopImmediatePropagation();open327(plan().map((_,j)=>j),'Aperçu — toutes les actions');},true);}});
   }
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(wireButtons,20));window.addEventListener('happyholo-relief-ready',()=>setTimeout(wireButtons,20));setTimeout(wireButtons,600);
-  console.log('[HAPPYHOLO] V3.2.7 OFFLINE · 7 frames · zones action actif');
-   
+  console.log('[HAPPYHOLO] V3.2.9 OFFLINE · appel de phare localisé actif');
 })();
