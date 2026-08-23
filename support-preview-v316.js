@@ -1,4 +1,4 @@
-/* HappyHolo V3.3.7 — simulation lenticulaire multi-couches + actions locales */
+/* HappyHolo V3.4.1 — simulation lenticulaire multi-couches + phares intégrés aux couches 3D */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -65,6 +65,7 @@
     const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30);
     if(token!==buildToken)return;
     reliefLayers={w:SW,h:SH,bg,sub};
+    headlightCache=null;
     $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
     play();
   }
@@ -89,17 +90,119 @@
     return p.find(s=>s?.action==='headlight' && Array.isArray(s.actionZones) && s.actionZones.length);
   }
 
-  // V3.3.8 — le masque phare doit suivre le même déplacement que le véhicule.
-  // On utilise la profondeur de la sélection comme profondeur d'ancrage du phare.
-  function headlightSubjectShift(norm){
-    const s=activeHeadlightSelection();
-    if(!s) return 0;
-    const d=Math.max(0,Math.min(1,Number(s.depth ?? .5)));
-    const z=(d-.5)*2;
-    return norm*(12+13*z)*(canvas.width/320);
+  // V3.4.1 — PHARES INTÉGRÉS AUX COUCHES 3D
+  // Le masque lumineux est découpé avec les mêmes couches de profondeur que le véhicule.
+  // Chaque morceau de phare reçoit donc EXACTEMENT le déplacement de sa couche.
+  let headlightCache=null;
+
+  function headlightSignature(s){
+    if(!s || !Array.isArray(s.actionZones)) return '';
+    return [
+      s.actionZones,
+      Number(s.intensity||50),
+      s.headlightMode||'off_to_on',
+      reliefLayers?.w||0,
+      reliefLayers?.h||0,
+      reliefLayers?.sub||null
+    ];
   }
 
-  function applyHeadlights(r,pulse,subjectShift=0){
+  function buildHeadlightLayerCache(){
+    const s=activeHeadlightSelection();
+    if(!s || !reliefLayers?.sub?.length) return null;
+    const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));
+    if(!zones.length) return null;
+
+    const W=reliefLayers.w,H=reliefLayers.h;
+    const baseMask=document.createElement('canvas');baseMask.width=W;baseMask.height=H;
+    const bx=baseMask.getContext('2d');
+
+    for(const z of zones){
+      const zm=drawPaintMask(z,W,H);
+      bx.drawImage(zm,0,0,W,H);
+    }
+
+    const layers=reliefLayers.sub.map(l=>{
+      // Masque du phare limité à l'alpha de CETTE couche de profondeur.
+      const clip=document.createElement('canvas');clip.width=W;clip.height=H;
+      const cx=clip.getContext('2d');
+      cx.drawImage(baseMask,0,0);
+      cx.globalCompositeOperation='destination-in';
+      cx.drawImage(l.canvas,0,0);
+      cx.globalCompositeOperation='source-over';
+
+      const dark=document.createElement('canvas');dark.width=W;dark.height=H;
+      const dx=dark.getContext('2d');
+      dx.fillStyle='#000';dx.fillRect(0,0,W,H);
+      dx.globalCompositeOperation='destination-in';dx.drawImage(clip,0,0);
+      dx.globalCompositeOperation='source-over';
+
+      const light=document.createElement('canvas');light.width=W;light.height=H;
+      const lx=light.getContext('2d');
+      lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,W,H);
+      lx.globalCompositeOperation='destination-in';lx.drawImage(clip,0,0);
+      lx.globalCompositeOperation='source-over';
+
+      return {dark,light};
+    });
+
+    return {
+      zonesRef:s.actionZones,
+      subRef:reliefLayers.sub,
+      intensity:Number(s.intensity||50),
+      mode:s.headlightMode||'off_to_on',
+      layers
+    };
+  }
+
+  function getHeadlightLayerCache(){
+    const s=activeHeadlightSelection();
+    if(!s || !reliefLayers?.sub?.length) return null;
+    const invalid=!headlightCache ||
+      headlightCache.zonesRef!==s.actionZones ||
+      headlightCache.subRef!==reliefLayers.sub ||
+      headlightCache.intensity!==Number(s.intensity||50) ||
+      headlightCache.mode!==(s.headlightMode||'off_to_on');
+    if(invalid) headlightCache=buildHeadlightLayerCache();
+    return headlightCache;
+  }
+
+  function drawHeadlightEffectForLayer(index,r,shift,pulse){
+    const s=activeHeadlightSelection();
+    const cache=getHeadlightLayerCache();
+    const layerFx=cache?.layers?.[index];
+    if(!s || !layerFx) return;
+
+    const intensity=Math.max(.1,Math.min(1,Number(s.intensity||50)/100));
+    const mode=s.headlightMode||'off_to_on';
+
+    // Le noir et la lumière utilisent exactement le même r.x+shift que la couche véhicule.
+    if(mode==='off_to_on'){
+      ctx.save();
+      ctx.globalAlpha=(1-pulse)*.58*intensity;
+      ctx.drawImage(layerFx.dark,r.x+shift,r.y,r.w,r.h);
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation='screen';
+    ctx.globalAlpha=(.18+.82*pulse)*intensity;
+    ctx.drawImage(layerFx.light,r.x+shift,r.y,r.w,r.h);
+    ctx.restore();
+
+    if(pulse>.55){
+      // Halo très court, lui aussi centré sur la couche déplacée.
+      const halo=(pulse-.55)*.40*intensity;
+      ctx.save();
+      ctx.globalCompositeOperation='screen';
+      ctx.globalAlpha=halo;
+      ctx.drawImage(layerFx.light,r.x+shift-1.5,r.y-1.5,r.w+3,r.h+3);
+      ctx.restore();
+    }
+  }
+
+  // Pour une image plate (avant relief), on garde un effet local sans déplacement.
+  function applyHeadlightsFlat(r,pulse){
     const s=activeHeadlightSelection();if(!s)return;
     const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));
     if(!zones.length)return;
@@ -107,39 +210,49 @@
     const mask=document.createElement('canvas');mask.width=canvas.width;mask.height=canvas.height;const mx=mask.getContext('2d');
     for(const z of zones){
       const zm=drawPaintMask(z,Math.max(2,Math.round(r.w)),Math.max(2,Math.round(r.h)));
-      mx.drawImage(zm,r.x+subjectShift,r.y,r.w,r.h);
+      mx.drawImage(zm,r.x,r.y,r.w,r.h);
     }
-
-    // OFF/quasi-éteint -> ON : assombrissement local au repos.
     if((s.headlightMode||'off_to_on')==='off_to_on'){
-      ctx.save();ctx.globalAlpha=(1-pulse)*.58*intensity;ctx.fillStyle='#000';ctx.globalCompositeOperation='source-over';
-      const dark=document.createElement('canvas');dark.width=canvas.width;dark.height=canvas.height;const dx=dark.getContext('2d');dx.fillStyle='#000';dx.fillRect(0,0,dark.width,dark.height);dx.globalCompositeOperation='destination-in';dx.drawImage(mask,0,0);ctx.drawImage(dark,0,0);ctx.restore();
+      const dark=document.createElement('canvas');dark.width=canvas.width;dark.height=canvas.height;const dx=dark.getContext('2d');
+      dx.fillStyle='#000';dx.fillRect(0,0,dark.width,dark.height);dx.globalCompositeOperation='destination-in';dx.drawImage(mask,0,0);
+      ctx.save();ctx.globalAlpha=(1-pulse)*.58*intensity;ctx.drawImage(dark,0,0);ctx.restore();
     }
-
-    // Éclaircissement local synchronisé de toutes les zones.
-    ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;
     const light=document.createElement('canvas');light.width=canvas.width;light.height=canvas.height;const lx=light.getContext('2d');
     lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,light.width,light.height);lx.globalCompositeOperation='destination-in';lx.drawImage(mask,0,0);
-    ctx.drawImage(light,0,0);ctx.restore();
-
-    // Petit halo uniquement au pic, sans éclairer toute la voiture.
-    if(pulse>.55){
-      ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(pulse-.55)*.55*intensity;
-      ctx.drawImage(light,-2,-2,canvas.width+4,canvas.height+4);ctx.restore();
-    }
+    ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;ctx.drawImage(light,0,0);ctx.restore();
   }
 
-  function drawFallback(actionPulse=0){ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);applyHeadlights(r,actionPulse,0);}
+  function drawFallback(actionPulse=0){
+    ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
+    if(!uploadedImage)return;
+    const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
+    ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);
+    applyHeadlightsFlat(r,actionPulse);
+  }
+
   function draw(norm,actionPulse=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
     if(!reliefLayers){drawFallback(actionPulse);return;}
     const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
+
     ctx.save();ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
-    for(const l of reliefLayers.bg){const z=(l.depth-.5)*2;const shift=norm*(4+5*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);}
-    for(const l of reliefLayers.sub){const z=(l.depth-.5)*2;const shift=norm*(12+13*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);}
+
+    for(const l of reliefLayers.bg){
+      const z=(l.depth-.5)*2;
+      const shift=norm*(4+5*z)*(canvas.width/320);
+      ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
+    }
+
+    reliefLayers.sub.forEach((l,i)=>{
+      const z=(l.depth-.5)*2;
+      const shift=norm*(12+13*z)*(canvas.width/320);
+      ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
+
+      // Important : le phare est rendu dans la même couche et avec le même shift.
+      drawHeadlightEffectForLayer(i,r,shift,actionPulse);
+    });
+
     ctx.restore();
-    // Les phares sont ancrés sur la profondeur de la sélection véhicule.
-    applyHeadlights(r,actionPulse,headlightSubjectShift(norm));
   }
 
   function headlightPulse(ts){
@@ -167,8 +280,8 @@
 
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
-  window.addEventListener('happyholo-action-plan-changed',()=>draw(0,0));
+  window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;draw(0,0);});
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.3.8 · phares ancrés au véhicule');
+  console.log('[HAPPYHOLO] support-preview V3.4.1 · phares intégrés aux couches 3D');
 })();
