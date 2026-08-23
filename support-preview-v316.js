@@ -89,7 +89,17 @@
     return p.find(s=>s?.action==='headlight' && Array.isArray(s.actionZones) && s.actionZones.length);
   }
 
-  function applyHeadlights(r,pulse){
+  // V3.3.8 — le masque phare doit suivre le même déplacement que le véhicule.
+  // On utilise la profondeur de la sélection comme profondeur d'ancrage du phare.
+  function headlightSubjectShift(norm){
+    const s=activeHeadlightSelection();
+    if(!s) return 0;
+    const d=Math.max(0,Math.min(1,Number(s.depth ?? .5)));
+    const z=(d-.5)*2;
+    return norm*(12+13*z)*(canvas.width/320);
+  }
+
+  function applyHeadlights(r,pulse,subjectShift=0){
     const s=activeHeadlightSelection();if(!s)return;
     const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));
     if(!zones.length)return;
@@ -97,7 +107,7 @@
     const mask=document.createElement('canvas');mask.width=canvas.width;mask.height=canvas.height;const mx=mask.getContext('2d');
     for(const z of zones){
       const zm=drawPaintMask(z,Math.max(2,Math.round(r.w)),Math.max(2,Math.round(r.h)));
-      mx.drawImage(zm,r.x,r.y,r.w,r.h);
+      mx.drawImage(zm,r.x+subjectShift,r.y,r.w,r.h);
     }
 
     // OFF/quasi-éteint -> ON : assombrissement local au repos.
@@ -119,7 +129,7 @@
     }
   }
 
-  function drawFallback(actionPulse=0){ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);applyHeadlights(r,actionPulse);}
+  function drawFallback(actionPulse=0){ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);applyHeadlights(r,actionPulse,0);}
   function draw(norm,actionPulse=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
     if(!reliefLayers){drawFallback(actionPulse);return;}
@@ -128,7 +138,8 @@
     for(const l of reliefLayers.bg){const z=(l.depth-.5)*2;const shift=norm*(4+5*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);}
     for(const l of reliefLayers.sub){const z=(l.depth-.5)*2;const shift=norm*(12+13*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);}
     ctx.restore();
-    applyHeadlights(r,actionPulse);
+    // Les phares sont ancrés sur la profondeur de la sélection véhicule.
+    applyHeadlights(r,actionPulse,headlightSubjectShift(norm));
   }
 
   function headlightPulse(ts){
@@ -159,5 +170,5 @@
   window.addEventListener('happyholo-action-plan-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.3.7 · profondeur + appel de phare localisé');
+  console.log('[HAPPYHOLO] support-preview V3.3.8 · phares ancrés au véhicule');
 })();
