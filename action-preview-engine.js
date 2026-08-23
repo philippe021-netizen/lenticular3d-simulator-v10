@@ -31,11 +31,11 @@
     ctx.restore();
   }
 
-  function drawHeadlight(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on'){
+  function drawHeadlight(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on',alreadyDrawn=false){
     // V3.3.0 : par défaut, l'appel de phare doit être VISIBILE.
     // On part donc d'un phare quasi éteint puis on monte jusqu'au plein phare.
     // Tout reste ultra localisé à l'optique : pas d'éclaircissement du pilote ni de la carrosserie.
-    ctx.drawImage(layer,0,0,W,H);
+    if(!alreadyDrawn) ctx.drawImage(layer,0,0,W,H);
     const z=zonePx(zone,W,H); if(!z) return;
 
     const p=clamp(phase,0,1);
@@ -143,7 +143,13 @@
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
-    if(action==='headlight') return drawHeadlight(ctx,layer,phase,intensity,W,H,s.actionZone,s.headlightMode||'off_to_on');
+    if(action==='headlight'){
+      const zones=Array.isArray(s.actionZones)&&s.actionZones.length?s.actionZones:(s.actionZone?[s.actionZone]:[]);
+      ctx.drawImage(layer,0,0,W,H);
+      if(!zones.length) return;
+      for(const z of zones) drawHeadlight(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on',true);
+      return;
+    }
     if(action==='person_wink') return drawWink(ctx,layer,phase,intensity,W,H,s.actionZone);
     ctx.drawImage(layer,0,0,W,H);
   }
@@ -164,6 +170,5 @@
   }
 
   window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover};
-  console.log('[HAPPYHOLO] action-preview-engine V3.3.0 OFFLINE actif · appel de phare visible');
+  console.log('[HAPPYHOLO] action-preview-engine V3.3.4 OFFLINE actif · multi-zones plein phare');
 })();
-
