@@ -1,4 +1,4 @@
-/* HappyHolo V3.6.6 — actions locales fiables uniquement */
+/* HappyHolo V3.6.8 — simulateur synchronisé avec placement sujet/fond */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -7,7 +7,7 @@
 
   let uploadedImage=null, objectUrl=null, raf=0, running=false, start=0, lastFrame=0;
   let reliefLayers=null, buildToken=0;
-  const state={support:'keychain-vertical',fit:'preserve',margin:14,zoom:100,x:0,y:0,rot:6,speed:5};
+  const state={support:'keychain-vertical',fit:'contain',margin:0,zoom:100,x:0,y:0,rot:6,speed:5};
 
   const host=document.createElement('section');
   host.className='support-card';
@@ -16,8 +16,8 @@
     <div class="support-grid">
       <div class="support-controls">
         <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round">Médaillon rond Ø30 mm</option></select>
-        <label>Cadrage</label><select id="supportFit"><option value="preserve">Préserver le sujet — recommandé</option><option value="contain">Adapter — image entière</option><option value="cover">Remplir — plein cadre</option></select>
-        <label><span>Marge autour du sujet</span><b id="marginOut">14%</b></label><input id="supportMargin" type="range" min="0" max="30" value="14">
+        <label>Cadrage</label><select id="supportFit"><option value="preserve">Préserver le sujet</option><option value="contain" selected>Placement maître — recommandé</option><option value="cover">Remplir — plein cadre</option></select>
+        <label><span>Marge autour du sujet</span><b id="marginOut">0%</b></label><input id="supportMargin" type="range" min="0" max="30" value="0">
         <label><span>Zoom</span><b id="zoomOut">100%</b></label><input id="supportZoom" type="range" min="60" max="180" value="100">
         <label><span>Position horizontale</span><b id="xOut">0%</b></label><input id="supportX" type="range" min="-50" max="50" value="0">
         <label><span>Position verticale</span><b id="yOut">0%</b></label><input id="supportY" type="range" min="-50" max="50" value="0">
@@ -44,18 +44,19 @@
     return c;
   }
 
-  function makeDepthLayers(img,depth,SW,SH,count,_soft){
-    const base=document.createElement('canvas');base.width=SW;base.height=SH;const bx=base.getContext('2d');const fr=coverRect(img.naturalWidth,img.naturalHeight,SW,SH);bx.drawImage(img,fr.x,fr.y,fr.w,fr.h);
-    const dep=document.createElement('canvas');dep.width=SW;dep.height=SH;const dx=dep.getContext('2d');const dr=coverRect(depth.width,depth.height,SW,SH);dx.drawImage(depth,dr.x,dr.y,dr.w,dr.h);
+  function makeDepthLayers(img,depth,SW,SH,count,_soft,placementRect=null){
+    const base=document.createElement('canvas');base.width=SW;base.height=SH;const bx=base.getContext('2d');
+    const fr=placementRect||coverRect(img.naturalWidth,img.naturalHeight,SW,SH);
+    bx.drawImage(img,fr.x,fr.y,fr.w,fr.h);
+    const dep=document.createElement('canvas');dep.width=SW;dep.height=SH;const dx=dep.getContext('2d');
+    const dr=placementRect||coverRect(depth.width,depth.height,SW,SH);
+    dx.drawImage(depth,0,0,depth.width,depth.height,dr.x,dr.y,dr.w,dr.h);
     const bd=bx.getImageData(0,0,SW,SH),dd=dx.getImageData(0,0,SW,SH).data;
     const out=[];
     for(let n=0;n<count;n++){
       const layer=document.createElement('canvas');layer.width=SW;layer.height=SH;const lx=layer.getContext('2d');const id=lx.createImageData(SW,SH),od=id.data;
       for(let i=0;i<SW*SH;i++){
         const d=dd[i*4]/255;
-        // Un pixel ne doit appartenir qu'à un seul plan. L'ancienne pondération
-        // douce le recopiait dans plusieurs couches : les déplacements créaient
-        // alors un sujet fantôme nettement visible.
         const owner=Math.max(0,Math.min(count-1,Math.round(d*(count-1))));
         if(owner!==n) continue;
         const a=bd.data[i*4+3]; if(a<1)continue;
@@ -74,10 +75,9 @@
     if(token!==buildToken)return;
     const SW=420, SH=Math.max(280,Math.round(SW*(rs.view.height/rs.view.width)));
     const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,4,.42);
-    const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30);
+    const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||null;
+    const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30,masterRect);
     if(token!==buildToken)return;
-    // Ce fond neutre reste sous les plans mobiles. Il n'est visible que dans
-    // les fentes sub-pixel ouvertes entre deux couches exclusives.
     const safetyBackground=makeFlatLayer(rs.backgroundImg,SW,SH);
     reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
     headlightCache=null;glintCache=null;transformCache=null;
@@ -100,320 +100,83 @@
     return c;
   }
 
-  function activeHeadlightSelection(){
-    const p=window.happyHoloSelectionPlan||[];
-    return p.find(s=>s?.action==='headlight' && Array.isArray(s.actionZones) && s.actionZones.length);
-  }
-
-  function activeGlintSelection(){
-    const p=window.happyHoloSelectionPlan||[];
-    return p.find(s=>s?.action==='glint'&&Array.isArray(s.actionZones)&&s.actionZones.length);
-  }
-
-  function transformSelections(){
-    const p=window.happyHoloSelectionPlan||[];
-    return p.filter(s=>s?.action==='yaw3d');
-  }
-
-  // V3.4.1 — PHARES INTÉGRÉS AUX COUCHES 3D
-  // Le masque lumineux est découpé avec les mêmes couches de profondeur que le véhicule.
-  // Chaque morceau de phare reçoit donc EXACTEMENT le déplacement de sa couche.
-  let headlightCache=null;
-  let glintCache=null;
-  let transformCache=null;
+  function activeHeadlightSelection(){const p=window.happyHoloSelectionPlan||[];return p.find(s=>s?.action==='headlight'&&Array.isArray(s.actionZones)&&s.actionZones.length);}
+  function activeGlintSelection(){const p=window.happyHoloSelectionPlan||[];return p.find(s=>s?.action==='glint'&&Array.isArray(s.actionZones)&&s.actionZones.length);}
+  function transformSelections(){const p=window.happyHoloSelectionPlan||[];return p.filter(s=>s?.action==='yaw3d');}
+  let headlightCache=null,glintCache=null,transformCache=null;
 
   function selectionMask(s,W,H){
     const m=s?.mask;if(!m?.width||!m?.height||!m?.data)return null;
-    const raw=document.createElement('canvas');raw.width=m.width;raw.height=m.height;
-    raw.getContext('2d').putImageData(m,0,0);
-    const src=window.HappyHoloReliefState?.sourceImg||window.HappyHoloReliefState?.subjectImg;
-    if(!src)return null;
+    const raw=document.createElement('canvas');raw.width=m.width;raw.height=m.height;raw.getContext('2d').putImageData(m,0,0);
+    const src=window.HappyHoloReliefState?.sourceImg||window.HappyHoloReliefState?.subjectImg;if(!src)return null;
     const c=document.createElement('canvas');c.width=W;c.height=H;
-    const r=coverRect(src.naturalWidth||src.width,src.naturalHeight||src.height,W,H);
-    c.getContext('2d').drawImage(raw,0,0,m.width,m.height,r.x,r.y,r.w,r.h);
-    return c;
+    const r=window.HappyHoloSubjectPlacement?.rect?.(src,W,H,{x:0,y:0,w:W,h:H})||coverRect(src.naturalWidth||src.width,src.naturalHeight||src.height,W,H);
+    c.getContext('2d').drawImage(raw,0,0,m.width,m.height,r.x,r.y,r.w,r.h);return c;
   }
 
   function getTransformCache(){
     const active=transformSelections(),engine=window.HappyHoloActionPreviewEngine;
-    if(!active.length||!reliefLayers?.sub?.length||typeof engine?.generateActionFrames!=='function') return null;
-    const plan=window.happyHoloSelectionPlan||[];
-    if(transformCache&&transformCache.subRef===reliefLayers.sub&&transformCache.planRef===plan) return transformCache;
-    const W=reliefLayers.w,H=reliefLayers.h;
-    const subject=document.createElement('canvas');subject.width=W;subject.height=H;
-    const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
-
-    const masks=plan.map(s=>selectionMask(s,W,H));
-    const base=document.createElement('canvas');base.width=W;base.height=H;
-    const bx=base.getContext('2d');bx.drawImage(subject,0,0);
-    bx.globalCompositeOperation='destination-out';masks.forEach(m=>{if(m)bx.drawImage(m,0,0);});bx.globalCompositeOperation='source-over';
-
-    const layers=new Map();
-    plan.forEach((s,i)=>{
-      const own=masks[i];if(!own)return;
-      const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
-      x.drawImage(subject,0,0);x.globalCompositeOperation='destination-in';x.drawImage(own,0,0);
-      for(let j=i+1;j<plan.length;j++)if(masks[j]){x.globalCompositeOperation='destination-out';x.drawImage(masks[j],0,0);}
-      x.globalCompositeOperation='source-over';layers.set(i,c);
-    });
-    const activeIndices=plan.map((s,i)=>s?.action==='yaw3d'?i:-1).filter(i=>i>=0);
-    const norms=[-1,-.66,-.33,0,.33,.66,1];
-    const frames=engine.generateActionFrames({
-      base,layers,selections:plan,activeIndices,W,H,phases:norms,
-      phaseForSelection:(_s,n)=>(n+1)/2
-    });
-    transformCache={subRef:reliefLayers.sub,planRef:plan,frames,selection:active[0]};
-    return transformCache;
+    if(!active.length||!reliefLayers?.sub?.length||typeof engine?.generateActionFrames!=='function')return null;
+    const plan=window.happyHoloSelectionPlan||[];if(transformCache&&transformCache.subRef===reliefLayers.sub&&transformCache.planRef===plan)return transformCache;
+    const W=reliefLayers.w,H=reliefLayers.h;const subject=document.createElement('canvas');subject.width=W;subject.height=H;const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
+    const masks=plan.map(s=>selectionMask(s,W,H));const base=document.createElement('canvas');base.width=W;base.height=H;const bx=base.getContext('2d');bx.drawImage(subject,0,0);bx.globalCompositeOperation='destination-out';masks.forEach(m=>{if(m)bx.drawImage(m,0,0);});bx.globalCompositeOperation='source-over';
+    const layers=new Map();plan.forEach((s,i)=>{const own=masks[i];if(!own)return;const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.drawImage(subject,0,0);x.globalCompositeOperation='destination-in';x.drawImage(own,0,0);for(let j=i+1;j<plan.length;j++)if(masks[j]){x.globalCompositeOperation='destination-out';x.drawImage(masks[j],0,0);}x.globalCompositeOperation='source-over';layers.set(i,c);});
+    const activeIndices=plan.map((s,i)=>s?.action==='yaw3d'?i:-1).filter(i=>i>=0);const norms=[-1,-.66,-.33,0,.33,.66,1];
+    const frames=engine.generateActionFrames({base,layers,selections:plan,activeIndices,W,H,phases:norms,phaseForSelection:(_s,n)=>(n+1)/2});
+    transformCache={subRef:reliefLayers.sub,planRef:plan,frames,selection:active[0]};return transformCache;
   }
 
-  function drawTransformSubject(r,norm){
-    const cache=getTransformCache();if(!cache?.frames?.length)return false;
-    const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));
-    const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];
-    const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));
-    const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);
-    ctx.drawImage(frame,r.x+shift,r.y,r.w,r.h);
-    return true;
-  }
+  function drawTransformSubject(r,norm){const cache=getTransformCache();if(!cache?.frames?.length)return false;const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);ctx.drawImage(frame,r.x+shift,r.y,r.w,r.h);return true;}
 
   function getGlintCache(){
-    const s=activeGlintSelection(),engine=window.HappyHoloActionPreviewEngine;
-    if(!s||!reliefLayers?.sub?.length||typeof engine?.buildGlintOverlay!=='function') return null;
-    const intensity=Number(s.intensity||50);
-    if(glintCache&&glintCache.zonesRef===s.actionZones&&glintCache.subRef===reliefLayers.sub&&glintCache.intensity===intensity) return glintCache;
-
-    const W=reliefLayers.w,H=reliefLayers.h;
-    const subject=document.createElement('canvas');subject.width=W;subject.height=H;
-    const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
-    const phases=[0,.17,.34,.5,.66,.83,1];
-    const frames=phases.map(phase=>engine.buildGlintOverlay({
-      layer:subject,phase,intensity:Math.max(.1,Math.min(1,intensity/100)),W,H,zones:s.actionZones
-    }));
-    glintCache={zonesRef:s.actionZones,subRef:reliefLayers.sub,intensity,frames,selection:s};
-    return glintCache;
+    const s=activeGlintSelection(),engine=window.HappyHoloActionPreviewEngine;if(!s||!reliefLayers?.sub?.length||typeof engine?.buildGlintOverlay!=='function')return null;
+    const intensity=Number(s.intensity||50);if(glintCache&&glintCache.zonesRef===s.actionZones&&glintCache.subRef===reliefLayers.sub&&glintCache.intensity===intensity)return glintCache;
+    const W=reliefLayers.w,H=reliefLayers.h,subject=document.createElement('canvas');subject.width=W;subject.height=H;const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
+    const phases=[0,.17,.34,.5,.66,.83,1],frames=phases.map(phase=>engine.buildGlintOverlay({layer:subject,phase,intensity:Math.max(.1,Math.min(1,intensity/100)),W,H,zones:s.actionZones}));glintCache={zonesRef:s.actionZones,subRef:reliefLayers.sub,intensity,frames,selection:s};return glintCache;
   }
-
-  function drawGlintEffect(r,norm){
-    const cache=getGlintCache();if(!cache?.frames?.length)return;
-    const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));
-    const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];
-    const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));
-    const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);
-    ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(frame,r.x+shift,r.y,r.w,r.h);ctx.restore();
-  }
-
-  function headlightSignature(s){
-    if(!s || !Array.isArray(s.actionZones)) return '';
-    return [
-      s.actionZones,
-      Number(s.intensity||50),
-      s.headlightMode||'off_to_on',
-      reliefLayers?.w||0,
-      reliefLayers?.h||0,
-      reliefLayers?.sub||null
-    ];
-  }
+  function drawGlintEffect(r,norm){const cache=getGlintCache();if(!cache?.frames?.length)return;const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(frame,r.x+shift,r.y,r.w,r.h);ctx.restore();}
 
   function buildHeadlightLayerCache(){
-    const s=activeHeadlightSelection();
-    if(!s || !reliefLayers?.sub?.length) return null;
-    const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));
-    if(!zones.length) return null;
-
-    const W=reliefLayers.w,H=reliefLayers.h;
-    const baseMask=document.createElement('canvas');baseMask.width=W;baseMask.height=H;
-    const bx=baseMask.getContext('2d');
-
-    for(const z of zones){
-      const zm=drawPaintMask(z,W,H);
-      bx.drawImage(zm,0,0,W,H);
-    }
-
-    const layers=reliefLayers.sub.map(l=>{
-      // Masque du phare limité à l'alpha de CETTE couche de profondeur.
-      const clip=document.createElement('canvas');clip.width=W;clip.height=H;
-      const cx=clip.getContext('2d');
-      cx.drawImage(baseMask,0,0);
-      cx.globalCompositeOperation='destination-in';
-      cx.drawImage(l.canvas,0,0);
-      cx.globalCompositeOperation='source-over';
-
-      const dark=document.createElement('canvas');dark.width=W;dark.height=H;
-      const dx=dark.getContext('2d');
-      dx.fillStyle='#000';dx.fillRect(0,0,W,H);
-      dx.globalCompositeOperation='destination-in';dx.drawImage(clip,0,0);
-      dx.globalCompositeOperation='source-over';
-
-      const light=document.createElement('canvas');light.width=W;light.height=H;
-      const lx=light.getContext('2d');
-      lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,W,H);
-      lx.globalCompositeOperation='destination-in';lx.drawImage(clip,0,0);
-      lx.globalCompositeOperation='source-over';
-
-      return {dark,light};
-    });
-
-    return {
-      zonesRef:s.actionZones,
-      subRef:reliefLayers.sub,
-      intensity:Number(s.intensity||50),
-      mode:s.headlightMode||'off_to_on',
-      layers
-    };
+    const s=activeHeadlightSelection();if(!s||!reliefLayers?.sub?.length)return null;const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));if(!zones.length)return null;
+    const W=reliefLayers.w,H=reliefLayers.h,baseMask=document.createElement('canvas');baseMask.width=W;baseMask.height=H;const bx=baseMask.getContext('2d');for(const z of zones){const zm=drawPaintMask(z,W,H);bx.drawImage(zm,0,0,W,H);}
+    const layers=reliefLayers.sub.map(l=>{const clip=document.createElement('canvas');clip.width=W;clip.height=H;const cx=clip.getContext('2d');cx.drawImage(baseMask,0,0);cx.globalCompositeOperation='destination-in';cx.drawImage(l.canvas,0,0);cx.globalCompositeOperation='source-over';const dark=document.createElement('canvas');dark.width=W;dark.height=H;const dx=dark.getContext('2d');dx.fillStyle='#000';dx.fillRect(0,0,W,H);dx.globalCompositeOperation='destination-in';dx.drawImage(clip,0,0);dx.globalCompositeOperation='source-over';const light=document.createElement('canvas');light.width=W;light.height=H;const lx=light.getContext('2d');lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,W,H);lx.globalCompositeOperation='destination-in';lx.drawImage(clip,0,0);lx.globalCompositeOperation='source-over';return{dark,light};});
+    return{zonesRef:s.actionZones,subRef:reliefLayers.sub,intensity:Number(s.intensity||50),mode:s.headlightMode||'off_to_on',layers};
   }
+  function getHeadlightLayerCache(){const s=activeHeadlightSelection();if(!s||!reliefLayers?.sub?.length)return null;const invalid=!headlightCache||headlightCache.zonesRef!==s.actionZones||headlightCache.subRef!==reliefLayers.sub||headlightCache.intensity!==Number(s.intensity||50)||headlightCache.mode!==(s.headlightMode||'off_to_on');if(invalid)headlightCache=buildHeadlightLayerCache();return headlightCache;}
+  function drawHeadlightEffectForLayer(index,r,shift,pulse){const s=activeHeadlightSelection(),cache=getHeadlightLayerCache(),layerFx=cache?.layers?.[index];if(!s||!layerFx)return;const intensity=Math.max(.1,Math.min(1,Number(s.intensity||50)/100)),mode=s.headlightMode||'off_to_on';if(mode==='off_to_on'){ctx.save();ctx.globalAlpha=(1-pulse)*.58*intensity;ctx.drawImage(layerFx.dark,r.x+shift,r.y,r.w,r.h);ctx.restore();}ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;ctx.drawImage(layerFx.light,r.x+shift,r.y,r.w,r.h);ctx.restore();if(pulse>.55){const halo=(pulse-.55)*.40*intensity;ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=halo;ctx.drawImage(layerFx.light,r.x+shift-1.5,r.y-1.5,r.w+3,r.h+3);ctx.restore();}}
 
-  function getHeadlightLayerCache(){
-    const s=activeHeadlightSelection();
-    if(!s || !reliefLayers?.sub?.length) return null;
-    const invalid=!headlightCache ||
-      headlightCache.zonesRef!==s.actionZones ||
-      headlightCache.subRef!==reliefLayers.sub ||
-      headlightCache.intensity!==Number(s.intensity||50) ||
-      headlightCache.mode!==(s.headlightMode||'off_to_on');
-    if(invalid) headlightCache=buildHeadlightLayerCache();
-    return headlightCache;
-  }
-
-  function drawHeadlightEffectForLayer(index,r,shift,pulse){
-    const s=activeHeadlightSelection();
-    const cache=getHeadlightLayerCache();
-    const layerFx=cache?.layers?.[index];
-    if(!s || !layerFx) return;
-
-    const intensity=Math.max(.1,Math.min(1,Number(s.intensity||50)/100));
-    const mode=s.headlightMode||'off_to_on';
-
-    // Le noir et la lumière utilisent exactement le même r.x+shift que la couche véhicule.
-    if(mode==='off_to_on'){
-      ctx.save();
-      ctx.globalAlpha=(1-pulse)*.58*intensity;
-      ctx.drawImage(layerFx.dark,r.x+shift,r.y,r.w,r.h);
-      ctx.restore();
-    }
-
-    ctx.save();
-    ctx.globalCompositeOperation='screen';
-    ctx.globalAlpha=(.18+.82*pulse)*intensity;
-    ctx.drawImage(layerFx.light,r.x+shift,r.y,r.w,r.h);
-    ctx.restore();
-
-    if(pulse>.55){
-      // Halo très court, lui aussi centré sur la couche déplacée.
-      const halo=(pulse-.55)*.40*intensity;
-      ctx.save();
-      ctx.globalCompositeOperation='screen';
-      ctx.globalAlpha=halo;
-      ctx.drawImage(layerFx.light,r.x+shift-1.5,r.y-1.5,r.w+3,r.h+3);
-      ctx.restore();
-    }
-  }
-
-  // Pour une image plate (avant relief), on garde un effet local sans déplacement.
-  function applyHeadlightsFlat(r,pulse){
-    const s=activeHeadlightSelection();if(!s)return;
-    const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));
-    if(!zones.length)return;
-    const intensity=Math.max(.1,Math.min(1,Number(s.intensity||50)/100));
-    const mask=document.createElement('canvas');mask.width=canvas.width;mask.height=canvas.height;const mx=mask.getContext('2d');
-    for(const z of zones){
-      const zm=drawPaintMask(z,Math.max(2,Math.round(r.w)),Math.max(2,Math.round(r.h)));
-      mx.drawImage(zm,r.x,r.y,r.w,r.h);
-    }
-    if((s.headlightMode||'off_to_on')==='off_to_on'){
-      const dark=document.createElement('canvas');dark.width=canvas.width;dark.height=canvas.height;const dx=dark.getContext('2d');
-      dx.fillStyle='#000';dx.fillRect(0,0,dark.width,dark.height);dx.globalCompositeOperation='destination-in';dx.drawImage(mask,0,0);
-      ctx.save();ctx.globalAlpha=(1-pulse)*.58*intensity;ctx.drawImage(dark,0,0);ctx.restore();
-    }
-    const light=document.createElement('canvas');light.width=canvas.width;light.height=canvas.height;const lx=light.getContext('2d');
-    lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,light.width,light.height);lx.globalCompositeOperation='destination-in';lx.drawImage(mask,0,0);
-    ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;ctx.drawImage(light,0,0);ctx.restore();
-  }
-
-  function drawTextLayer(norm,r){
-    window.HappyHoloTextLayer?.draw?.(ctx,norm,r);
-  }
-
-  function drawFallback(actionPulse=0,norm=0){
-    ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(!uploadedImage)return;
-    const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
-    ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);
-    applyHeadlightsFlat(r,actionPulse);
-    drawTextLayer(norm,r);
-  }
+  function applyHeadlightsFlat(r,pulse){const s=activeHeadlightSelection();if(!s)return;const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));if(!zones.length)return;const intensity=Math.max(.1,Math.min(1,Number(s.intensity||50)/100));const mask=document.createElement('canvas');mask.width=canvas.width;mask.height=canvas.height;const mx=mask.getContext('2d');for(const z of zones){const zm=drawPaintMask(z,Math.max(2,Math.round(r.w)),Math.max(2,Math.round(r.h)));mx.drawImage(zm,r.x,r.y,r.w,r.h);}if((s.headlightMode||'off_to_on')==='off_to_on'){const dark=document.createElement('canvas');dark.width=canvas.width;dark.height=canvas.height;const dx=dark.getContext('2d');dx.fillStyle='#000';dx.fillRect(0,0,dark.width,dark.height);dx.globalCompositeOperation='destination-in';dx.drawImage(mask,0,0);ctx.save();ctx.globalAlpha=(1-pulse)*.58*intensity;ctx.drawImage(dark,0,0);ctx.restore();}const light=document.createElement('canvas');light.width=canvas.width;light.height=canvas.height;const lx=light.getContext('2d');lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,light.width,light.height);lx.globalCompositeOperation='destination-in';lx.drawImage(mask,0,0);ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;ctx.drawImage(light,0,0);ctx.restore();}
+  function drawTextLayer(norm,r){window.HappyHoloTextLayer?.draw?.(ctx,norm,r);}
+  function drawFallback(actionPulse=0,norm=0){ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);applyHeadlightsFlat(r,actionPulse);drawTextLayer(norm,r);}
 
   function draw(norm,actionPulse=0){
-    ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(!reliefLayers){drawFallback(actionPulse,norm);return;}
-    const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
-
+    ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!reliefLayers){drawFallback(actionPulse,norm);return;}const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
     ctx.save();ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
-
-    const customBg=window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,r);
+    const full={x:0,y:0,w:canvas.width,h:canvas.height};
+    const customBg=window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,full);
     if(!customBg){
-      if(reliefLayers.safetyBackground)ctx.drawImage(reliefLayers.safetyBackground,r.x-1,r.y-1,r.w+2,r.h+2);
-      for(const l of reliefLayers.bg){
-        const z=(l.depth-.5)*2;
-        const shift=norm*(4+5*z)*(canvas.width/320);
-        ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
-      }
+      const br=coverRect(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
+      if(reliefLayers.safetyBackground)ctx.drawImage(reliefLayers.safetyBackground,br.x-1,br.y-1,br.w+2,br.h+2);
+      for(const l of reliefLayers.bg){const z=(l.depth-.5)*2,shift=norm*(4+5*z)*(canvas.width/320);ctx.drawImage(l.canvas,br.x+shift,br.y,br.w,br.h);}
     }
-
-    const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
-    if(textDepth<0) drawTextLayer(norm,r);
-
-    const transformDrawn=drawTransformSubject(r,norm);
-    if(!transformDrawn){
-      reliefLayers.sub.forEach((l,i)=>{
-        const z=(l.depth-.5)*2;
-        const shift=norm*(12+13*z)*(canvas.width/320);
-        ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
-
-        // Important : le phare est rendu dans la même couche et avec le même shift.
-        drawHeadlightEffectForLayer(i,r,shift,actionPulse);
-      });
-    }else if(activeHeadlightSelection()){
-      // La rotation est limitée à ±3° : un masque plat reste suffisamment
-      // proche pour conserver un éventuel phare sur une autre sélection.
-      applyHeadlightsFlat(r,actionPulse);
-    }
-
-    drawGlintEffect(r,norm);
-
-    if(textDepth>=0) drawTextLayer(norm,r);
-
-    ctx.restore();
+    const textDepth=Number(window.happyHoloTextLayer?.depth)||0;if(textDepth<0)drawTextLayer(norm,r);
+    const transformDrawn=drawTransformSubject(r,norm);if(!transformDrawn){reliefLayers.sub.forEach((l,i)=>{const z=(l.depth-.5)*2,shift=norm*(12+13*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);drawHeadlightEffectForLayer(i,r,shift,actionPulse);});}else if(activeHeadlightSelection())applyHeadlightsFlat(r,actionPulse);
+    drawGlintEffect(r,norm);if(textDepth>=0)drawTextLayer(norm,r);ctx.restore();
   }
 
-  function headlightPulse(ts){
-    const s=activeHeadlightSelection();if(!s)return 0;
-    const ms=Math.max(800,Number(s.actionSpeed||2000));
-    const t=((ts-start)%ms)/ms;
-    // Une impulsion visible par cycle : repos -> pic -> repos.
-    return (1-Math.cos(t*Math.PI*2))/2;
-  }
-
-  function tick(ts){
-    if(!running)return;if(!start)start=ts;
-    if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}
-    lastFrame=ts;
-    const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);
-    draw(phase,headlightPulse(ts));
-    raf=requestAnimationFrame(tick);
-  }
+  function headlightPulse(ts){const s=activeHeadlightSelection();if(!s)return 0;const ms=Math.max(800,Number(s.actionSpeed||2000)),t=((ts-start)%ms)/ms;return(1-Math.cos(t*Math.PI*2))/2;}
+  function tick(ts){if(!running)return;if(!start)start=ts;if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}lastFrame=ts;const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);draw(phase,headlightPulse(ts));raf=requestAnimationFrame(tick);}
   function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);product.classList.add('support-playing');cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
   function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');product.style.transform='perspective(620px) rotateY(0deg) translateX(0)';draw(0,0);}
-  function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0,0);if(running){start=0;}}
-
+  function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0,0);if(running)start=0;}
   [type,fit,margin,zoom,xp,yp,rot,speed].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;apply();}));
   $('#supportPlay').addEventListener('click',play);$('#supportStop').addEventListener('click',stop);
-
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
   window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;draw(0,0);});
   window.addEventListener('happyholo-background-changed',()=>draw(0,0));
+  window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
-  apply();
-  console.log('[HAPPYHOLO] support-preview V3.6.6 · actions fiables uniquement');
+  apply();console.log('[HAPPYHOLO] support-preview V3.6.8 · placement sujet/fond synchronisé');
 })();
