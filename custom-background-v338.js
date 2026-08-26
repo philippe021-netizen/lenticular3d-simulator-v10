@@ -139,4 +139,5 @@
   if(window.innerWidth<760)grid.style.gridTemplateColumns='1fr';
 
   console.log('[HAPPYHOLO] custom-background V3.4.1 + activation immédiate du fond');
+  
 })();
