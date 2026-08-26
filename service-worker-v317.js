@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.36';
+const CACHE_VERSION = 'happyholo-offline-v1.38';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -9,6 +9,7 @@ const APP_SHELL = [
   './action-preview-engine.js',
   './mask-editor-v315-panfix.js',
   './selection-controls-v336.js',
+  './custom-background-v338.js',
   './text-layer-v337.js',
   './v311-monotonic-patch.js',
   './support-preview-v316.js',

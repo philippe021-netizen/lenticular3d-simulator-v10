@@ -304,8 +304,6 @@
       ['Moto/voiture — appel de phare','headlight'],
       ['Reflet lumineux local','glint'],
       ['Sujet — rotation 3D verticale légère','yaw3d'],
-      ['Couple — rapprochement léger','couple_approach'],
-      ['Animal — mouvement d’oreille','animal_ear'],
       ['Objet rigide — pivot léger','pivot']
     ].forEach(([t,v])=>{
       planAction.appendChild(new Option(t,v));
@@ -326,17 +324,15 @@
         const s=selections[activeSelection];
         if(!s) return;
 
-        if(s.action==='person_wink'||s.action==='animal_ear'||s.action==='couple_approach'){
+        if(s.action==='person_wink'){
           if(typeof window.HappyHoloChooseActionZone!=='function'){
             alert('Outil de zone action non chargé. Recharge la page puis réessaie.');
             return;
           }
 
           const z=await window.HappyHoloChooseActionZone(
-            {actionZone:s.actionZone||null,zoneMode:(s.action==='animal_ear'||s.action==='couple_approach')?'outline':'paint',zoneLabel:s.action==='couple_approach'?'visage':'oreille'},
-            s.action==='animal_ear'
-              ? 'Contour extérieur de l’oreille'
-              : (s.action==='couple_approach'?'Contour extérieur du visage':'Zone du clin d’œil')
+            {actionZone:s.actionZone||null,zoneMode:'paint'},
+            'Zone du clin d’œil'
           );
 
           if(z){
@@ -440,19 +436,17 @@
         editorRemoveZoneBtn.style.display=
           s.actionZones.length?'block':'none';
 
-      }else if(s.action==='person_wink'||s.action==='animal_ear'||s.action==='couple_approach'){
+      }else if(s.action==='person_wink'){
 
         editorZoneWrap.style.display='flex';
 
         editorZoneBtn.textContent=
           s.actionZone
-            ? `✓ Modifier contour ${s.action==='animal_ear'?'oreille':(s.action==='couple_approach'?'visage':'œil')}`
-            : `🎯 Tracer contour ${s.action==='animal_ear'?'oreille':(s.action==='couple_approach'?'visage':'œil')}`;
+            ? '✓ Modifier zone œil'
+            : '🎯 Définir zone œil';
 
         editorZoneInfo.textContent=
-          (s.action==='animal_ear'||s.action==='couple_approach')
-            ? `Apple Pencil : trace uniquement l’extérieur ${s.action==='animal_ear'?'de l’oreille':'du visage'}. L’intérieur sera rempli automatiquement.`
-            : 'Apple Pencil : entoure librement l’œil. 1 doigt : déplacer. 2 doigts : zoom.';
+          'Apple Pencil : entoure librement l’œil. 1 doigt : déplacer. 2 doigts : zoom.';
 
         editorRemoveZoneBtn.style.display='none';
 
@@ -468,7 +462,7 @@
       const previous=s.action;
       s.action=planAction.value;
 
-      if(previous!==s.action && !['person_wink','animal_ear','couple_approach'].includes(s.action)){
+      if(previous!==s.action && s.action!=='person_wink'){
         delete s.actionZone;
       }
 
@@ -841,7 +835,7 @@
     const bottomActions=document.createElement('div');
     Object.assign(bottomActions.style,{display:'flex',gap:'10px',padding:'9px 12px max(9px, env(safe-area-inset-bottom))',background:'#17171a',borderTop:'1px solid #444',flexShrink:'0',zIndex:'3'});
     const bottomClear=document.createElement('button');bottomClear.type='button';bottomClear.textContent='Effacer';
-    const bottomOk=document.createElement('button');bottomOk.type='button';bottomOk.textContent='✓ Valider le contour';
+    const bottomOk=document.createElement('button');bottomOk.type='button';bottomOk.textContent='✓ Valider la zone';zoneModal._bottomOk=bottomOk;
     for(const b of[bottomClear,bottomOk])Object.assign(b.style,{flex:'1',minHeight:'46px',borderRadius:'11px',border:'1px solid #666',fontWeight:'850',fontSize:'15px'});
     Object.assign(bottomClear.style,{background:'#2b2b2f',color:'#fff'});Object.assign(bottomOk.style,{background:'#0a84ff',color:'#fff'});
     bottomClear.onclick=()=>clear.onclick();bottomOk.onclick=()=>ok.onclick();
@@ -1116,6 +1110,7 @@
       if(zoneModal._foot)zoneModal._foot.textContent=zoneState.mode==='outline'
         ? `Apple Pencil : trace le contour extérieur ${zoneState.label==='visage'?'du visage':'de chaque oreille'} • Relâche pour fermer et remplir automatiquement • 1 doigt : déplacer • 2 doigts : zoom`
         : 'Apple Pencil : peindre plusieurs zones • Gomme : corriger • 1 doigt : déplacer • 2 doigts : zoom + déplacement';
+      if(zoneModal._bottomOk)zoneModal._bottomOk.textContent=zoneState.mode==='outline'?'✓ Valider le contour':'✓ Valider la zone';
       drawZone();
 
       return new Promise(resolve=>{

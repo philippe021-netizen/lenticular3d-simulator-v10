@@ -248,8 +248,11 @@ function renderAt(norm,target=view){
   const bgK=Number(bgDepth.value)/0.10;
   const subK=Number(subjectDepth.value)/0.30;
   const protect=Number(edgeProtect.value)/100;
-  const fb=fitCover(backgroundImg,W,H); const bgShift=norm*6*amplitude*bgK;
-  x.drawImage(backgroundImg,fb.x+bgShift,fb.y,fb.w,fb.h);
+  const customBg=window.HappyHoloCustomBackground?.draw?.(x,norm,W,H,{x:0,y:0,w:W,h:H});
+  if(!customBg){
+    const fb=fitCover(backgroundImg,W,H); const bgShift=norm*6*amplitude*bgK;
+    x.drawImage(backgroundImg,fb.x+bgShift,fb.y,fb.w,fb.h);
+  }
   const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
   if(textDepth<0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
   const tmp=document.createElement('canvas'); tmp.width=W;tmp.height=H; const tx=tmp.getContext('2d');
@@ -330,7 +333,8 @@ downloadBtn.addEventListener('click',async()=>{
     generator:'HappyHolo Relief 3D V3.17 iPad memory',localSegmentation:true,externalPaidApi:false,views:9,
     depthInference:'single-512-with-local-fallback',
     angle:Number(angle.value),subjectDepth:Number(subjectDepth.value),backgroundDepth:Number(bgDepth.value),edgeProtection:Number(edgeProtect.value),
-    textLayer:window.HappyHoloTextLayer?.serialize?.()||null
+    textLayer:window.HappyHoloTextLayer?.serialize?.()||null,
+    customBackground:window.HappyHoloCustomBackground?.serialize?.()||null
   },null,2));
   const b=await zip.generateAsync({type:'blob'}); const u=URL.createObjectURL(b);
   const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v317-ipad.zip'; a.click();

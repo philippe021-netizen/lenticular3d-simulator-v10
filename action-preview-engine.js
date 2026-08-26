@@ -60,36 +60,6 @@
     ctx.drawImage(buildYawFrame({layer,phase,intensity,W,H}),0,0);
   }
 
-  function buildApproachFrame({layer,phase=0,intensity=.5,W,H,direction=0,zone=null}){
-    const pulse=clamp(Number(phase)||0,0,1);
-    const dir=Math.sign(Number(direction)||0);
-    const k=clamp(Number(intensity)||.5,.1,1)*pulse;
-    const dx=dir*W*.012*k;
-    const mask=paintZoneMask(zone,W,H),bounds=mask&&alphaBounds(mask);
-    if(!mask||!bounds){
-      const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d').drawImage(layer,dx,0,W,H);return c;
-    }
-
-    const movingMask=document.createElement('canvas');movingMask.width=W;movingMask.height=H;
-    const mx=movingMask.getContext('2d');mx.save();mx.filter=`blur(${Math.max(1,Math.round(Math.min(W,H)*.0025))}px)`;mx.drawImage(mask,0,0);mx.restore();
-    mx.globalCompositeOperation='destination-in';
-    const fade=mx.createLinearGradient(0,bounds.y,0,bounds.y+bounds.h);
-    fade.addColorStop(0,'#fff');fade.addColorStop(.70,'#fff');fade.addColorStop(.96,'rgba(255,255,255,0)');
-    mx.fillStyle=fade;mx.fillRect(bounds.x-4,bounds.y-4,bounds.w+8,bounds.h+8);mx.globalCompositeOperation='source-over';
-
-    const out=document.createElement('canvas');out.width=W;out.height=H;const ox=out.getContext('2d');ox.drawImage(layer,0,0);
-    ox.globalCompositeOperation='destination-out';ox.drawImage(movingMask,0,0);ox.globalCompositeOperation='source-over';
-    const face=document.createElement('canvas');face.width=W;face.height=H;const fx=face.getContext('2d');fx.drawImage(layer,0,0);fx.globalCompositeOperation='destination-in';fx.drawImage(movingMask,0,0);
-    const pivotX=bounds.x+bounds.w*.5,pivotY=bounds.y+bounds.h*.88;
-    ox.save();ox.translate(pivotX+dx,pivotY);ox.rotate(-dir*1.4*k*Math.PI/180);ox.drawImage(face,-pivotX,-pivotY);ox.restore();
-    return out;
-  }
-
-  function drawCoupleApproach(ctx,layer,phase,intensity,W,H,direction=0,zone=null){
-    ctx.drawImage(buildApproachFrame({layer,phase,intensity,W,H,direction,zone}),0,0);
-  }
-
-
   function paintZoneMask(zone,W,H){
     if(!zone) return null;
     const sourceW=Math.max(1,Number(zone.sourceW)||W), sourceH=Math.max(1,Number(zone.sourceH)||H);
@@ -133,53 +103,6 @@
       if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
     }
     return maxX<minX?null:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1,cx:(minX+maxX)/2};
-  }
-
-  function buildEarFrame({layer,phase=0,intensity=.5,W,H,zone}){
-    const zones=zone?.kind==='outline'&&Array.isArray(zone.contours)
-      ? zone.contours.map(points=>({...zone,contours:[points]}))
-      : [zone];
-    const parts=zones.map(z=>{const mask=paintZoneMask(z,W,H);return{mask,bounds:mask&&alphaBounds(mask)};}).filter(p=>p.mask&&p.bounds);
-    if(!parts.length) return layer;
-
-    const out=document.createElement('canvas');out.width=W;out.height=H;
-    const ox=out.getContext('2d');ox.drawImage(layer,0,0,W,H);
-
-    for(const {mask,bounds} of parts){
-
-      // Seuls les 70 % supérieurs bougent. La base reste raccordée à la tête.
-      // Le flou très léger évite la ligne sombre créée par une découpe franche.
-      const movingMask=document.createElement('canvas');movingMask.width=W;movingMask.height=H;
-      const mx=movingMask.getContext('2d');
-      mx.save();mx.filter=`blur(${Math.max(1,Math.round(Math.min(W,H)*.0025))}px)`;mx.drawImage(mask,0,0);mx.restore();
-      mx.globalCompositeOperation='destination-in';
-      const fade=mx.createLinearGradient(0,bounds.y,0,bounds.y+bounds.h);
-      fade.addColorStop(0,'rgba(255,255,255,1)');
-      fade.addColorStop(.62,'rgba(255,255,255,1)');
-      fade.addColorStop(.88,'rgba(255,255,255,0)');
-      fade.addColorStop(1,'rgba(255,255,255,0)');
-      mx.fillStyle=fade;mx.fillRect(bounds.x-4,bounds.y-4,bounds.w+8,bounds.h+8);
-      mx.globalCompositeOperation='source-over';
-
-      ox.globalCompositeOperation='destination-out';ox.drawImage(movingMask,0,0);
-      ox.globalCompositeOperation='source-over';
-
-      const ear=document.createElement('canvas');ear.width=W;ear.height=H;
-      const ex=ear.getContext('2d');ex.drawImage(layer,0,0,W,H);
-      ex.globalCompositeOperation='destination-in';ex.drawImage(movingMask,0,0);
-      ex.globalCompositeOperation='source-over';
-
-      const k=clamp(Number(intensity)||.5,.1,1)*clamp(Number(phase)||0,0,1);
-      const side=bounds.cx<W/2?-1:1;
-      const pivotX=bounds.x+bounds.w*.5,pivotY=bounds.y+bounds.h*.82;
-      ox.save();ox.translate(pivotX,pivotY);ox.rotate(side*4.5*k*Math.PI/180);
-      ox.drawImage(ear,-pivotX,-pivotY);ox.restore();
-    }
-    return out;
-  }
-
-  function drawEarMove(ctx,layer,phase,intensity,W,H,zone){
-    ctx.drawImage(buildEarFrame({layer,phase,intensity,W,H,zone}),0,0);
   }
 
   function drawHeadlightPaint(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on'){
@@ -378,8 +301,6 @@
     const action=s.action||'none';
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
     if(action==='yaw3d') return drawYaw3D(ctx,layer,phase,intensity,W,H);
-    if(action==='couple_approach') return drawCoupleApproach(ctx,layer,phase,intensity,W,H,meta.direction,s.actionZone);
-    if(action==='animal_ear') return drawEarMove(ctx,layer,phase,intensity,W,H,s.actionZone);
     if(action==='headlight'){
       const zones=Array.isArray(s.actionZones)&&s.actionZones.length?s.actionZones:(s.actionZone?[s.actionZone]:[]);
       ctx.drawImage(layer,0,0,W,H);
@@ -397,17 +318,13 @@
 
   function generateActionFrames({base, layers, selections, activeIndices, W, H, phases=PHASES, phaseForSelection=null}){
     const out=[];
-    const approach=activeIndices.filter(i=>selections[i]?.action==='couple_approach'&&layers.get(i));
-    const centers=approach.map(i=>({i,b:alphaBounds(layers.get(i))})).filter(v=>v.b);
-    const mean=centers.length?centers.reduce((n,v)=>n+v.b.cx,0)/centers.length:W/2;
-    const directions=new Map(centers.map(v=>[v.i,v.b.cx<mean?1:(v.b.cx>mean?-1:0)]));
     for(const phase of phases){
       const c=document.createElement('canvas'); c.width=W;c.height=H;
       const x=c.getContext('2d'); x.drawImage(base,0,0,W,H);
       selections.forEach((s,i)=>{
         const layer=layers.get(i); if(!layer) return;
         const localPhase=typeof phaseForSelection==='function'?phaseForSelection(s,phase,i):phase;
-        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,localPhase,W,H,{direction:directions.get(i)||0});
+        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,localPhase,W,H);
         else x.drawImage(layer,0,0,W,H);
       });
       out.push(c);
@@ -415,6 +332,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildEarFrame,buildApproachFrame};
-  console.log('[HAPPYHOLO] action-preview-engine V3.6.4 OFFLINE · vue centrale au repos pour oreilles et visages');
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame};
+  console.log('[HAPPYHOLO] action-preview-engine V3.6.6 OFFLINE · actions locales fiables uniquement');
 })();

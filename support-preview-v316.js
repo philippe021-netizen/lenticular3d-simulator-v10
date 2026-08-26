@@ -1,4 +1,4 @@
-/* HappyHolo V3.6.0 — actions couple + oreille hors réseau */
+/* HappyHolo V3.6.6 — actions locales fiables uniquement */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -112,7 +112,7 @@
 
   function transformSelections(){
     const p=window.happyHoloSelectionPlan||[];
-    return p.filter(s=>['yaw3d','couple_approach','animal_ear'].includes(s?.action));
+    return p.filter(s=>s?.action==='yaw3d');
   }
 
   // V3.4.1 — PHARES INTÉGRÉS AUX COUCHES 3D
@@ -156,11 +156,11 @@
       for(let j=i+1;j<plan.length;j++)if(masks[j]){x.globalCompositeOperation='destination-out';x.drawImage(masks[j],0,0);}
       x.globalCompositeOperation='source-over';layers.set(i,c);
     });
-    const activeIndices=plan.map((s,i)=>['yaw3d','couple_approach','animal_ear'].includes(s?.action)?i:-1).filter(i=>i>=0);
+    const activeIndices=plan.map((s,i)=>s?.action==='yaw3d'?i:-1).filter(i=>i>=0);
     const norms=[-1,-.66,-.33,0,.33,.66,1];
     const frames=engine.generateActionFrames({
       base,layers,selections:plan,activeIndices,W,H,phases:norms,
-      phaseForSelection:(s,n)=>s?.action==='yaw3d'?(n+1)/2:Math.abs(n)
+      phaseForSelection:(_s,n)=>(n+1)/2
     });
     transformCache={subRef:reliefLayers.sub,planRef:plan,frames,selection:active[0]};
     return transformCache;
@@ -349,14 +349,14 @@
 
     ctx.save();ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
 
-    if(reliefLayers.safetyBackground){
-      ctx.drawImage(reliefLayers.safetyBackground,r.x-1,r.y-1,r.w+2,r.h+2);
-    }
-
-    for(const l of reliefLayers.bg){
-      const z=(l.depth-.5)*2;
-      const shift=norm*(4+5*z)*(canvas.width/320);
-      ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
+    const customBg=window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,r);
+    if(!customBg){
+      if(reliefLayers.safetyBackground)ctx.drawImage(reliefLayers.safetyBackground,r.x-1,r.y-1,r.w+2,r.h+2);
+      for(const l of reliefLayers.bg){
+        const z=(l.depth-.5)*2;
+        const shift=norm*(4+5*z)*(canvas.width/320);
+        ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
+      }
     }
 
     const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
@@ -411,8 +411,9 @@
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
   window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;draw(0,0);});
+  window.addEventListener('happyholo-background-changed',()=>draw(0,0));
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.6.0 · rapprochement couple + mouvement oreille');
+  console.log('[HAPPYHOLO] support-preview V3.6.6 · actions fiables uniquement');
 })();
