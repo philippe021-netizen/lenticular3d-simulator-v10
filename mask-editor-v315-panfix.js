@@ -333,7 +333,7 @@
           }
 
           const z=await window.HappyHoloChooseActionZone(
-            {actionZone:s.actionZone||null,zoneMode:(s.action==='animal_ear'||s.action==='couple_approach')?'outline':'paint'},
+            {actionZone:s.actionZone||null,zoneMode:(s.action==='animal_ear'||s.action==='couple_approach')?'outline':'paint',zoneLabel:s.action==='couple_approach'?'visage':'oreille'},
             s.action==='animal_ear'
               ? 'Contour extérieur de l’oreille'
               : (s.action==='couple_approach'?'Contour extérieur du visage':'Zone du clin d’œil')
@@ -638,7 +638,7 @@
       if(st.points.length===1){zoneCtx.arc(first.x,first.y,zoneCtx.lineWidth/2,0,Math.PI*2);zoneCtx.fill();}
       else{
         for(let i=1;i<st.points.length;i++){const p=toPoint(st.points[i]);zoneCtx.lineTo(p.x,p.y);}
-        if(zoneState.mode==='outline'){
+        if(zoneState.mode==='outline'&&st.closed){
           zoneCtx.closePath();zoneCtx.globalAlpha=.20;zoneCtx.fill();zoneCtx.globalAlpha=1;
         }
         zoneCtx.stroke();
@@ -720,12 +720,16 @@
     Object.assign(zoneModal.style,{
       position:'fixed',
       inset:'0',
+      width:'100vw',
+      height:'100dvh',
+      maxHeight:'100dvh',
       zIndex:'1000005',
       background:'rgba(6,6,10,.97)',
       display:'none',
       flexDirection:'column',
       color:'#fff',
-      fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'
+      fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif',
+      overflow:'hidden'
     });
 
     const top=document.createElement('div');
@@ -735,7 +739,9 @@
       display:'flex',
       gap:'10px',
       alignItems:'center',
-      background:'#17171a'
+      background:'#17171a',
+      flexShrink:'0',
+      paddingTop:'max(10px, env(safe-area-inset-top))'
     });
 
     const title=document.createElement('b');
@@ -778,7 +784,7 @@
       const z=zoneFromStrokes();
 
       if(!z){
-        alert(zoneState?.mode==='outline'?'Trace d’abord un contour fermé autour de l’oreille.':'Peins d’abord précisément la zone avec l’Apple Pencil.');
+        alert(zoneState?.mode==='outline'?`Trace d’abord un contour fermé autour ${zoneState.label==='visage'?'du visage':'de l’oreille'}.`:'Peins d’abord précisément la zone avec l’Apple Pencil.');
         return;
       }
 
@@ -832,7 +838,15 @@
     });
     zoneModal._foot=foot;
 
-    zoneModal.append(top,tools,body,foot);
+    const bottomActions=document.createElement('div');
+    Object.assign(bottomActions.style,{display:'flex',gap:'10px',padding:'9px 12px max(9px, env(safe-area-inset-bottom))',background:'#17171a',borderTop:'1px solid #444',flexShrink:'0',zIndex:'3'});
+    const bottomClear=document.createElement('button');bottomClear.type='button';bottomClear.textContent='Effacer';
+    const bottomOk=document.createElement('button');bottomOk.type='button';bottomOk.textContent='✓ Valider le contour';
+    for(const b of[bottomClear,bottomOk])Object.assign(b.style,{flex:'1',minHeight:'46px',borderRadius:'11px',border:'1px solid #666',fontWeight:'850',fontSize:'15px'});
+    Object.assign(bottomClear.style,{background:'#2b2b2f',color:'#fff'});Object.assign(bottomOk.style,{background:'#0a84ff',color:'#fff'});
+    bottomClear.onclick=()=>clear.onclick();bottomOk.onclick=()=>ok.onclick();
+
+    zoneModal.append(top,tools,body,foot,bottomActions);
     document.body.appendChild(zoneModal);
 
     const activePointers=new Map();
@@ -869,7 +883,7 @@
         drawingPointer=e.pointerId;
 
         const p=zoneImagePoint(e.clientX,e.clientY);
-        zoneState.activeStroke={erase:zoneState.mode==='outline'?false:!!zoneState.erase,size:zoneState.brush,points:[[clamp(p.x/zoneState.imgW,0,1),clamp(p.y/zoneState.imgH,0,1)]]};
+        zoneState.activeStroke={erase:zoneState.mode==='outline'?false:!!zoneState.erase,size:zoneState.brush,closed:false,points:[[clamp(p.x/zoneState.imgW,0,1),clamp(p.y/zoneState.imgH,0,1)]]};
         zoneState.strokes.push(zoneState.activeStroke);
 
         drawZone();
@@ -999,6 +1013,7 @@
       activePointers.delete(e.pointerId);
 
       if(e.pointerId===drawingPointer){
+        if(zoneState?.activeStroke&&zoneState.mode==='outline')zoneState.activeStroke.closed=zoneState.activeStroke.points.length>=3;
         drawingPointer=null;
         if(zoneState)zoneState.activeStroke=null;
       }
@@ -1063,6 +1078,7 @@
         imgW:iw,
         imgH:ih,
         mode:current?.zoneMode==='outline'?'outline':'paint',
+        label:current?.zoneLabel==='visage'?'visage':'oreille',
         zoom:1,
         panX:0,
         panY:0,
@@ -1080,9 +1096,9 @@
       zoneState.panY=f.y;
 
       if(current?.actionZone?.kind==='paint'&&Array.isArray(current.actionZone.strokes)){
-        zoneState.strokes=current.actionZone.strokes.map(st=>({erase:!!st.erase,size:Number(st.size)||zoneState.brush,points:(st.points||[]).map(p=>[Number(p[0])||0,Number(p[1])||0])}));
+        zoneState.strokes=current.actionZone.strokes.map(st=>({erase:!!st.erase,size:Number(st.size)||zoneState.brush,closed:zoneState.mode==='outline',points:(st.points||[]).map(p=>[Number(p[0])||0,Number(p[1])||0])}));
       }else if(current?.actionZone?.kind==='outline'&&Array.isArray(current.actionZone.contours)){
-        zoneState.strokes=current.actionZone.contours.map(points=>({erase:false,size:zoneState.brush,points:points.map(p=>[Number(p[0])||0,Number(p[1])||0])}));
+        zoneState.strokes=current.actionZone.contours.map(points=>({erase:false,size:zoneState.brush,closed:true,points:points.map(p=>[Number(p[0])||0,Number(p[1])||0])}));
       }else if(current?.actionZone){
         const z=current.actionZone;
 
@@ -1091,14 +1107,14 @@
         const w=z.w*iw;
         const h=z.h*ih;
 
-        zoneState.strokes=[{erase:false,size:zoneState.brush,points:[[x/iw,y/ih],[(x+w)/iw,y/ih],[(x+w)/iw,(y+h)/ih],[x/iw,(y+h)/ih],[x/iw,y/ih]]}];
+        zoneState.strokes=[{erase:false,size:zoneState.brush,closed:true,points:[[x/iw,y/ih],[(x+w)/iw,y/ih],[(x+w)/iw,(y+h)/ih],[x/iw,(y+h)/ih],[x/iw,y/ih]]}];
       }
 
       zoneModal._refreshTools?.();
       if(zoneModal._erase)zoneModal._erase.style.display=zoneState.mode==='outline'?'none':'inline-block';
       if(zoneModal._brush)zoneModal._brush.style.display=zoneState.mode==='outline'?'none':'block';
       if(zoneModal._foot)zoneModal._foot.textContent=zoneState.mode==='outline'
-        ? 'Apple Pencil : trace le contour extérieur de chaque oreille • Relâche pour fermer et remplir automatiquement • 1 doigt : déplacer • 2 doigts : zoom'
+        ? `Apple Pencil : trace le contour extérieur ${zoneState.label==='visage'?'du visage':'de chaque oreille'} • Relâche pour fermer et remplir automatiquement • 1 doigt : déplacer • 2 doigts : zoom`
         : 'Apple Pencil : peindre plusieurs zones • Gomme : corriger • 1 doigt : déplacer • 2 doigts : zoom + déplacement';
       drawZone();
 

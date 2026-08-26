@@ -486,7 +486,7 @@
         if(s.action==='person_wink'||s.action==='animal_ear'||s.action==='couple_approach'){
           const outline=s.action==='animal_ear'||s.action==='couple_approach';
           const title=s.action==='animal_ear'?'Contour extérieur de l’oreille':(s.action==='couple_approach'?'Contour extérieur du visage':'Zone précise de l’œil');
-          const z=await window.HappyHoloChooseActionZone({actionZone:s.actionZone||null,zoneMode:outline?'outline':'paint'},title);if(z)s.actionZone=z;
+          const z=await window.HappyHoloChooseActionZone({actionZone:s.actionZone||null,zoneMode:outline?'outline':'paint',zoneLabel:s.action==='couple_approach'?'visage':'oreille'},title);if(z)s.actionZone=z;
         }else if(s.action==='headlight'||s.action==='glint'){
           s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];if(s.actionZones.length>=4){alert('4 zones maximum.');return;}
           const z=await window.HappyHoloChooseActionZone({actionZone:null},`${s.action==='glint'?'Zone reflet':'Zone plein phare'} ${s.actionZones.length+1}`);if(z)s.actionZones.push(z);
