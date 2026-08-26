@@ -60,6 +60,13 @@
     ctx.drawImage(buildYawFrame({layer,phase,intensity,W,H}),0,0);
   }
 
+  function drawCoupleApproach(ctx,layer,phase,intensity,W,H,direction=0){
+    const pulse=clamp(Number(phase)||0,0,1);
+    const dir=Math.sign(Number(direction)||0);
+    const dx=dir*W*.024*clamp(Number(intensity)||.5,.1,1)*pulse;
+    ctx.drawImage(layer,dx,0,W,H);
+  }
+
 
   function paintZoneMask(zone,W,H){
     if(!zone || zone.kind!=='paint' || !Array.isArray(zone.strokes)) return null;
@@ -82,6 +89,42 @@
     const W=mask.width,H=mask.height,tmp=document.createElement('canvas');tmp.width=W;tmp.height=H;const t=tmp.getContext('2d');
     drawFn(t);t.globalCompositeOperation='destination-in';t.drawImage(mask,0,0);t.globalCompositeOperation='source-over';
     ctx.save();ctx.globalAlpha=alpha;ctx.globalCompositeOperation=composite;ctx.drawImage(tmp,0,0);ctx.restore();
+  }
+
+  function alphaBounds(canvas){
+    const W=canvas.width,H=canvas.height,data=canvas.getContext('2d').getImageData(0,0,W,H).data;
+    let minX=W,minY=H,maxX=-1,maxY=-1;
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+      if(data[(y*W+x)*4+3]<12) continue;
+      if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+    }
+    return maxX<minX?null:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1,cx:(minX+maxX)/2};
+  }
+
+  function buildEarFrame({layer,phase=0,intensity=.5,W,H,zone}){
+    const mask=paintZoneMask(zone,W,H),bounds=mask&&alphaBounds(mask);
+    if(!mask||!bounds) return layer;
+
+    const out=document.createElement('canvas');out.width=W;out.height=H;
+    const ox=out.getContext('2d');ox.drawImage(layer,0,0,W,H);
+    ox.globalCompositeOperation='destination-out';ox.drawImage(mask,0,0);
+    ox.globalCompositeOperation='source-over';
+
+    const ear=document.createElement('canvas');ear.width=W;ear.height=H;
+    const ex=ear.getContext('2d');ex.drawImage(layer,0,0,W,H);
+    ex.globalCompositeOperation='destination-in';ex.drawImage(mask,0,0);
+    ex.globalCompositeOperation='source-over';
+
+    const k=clamp(Number(intensity)||.5,.1,1)*clamp(Number(phase)||0,0,1);
+    const side=bounds.cx<W/2?-1:1;
+    const pivotX=bounds.x+bounds.w*.5,pivotY=bounds.y+bounds.h*.88;
+    ox.save();ox.translate(pivotX,pivotY);ox.rotate(side*7*k*Math.PI/180);
+    ox.drawImage(ear,-pivotX,-pivotY);ox.restore();
+    return out;
+  }
+
+  function drawEarMove(ctx,layer,phase,intensity,W,H,zone){
+    ctx.drawImage(buildEarFrame({layer,phase,intensity,W,H,zone}),0,0);
   }
 
   function drawHeadlightPaint(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on'){
@@ -275,11 +318,13 @@
     ctx.drawImage(out,0,0);
   }
 
-  function renderAction(ctx,layer,s,phase,W,H){
+  function renderAction(ctx,layer,s,phase,W,H,meta={}){
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
     if(action==='yaw3d') return drawYaw3D(ctx,layer,phase,intensity,W,H);
+    if(action==='couple_approach') return drawCoupleApproach(ctx,layer,phase,intensity,W,H,meta.direction);
+    if(action==='animal_ear') return drawEarMove(ctx,layer,phase,intensity,W,H,s.actionZone);
     if(action==='headlight'){
       const zones=Array.isArray(s.actionZones)&&s.actionZones.length?s.actionZones:(s.actionZone?[s.actionZone]:[]);
       ctx.drawImage(layer,0,0,W,H);
@@ -297,12 +342,16 @@
 
   function generateActionFrames({base, layers, selections, activeIndices, W, H}){
     const out=[];
+    const approach=activeIndices.filter(i=>selections[i]?.action==='couple_approach'&&layers.get(i));
+    const centers=approach.map(i=>({i,b:alphaBounds(layers.get(i))})).filter(v=>v.b);
+    const mean=centers.length?centers.reduce((n,v)=>n+v.b.cx,0)/centers.length:W/2;
+    const directions=new Map(centers.map(v=>[v.i,v.b.cx<mean?1:(v.b.cx>mean?-1:0)]));
     for(const phase of PHASES){
       const c=document.createElement('canvas'); c.width=W;c.height=H;
       const x=c.getContext('2d'); x.drawImage(base,0,0,W,H);
       selections.forEach((s,i)=>{
         const layer=layers.get(i); if(!layer) return;
-        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,phase,W,H);
+        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,phase,W,H,{direction:directions.get(i)||0});
         else x.drawImage(layer,0,0,W,H);
       });
       out.push(c);
@@ -310,6 +359,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame};
-  console.log('[HAPPYHOLO] action-preview-engine V3.5.0 OFFLINE · rotation verticale légère active');
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildEarFrame};
+  console.log('[HAPPYHOLO] action-preview-engine V3.6.0 OFFLINE · rapprochement couple + mouvement oreille');
 })();

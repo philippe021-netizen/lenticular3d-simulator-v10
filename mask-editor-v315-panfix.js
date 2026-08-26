@@ -304,6 +304,8 @@
       ['Moto/voiture — appel de phare','headlight'],
       ['Reflet lumineux local','glint'],
       ['Sujet — rotation 3D verticale légère','yaw3d'],
+      ['Couple — rapprochement léger','couple_approach'],
+      ['Animal — mouvement d’oreille','animal_ear'],
       ['Objet rigide — pivot léger','pivot']
     ].forEach(([t,v])=>{
       planAction.appendChild(new Option(t,v));
@@ -324,7 +326,7 @@
         const s=selections[activeSelection];
         if(!s) return;
 
-        if(s.action==='person_wink'){
+        if(s.action==='person_wink'||s.action==='animal_ear'){
           if(typeof window.HappyHoloChooseActionZone!=='function'){
             alert('Outil de zone action non chargé. Recharge la page puis réessaie.');
             return;
@@ -332,7 +334,9 @@
 
           const z=await window.HappyHoloChooseActionZone(
             {actionZone:s.actionZone||null},
-            'Zone du clin d’œil'
+            s.action==='animal_ear'
+              ? 'Zone précise de l’oreille — peins uniquement l’oreille'
+              : 'Zone du clin d’œil'
           );
 
           if(z){
@@ -436,17 +440,19 @@
         editorRemoveZoneBtn.style.display=
           s.actionZones.length?'block':'none';
 
-      }else if(s.action==='person_wink'){
+      }else if(s.action==='person_wink'||s.action==='animal_ear'){
 
         editorZoneWrap.style.display='flex';
 
         editorZoneBtn.textContent=
           s.actionZone
-            ? '✓ Modifier zone œil'
-            : '🎯 Définir zone œil';
+            ? `✓ Modifier zone ${s.action==='animal_ear'?'oreille':'œil'}`
+            : `🎯 Définir zone ${s.action==='animal_ear'?'oreille':'œil'}`;
 
         editorZoneInfo.textContent=
-          'Apple Pencil : entoure librement l’œil. 1 doigt : déplacer. 2 doigts : zoom.';
+          s.action==='animal_ear'
+            ? 'Apple Pencil : peins uniquement l’oreille, jusqu’à sa base. 1 doigt : déplacer. 2 doigts : zoom.'
+            : 'Apple Pencil : entoure librement l’œil. 1 doigt : déplacer. 2 doigts : zoom.';
 
         editorRemoveZoneBtn.style.display='none';
 
@@ -462,7 +468,7 @@
       const previous=s.action;
       s.action=planAction.value;
 
-      if(previous!==s.action && s.action!=='person_wink'){
+      if(previous!==s.action && s.action!=='person_wink' && s.action!=='animal_ear'){
         delete s.actionZone;
       }
 

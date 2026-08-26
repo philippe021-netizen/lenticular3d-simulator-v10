@@ -1,4 +1,4 @@
-/* HappyHolo V3.5.0 — rotation verticale légère du sujet */
+/* HappyHolo V3.6.0 — actions couple + oreille hors réseau */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -80,7 +80,7 @@
     // les fentes sub-pixel ouvertes entre deux couches exclusives.
     const safetyBackground=makeFlatLayer(rs.backgroundImg,SW,SH);
     reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
-    headlightCache=null;glintCache=null;yawCache=null;
+    headlightCache=null;glintCache=null;transformCache=null;
     $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
     play();
   }
@@ -110,9 +110,9 @@
     return p.find(s=>s?.action==='glint'&&Array.isArray(s.actionZones)&&s.actionZones.length);
   }
 
-  function activeYawSelection(){
+  function transformSelections(){
     const p=window.happyHoloSelectionPlan||[];
-    return p.find(s=>s?.action==='yaw3d');
+    return p.filter(s=>['yaw3d','couple_approach','animal_ear'].includes(s?.action));
   }
 
   // V3.4.1 — PHARES INTÉGRÉS AUX COUCHES 3D
@@ -120,26 +120,50 @@
   // Chaque morceau de phare reçoit donc EXACTEMENT le déplacement de sa couche.
   let headlightCache=null;
   let glintCache=null;
-  let yawCache=null;
+  let transformCache=null;
 
-  function getYawCache(){
-    const s=activeYawSelection(),engine=window.HappyHoloActionPreviewEngine;
-    if(!s||!reliefLayers?.sub?.length||typeof engine?.buildYawFrame!=='function') return null;
-    const intensity=Number(s.intensity||50);
-    if(yawCache&&yawCache.subRef===reliefLayers.sub&&yawCache.intensity===intensity&&yawCache.selection===s) return yawCache;
+  function selectionMask(s,W,H){
+    const m=s?.mask;if(!m?.width||!m?.height||!m?.data)return null;
+    const raw=document.createElement('canvas');raw.width=m.width;raw.height=m.height;
+    raw.getContext('2d').putImageData(m,0,0);
+    const src=window.HappyHoloReliefState?.sourceImg||window.HappyHoloReliefState?.subjectImg;
+    if(!src)return null;
+    const c=document.createElement('canvas');c.width=W;c.height=H;
+    const r=coverRect(src.naturalWidth||src.width,src.naturalHeight||src.height,W,H);
+    c.getContext('2d').drawImage(raw,0,0,m.width,m.height,r.x,r.y,r.w,r.h);
+    return c;
+  }
+
+  function getTransformCache(){
+    const active=transformSelections(),engine=window.HappyHoloActionPreviewEngine;
+    if(!active.length||!reliefLayers?.sub?.length||typeof engine?.generateActionFrames!=='function') return null;
+    const plan=window.happyHoloSelectionPlan||[];
+    if(transformCache&&transformCache.subRef===reliefLayers.sub&&transformCache.planRef===plan) return transformCache;
     const W=reliefLayers.w,H=reliefLayers.h;
     const subject=document.createElement('canvas');subject.width=W;subject.height=H;
     const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
-    const phases=[0,.17,.34,.5,.66,.83,1];
-    const frames=phases.map(phase=>engine.buildYawFrame({
-      layer:subject,phase,intensity:Math.max(.1,Math.min(1,intensity/100)),W,H
-    }));
-    yawCache={subRef:reliefLayers.sub,intensity,selection:s,frames};
-    return yawCache;
+
+    const masks=plan.map(s=>selectionMask(s,W,H));
+    const base=document.createElement('canvas');base.width=W;base.height=H;
+    const bx=base.getContext('2d');bx.drawImage(subject,0,0);
+    bx.globalCompositeOperation='destination-out';masks.forEach(m=>{if(m)bx.drawImage(m,0,0);});bx.globalCompositeOperation='source-over';
+
+    const layers=new Map();
+    plan.forEach((s,i)=>{
+      const own=masks[i];if(!own)return;
+      const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+      x.drawImage(subject,0,0);x.globalCompositeOperation='destination-in';x.drawImage(own,0,0);
+      for(let j=i+1;j<plan.length;j++)if(masks[j]){x.globalCompositeOperation='destination-out';x.drawImage(masks[j],0,0);}
+      x.globalCompositeOperation='source-over';layers.set(i,c);
+    });
+    const activeIndices=plan.map((s,i)=>['yaw3d','couple_approach','animal_ear'].includes(s?.action)?i:-1).filter(i=>i>=0);
+    const frames=engine.generateActionFrames({base,layers,selections:plan,activeIndices,W,H});
+    transformCache={subRef:reliefLayers.sub,planRef:plan,frames,selection:active[0]};
+    return transformCache;
   }
 
-  function drawYawSubject(r,norm){
-    const cache=getYawCache();if(!cache?.frames?.length)return false;
+  function drawTransformSubject(r,norm){
+    const cache=getTransformCache();if(!cache?.frames?.length)return false;
     const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));
     const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];
     const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));
@@ -334,8 +358,8 @@
     const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
     if(textDepth<0) drawTextLayer(norm,r);
 
-    const yawDrawn=drawYawSubject(r,norm);
-    if(!yawDrawn){
+    const transformDrawn=drawTransformSubject(r,norm);
+    if(!transformDrawn){
       reliefLayers.sub.forEach((l,i)=>{
         const z=(l.depth-.5)*2;
         const shift=norm*(12+13*z)*(canvas.width/320);
@@ -382,9 +406,9 @@
 
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
-  window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;yawCache=null;draw(0,0);});
+  window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;draw(0,0);});
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.5.0 · rotation verticale légère du sujet');
+  console.log('[HAPPYHOLO] support-preview V3.6.0 · rapprochement couple + mouvement oreille');
 })();
