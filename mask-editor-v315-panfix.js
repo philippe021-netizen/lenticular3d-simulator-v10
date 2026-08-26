@@ -622,36 +622,27 @@
 
     zoneCtx.restore();
 
-    if(zoneState.points.length>1){
-      zoneCtx.save();
-
-      zoneCtx.beginPath();
-
-      const first=pointToCanvas(zoneState.points[0]);
-      zoneCtx.moveTo(first.x,first.y);
-
-      for(let i=1;i<zoneState.points.length;i++){
-        const p=pointToCanvas(zoneState.points[i]);
-        zoneCtx.lineTo(p.x,p.y);
-      }
-
-      zoneCtx.closePath();
-
-      zoneCtx.fillStyle='rgba(0,229,255,.14)';
-      zoneCtx.fill();
-
-      zoneCtx.strokeStyle='#00e5ff';
-      zoneCtx.lineWidth=Math.max(3,W/300);
-      zoneCtx.lineJoin='round';
-      zoneCtx.lineCap='round';
-      zoneCtx.stroke();
-
+    for(const st of zoneState.strokes||[]){
+      if(!st?.points?.length)continue;
+      zoneCtx.save();zoneCtx.lineJoin='round';zoneCtx.lineCap='round';
+      zoneCtx.globalCompositeOperation=st.erase?'destination-out':'source-over';
+      zoneCtx.strokeStyle=st.erase?'rgba(255,75,90,.85)':'rgba(0,229,255,.72)';zoneCtx.fillStyle=zoneCtx.strokeStyle;
+      zoneCtx.lineWidth=Math.max(3,(Number(st.size)||.02)*Math.max(zoneState.imgW,zoneState.imgH)*zoneState.zoom);
+      const toPoint=p=>pointToCanvas({x:p[0]*zoneState.imgW,y:p[1]*zoneState.imgH});
+      const first=toPoint(st.points[0]);zoneCtx.beginPath();zoneCtx.moveTo(first.x,first.y);
+      if(st.points.length===1){zoneCtx.arc(first.x,first.y,zoneCtx.lineWidth/2,0,Math.PI*2);zoneCtx.fill();}
+      else{for(let i=1;i<st.points.length;i++){const p=toPoint(st.points[i]);zoneCtx.lineTo(p.x,p.y);}zoneCtx.stroke();}
       zoneCtx.restore();
     }
+
+    const cx=W/2,cy=H/2;zoneCtx.save();zoneCtx.strokeStyle='rgba(255,255,255,.86)';zoneCtx.lineWidth=1.5;
+    zoneCtx.beginPath();zoneCtx.moveTo(cx-11,cy);zoneCtx.lineTo(cx+11,cy);zoneCtx.moveTo(cx,cy-11);zoneCtx.lineTo(cx,cy+11);zoneCtx.stroke();zoneCtx.restore();
   }
 
-  function zoneFromPoints(points){
-    if(!points || points.length<3) return null;
+  function zoneFromStrokes(){
+    const strokes=(zoneState?.strokes||[]).filter(st=>st?.points?.length);
+    const points=strokes.filter(st=>!st.erase).flatMap(st=>st.points||[]);
+    if(!points.length)return null;
 
     let minX=Infinity;
     let minY=Infinity;
@@ -659,14 +650,12 @@
     let maxY=-Infinity;
 
     for(const p of points){
-      if(p.x<minX) minX=p.x;
-      if(p.y<minY) minY=p.y;
-      if(p.x>maxX) maxX=p.x;
-      if(p.y>maxY) maxY=p.y;
+      const x=p[0]*zoneState.imgW,y=p[1]*zoneState.imgH;
+      if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;
     }
 
-    const padX=Math.max(4,(maxX-minX)*.08);
-    const padY=Math.max(4,(maxY-minY)*.12);
+    const pad=Math.max(4,(Number(zoneState.brush)||.02)*Math.max(zoneState.imgW,zoneState.imgH)*.6);
+    const padX=pad,padY=pad;
 
     minX-=padX;
     maxX+=padX;
@@ -684,6 +673,8 @@
     if(w<5 || h<5) return null;
 
     return {
+      kind:'paint',sourceW:zoneState.imgW,sourceH:zoneState.imgH,
+      strokes:strokes.map(st=>({erase:!!st.erase,size:Number(st.size)||zoneState.brush,points:st.points.map(p=>[p[0],p[1]])})),
       x:minX/zoneState.imgW,
       y:minY/zoneState.imgH,
       w:w/zoneState.imgW,
@@ -762,15 +753,15 @@
 
     clear.onclick=()=>{
       if(!zoneState) return;
-      zoneState.points=[];
+      zoneState.strokes=[];
       drawZone();
     };
 
     ok.onclick=()=>{
-      const z=zoneFromPoints(zoneState?.points||[]);
+      const z=zoneFromStrokes();
 
       if(!z){
-        alert('Entoure d’abord précisément l’œil avec l’Apple Pencil.');
+        alert('Peins d’abord précisément la zone avec l’Apple Pencil.');
         return;
       }
 
@@ -778,6 +769,14 @@
     };
 
     top.append(title,cancel,clear,ok);
+
+    const tools=document.createElement('div');Object.assign(tools.style,{display:'flex',gap:'8px',padding:'8px 12px',background:'#111',alignItems:'center',flexWrap:'wrap'});
+    const add=document.createElement('button');add.textContent='✏️ Sélectionner';const erase=document.createElement('button');erase.textContent='⌫ Gomme';
+    const brush=document.createElement('input');brush.type='range';brush.min='8';brush.max='90';brush.value='28';Object.assign(brush.style,{flex:'1',minWidth:'130px'});
+    for(const b of[add,erase])Object.assign(b.style,{padding:'9px 11px',borderRadius:'9px',border:'1px solid #555',background:'#26262a',color:'#fff',fontWeight:'800'});
+    const refresh=()=>{add.style.background=zoneState?.erase?'#26262a':'#087544';erase.style.background=zoneState?.erase?'#8b2732':'#26262a';};
+    add.onclick=()=>{if(zoneState)zoneState.erase=false;refresh();drawZone();};erase.onclick=()=>{if(zoneState)zoneState.erase=true;refresh();drawZone();};
+    brush.oninput=()=>{if(zoneState)zoneState.brush=Number(brush.value)/Math.max(1,Math.max(zoneState.imgW,zoneState.imgH));drawZone();};tools.append(add,erase,brush);zoneModal._refreshTools=refresh;
 
     const body=document.createElement('div');
 
@@ -806,7 +805,7 @@
     const foot=document.createElement('div');
 
     foot.textContent=
-      'Apple Pencil : entoure l’œil • 1 doigt : déplacer • 2 doigts : zoom + déplacement';
+      'Apple Pencil : peindre plusieurs zones • Gomme : corriger • 1 doigt : déplacer • 2 doigts : zoom + déplacement';
 
     Object.assign(foot.style,{
       padding:'10px',
@@ -815,7 +814,7 @@
       opacity:.8
     });
 
-    zoneModal.append(top,body,foot);
+    zoneModal.append(top,tools,body,foot);
     document.body.appendChild(zoneModal);
 
     const activePointers=new Map();
@@ -851,14 +850,9 @@
       if(e.pointerType==='pen'){
         drawingPointer=e.pointerId;
 
-        zoneState.points=[];
-
         const p=zoneImagePoint(e.clientX,e.clientY);
-
-        zoneState.points.push({
-          x:clamp(p.x,0,zoneState.imgW),
-          y:clamp(p.y,0,zoneState.imgH)
-        });
+        zoneState.activeStroke={erase:!!zoneState.erase,size:zoneState.brush,points:[[clamp(p.x/zoneState.imgW,0,1),clamp(p.y/zoneState.imgH,0,1)]]};
+        zoneState.strokes.push(zoneState.activeStroke);
 
         drawZone();
         return;
@@ -914,10 +908,8 @@
       ){
         const p=zoneImagePoint(e.clientX,e.clientY);
 
-        zoneState.points.push({
-          x:clamp(p.x,0,zoneState.imgW),
-          y:clamp(p.y,0,zoneState.imgH)
-        });
+        const q=[clamp(p.x/zoneState.imgW,0,1),clamp(p.y/zoneState.imgH,0,1)],pts=zoneState.activeStroke?.points,last=pts?.[pts.length-1];
+        if(pts&&(!last||Math.hypot((q[0]-last[0])*zoneState.imgW,(q[1]-last[1])*zoneState.imgH)>1.2))pts.push(q);
 
         drawZone();
         return;
@@ -990,6 +982,7 @@
 
       if(e.pointerId===drawingPointer){
         drawingPointer=null;
+        if(zoneState)zoneState.activeStroke=null;
       }
 
       if(e.pointerId===panPointer){
@@ -1054,7 +1047,7 @@
         zoom:1,
         panX:0,
         panY:0,
-        points:[]
+        strokes:[],activeStroke:null,erase:false,brush:28/Math.max(iw,ih)
       };
 
       const f=zoneFit(
@@ -1067,7 +1060,9 @@
       zoneState.panX=f.x;
       zoneState.panY=f.y;
 
-      if(current?.actionZone){
+      if(current?.actionZone?.kind==='paint'&&Array.isArray(current.actionZone.strokes)){
+        zoneState.strokes=current.actionZone.strokes.map(st=>({erase:!!st.erase,size:Number(st.size)||zoneState.brush,points:(st.points||[]).map(p=>[Number(p[0])||0,Number(p[1])||0])}));
+      }else if(current?.actionZone){
         const z=current.actionZone;
 
         const x=z.x*iw;
@@ -1075,15 +1070,10 @@
         const w=z.w*iw;
         const h=z.h*ih;
 
-        zoneState.points=[
-          {x,y},
-          {x:x+w,y},
-          {x:x+w,y:y+h},
-          {x,y:y+h},
-          {x,y}
-        ];
+        zoneState.strokes=[{erase:false,size:zoneState.brush,points:[[x/iw,y/ih],[(x+w)/iw,y/ih],[(x+w)/iw,(y+h)/ih],[x/iw,(y+h)/ih],[x/iw,y/ih]]}];
       }
 
+      zoneModal._refreshTools?.();
       drawZone();
 
       return new Promise(resolve=>{

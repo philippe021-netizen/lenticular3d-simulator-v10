@@ -177,6 +177,19 @@
     ctx.restore();
   }
 
+  function drawWinkPaint(ctx,layer,phase,intensity,W,H,zone){
+    ctx.drawImage(layer,0,0,W,H);
+    const mask=paintZoneMask(zone,W,H),z=zonePx(zone,W,H);if(!mask||!z)return;
+    const k=clamp(phase*intensity,0,1),strips=22,sh=z.h/strips,mid=z.y+z.h*.54;
+    const warped=document.createElement('canvas');warped.width=W;warped.height=H;const x=warped.getContext('2d');
+    for(let i=0;i<strips;i++){
+      const sy=z.y+i*sh,center=sy+sh/2,dist=center-mid,dy=-dist*.76*k,dh=Math.max(.5,sh*(1-.28*k));
+      x.drawImage(layer,z.x,sy,z.w,sh,z.x,sy+dy,z.w,dh);
+    }
+    if(k>.35){x.globalAlpha=(k-.35)/.65*.30;x.fillStyle='rgba(45,30,28,.72)';x.fillRect(z.x+z.w*.08,mid-1,z.w*.84,Math.max(1,z.h*.025));x.globalAlpha=1;}
+    x.globalCompositeOperation='destination-in';x.drawImage(mask,0,0);x.globalCompositeOperation='source-over';ctx.drawImage(warped,0,0);
+  }
+
   function renderAction(ctx,layer,s,phase,W,H){
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
@@ -188,7 +201,7 @@
       for(const z of zones){if(z?.kind==='paint') drawHeadlightPaint(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on');else drawHeadlight(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on',true);}
       return;
     }
-    if(action==='person_wink') return drawWink(ctx,layer,phase,intensity,W,H,s.actionZone);
+    if(action==='person_wink') return s.actionZone?.kind==='paint'?drawWinkPaint(ctx,layer,phase,intensity,W,H,s.actionZone):drawWink(ctx,layer,phase,intensity,W,H,s.actionZone);
     ctx.drawImage(layer,0,0,W,H);
   }
 
@@ -208,5 +221,5 @@
   }
 
   window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover};
-  console.log('[HAPPYHOLO] action-preview-engine V3.3.5 OFFLINE actif · masques libres multi-zones plein phare');
+  console.log('[HAPPYHOLO] action-preview-engine V3.3.6 OFFLINE actif · masque libre clin d’œil + multi-zones plein phare');
 })();
