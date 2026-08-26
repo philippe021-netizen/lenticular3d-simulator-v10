@@ -265,3 +265,276 @@
     }
   }, true);
 })();
+/* HappyHolo — clin d'oeil sans changement du site
+   À AJOUTER à la fin de v311-monotonic-patch.js
+   - aucun changement visuel de l'interface
+   - aucune nouvelle sélection ni nouvel outil
+   - utilise la sélection déjà dessinée au stylet
+   - agit uniquement sur les sélections action==='person_wink' ou 'cat_blink'
+   - post-traite les 9 vues générées dans #frames
+*/
+(() => {
+  'use strict';
+
+  const SUPPORTED = new Set(['person_wink', 'cat_blink']);
+  const WINK_SEQ = [0, 0.22, 0.45, 0.72, 1, 0.72, 0.45, 0.22, 0];
+  const $ = s => document.querySelector(s);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function getPlan() {
+    return Array.isArray(window.happyHoloSelectionPlan) ? window.happyHoloSelectionPlan : [];
+  }
+
+  function maskToCanvas(mask) {
+    if (!mask?.width || !mask?.height || !mask?.data) return null;
+    const c = document.createElement('canvas');
+    c.width = mask.width;
+    c.height = mask.height;
+    c.getContext('2d').putImageData(mask, 0, 0);
+    return c;
+  }
+
+  function maskBBox(mask) {
+    const d = mask?.data, w = mask?.width, h = mask?.height;
+    if (!d || !w || !h) return null;
+    let minX = w, minY = h, maxX = -1, maxY = -1, count = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (d[(y * w + x) * 4 + 3] > 12) {
+          count++;
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (!count) return null;
+    return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1, maskW: w, maskH: h };
+  }
+
+  function phaseForFrame(i, timing) {
+    const seq = WINK_SEQ;
+    if (timing === '1-3') {
+      const local = [0, 0.55, 1];
+      return i >= 0 && i <= 2 ? local[i] : 0;
+    }
+    if (timing === '4-6') {
+      const local = [0, 0.55, 1];
+      return i >= 3 && i <= 5 ? local[i - 3] : 0;
+    }
+    if (timing === '7-9') {
+      const local = [0, 0.55, 1];
+      return i >= 6 && i <= 8 ? local[i - 6] : 0;
+    }
+    return seq[i] ?? 0;
+  }
+
+  function frameImgToCanvas(img) {
+    const c = document.createElement('canvas');
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    c.width = w;
+    c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    return c;
+  }
+
+  function scaledMaskCanvas(sel, outW, outH) {
+    const mc = maskToCanvas(sel.mask);
+    if (!mc) return null;
+    const c = document.createElement('canvas');
+    c.width = outW;
+    c.height = outH;
+    c.getContext('2d').drawImage(mc, 0, 0, outW, outH);
+    return c;
+  }
+
+  function scaledBBox(sel, outW, outH) {
+    const b = maskBBox(sel.mask);
+    if (!b) return null;
+    return {
+      x: Math.round((b.x / b.maskW) * outW),
+      y: Math.round((b.y / b.maskH) * outH),
+      w: Math.max(1, Math.round((b.w / b.maskW) * outW)),
+      h: Math.max(1, Math.round((b.h / b.maskH) * outH))
+    };
+  }
+
+  function cropMasked(canvas, sel, box, scaledMask) {
+    const c = document.createElement('canvas');
+    c.width = box.w;
+    c.height = box.h;
+    const x = c.getContext('2d');
+    x.drawImage(canvas, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+    x.globalCompositeOperation = 'destination-in';
+    x.drawImage(scaledMask, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+    x.globalCompositeOperation = 'source-over';
+    return c;
+  }
+
+  function makeClosedEyePatch(srcCrop, closeAmount) {
+    const w = srcCrop.width, h = srcCrop.height;
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    const ox = out.getContext('2d');
+
+    const center = h / 2;
+    const topKeep = Math.max(1, Math.round(center * (1 - closeAmount * 0.92)));
+    const bottomKeep = Math.max(1, Math.round((h - center) * (1 - closeAmount * 0.92)));
+    const topSrcH = Math.max(1, Math.round(center));
+    const bottomSrcY = Math.round(center);
+    const bottomSrcH = Math.max(1, h - bottomSrcY);
+
+    // Paupière haute descend
+    ox.drawImage(srcCrop,
+      0, 0, w, topSrcH,
+      0, 0, w, topKeep
+    );
+
+    // Paupière basse monte
+    ox.drawImage(srcCrop,
+      0, bottomSrcY, w, bottomSrcH,
+      0, h - bottomKeep, w, bottomKeep
+    );
+
+    // Comble la fente centrale avec un mélange de tons voisins pour éviter le "rectangle écrasé"
+    const gapTop = topKeep;
+    const gapBottom = h - bottomKeep;
+    if (gapBottom > gapTop) {
+      const bandH = gapBottom - gapTop;
+      const skinBand = document.createElement('canvas');
+      skinBand.width = w;
+      skinBand.height = Math.max(1, bandH);
+      const sx = skinBand.getContext('2d');
+
+      const sampleH = Math.max(1, Math.round(h * 0.12));
+      sx.globalAlpha = 0.62;
+      sx.drawImage(srcCrop, 0, Math.max(0, topSrcH - sampleH), w, sampleH, 0, 0, w, bandH);
+      sx.globalAlpha = 0.38;
+      sx.drawImage(srcCrop, 0, bottomSrcY, w, sampleH, 0, 0, w, bandH);
+      sx.globalAlpha = 1;
+
+      ox.drawImage(skinBand, 0, gapTop);
+    }
+
+    // Trait de fermeture plus net quand l'oeil est presque fermé
+    if (closeAmount > 0.25) {
+      const lineY = Math.round(center);
+      const alpha = clamp((closeAmount - 0.25) / 0.75, 0, 1) * 0.7;
+      ox.fillStyle = `rgba(35,28,26,${alpha})`;
+      ox.fillRect(0, lineY, w, Math.max(1, Math.round(h * 0.04)));
+    }
+
+    return out;
+  }
+
+  function applyWinkToSelection(baseCanvas, sel, phase) {
+    const out = document.createElement('canvas');
+    out.width = baseCanvas.width;
+    out.height = baseCanvas.height;
+    const x = out.getContext('2d');
+    x.drawImage(baseCanvas, 0, 0);
+
+    const amount = clamp((Number(sel.intensity ?? 50) / 100) * phase, 0, 1);
+    if (amount <= 0) return out;
+
+    const box = scaledBBox(sel, out.width, out.height);
+    const scaledMask = scaledMaskCanvas(sel, out.width, out.height);
+    if (!box || !scaledMask) return out;
+
+    const srcCrop = cropMasked(baseCanvas, sel, box, scaledMask);
+    const winkPatch = makeClosedEyePatch(srcCrop, amount);
+
+    // Retire uniquement la zone masquée, puis repose le patch modifié.
+    x.save();
+    x.globalCompositeOperation = 'destination-out';
+    x.drawImage(scaledMask, 0, 0);
+    x.restore();
+
+    x.drawImage(winkPatch, box.x, box.y, box.w, box.h);
+    return out;
+  }
+
+  async function replaceImgWithCanvas(img, canvas) {
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(b => b ? resolve(b) : reject(new Error('Conversion PNG impossible')), 'image/png');
+    });
+    const old = img.src;
+    img.src = URL.createObjectURL(blob);
+    if (typeof old === 'string' && old.startsWith('blob:')) {
+      setTimeout(() => URL.revokeObjectURL(old), 1500);
+    }
+  }
+
+  let processing = false;
+  const seen = new WeakSet();
+
+  async function processFrames() {
+    if (processing) return;
+    const selections = getPlan().filter(sel => SUPPORTED.has(sel?.action) && sel?.mask);
+    if (!selections.length) return;
+
+    const host = $('#frames');
+    if (!host) return;
+    const imgs = [...host.querySelectorAll('img')];
+    if (imgs.length !== 9) return;
+
+    processing = true;
+    try {
+      for (let i = 0; i < imgs.length; i++) {
+        const img = imgs[i];
+        if (seen.has(img)) continue;
+        if (!img.complete) {
+          await new Promise(resolve => img.addEventListener('load', resolve, { once: true }));
+        }
+        let current = frameImgToCanvas(img);
+        for (const sel of selections) {
+          const phase = phaseForFrame(i, sel.timing);
+          if (phase <= 0) continue;
+          current = applyWinkToSelection(current, sel, phase);
+        }
+        await replaceImgWithCanvas(img, current);
+        seen.add(img);
+      }
+      window.dispatchEvent(new CustomEvent('happyholo:wink-applied', {
+        detail: { count: selections.length, views: 9 }
+      }));
+      console.log('[HAPPYHOLO] clin d\'oeil appliqué sur les 9 vues');
+    } catch (err) {
+      console.error('[HAPPYHOLO wink patch]', err);
+    } finally {
+      processing = false;
+    }
+  }
+
+  function watchFrames() {
+    const host = $('#frames');
+    if (!host) return false;
+    const observer = new MutationObserver(() => {
+      const imgs = [...host.querySelectorAll('img')];
+      if (imgs.length === 9) {
+        setTimeout(processFrames, 120);
+      }
+    });
+    observer.observe(host, { childList: true, subtree: true });
+    setTimeout(processFrames, 150);
+    return true;
+  }
+
+  function boot() {
+    if (watchFrames()) return;
+    const mo = new MutationObserver(() => {
+      if (watchFrames()) mo.disconnect();
+    });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
+})();
+
