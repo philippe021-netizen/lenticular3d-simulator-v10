@@ -77,6 +77,8 @@
     wrap._input=input;wrap._out=out;wrap.append(text,input,out);return wrap;
   }
 
+  let modeSelect=null;
+
   function slotCard(key,title){
     const slot=state[key],card=document.createElement('div');
     card.style.cssText='border:1px solid #ccc;border-radius:14px;padding:12px;display:grid;gap:9px;background:#fafafa';
@@ -87,7 +89,7 @@
     file.addEventListener('change',()=>{
       const f=file.files?.[0];if(!f)return;
       if(slot.url)URL.revokeObjectURL(slot.url);slot.url=URL.createObjectURL(f);slot.name=f.name;
-      const im=new Image();im.onload=()=>{slot.img=im;status.textContent=`✓ ${f.name}`;notify();};im.src=slot.url;
+      const im=new Image();im.onload=()=>{slot.img=im;status.textContent=`✓ ${f.name}`;state.mode=key==='a'?'fixedA':'fixedB';if(modeSelect)modeSelect.value=state.mode;notify();};im.src=slot.url;
     });
     card.append(head,file,status,
       control('Zoom fond',60,180,100,v=>slot.zoom=v),
@@ -118,10 +120,10 @@
     notify();
   });
 
-  const mode=document.createElement('select');
-  mode.style.cssText='width:100%;padding:10px;border:1px solid #bbb;border-radius:10px;margin:12px 0';
-  [['Décor reconstruit actuel','original'],['Fond A fixe','fixedA'],['Fond B fixe','fixedB'],['Effet lenticulaire A / B','flipAB']].forEach(([t,v])=>mode.appendChild(new Option(t,v)));
-  mode.addEventListener('change',()=>{state.mode=mode.value;notify();});
+  modeSelect=document.createElement('select');
+  modeSelect.style.cssText='width:100%;padding:10px;border:1px solid #bbb;border-radius:10px;margin:12px 0';
+  [['Décor reconstruit actuel','original'],['Fond A fixe','fixedA'],['Fond B fixe','fixedB'],['Effet lenticulaire A / B','flipAB']].forEach(([t,v])=>modeSelect.appendChild(new Option(t,v)));
+  modeSelect.addEventListener('change',()=>{state.mode=modeSelect.value;notify();});
 
   const grid=document.createElement('div');
   grid.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px';
@@ -131,11 +133,10 @@
   hint.textContent='Le fond utilise toujours le plein cadre. Le sujet utilise un cadrage préservé indépendant avec zoom et déplacements X/Y.';
   hint.style.cssText='margin-top:10px;padding:9px;border-radius:9px;background:#f1f1f1;font-size:11px;color:#555';
 
-  host.append(title,subjectCard,mode,grid,hint);
+  host.append(title,subjectCard,modeSelect,grid,hint);
   const anchor=document.getElementById('happyHoloSelectionControls')||document.querySelector('.card.grid')?.nextSibling;
   if(anchor?.parentNode)anchor.parentNode.insertBefore(host,anchor);else document.querySelector('.wrap')?.appendChild(host);
   if(window.innerWidth<760)grid.style.gridTemplateColumns='1fr';
 
-  console.log('[HAPPYHOLO] custom-background V3.3.9 + placement sujet indépendant actif');
-  
+  console.log('[HAPPYHOLO] custom-background V3.4.1 + activation immédiate du fond');
 })();
