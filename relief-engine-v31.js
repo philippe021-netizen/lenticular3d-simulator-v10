@@ -241,7 +241,7 @@ async function estimateDepth(img,label){
   }
 }
 
-/* 5 — RENDU MULTICOUCHE */
+/* 5 — RENDU MULTICOUCHE V3.4.2 — fond + placement sujet maître */
 function renderAt(norm,target=view){
   const x=target.getContext('2d'); const W=target.width,H=target.height; x.clearRect(0,0,W,H);
   const amplitude=Number(angle.value)/4;
@@ -340,5 +340,3 @@ downloadBtn.addEventListener('click',async()=>{
   const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v317-ipad.zip'; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1500);
 });
-
-console.log('[HAPPYHOLO] relief-engine V3.17 iPad memory actif');
