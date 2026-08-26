@@ -150,11 +150,12 @@
   function actionLayer(s,layer,norm,W,H,direction=0){
     if(!layer) return layer;
     const engine=window.HappyHoloActionPreviewEngine;
-    const phase=clamp((Number(norm)||0)+1,0,2)/2;
+    const signedNorm=clamp(Number(norm)||0,-1,1);
+    const phase=(s?.action==='animal_ear'||s?.action==='couple_approach')?Math.abs(signedNorm):(signedNorm+1)/2;
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     if(s?.action==='yaw3d'&&typeof engine?.buildYawFrame==='function') return engine.buildYawFrame({layer,phase,intensity,W,H});
     if(s?.action==='animal_ear'&&typeof engine?.buildEarFrame==='function') return engine.buildEarFrame({layer,phase,intensity,W,H,zone:s.actionZone});
-    if(s?.action==='couple_approach'&&typeof engine?.buildApproachFrame==='function') return engine.buildApproachFrame({layer,phase:1-Math.abs(Number(norm)||0),intensity,W,H,direction,zone:s.actionZone});
+    if(s?.action==='couple_approach'&&typeof engine?.buildApproachFrame==='function') return engine.buildApproachFrame({layer,phase,intensity,W,H,direction,zone:s.actionZone});
     return layer;
   }
 

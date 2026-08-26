@@ -395,18 +395,19 @@
     ctx.drawImage(layer,0,0,W,H);
   }
 
-  function generateActionFrames({base, layers, selections, activeIndices, W, H}){
+  function generateActionFrames({base, layers, selections, activeIndices, W, H, phases=PHASES, phaseForSelection=null}){
     const out=[];
     const approach=activeIndices.filter(i=>selections[i]?.action==='couple_approach'&&layers.get(i));
     const centers=approach.map(i=>({i,b:alphaBounds(layers.get(i))})).filter(v=>v.b);
     const mean=centers.length?centers.reduce((n,v)=>n+v.b.cx,0)/centers.length:W/2;
     const directions=new Map(centers.map(v=>[v.i,v.b.cx<mean?1:(v.b.cx>mean?-1:0)]));
-    for(const phase of PHASES){
+    for(const phase of phases){
       const c=document.createElement('canvas'); c.width=W;c.height=H;
       const x=c.getContext('2d'); x.drawImage(base,0,0,W,H);
       selections.forEach((s,i)=>{
         const layer=layers.get(i); if(!layer) return;
-        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,phase,W,H,{direction:directions.get(i)||0});
+        const localPhase=typeof phaseForSelection==='function'?phaseForSelection(s,phase,i):phase;
+        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,localPhase,W,H,{direction:directions.get(i)||0});
         else x.drawImage(layer,0,0,W,H);
       });
       out.push(c);
@@ -415,5 +416,5 @@
   }
 
   window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildEarFrame,buildApproachFrame};
-  console.log('[HAPPYHOLO] action-preview-engine V3.6.3 OFFLINE · contours fermés oreilles + visages');
+  console.log('[HAPPYHOLO] action-preview-engine V3.6.4 OFFLINE · vue centrale au repos pour oreilles et visages');
 })();

@@ -157,7 +157,11 @@
       x.globalCompositeOperation='source-over';layers.set(i,c);
     });
     const activeIndices=plan.map((s,i)=>['yaw3d','couple_approach','animal_ear'].includes(s?.action)?i:-1).filter(i=>i>=0);
-    const frames=engine.generateActionFrames({base,layers,selections:plan,activeIndices,W,H});
+    const norms=[-1,-.66,-.33,0,.33,.66,1];
+    const frames=engine.generateActionFrames({
+      base,layers,selections:plan,activeIndices,W,H,phases:norms,
+      phaseForSelection:(s,n)=>s?.action==='yaw3d'?(n+1)/2:Math.abs(n)
+    });
     transformCache={subRef:reliefLayers.sub,planRef:plan,frames,selection:active[0]};
     return transformCache;
   }
