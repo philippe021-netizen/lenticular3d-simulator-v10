@@ -105,20 +105,34 @@
     const mask=paintZoneMask(zone,W,H),bounds=mask&&alphaBounds(mask);
     if(!mask||!bounds) return layer;
 
+    // Seuls les 70 % supérieurs bougent. La base reste raccordée à la tête.
+    // Le flou très léger évite la ligne sombre créée par une découpe franche.
+    const movingMask=document.createElement('canvas');movingMask.width=W;movingMask.height=H;
+    const mx=movingMask.getContext('2d');
+    mx.save();mx.filter=`blur(${Math.max(1,Math.round(Math.min(W,H)*.0025))}px)`;mx.drawImage(mask,0,0);mx.restore();
+    mx.globalCompositeOperation='destination-in';
+    const fade=mx.createLinearGradient(0,bounds.y,0,bounds.y+bounds.h);
+    fade.addColorStop(0,'rgba(255,255,255,1)');
+    fade.addColorStop(.62,'rgba(255,255,255,1)');
+    fade.addColorStop(.88,'rgba(255,255,255,0)');
+    fade.addColorStop(1,'rgba(255,255,255,0)');
+    mx.fillStyle=fade;mx.fillRect(bounds.x-4,bounds.y-4,bounds.w+8,bounds.h+8);
+    mx.globalCompositeOperation='source-over';
+
     const out=document.createElement('canvas');out.width=W;out.height=H;
     const ox=out.getContext('2d');ox.drawImage(layer,0,0,W,H);
-    ox.globalCompositeOperation='destination-out';ox.drawImage(mask,0,0);
+    ox.globalCompositeOperation='destination-out';ox.drawImage(movingMask,0,0);
     ox.globalCompositeOperation='source-over';
 
     const ear=document.createElement('canvas');ear.width=W;ear.height=H;
     const ex=ear.getContext('2d');ex.drawImage(layer,0,0,W,H);
-    ex.globalCompositeOperation='destination-in';ex.drawImage(mask,0,0);
+    ex.globalCompositeOperation='destination-in';ex.drawImage(movingMask,0,0);
     ex.globalCompositeOperation='source-over';
 
     const k=clamp(Number(intensity)||.5,.1,1)*clamp(Number(phase)||0,0,1);
     const side=bounds.cx<W/2?-1:1;
-    const pivotX=bounds.x+bounds.w*.5,pivotY=bounds.y+bounds.h*.88;
-    ox.save();ox.translate(pivotX,pivotY);ox.rotate(side*7*k*Math.PI/180);
+    const pivotX=bounds.x+bounds.w*.5,pivotY=bounds.y+bounds.h*.82;
+    ox.save();ox.translate(pivotX,pivotY);ox.rotate(side*4.5*k*Math.PI/180);
     ox.drawImage(ear,-pivotX,-pivotY);ox.restore();
     return out;
   }
@@ -360,5 +374,5 @@
   }
 
   window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildEarFrame};
-  console.log('[HAPPYHOLO] action-preview-engine V3.6.0 OFFLINE · rapprochement couple + mouvement oreille');
+  console.log('[HAPPYHOLO] action-preview-engine V3.6.1 OFFLINE · oreille raccordée sans contour dur');
 })();
