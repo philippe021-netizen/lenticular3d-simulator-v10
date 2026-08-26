@@ -1,4 +1,4 @@
-/* HappyHolo V3.4.2 — simulation multi-couches + phares + reflet local */
+/* HappyHolo V3.4.3 — couches de profondeur exclusives, sans dédoublement */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -37,19 +37,24 @@
   function ensureCanvas(){ const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2); const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} }
   function coverRect(sw,sh,dw,dh){const k=Math.max(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
 
-  function makeDepthLayers(img,depth,SW,SH,count,soft){
+  function makeDepthLayers(img,depth,SW,SH,count,_soft){
     const base=document.createElement('canvas');base.width=SW;base.height=SH;const bx=base.getContext('2d');const fr=coverRect(img.naturalWidth,img.naturalHeight,SW,SH);bx.drawImage(img,fr.x,fr.y,fr.w,fr.h);
     const dep=document.createElement('canvas');dep.width=SW;dep.height=SH;const dx=dep.getContext('2d');const dr=coverRect(depth.width,depth.height,SW,SH);dx.drawImage(depth,dr.x,dr.y,dr.w,dr.h);
     const bd=bx.getImageData(0,0,SW,SH),dd=dx.getImageData(0,0,SW,SH).data;
     const out=[];
     for(let n=0;n<count;n++){
-      const center=count===1?.5:n/(count-1), layer=document.createElement('canvas');layer.width=SW;layer.height=SH;const lx=layer.getContext('2d');const id=lx.createImageData(SW,SH),od=id.data;
+      const layer=document.createElement('canvas');layer.width=SW;layer.height=SH;const lx=layer.getContext('2d');const id=lx.createImageData(SW,SH),od=id.data;
       for(let i=0;i<SW*SH;i++){
-        const d=dd[i*4]/255, dist=Math.abs(d-center), weight=Math.max(0,1-dist/soft); if(weight<=0)continue;
-        const a=bd.data[i*4+3]*weight; if(a<1)continue;
+        const d=dd[i*4]/255;
+        // Un pixel ne doit appartenir qu'à un seul plan. L'ancienne pondération
+        // douce le recopiait dans plusieurs couches : les déplacements créaient
+        // alors un sujet fantôme nettement visible.
+        const owner=Math.max(0,Math.min(count-1,Math.round(d*(count-1))));
+        if(owner!==n) continue;
+        const a=bd.data[i*4+3]; if(a<1)continue;
         od[i*4]=bd.data[i*4];od[i*4+1]=bd.data[i*4+1];od[i*4+2]=bd.data[i*4+2];od[i*4+3]=a;
       }
-      lx.putImageData(id,0,0);out.push({canvas:layer,depth:center});
+      lx.putImageData(id,0,0);out.push({canvas:layer,depth:count===1?.5:n/(count-1)});
     }
     return out;
   }
@@ -328,5 +333,5 @@
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.4.2 · phares + reflet local intégrés');
+  console.log('[HAPPYHOLO] support-preview V3.4.3 · profondeur exclusive sans image fantôme');
 })();
