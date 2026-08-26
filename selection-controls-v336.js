@@ -1,4 +1,4 @@
-/* HappyHolo V3.4.1 — réglages par sélection + reflet lumineux local */
+/* HappyHolo V3.5.0 — rotation 3D verticale locale légère */
 (() => {
   'use strict';
 
@@ -11,6 +11,7 @@
     ['Aucune action','none'],
     ['Moto/voiture — appel de phare','headlight'],
     ['Reflet lumineux local','glint'],
+    ['Sujet — rotation 3D verticale légère','yaw3d'],
     ['Objet rigide — pivot léger','pivot']
   ];
 
@@ -133,6 +134,16 @@
     ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(fx,shift,0);ctx.restore();
   }
 
+  function actionLayer(s,layer,norm,W,H){
+    if(s?.action!=='yaw3d'||!layer) return layer;
+    const engine=window.HappyHoloActionPreviewEngine;
+    if(typeof engine?.buildYawFrame!=='function') return layer;
+    return engine.buildYawFrame({
+      layer,phase:clamp((Number(norm)||0)+1,0,2)/2,
+      intensity:clamp(Number(s.intensity||50)/100,.1,1),W,H
+    });
+  }
+
   function drawSinglePlanGlints(norm,target){
     const selections=plan(),out=resolveRenderTarget(target);
     if(!out||!selections.length) return;
@@ -153,7 +164,8 @@
       return;
     }
 
-    if(selections.length<2){
+    const needsLayerComposition=selections.some(s=>s?.action==='yaw3d');
+    if(selections.length<2&&!needsLayerComposition){
       if(originalRenderAt) originalRenderAt(norm,target);
       drawSinglePlanGlints(norm,target);
       return;
@@ -192,12 +204,15 @@
       // Échelle compatible avec le réglage historique 0,48.
       const k=clamp((Number(it.s.depth)||0.02)/0.30,0.05,3);
       const shift=norm*18*amplitude*k;
-      x.drawImage(layer,shift,0);
+      const rendered=actionLayer(it.s,layer,norm,W,H);
+      x.drawImage(rendered,shift,0);
 
       // léger renfort anti-trous, volontairement discret
-      x.globalAlpha=.18;
-      x.drawImage(layer,shift*.985,0);
-      x.globalAlpha=1;
+      if(it.s.action!=='yaw3d'){
+        x.globalAlpha=.18;
+        x.drawImage(layer,shift*.985,0);
+        x.globalAlpha=1;
+      }
       drawGlintForSelection(x,it.s,layer,norm,W,H,shift);
     }
 

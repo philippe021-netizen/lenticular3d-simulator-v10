@@ -31,6 +31,35 @@
     ctx.restore();
   }
 
+  function buildYawFrame({layer,phase=.5,intensity=.5,W,H}){
+    const c=document.createElement('canvas');c.width=W;c.height=H;
+    const x=c.getContext('2d');
+    const signed=clamp((Number(phase)||0)*2-1,-1,1);
+    const k=clamp(Number(intensity)||.5,.1,1);
+    const turn=signed*k;
+    const squeeze=1-Math.abs(turn)*.035;
+    const bulge=W*.032*turn;
+    const strips=112;
+
+    // Cylindrage léger : le centre se déplace davantage que les bords,
+    // tandis qu'un côté se resserre. Le chevauchement de 1 px évite les fentes.
+    for(let i=0;i<strips;i++){
+      const sx=i*W/strips,ex=(i+1)*W/strips,sw=Math.max(1,ex-sx);
+      const nx=((sx+sw*.5)/W-.5)*2;
+      const curve=Math.max(0,1-nx*nx);
+      const dx=bulge*curve;
+      const perspective=1-turn*nx*.055;
+      const tx=W*.5+(sx-W*.5)*squeeze+dx;
+      const tw=Math.max(1,sw*squeeze*perspective+1.15);
+      x.drawImage(layer,sx,0,sw,H,tx,0,tw,H);
+    }
+    return c;
+  }
+
+  function drawYaw3D(ctx,layer,phase,intensity,W,H){
+    ctx.drawImage(buildYawFrame({layer,phase,intensity,W,H}),0,0);
+  }
+
 
   function paintZoneMask(zone,W,H){
     if(!zone || zone.kind!=='paint' || !Array.isArray(zone.strokes)) return null;
@@ -250,6 +279,7 @@
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
+    if(action==='yaw3d') return drawYaw3D(ctx,layer,phase,intensity,W,H);
     if(action==='headlight'){
       const zones=Array.isArray(s.actionZones)&&s.actionZones.length?s.actionZones:(s.actionZone?[s.actionZone]:[]);
       ctx.drawImage(layer,0,0,W,H);
@@ -280,6 +310,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay};
-  console.log('[HAPPYHOLO] action-preview-engine V3.4.1 OFFLINE · reflet lumineux local actif');
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame};
+  console.log('[HAPPYHOLO] action-preview-engine V3.5.0 OFFLINE · rotation verticale légère active');
 })();

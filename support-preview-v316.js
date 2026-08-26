@@ -1,4 +1,4 @@
-/* HappyHolo V3.4.4 — couches exclusives + fond de sécurité anti-fentes */
+/* HappyHolo V3.5.0 — rotation verticale légère du sujet */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -80,7 +80,7 @@
     // les fentes sub-pixel ouvertes entre deux couches exclusives.
     const safetyBackground=makeFlatLayer(rs.backgroundImg,SW,SH);
     reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
-    headlightCache=null;glintCache=null;
+    headlightCache=null;glintCache=null;yawCache=null;
     $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
     play();
   }
@@ -110,11 +110,43 @@
     return p.find(s=>s?.action==='glint'&&Array.isArray(s.actionZones)&&s.actionZones.length);
   }
 
+  function activeYawSelection(){
+    const p=window.happyHoloSelectionPlan||[];
+    return p.find(s=>s?.action==='yaw3d');
+  }
+
   // V3.4.1 — PHARES INTÉGRÉS AUX COUCHES 3D
   // Le masque lumineux est découpé avec les mêmes couches de profondeur que le véhicule.
   // Chaque morceau de phare reçoit donc EXACTEMENT le déplacement de sa couche.
   let headlightCache=null;
   let glintCache=null;
+  let yawCache=null;
+
+  function getYawCache(){
+    const s=activeYawSelection(),engine=window.HappyHoloActionPreviewEngine;
+    if(!s||!reliefLayers?.sub?.length||typeof engine?.buildYawFrame!=='function') return null;
+    const intensity=Number(s.intensity||50);
+    if(yawCache&&yawCache.subRef===reliefLayers.sub&&yawCache.intensity===intensity&&yawCache.selection===s) return yawCache;
+    const W=reliefLayers.w,H=reliefLayers.h;
+    const subject=document.createElement('canvas');subject.width=W;subject.height=H;
+    const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
+    const phases=[0,.17,.34,.5,.66,.83,1];
+    const frames=phases.map(phase=>engine.buildYawFrame({
+      layer:subject,phase,intensity:Math.max(.1,Math.min(1,intensity/100)),W,H
+    }));
+    yawCache={subRef:reliefLayers.sub,intensity,selection:s,frames};
+    return yawCache;
+  }
+
+  function drawYawSubject(r,norm){
+    const cache=getYawCache();if(!cache?.frames?.length)return false;
+    const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));
+    const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];
+    const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));
+    const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);
+    ctx.drawImage(frame,r.x+shift,r.y,r.w,r.h);
+    return true;
+  }
 
   function getGlintCache(){
     const s=activeGlintSelection(),engine=window.HappyHoloActionPreviewEngine;
@@ -302,14 +334,21 @@
     const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
     if(textDepth<0) drawTextLayer(norm,r);
 
-    reliefLayers.sub.forEach((l,i)=>{
-      const z=(l.depth-.5)*2;
-      const shift=norm*(12+13*z)*(canvas.width/320);
-      ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
+    const yawDrawn=drawYawSubject(r,norm);
+    if(!yawDrawn){
+      reliefLayers.sub.forEach((l,i)=>{
+        const z=(l.depth-.5)*2;
+        const shift=norm*(12+13*z)*(canvas.width/320);
+        ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
 
-      // Important : le phare est rendu dans la même couche et avec le même shift.
-      drawHeadlightEffectForLayer(i,r,shift,actionPulse);
-    });
+        // Important : le phare est rendu dans la même couche et avec le même shift.
+        drawHeadlightEffectForLayer(i,r,shift,actionPulse);
+      });
+    }else if(activeHeadlightSelection()){
+      // La rotation est limitée à ±3° : un masque plat reste suffisamment
+      // proche pour conserver un éventuel phare sur une autre sélection.
+      applyHeadlightsFlat(r,actionPulse);
+    }
 
     drawGlintEffect(r,norm);
 
@@ -343,9 +382,9 @@
 
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
-  window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;draw(0,0);});
+  window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;yawCache=null;draw(0,0);});
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.4.4 · anti-dédoublement + anti-fentes noires');
+  console.log('[HAPPYHOLO] support-preview V3.5.0 · rotation verticale légère du sujet');
 })();

@@ -303,6 +303,7 @@
       ['Aucune action','none'],
       ['Moto/voiture — appel de phare','headlight'],
       ['Reflet lumineux local','glint'],
+      ['Sujet — rotation 3D verticale légère','yaw3d'],
       ['Objet rigide — pivot léger','pivot']
     ].forEach(([t,v])=>{
       planAction.appendChild(new Option(t,v));
