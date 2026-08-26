@@ -185,4 +185,5 @@
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();console.log('[HAPPYHOLO] support-preview V3.6.9 · fond immédiat + placement synchronisé');
+  
 })();
