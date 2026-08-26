@@ -7,7 +7,7 @@
 
   let uploadedImage=null, objectUrl=null, raf=0, running=false, start=0, lastFrame=0;
   let reliefLayers=null, buildToken=0;
-  const state={support:'keychain-vertical',fit:'contain',margin:0,zoom:100,x:0,y:0,rot:6,speed:5};
+  const state={support:'keychain-vertical',fit:'contain',margin:0,zoom:100,x:0,y:0,rot:6,speed:5,showSafe:1,safe:6};
 
   const host=document.createElement('section');
   host.className='support-card';
@@ -23,13 +23,15 @@
         <label><span>Position verticale</span><b id="yOut">0%</b></label><input id="supportY" type="range" min="-50" max="50" value="0">
         <label><span>Rotation lenticulaire</span><b id="rotOut">±6°</b></label><input id="supportRot" type="range" min="0" max="8" value="6" step="1">
         <label><span>Vitesse</span><b id="speedOut">5.0 s</b></label><input id="supportSpeed" type="range" min="2" max="8" value="5" step="0.5">
+        <label style="display:flex;align-items:center;gap:8px"><input id="supportShowSafe" type="checkbox" checked> Afficher la zone de sécurité carte</label>
+        <label><span>Marge de sécurité</span><b id="safeOut">6%</b></label><input id="supportSafe" type="range" min="2" max="12" value="6" step="1">
         <div><button id="supportPlay">Lancer l’aperçu</button><button id="supportStop" class="secondary">Stop</button></div>
       </div>
       <div class="support-stage-wrap"><div class="support-stage"><div id="productObject" class="product-object keychain-vertical"><div class="ring"></div><div class="link"></div><div class="shell"><div class="image-window"><canvas id="supportCanvas"></canvas></div></div></div><div id="supportEmpty" class="support-empty">Charge une photo pour afficher le support.</div></div><div id="supportRecommendation" class="support-note">Portrait → porte-clé vertical recommandé.</div><div id="supportHint" class="support-note">Après « Créer le relief 3D local », l’aperçu utilise plusieurs plans de profondeur. Les actions validées sont jouées dans ce même aperçu.</div></div>
     </div>`;
   document.querySelector('.card.grid')?.insertAdjacentElement('afterend',host);
 
-  const type=$('#supportType'),fit=$('#supportFit'),margin=$('#supportMargin'),zoom=$('#supportZoom'),xp=$('#supportX'),yp=$('#supportY'),rot=$('#supportRot'),speed=$('#supportSpeed');
+  const type=$('#supportType'),fit=$('#supportFit'),margin=$('#supportMargin'),zoom=$('#supportZoom'),xp=$('#supportX'),yp=$('#supportY'),rot=$('#supportRot'),speed=$('#supportSpeed'),showSafe=$('#supportShowSafe'),safe=$('#supportSafe');
   const product=$('#productObject'),canvas=$('#supportCanvas'),empty=$('#supportEmpty'),ctx=canvas.getContext('2d');
 
   const shell=product.querySelector('.shell');
@@ -51,7 +53,7 @@
       shell.style.borderRadius='14px';
       if(ring)ring.style.display='none';
       if(link)link.style.display='none';
-      $('#supportRecommendation').textContent='Carte de visite — 85,60 × 53,98 mm. Le texte en profondeur est repris dans les 9 vues.';
+      $('#supportRecommendation').textContent='Carte de visite — 85,60 × 53,98 mm. Garde les infos importantes dans la zone de sécurité.';
     }else if(state.support==='business-card-88'){
       // Ratio 88 / 56 = 1,5714
       shell.style.width='300px';
@@ -59,14 +61,39 @@
       shell.style.borderRadius='14px';
       if(ring)ring.style.display='none';
       if(link)link.style.display='none';
-      $('#supportRecommendation').textContent='Carte — 88 × 56 mm. Le texte en profondeur est repris dans les 9 vues.';
+      $('#supportRecommendation').textContent='Carte — 88 × 56 mm. Garde les infos importantes dans la zone de sécurité.';
     }
   }
 
-  function updateText(){ $('#marginOut').textContent=`${state.margin}%`;$('#zoomOut').textContent=`${state.zoom}%`;$('#xOut').textContent=`${state.x}%`;$('#yOut').textContent=`${state.y}%`;$('#rotOut').textContent=`±${state.rot}°`;$('#speedOut').textContent=`${state.speed.toFixed(1)} s`; }
+  function updateText(){ $('#marginOut').textContent=`${state.margin}%`;$('#zoomOut').textContent=`${state.zoom}%`;$('#xOut').textContent=`${state.x}%`;$('#yOut').textContent=`${state.y}%`;$('#rotOut').textContent=`±${state.rot}°`;$('#speedOut').textContent=`${state.speed.toFixed(1)} s`; if($('#safeOut')) $('#safeOut').textContent=`${state.safe}%`; }
   function fitBox(sw,sh,dw,dh){ let k=(state.fit==='cover')?Math.max(dw/sw,dh/sh):Math.min(dw/sw,dh/sh); k*=state.zoom/100; if(state.fit==='preserve')k*=Math.max(.55,1-state.margin/100); const w=sw*k,h=sh*k; return {x:(dw-w)/2+(state.x/100)*dw*.5,y:(dh-h)/2+(state.y/100)*dh*.5,w,h}; }
   function ensureCanvas(){ const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2); const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} }
   function coverRect(sw,sh,dw,dh){const k=Math.max(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
+
+  function isCardSupport(){
+    return state.support==='business-card' || state.support==='business-card-88';
+  }
+
+  function drawCardGuides(){
+    if(!isCardSupport() || !state.showSafe) return;
+    const W=canvas.width,H=canvas.height;
+    const trimPad=Math.round(Math.min(W,H)*0.012);
+    const safePad=Math.round(Math.min(W,H)*(Number(state.safe)||6)/100);
+    ctx.save();
+    ctx.strokeStyle='rgba(255,255,255,.92)';
+    ctx.lineWidth=Math.max(1,Math.round(Math.min(W,H)*0.006));
+    ctx.strokeRect(trimPad,trimPad,W-trimPad*2,H-trimPad*2);
+    ctx.setLineDash([Math.max(6,Math.round(W*0.02)),Math.max(4,Math.round(W*0.012))]);
+    ctx.strokeStyle='rgba(255,214,80,.95)';
+    ctx.lineWidth=Math.max(1,Math.round(Math.min(W,H)*0.005));
+    ctx.strokeRect(safePad,safePad,W-safePad*2,H-safePad*2);
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,214,80,.95)';
+    ctx.font=`700 ${Math.max(10,Math.round(Math.min(W,H)*0.055))}px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif`;
+    ctx.textBaseline='top';
+    ctx.fillText('Zone de sécurité', safePad+6, safePad+6);
+    ctx.restore();
+  }
 
   function makeFlatLayer(img,W,H){
     const c=document.createElement('canvas');c.width=W;c.height=H;
@@ -183,7 +210,7 @@
     const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
     const customBg=window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,{x:0,y:0,w:canvas.width,h:canvas.height});
     if(!customBg)ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);
-    applyHeadlightsFlat(r,actionPulse);drawTextLayer(norm,r);
+    applyHeadlightsFlat(r,actionPulse);drawTextLayer(norm,r);drawCardGuides();
   }
 
   function draw(norm,actionPulse=0){
@@ -198,7 +225,7 @@
     }
     const textDepth=Number(window.happyHoloTextLayer?.depth)||0;if(textDepth<0)drawTextLayer(norm,r);
     const transformDrawn=drawTransformSubject(r,norm);if(!transformDrawn){reliefLayers.sub.forEach((l,i)=>{const z=(l.depth-.5)*2,shift=norm*(12+13*z)*(canvas.width/320);ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);drawHeadlightEffectForLayer(i,r,shift,actionPulse);});}else if(activeHeadlightSelection())applyHeadlightsFlat(r,actionPulse);
-    drawGlintEffect(r,norm);if(textDepth>=0)drawTextLayer(norm,r);ctx.restore();
+    drawGlintEffect(r,norm);if(textDepth>=0)drawTextLayer(norm,r);ctx.restore();drawCardGuides();
   }
 
   function headlightPulse(ts){const s=activeHeadlightSelection();if(!s)return 0;const ms=Math.max(800,Number(s.actionSpeed||2000)),t=((ts-start)%ms)/ms;return(1-Math.cos(t*Math.PI*2))/2;}
@@ -206,7 +233,8 @@
   function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);product.classList.add('support-playing');cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
   function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');product.style.transform='perspective(620px) rotateY(0deg) translateX(0)';draw(0,0);}
   function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;applySupportShape();product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0,0);if(running)start=0;}
-  [type,fit,margin,zoom,xp,yp,rot,speed].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;apply();}));
+  [type,fit,margin,zoom,xp,yp,rot,speed,safe].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;state.safe=+safe.value;apply();}));
+  showSafe.addEventListener('input',()=>{state.showSafe=showSafe.checked?1:0;apply();});
   $('#supportPlay').addEventListener('click',play);$('#supportStop').addEventListener('click',stop);
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
@@ -215,5 +243,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
-  apply();console.log('[HAPPYHOLO] support-preview V3.7.0 · carte visite + texte relief compatible');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;apply();console.log('[HAPPYHOLO] support-preview V3.7.1 · format carte sécurisé + guides');
 })();
