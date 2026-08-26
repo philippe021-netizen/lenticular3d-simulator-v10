@@ -196,4 +196,3 @@
   syncOutputs();
   console.log('[HAPPYHOLO] couche texte V3.4.4 · carte 4 lignes');
 })();
-
