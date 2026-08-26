@@ -143,6 +143,9 @@
     const bgShift=norm*6*amplitude*(bgD/.10);
     x.drawImage(bg,fb.x+bgShift,fb.y,fb.w,fb.h);
 
+    const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
+    if(textDepth<0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
+
     // Les plans les plus éloignés sont dessinés d'abord.
     const order=selections
       .map((s,i)=>({s,i,d:Number(s.depth)||0}))
@@ -162,6 +165,8 @@
       x.drawImage(layer,shift*.985,0);
       x.globalAlpha=1;
     }
+
+    if(textDepth>=0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
   }
 
   if(originalRenderAt){

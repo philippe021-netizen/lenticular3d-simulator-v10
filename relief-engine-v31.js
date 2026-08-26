@@ -250,6 +250,8 @@ function renderAt(norm,target=view){
   const protect=Number(edgeProtect.value)/100;
   const fb=fitCover(backgroundImg,W,H); const bgShift=norm*6*amplitude*bgK;
   x.drawImage(backgroundImg,fb.x+bgShift,fb.y,fb.w,fb.h);
+  const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
+  if(textDepth<0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
   const tmp=document.createElement('canvas'); tmp.width=W;tmp.height=H; const tx=tmp.getContext('2d');
   const fs=fitCover(subjectImg,W,H); tx.drawImage(subjectImg,fs.x,fs.y,fs.w,fs.h);
   const subShift=norm*18*amplitude*subK; const strips=96;
@@ -267,6 +269,7 @@ function renderAt(norm,target=view){
     x.drawImage(tmp,sx,0,ww,H,sx+subShift+internal,0,ww+1,H);
   }
   x.globalAlpha=0.24+protect*0.28; x.drawImage(tmp,subShift,0); x.globalAlpha=1;
+  if(textDepth>=0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
 }
 
 function startPreview(){

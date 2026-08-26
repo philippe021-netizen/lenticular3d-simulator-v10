@@ -1,4 +1,4 @@
-/* HappyHolo V3.3.9 — couche texte locale, profondeur avant/arrière visible */
+/* HappyHolo V3.4.0 — couche texte locale avec occlusion avant/arrière réelle */
 (() => {
   'use strict';
 
@@ -86,28 +86,13 @@
     ctx.restore();
   }
 
-  let previousRenderAt=null;
-  try{ if(typeof renderAt==='function') previousRenderAt=renderAt; }catch(_){ }
-
-  function renderWithText(norm,target){
-    if(previousRenderAt) previousRenderAt(norm,target);
-    let out=target;
-    try{ if(!out) out=(typeof view!=='undefined'&&view)||window.HappyHoloReliefState?.view; }catch(_){ out=window.HappyHoloReliefState?.view; }
-    if(out) draw(out.getContext('2d'),norm,{x:0,y:0,w:out.width,h:out.height});
-  }
-
-  if(previousRenderAt){
-    try{ renderAt=renderWithText; }catch(_){ }
-    try{ window.renderAt=renderWithText; }catch(_){ }
-  }
-
   function serialize(){
     if(!state.enabled||!cleanLines().length) return null;
     return {
       text:cleanLines().join('\n'),x:state.x,y:state.y,size:state.size,
       orientation:state.orientation,rotation3D:state.rotation3D,depth:state.depth,
       color:state.color,outline:state.outline,outlineSize:state.outlineSize,font:state.font,
-      placement:'front'
+      placement:Number(state.depth)<0?'behind-subject':'front'
     };
   }
 
@@ -115,7 +100,9 @@
 
   function requestRedraw(){
     window.dispatchEvent(new CustomEvent('happyholo-text-layer-changed',{detail:serialize()}));
-    if(window.HappyHoloReliefState?.view) renderWithText(0,window.HappyHoloReliefState.view);
+    if(window.HappyHoloReliefState?.view){
+      try{ if(typeof renderAt==='function') renderAt(0,window.HappyHoloReliefState.view); }catch(_){ }
+    }
   }
 
   const card=document.createElement('section');
@@ -207,5 +194,5 @@
   setTimeout(placeBeforeSupport,0);
   window.addEventListener('happyholo:selection-plan',placeBeforeSupport);
   syncOutputs();
-  console.log('[HAPPYHOLO] couche texte V3.3.9 · profondeur avant/arrière active');
+  console.log('[HAPPYHOLO] couche texte V3.4.0 · occlusion avant/arrière réelle');
 })();

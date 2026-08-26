@@ -248,6 +248,9 @@
       ctx.drawImage(l.canvas,r.x+shift,r.y,r.w,r.h);
     }
 
+    const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
+    if(textDepth<0) drawTextLayer(norm,r);
+
     reliefLayers.sub.forEach((l,i)=>{
       const z=(l.depth-.5)*2;
       const shift=norm*(12+13*z)*(canvas.width/320);
@@ -257,7 +260,7 @@
       drawHeadlightEffectForLayer(i,r,shift,actionPulse);
     });
 
-    drawTextLayer(norm,r);
+    if(textDepth>=0) drawTextLayer(norm,r);
 
     ctx.restore();
   }
