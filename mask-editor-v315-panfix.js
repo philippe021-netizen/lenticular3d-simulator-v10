@@ -301,17 +301,8 @@
 
     [
       ['Aucune action','none'],
-      ['Personne — clin d’œil','person_wink'],
-      ['Personne — sourire léger','person_smile'],
-      ['Personne — petit bisou','person_kiss'],
-      ['Chat — clignement lent','cat_blink'],
-      ['Chat — miaulement','cat_meow'],
-      ['Chien — tête penchée','dog_tilt'],
-      ['Chien — petit aboiement','dog_bark'],
       ['Moto/voiture — appel de phare','headlight'],
-      ['Moto/voiture — clignotant','indicator'],
-      ['Logo — brillance','logo_shine'],
-      ['Objet/logo — pivot léger','pivot']
+      ['Objet rigide — pivot léger','pivot']
     ].forEach(([t,v])=>{
       planAction.appendChild(new Option(t,v));
     });

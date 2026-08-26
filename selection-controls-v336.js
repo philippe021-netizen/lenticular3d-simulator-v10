@@ -9,9 +9,8 @@
 
   const actionOptions = [
     ['Aucune action','none'],
-    ['Personne — clin d’œil','person_wink'],
     ['Moto/voiture — appel de phare','headlight'],
-    ['Objet/logo — pivot léger','pivot']
+    ['Objet rigide — pivot léger','pivot']
   ];
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));

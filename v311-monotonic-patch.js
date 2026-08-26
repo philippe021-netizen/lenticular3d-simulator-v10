@@ -245,7 +245,8 @@
         angle: Number(angle?.value ?? 7),
         subjectDepth: Number(subjectDepth?.value ?? 0.48),
         backgroundDepth: Number(bgDepth?.value ?? 0.10),
-        edgeProtection: Number(edgeProtect?.value ?? 84)
+        edgeProtection: Number(edgeProtect?.value ?? 84),
+        textLayer: window.HappyHoloTextLayer?.serialize?.() || null
       }, null, 2));
 
       const out = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
@@ -537,4 +538,3 @@
     boot();
   }
 })();
-

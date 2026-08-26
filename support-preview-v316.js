@@ -222,17 +222,22 @@
     ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;ctx.drawImage(light,0,0);ctx.restore();
   }
 
-  function drawFallback(actionPulse=0){
+  function drawTextLayer(norm,r){
+    window.HappyHoloTextLayer?.draw?.(ctx,norm,r);
+  }
+
+  function drawFallback(actionPulse=0,norm=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
     if(!uploadedImage)return;
     const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
     ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);
     applyHeadlightsFlat(r,actionPulse);
+    drawTextLayer(norm,r);
   }
 
   function draw(norm,actionPulse=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);
-    if(!reliefLayers){drawFallback(actionPulse);return;}
+    if(!reliefLayers){drawFallback(actionPulse,norm);return;}
     const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
 
     ctx.save();ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
@@ -251,6 +256,8 @@
       // Important : le phare est rendu dans la même couche et avec le même shift.
       drawHeadlightEffectForLayer(i,r,shift,actionPulse);
     });
+
+    drawTextLayer(norm,r);
 
     ctx.restore();
   }
@@ -281,6 +288,7 @@
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
   window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;draw(0,0);});
+  window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
   console.log('[HAPPYHOLO] support-preview V3.4.1 · phares intégrés aux couches 3D');

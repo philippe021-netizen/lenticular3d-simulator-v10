@@ -326,7 +326,8 @@ downloadBtn.addEventListener('click',async()=>{
   zip.file('manifest.json',JSON.stringify({
     generator:'HappyHolo Relief 3D V3.17 iPad memory',localSegmentation:true,externalPaidApi:false,views:9,
     depthInference:'single-512-with-local-fallback',
-    angle:Number(angle.value),subjectDepth:Number(subjectDepth.value),backgroundDepth:Number(bgDepth.value),edgeProtection:Number(edgeProtect.value)
+    angle:Number(angle.value),subjectDepth:Number(subjectDepth.value),backgroundDepth:Number(bgDepth.value),edgeProtection:Number(edgeProtect.value),
+    textLayer:window.HappyHoloTextLayer?.serialize?.()||null
   },null,2));
   const b=await zip.generateAsync({type:'blob'}); const u=URL.createObjectURL(b);
   const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v317-ipad.zip'; a.click();
