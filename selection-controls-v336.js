@@ -154,11 +154,7 @@
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     if(s?.action==='yaw3d'&&typeof engine?.buildYawFrame==='function') return engine.buildYawFrame({layer,phase,intensity,W,H});
     if(s?.action==='animal_ear'&&typeof engine?.buildEarFrame==='function') return engine.buildEarFrame({layer,phase,intensity,W,H,zone:s.actionZone});
-    if(s?.action==='couple_approach'){
-      const c=document.createElement('canvas');c.width=W;c.height=H;
-      c.getContext('2d').drawImage(layer,Math.sign(direction)*W*.024*intensity*(1-Math.abs(Number(norm)||0)),0,W,H);
-      return c;
-    }
+    if(s?.action==='couple_approach'&&typeof engine?.buildApproachFrame==='function') return engine.buildApproachFrame({layer,phase:1-Math.abs(Number(norm)||0),intensity,W,H,direction,zone:s.actionZone});
     return layer;
   }
 
@@ -367,6 +363,7 @@
       if(s.action==='headlight'&&!(Array.isArray(s.actionZones)&&s.actionZones.length)){alert('Définis d’abord au moins une zone de phare.');return;}
       if(s.action==='glint'&&!(Array.isArray(s.actionZones)&&s.actionZones.length)){alert('Définis d’abord au moins une zone de reflet.');return;}
       if(s.action==='animal_ear'&&!s.actionZone){alert('Définis d’abord la zone précise de l’oreille.');return;}
+      if(s.action==='couple_approach'&&!s.actionZone){alert('Trace d’abord le contour du visage pour chaque personne.');return;}
     }
     if(valid.some(i=>selections[i]?.action==='couple_approach')&&valid.filter(i=>selections[i]?.action==='couple_approach').length<2){alert('Le rapprochement demande deux sélections, une par personne.');return;}
     const base=document.createElement('canvas');base.width=W;base.height=H;
@@ -477,14 +474,19 @@
       Object.assign(removeZone.style,{display:'none',width:'100%',padding:'7px',borderRadius:'9px',border:'1px solid #bbb',background:'#f3f3f3',marginTop:'5px'});
       const updateZone=()=>{
         headlightMode.style.display=s.action==='headlight'?'block':'none';
-        if(s.action==='person_wink'||s.action==='animal_ear'){zoneBtn.style.display='block';removeZone.style.display='none';zoneBtn.textContent=s.actionZone?`✓ Modifier zone ${s.action==='animal_ear'?'oreille':'œil'}`:`🎯 Définir zone ${s.action==='animal_ear'?'oreille':'œil'}`;}
+        if(s.action==='person_wink'||s.action==='animal_ear'||s.action==='couple_approach'){
+          const label=s.action==='animal_ear'?'oreille':(s.action==='couple_approach'?'visage':'œil');
+          zoneBtn.style.display='block';removeZone.style.display='none';zoneBtn.textContent=s.actionZone?`✓ Modifier contour ${label}`:`🎯 Tracer contour ${label}`;
+        }
         else if(s.action==='headlight'||s.action==='glint'){s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];zoneBtn.style.display='block';removeZone.style.display=s.actionZones.length?'block':'none';zoneBtn.textContent=`＋ Ajouter zone ${s.action==='glint'?'reflet':'plein phare'} (${s.actionZones.length}/4)`;}
         else{zoneBtn.style.display='none';removeZone.style.display='none';}
       };
       zoneBtn.addEventListener('click',async()=>{
         if(typeof window.HappyHoloChooseActionZone!=='function'){alert('Outil de zone indisponible. Recharge la page.');return;}
-        if(s.action==='person_wink'||s.action==='animal_ear'){
-          const z=await window.HappyHoloChooseActionZone({actionZone:s.actionZone||null},s.action==='animal_ear'?'Zone précise de l’oreille':'Zone précise de l’œil');if(z)s.actionZone=z;
+        if(s.action==='person_wink'||s.action==='animal_ear'||s.action==='couple_approach'){
+          const outline=s.action==='animal_ear'||s.action==='couple_approach';
+          const title=s.action==='animal_ear'?'Contour extérieur de l’oreille':(s.action==='couple_approach'?'Contour extérieur du visage':'Zone précise de l’œil');
+          const z=await window.HappyHoloChooseActionZone({actionZone:s.actionZone||null,zoneMode:outline?'outline':'paint'},title);if(z)s.actionZone=z;
         }else if(s.action==='headlight'||s.action==='glint'){
           s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];if(s.actionZones.length>=4){alert('4 zones maximum.');return;}
           const z=await window.HappyHoloChooseActionZone({actionZone:null},`${s.action==='glint'?'Zone reflet':'Zone plein phare'} ${s.actionZones.length+1}`);if(z)s.actionZones.push(z);
@@ -492,7 +494,7 @@
         updateZone();notifyActionPlan();
       });
       removeZone.addEventListener('click',()=>{if(Array.isArray(s.actionZones)&&s.actionZones.length)s.actionZones.pop();updateZone();notifyActionPlan();});
-      asel.addEventListener('change',()=>{s.action=asel.value;if(s.action!=='person_wink'&&s.action!=='animal_ear')delete s.actionZone;if(s.action!=='headlight'&&s.action!=='glint')s.actionZones=[];updateZone();notifyActionPlan();});
+      asel.addEventListener('change',()=>{s.action=asel.value;if(!['person_wink','animal_ear','couple_approach'].includes(s.action))delete s.actionZone;if(s.action!=='headlight'&&s.action!=='glint')s.actionZones=[];updateZone();notifyActionPlan();});
       awrap.append(zoneBtn,removeZone);
 
       const intensityLine=document.createElement('div');

@@ -326,17 +326,17 @@
         const s=selections[activeSelection];
         if(!s) return;
 
-        if(s.action==='person_wink'||s.action==='animal_ear'){
+        if(s.action==='person_wink'||s.action==='animal_ear'||s.action==='couple_approach'){
           if(typeof window.HappyHoloChooseActionZone!=='function'){
             alert('Outil de zone action non chargé. Recharge la page puis réessaie.');
             return;
           }
 
           const z=await window.HappyHoloChooseActionZone(
-            {actionZone:s.actionZone||null},
+            {actionZone:s.actionZone||null,zoneMode:(s.action==='animal_ear'||s.action==='couple_approach')?'outline':'paint'},
             s.action==='animal_ear'
-              ? 'Zone précise de l’oreille — peins uniquement l’oreille'
-              : 'Zone du clin d’œil'
+              ? 'Contour extérieur de l’oreille'
+              : (s.action==='couple_approach'?'Contour extérieur du visage':'Zone du clin d’œil')
           );
 
           if(z){
@@ -440,18 +440,18 @@
         editorRemoveZoneBtn.style.display=
           s.actionZones.length?'block':'none';
 
-      }else if(s.action==='person_wink'||s.action==='animal_ear'){
+      }else if(s.action==='person_wink'||s.action==='animal_ear'||s.action==='couple_approach'){
 
         editorZoneWrap.style.display='flex';
 
         editorZoneBtn.textContent=
           s.actionZone
-            ? `✓ Modifier zone ${s.action==='animal_ear'?'oreille':'œil'}`
-            : `🎯 Définir zone ${s.action==='animal_ear'?'oreille':'œil'}`;
+            ? `✓ Modifier contour ${s.action==='animal_ear'?'oreille':(s.action==='couple_approach'?'visage':'œil')}`
+            : `🎯 Tracer contour ${s.action==='animal_ear'?'oreille':(s.action==='couple_approach'?'visage':'œil')}`;
 
         editorZoneInfo.textContent=
-          s.action==='animal_ear'
-            ? 'Apple Pencil : peins uniquement l’oreille, jusqu’à sa base. 1 doigt : déplacer. 2 doigts : zoom.'
+          (s.action==='animal_ear'||s.action==='couple_approach')
+            ? `Apple Pencil : trace uniquement l’extérieur ${s.action==='animal_ear'?'de l’oreille':'du visage'}. L’intérieur sera rempli automatiquement.`
             : 'Apple Pencil : entoure librement l’œil. 1 doigt : déplacer. 2 doigts : zoom.';
 
         editorRemoveZoneBtn.style.display='none';
@@ -468,7 +468,7 @@
       const previous=s.action;
       s.action=planAction.value;
 
-      if(previous!==s.action && s.action!=='person_wink' && s.action!=='animal_ear'){
+      if(previous!==s.action && !['person_wink','animal_ear','couple_approach'].includes(s.action)){
         delete s.actionZone;
       }
 
@@ -636,7 +636,13 @@
       const toPoint=p=>pointToCanvas({x:p[0]*zoneState.imgW,y:p[1]*zoneState.imgH});
       const first=toPoint(st.points[0]);zoneCtx.beginPath();zoneCtx.moveTo(first.x,first.y);
       if(st.points.length===1){zoneCtx.arc(first.x,first.y,zoneCtx.lineWidth/2,0,Math.PI*2);zoneCtx.fill();}
-      else{for(let i=1;i<st.points.length;i++){const p=toPoint(st.points[i]);zoneCtx.lineTo(p.x,p.y);}zoneCtx.stroke();}
+      else{
+        for(let i=1;i<st.points.length;i++){const p=toPoint(st.points[i]);zoneCtx.lineTo(p.x,p.y);}
+        if(zoneState.mode==='outline'){
+          zoneCtx.closePath();zoneCtx.globalAlpha=.20;zoneCtx.fill();zoneCtx.globalAlpha=1;
+        }
+        zoneCtx.stroke();
+      }
       zoneCtx.restore();
     }
 
@@ -659,7 +665,7 @@
       if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;
     }
 
-    const pad=Math.max(4,(Number(zoneState.brush)||.02)*Math.max(zoneState.imgW,zoneState.imgH)*.6);
+    const pad=zoneState.mode==='outline'?2:Math.max(4,(Number(zoneState.brush)||.02)*Math.max(zoneState.imgW,zoneState.imgH)*.6);
     const padX=pad,padY=pad;
 
     minX-=padX;
@@ -676,6 +682,12 @@
     const h=maxY-minY;
 
     if(w<5 || h<5) return null;
+
+    if(zoneState.mode==='outline'){
+      const contours=strokes.filter(st=>!st.erase&&st.points.length>=3).map(st=>st.points.map(p=>[p[0],p[1]]));
+      if(!contours.length)return null;
+      return {kind:'outline',sourceW:zoneState.imgW,sourceH:zoneState.imgH,contours,x:minX/zoneState.imgW,y:minY/zoneState.imgH,w:w/zoneState.imgW,h:h/zoneState.imgH};
+    }
 
     return {
       kind:'paint',sourceW:zoneState.imgW,sourceH:zoneState.imgH,
@@ -766,7 +778,7 @@
       const z=zoneFromStrokes();
 
       if(!z){
-        alert('Peins d’abord précisément la zone avec l’Apple Pencil.');
+        alert(zoneState?.mode==='outline'?'Trace d’abord un contour fermé autour de l’oreille.':'Peins d’abord précisément la zone avec l’Apple Pencil.');
         return;
       }
 
@@ -775,9 +787,9 @@
 
     top.append(title,cancel,clear,ok);
 
-    const tools=document.createElement('div');Object.assign(tools.style,{display:'flex',gap:'8px',padding:'8px 12px',background:'#111',alignItems:'center',flexWrap:'wrap'});
+    const tools=document.createElement('div');Object.assign(tools.style,{display:'flex',gap:'8px',padding:'8px 12px',background:'#111',alignItems:'center',flexWrap:'wrap'});zoneModal._tools=tools;
     const add=document.createElement('button');add.textContent='✏️ Sélectionner';const erase=document.createElement('button');erase.textContent='⌫ Gomme';
-    const brush=document.createElement('input');brush.type='range';brush.min='8';brush.max='90';brush.value='28';Object.assign(brush.style,{flex:'1',minWidth:'130px'});
+    const brush=document.createElement('input');brush.type='range';brush.min='8';brush.max='90';brush.value='28';Object.assign(brush.style,{flex:'1',minWidth:'130px'});zoneModal._brush=brush;zoneModal._erase=erase;
     for(const b of[add,erase])Object.assign(b.style,{padding:'9px 11px',borderRadius:'9px',border:'1px solid #555',background:'#26262a',color:'#fff',fontWeight:'800'});
     const refresh=()=>{add.style.background=zoneState?.erase?'#26262a':'#087544';erase.style.background=zoneState?.erase?'#8b2732':'#26262a';};
     add.onclick=()=>{if(zoneState)zoneState.erase=false;refresh();drawZone();};erase.onclick=()=>{if(zoneState)zoneState.erase=true;refresh();drawZone();};
@@ -818,6 +830,7 @@
       fontSize:'12px',
       opacity:.8
     });
+    zoneModal._foot=foot;
 
     zoneModal.append(top,tools,body,foot);
     document.body.appendChild(zoneModal);
@@ -856,7 +869,7 @@
         drawingPointer=e.pointerId;
 
         const p=zoneImagePoint(e.clientX,e.clientY);
-        zoneState.activeStroke={erase:!!zoneState.erase,size:zoneState.brush,points:[[clamp(p.x/zoneState.imgW,0,1),clamp(p.y/zoneState.imgH,0,1)]]};
+        zoneState.activeStroke={erase:zoneState.mode==='outline'?false:!!zoneState.erase,size:zoneState.brush,points:[[clamp(p.x/zoneState.imgW,0,1),clamp(p.y/zoneState.imgH,0,1)]]};
         zoneState.strokes.push(zoneState.activeStroke);
 
         drawZone();
@@ -1049,6 +1062,7 @@
       zoneState={
         imgW:iw,
         imgH:ih,
+        mode:current?.zoneMode==='outline'?'outline':'paint',
         zoom:1,
         panX:0,
         panY:0,
@@ -1067,6 +1081,8 @@
 
       if(current?.actionZone?.kind==='paint'&&Array.isArray(current.actionZone.strokes)){
         zoneState.strokes=current.actionZone.strokes.map(st=>({erase:!!st.erase,size:Number(st.size)||zoneState.brush,points:(st.points||[]).map(p=>[Number(p[0])||0,Number(p[1])||0])}));
+      }else if(current?.actionZone?.kind==='outline'&&Array.isArray(current.actionZone.contours)){
+        zoneState.strokes=current.actionZone.contours.map(points=>({erase:false,size:zoneState.brush,points:points.map(p=>[Number(p[0])||0,Number(p[1])||0])}));
       }else if(current?.actionZone){
         const z=current.actionZone;
 
@@ -1079,6 +1095,11 @@
       }
 
       zoneModal._refreshTools?.();
+      if(zoneModal._erase)zoneModal._erase.style.display=zoneState.mode==='outline'?'none':'inline-block';
+      if(zoneModal._brush)zoneModal._brush.style.display=zoneState.mode==='outline'?'none':'block';
+      if(zoneModal._foot)zoneModal._foot.textContent=zoneState.mode==='outline'
+        ? 'Apple Pencil : trace le contour extérieur de chaque oreille • Relâche pour fermer et remplir automatiquement • 1 doigt : déplacer • 2 doigts : zoom'
+        : 'Apple Pencil : peindre plusieurs zones • Gomme : corriger • 1 doigt : déplacer • 2 doigts : zoom + déplacement';
       drawZone();
 
       return new Promise(resolve=>{
