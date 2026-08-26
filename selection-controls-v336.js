@@ -136,4 +136,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{clearCaches();try{window.renderAt?.(0,window.HappyHoloReliefState?.view);}catch(_){} });
   setTimeout(ensureControlPanel,300);
   console.log('[HAPPYHOLO] V3.6.7 sélections + placement sujet indépendant actif');
+  
 })();
