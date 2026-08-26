@@ -151,43 +151,55 @@
   }
 
 
-  // Déformation locale simple : des bandes horizontales de la zone œil convergent
-  // vers la ligne de paupière. Le reste du visage reste absolument fixe.
+  function buildWinkPatch(layer,z,k,W,H){
+    const patch=document.createElement('canvas');patch.width=W;patch.height=H;
+    const x=patch.getContext('2d');
+    const half=z.h*.5;
+    const squeeze=.30*k;
+    const topSourceH=Math.max(1,z.h*(.5-squeeze));
+    const bottomSourceY=z.y+z.h*(.5+squeeze);
+    const bottomSourceH=Math.max(1,z.y+z.h-bottomSourceY);
+
+    // Au repos, les deux moitiés reproduisent exactement l’œil. Au pic,
+    // elles étirent les paupières supérieure et inférieure vers le centre
+    // et éliminent réellement l’iris de la zone affichée.
+    x.drawImage(layer,z.x,z.y,z.w,topSourceH,z.x,z.y,z.w,half+.5);
+    x.drawImage(layer,z.x,bottomSourceY,z.w,bottomSourceH,z.x,z.y+half-.5,z.w,half+.5);
+
+    if(k>.28){
+      x.globalAlpha=clamp((k-.28)/.72,0,1)*.58;
+      x.fillStyle='rgba(42,28,25,.88)';
+      x.fillRect(z.x+z.w*.08,z.y+half-Math.max(1,z.h*.018),z.w*.84,Math.max(2,z.h*.036));
+      x.globalAlpha=1;
+    }
+    return patch;
+  }
+
+  // Le patch fermé remplace la zone d’origine dans la couche du sujet.
+  // L’ancien moteur le superposait seulement : l’œil ouvert restait visible.
   function drawWink(ctx,layer,phase,intensity,W,H,zone){
-    ctx.drawImage(layer,0,0,W,H);
-    const z=zonePx(zone,W,H); if(!z) return;
-    const k=clamp(phase*intensity,0,1);
-    const strips=18, sh=z.h/strips, mid=z.y+z.h*.54;
-    ctx.save();
-    ctx.beginPath(); ctx.rect(z.x,z.y,z.w,z.h); ctx.clip();
-    for(let i=0;i<strips;i++){
-      const sy=z.y+i*sh;
-      const center=sy+sh/2;
-      const dist=center-mid;
-      const dy=-dist*.74*k;
-      const dh=sh*(1-.26*k);
-      ctx.drawImage(layer,z.x,sy,z.w,sh,z.x,sy+dy,z.w,dh);
-    }
-    // ligne de paupière douce au pic de fermeture
-    if(k>.35){
-      ctx.globalAlpha=(k-.35)/.65*.30;
-      ctx.fillStyle='rgba(45,30,28,.72)';
-      ctx.fillRect(z.x+z.w*.10,mid-1,z.w*.80,Math.max(1,z.h*.025));
-    }
-    ctx.restore();
+    const z=zonePx(zone,W,H); if(!z){ctx.drawImage(layer,0,0,W,H);return;}
+    const k=clamp(phase*(.35+.65*intensity),0,1);
+    const out=document.createElement('canvas');out.width=W;out.height=H;
+    const x=out.getContext('2d');x.drawImage(layer,0,0,W,H);
+    x.clearRect(z.x,z.y,z.w,z.h);
+    x.drawImage(buildWinkPatch(layer,z,k,W,H),0,0);
+    ctx.drawImage(out,0,0);
   }
 
   function drawWinkPaint(ctx,layer,phase,intensity,W,H,zone){
-    ctx.drawImage(layer,0,0,W,H);
-    const mask=paintZoneMask(zone,W,H),z=zonePx(zone,W,H);if(!mask||!z)return;
-    const k=clamp(phase*intensity,0,1),strips=22,sh=z.h/strips,mid=z.y+z.h*.54;
-    const warped=document.createElement('canvas');warped.width=W;warped.height=H;const x=warped.getContext('2d');
-    for(let i=0;i<strips;i++){
-      const sy=z.y+i*sh,center=sy+sh/2,dist=center-mid,dy=-dist*.76*k,dh=Math.max(.5,sh*(1-.28*k));
-      x.drawImage(layer,z.x,sy,z.w,sh,z.x,sy+dy,z.w,dh);
-    }
-    if(k>.35){x.globalAlpha=(k-.35)/.65*.30;x.fillStyle='rgba(45,30,28,.72)';x.fillRect(z.x+z.w*.08,mid-1,z.w*.84,Math.max(1,z.h*.025));x.globalAlpha=1;}
-    x.globalCompositeOperation='destination-in';x.drawImage(mask,0,0);x.globalCompositeOperation='source-over';ctx.drawImage(warped,0,0);
+    const mask=paintZoneMask(zone,W,H),z=zonePx(zone,W,H);
+    if(!mask||!z){ctx.drawImage(layer,0,0,W,H);return;}
+    const k=clamp(phase*(.35+.65*intensity),0,1);
+    const patch=buildWinkPatch(layer,z,k,W,H);
+    const px=patch.getContext('2d');
+    px.globalCompositeOperation='destination-in';px.drawImage(mask,0,0);px.globalCompositeOperation='source-over';
+
+    const out=document.createElement('canvas');out.width=W;out.height=H;
+    const x=out.getContext('2d');x.drawImage(layer,0,0,W,H);
+    x.globalCompositeOperation='destination-out';x.drawImage(mask,0,0);
+    x.globalCompositeOperation='source-over';x.drawImage(patch,0,0);
+    ctx.drawImage(out,0,0);
   }
 
   function renderAction(ctx,layer,s,phase,W,H){

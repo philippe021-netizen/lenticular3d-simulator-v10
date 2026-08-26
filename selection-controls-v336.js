@@ -265,6 +265,10 @@
 
     const valid=indices.filter(i=>selections[i]);
     if(!valid.length) return;
+    if(valid.every(i=>(selections[i].action||'none')==='none')){
+      alert('Choisis d’abord une action pour cette sélection.');
+      return;
+    }
     const maxSide=1050;
     const sw=src.naturalWidth||src.width||1, sh=src.naturalHeight||src.height||1;
     const scale=Math.min(1,maxSide/Math.max(sw,sh));

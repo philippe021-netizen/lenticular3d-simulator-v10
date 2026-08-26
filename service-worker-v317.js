@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.21';
+const CACHE_VERSION = 'happyholo-offline-v1.22';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
