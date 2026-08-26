@@ -1,4 +1,4 @@
-/* HappyHolo V3.3.6 — panneau Réglages par sélection restauré */
+/* HappyHolo V3.4.1 — réglages par sélection + reflet lumineux local */
 (() => {
   'use strict';
 
@@ -10,6 +10,7 @@
   const actionOptions = [
     ['Aucune action','none'],
     ['Moto/voiture — appel de phare','headlight'],
+    ['Reflet lumineux local','glint'],
     ['Objet rigide — pivot léger','pivot']
   ];
 
@@ -19,6 +20,10 @@
     return Array.isArray(window.happyHoloSelectionPlan)
       ? window.happyHoloSelectionPlan
       : [];
+  }
+
+  function notifyActionPlan(){
+    window.dispatchEvent(new CustomEvent('happyholo-action-plan-changed'));
   }
 
   function clearCaches(){
@@ -111,21 +116,50 @@
     return c;
   }
 
+  function resolveRenderTarget(target){
+    if(target) return target;
+    try{ if(typeof view!=='undefined'&&view) return view; }catch(_){ }
+    return window.HappyHoloReliefState?.view||null;
+  }
+
+  function drawGlintForSelection(ctx,s,layer,norm,W,H,shift=0){
+    if(s?.action!=='glint'||!Array.isArray(s.actionZones)||!s.actionZones.length||!layer) return;
+    const engine=window.HappyHoloActionPreviewEngine;
+    if(typeof engine?.buildGlintOverlay!=='function') return;
+    const fx=engine.buildGlintOverlay({
+      layer,phase:clamp((Number(norm)||0)+1,0,2)/2,
+      intensity:clamp(Number(s.intensity||50)/100,.1,1),W,H,zones:s.actionZones
+    });
+    ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(fx,shift,0);ctx.restore();
+  }
+
+  function drawSinglePlanGlints(norm,target){
+    const selections=plan(),out=resolveRenderTarget(target);
+    if(!out||!selections.length) return;
+    const x=out.getContext('2d'),W=out.width,H=out.height;
+    let amplitude=1.75;
+    try{ if(typeof angle!=='undefined') amplitude=Number(angle.value)/4; }catch(_){ }
+    selections.forEach((s,i)=>{
+      if(s.action!=='glint') return;
+      const layer=getExclusiveLayer(i,W,H),k=clamp((Number(s.depth)||.35)/.30,.05,3);
+      drawGlintForSelection(x,s,layer,norm,W,H,Number(norm||0)*18*amplitude*k);
+    });
+  }
+
   function multiRenderAt(norm,target){
     const selections=plan();
-    if(selections.length<2 || !sourceImage() || !bgImage()){
+    if(!sourceImage() || !bgImage()){
       if(originalRenderAt) return originalRenderAt(norm,target);
       return;
     }
 
-    try{
-      if(!target){
-        if(typeof view!=='undefined') target=view;
-        else target=window.HappyHoloReliefState?.view;
-      }
-    }catch(_){
-      target=window.HappyHoloReliefState?.view;
+    if(selections.length<2){
+      if(originalRenderAt) originalRenderAt(norm,target);
+      drawSinglePlanGlints(norm,target);
+      return;
     }
+
+    target=resolveRenderTarget(target);
     if(!target) return;
 
     const x=target.getContext('2d');
@@ -164,6 +198,7 @@
       x.globalAlpha=.18;
       x.drawImage(layer,shift*.985,0);
       x.globalAlpha=1;
+      drawGlintForSelection(x,it.s,layer,norm,W,H,shift);
     }
 
     if(textDepth>=0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
@@ -289,6 +324,7 @@
       const s=selections[i];
       if(s.action==='person_wink'&&!s.actionZone){alert('Définis d’abord la zone de l’œil.');return;}
       if(s.action==='headlight'&&!(Array.isArray(s.actionZones)&&s.actionZones.length)){alert('Définis d’abord au moins une zone de phare.');return;}
+      if(s.action==='glint'&&!(Array.isArray(s.actionZones)&&s.actionZones.length)){alert('Définis d’abord au moins une zone de reflet.');return;}
     }
     const base=document.createElement('canvas');base.width=W;base.height=H;
     const bx=base.getContext('2d'),bg=bgImage()||src,bf=fitCoverLocal(bg,W,H);bx.drawImage(bg,bf.x,bf.y,bf.w,bf.h);
@@ -384,13 +420,13 @@
       [['Rapide · 1 s',1000],['Normal · 2 s',2000],['Doux · 3 s',3000]].forEach(([t,v])=>speed.appendChild(new Option(t,String(v))));
       speed.value=String(s.actionSpeed||2000);s.actionSpeed=Number(speed.value);
       Object.assign(speed.style,{width:'100%',padding:'7px',borderRadius:'8px',marginTop:'7px'});
-      speed.addEventListener('change',()=>s.actionSpeed=Number(speed.value));awrap.appendChild(speed);
+      speed.addEventListener('change',()=>{s.actionSpeed=Number(speed.value);notifyActionPlan();});awrap.appendChild(speed);
 
       const headlightMode=document.createElement('select');
       [['Réaliste · déjà allumé → appel','already_on'],['Visible · quasi éteint → 100 %','off_to_on']].forEach(([t,v])=>headlightMode.appendChild(new Option(t,v)));
       headlightMode.value=s.headlightMode||'already_on';s.headlightMode=headlightMode.value;
       Object.assign(headlightMode.style,{display:'none',width:'100%',padding:'7px',borderRadius:'8px',marginTop:'7px'});
-      headlightMode.addEventListener('change',()=>s.headlightMode=headlightMode.value);awrap.appendChild(headlightMode);
+      headlightMode.addEventListener('change',()=>{s.headlightMode=headlightMode.value;notifyActionPlan();});awrap.appendChild(headlightMode);
 
       const zoneBtn=document.createElement('button');zoneBtn.type='button';
       Object.assign(zoneBtn.style,{display:'none',width:'100%',padding:'9px',borderRadius:'9px',border:'1px solid #888',background:'#fff',fontWeight:'800',marginTop:'7px'});
@@ -399,21 +435,21 @@
       const updateZone=()=>{
         headlightMode.style.display=s.action==='headlight'?'block':'none';
         if(s.action==='person_wink'){zoneBtn.style.display='block';removeZone.style.display='none';zoneBtn.textContent=s.actionZone?'✓ Modifier zone œil':'🎯 Définir zone œil';}
-        else if(s.action==='headlight'){s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];zoneBtn.style.display='block';removeZone.style.display=s.actionZones.length?'block':'none';zoneBtn.textContent=`＋ Ajouter zone plein phare (${s.actionZones.length}/4)`;}
+        else if(s.action==='headlight'||s.action==='glint'){s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];zoneBtn.style.display='block';removeZone.style.display=s.actionZones.length?'block':'none';zoneBtn.textContent=`＋ Ajouter zone ${s.action==='glint'?'reflet':'plein phare'} (${s.actionZones.length}/4)`;}
         else{zoneBtn.style.display='none';removeZone.style.display='none';}
       };
       zoneBtn.addEventListener('click',async()=>{
         if(typeof window.HappyHoloChooseActionZone!=='function'){alert('Outil de zone indisponible. Recharge la page.');return;}
         if(s.action==='person_wink'){
           const z=await window.HappyHoloChooseActionZone({actionZone:s.actionZone||null},'Zone précise de l’œil');if(z)s.actionZone=z;
-        }else if(s.action==='headlight'){
+        }else if(s.action==='headlight'||s.action==='glint'){
           s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];if(s.actionZones.length>=4){alert('4 zones maximum.');return;}
-          const z=await window.HappyHoloChooseActionZone({actionZone:null},`Zone plein phare ${s.actionZones.length+1}`);if(z)s.actionZones.push(z);
+          const z=await window.HappyHoloChooseActionZone({actionZone:null},`${s.action==='glint'?'Zone reflet':'Zone plein phare'} ${s.actionZones.length+1}`);if(z)s.actionZones.push(z);
         }
-        updateZone();
+        updateZone();notifyActionPlan();
       });
-      removeZone.addEventListener('click',()=>{if(Array.isArray(s.actionZones)&&s.actionZones.length)s.actionZones.pop();updateZone();});
-      asel.addEventListener('change',()=>{s.action=asel.value;if(s.action!=='person_wink')delete s.actionZone;if(s.action!=='headlight')s.actionZones=[];updateZone();});
+      removeZone.addEventListener('click',()=>{if(Array.isArray(s.actionZones)&&s.actionZones.length)s.actionZones.pop();updateZone();notifyActionPlan();});
+      asel.addEventListener('change',()=>{s.action=asel.value;if(s.action!=='person_wink')delete s.actionZone;if(s.action!=='headlight'&&s.action!=='glint')s.actionZones=[];updateZone();notifyActionPlan();});
       awrap.append(zoneBtn,removeZone);
 
       const intensityLine=document.createElement('div');
@@ -427,7 +463,7 @@
       const intensityOut=document.createElement('b');
       intensityOut.textContent=`${Number(s.intensity||50)}%`;
       Object.assign(intensityOut.style,{fontSize:'10px',minWidth:'34px',textAlign:'right'});
-      intensity.addEventListener('input',()=>{ s.intensity=Number(intensity.value); intensityOut.textContent=`${s.intensity}%`; });
+      intensity.addEventListener('input',()=>{ s.intensity=Number(intensity.value); intensityOut.textContent=`${s.intensity}%`; notifyActionPlan(); });
       intensityLine.append(intensityLabel,intensity,intensityOut);
       awrap.appendChild(intensityLine);
 

@@ -302,6 +302,7 @@
     [
       ['Aucune action','none'],
       ['Moto/voiture — appel de phare','headlight'],
+      ['Reflet lumineux local','glint'],
       ['Objet rigide — pivot léger','pivot']
     ].forEach(([t,v])=>{
       planAction.appendChild(new Option(t,v));
@@ -340,12 +341,12 @@
           return;
         }
 
-        if(s.action!=='headlight') return;
+        if(s.action!=='headlight'&&s.action!=='glint') return;
 
         s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];
 
         if(s.actionZones.length>=4){
-          alert('4 zones de plein phare maximum.');
+          alert('4 zones maximum pour cette action.');
           return;
         }
 
@@ -354,9 +355,12 @@
           return;
         }
 
+        const isGlint=s.action==='glint';
         const z=await window.HappyHoloChooseActionZone(
           {actionZone:null},
-          `Zone plein phare ${s.actionZones.length+1} — serre autour de l’optique`
+          isGlint
+            ? `Zone reflet ${s.actionZones.length+1} — peins uniquement la matière à faire briller`
+            : `Zone plein phare ${s.actionZones.length+1} — serre autour de l’optique`
         );
 
         if(z){
@@ -410,20 +414,23 @@
         return;
       }
 
-      if(s.action==='headlight'){
+      if(s.action==='headlight'||s.action==='glint'){
         s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];
+        const isGlint=s.action==='glint';
 
         editorZoneWrap.style.display='flex';
 
         editorZoneBtn.textContent=
           s.actionZones.length>=4
-            ? '✓ 4 zones plein phare définies'
-            : `＋ Ajouter zone plein phare (${s.actionZones.length}/4)`;
+            ? `✓ 4 zones ${isGlint?'reflet':'plein phare'} définies`
+            : `＋ Ajouter zone ${isGlint?'reflet':'plein phare'} (${s.actionZones.length}/4)`;
 
         editorZoneInfo.textContent=
           s.actionZones.length
-            ? `${s.actionZones.length} zone${s.actionZones.length>1?'s':''} de plein phare synchronisée${s.actionZones.length>1?'s':''}.`
-            : 'Sélectionne uniquement les optiques de plein phare. 1 à 4 zones.';
+            ? `${s.actionZones.length} zone${s.actionZones.length>1?'s':''} ${isGlint?'de reflet':'de plein phare'} synchronisée${s.actionZones.length>1?'s':''}.`
+            : (isGlint
+              ? 'Peins uniquement les yeux, bijoux, médailles, chromes ou carrosseries à faire briller.'
+              : 'Sélectionne uniquement les optiques de plein phare. 1 à 4 zones.');
 
         editorRemoveZoneBtn.style.display=
           s.actionZones.length?'block':'none';
@@ -458,7 +465,7 @@
         delete s.actionZone;
       }
 
-      if(previous!==s.action && s.action!=='headlight'){
+      if(previous!==s.action && s.action!=='headlight' && s.action!=='glint'){
         s.actionZones=[];
       }
 

@@ -150,6 +150,50 @@
     ctx.restore();
   }
 
+  function buildGlintOverlay({layer,phase=0,intensity=.5,W,H,zones=[]}){
+    const out=document.createElement('canvas');out.width=W;out.height=H;
+    const ox=out.getContext('2d');
+    const p=clamp(Number(phase)||0,0,1),k=clamp(Number(intensity)||.5,.1,1);
+
+    for(const zone of zones){
+      const mask=paintZoneMask(zone,W,H),z=zonePx(zone,W,H);
+      if(!mask||!z) continue;
+
+      const band=document.createElement('canvas');band.width=W;band.height=H;
+      const bx=band.getContext('2d');
+      const cx=z.x+(-.28+1.56*p)*z.w,cy=z.y+z.h*.5;
+      const bw=Math.max(5,z.w*(.12+.10*k));
+      bx.save();bx.translate(cx,cy);bx.rotate(-24*Math.PI/180);
+      const g=bx.createLinearGradient(-bw,0,bw,0);
+      g.addColorStop(0,'rgba(255,255,255,0)');
+      g.addColorStop(.34,'rgba(255,248,220,.18)');
+      g.addColorStop(.50,'rgba(255,255,255,.98)');
+      g.addColorStop(.66,'rgba(225,244,255,.24)');
+      g.addColorStop(1,'rgba(255,255,255,0)');
+      bx.fillStyle=g;bx.fillRect(-bw,-H,bw*2,H*2);bx.restore();
+      bx.globalCompositeOperation='destination-in';bx.drawImage(mask,0,0);bx.globalCompositeOperation='source-over';
+
+      if(layer){
+        const detail=document.createElement('canvas');detail.width=W;detail.height=H;
+        const dx=detail.getContext('2d');
+        dx.filter=`brightness(${2.1+1.8*k}) contrast(${1+.22*k}) saturate(${1-.18*k})`;
+        dx.drawImage(layer,0,0);dx.filter='none';
+        dx.globalCompositeOperation='destination-in';dx.drawImage(band,0,0);dx.globalCompositeOperation='source-over';
+        ox.save();ox.globalCompositeOperation='screen';ox.globalAlpha=.45+.35*k;ox.drawImage(detail,0,0);ox.restore();
+      }
+
+      ox.save();ox.globalCompositeOperation='screen';ox.globalAlpha=.48+.42*k;ox.drawImage(band,0,0);ox.restore();
+    }
+    return out;
+  }
+
+  function drawGlint(ctx,layer,phase,intensity,W,H,zones){
+    ctx.drawImage(layer,0,0,W,H);
+    if(!Array.isArray(zones)||!zones.length) return;
+    const fx=buildGlintOverlay({layer,phase,intensity,W,H,zones});
+    ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(fx,0,0);ctx.restore();
+  }
+
 
   function buildWinkPatch(layer,z,k,W,H){
     const patch=document.createElement('canvas');patch.width=W;patch.height=H;
@@ -213,6 +257,10 @@
       for(const z of zones){if(z?.kind==='paint') drawHeadlightPaint(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on');else drawHeadlight(ctx,layer,phase,intensity,W,H,z,s.headlightMode||'off_to_on',true);}
       return;
     }
+    if(action==='glint'){
+      const zones=Array.isArray(s.actionZones)?s.actionZones:[];
+      return drawGlint(ctx,layer,phase,intensity,W,H,zones);
+    }
     if(action==='person_wink') return s.actionZone?.kind==='paint'?drawWinkPaint(ctx,layer,phase,intensity,W,H,s.actionZone):drawWink(ctx,layer,phase,intensity,W,H,s.actionZone);
     ctx.drawImage(layer,0,0,W,H);
   }
@@ -232,6 +280,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover};
-  console.log('[HAPPYHOLO] action-preview-engine V3.3.6 OFFLINE actif · masque libre clin d’œil + multi-zones plein phare');
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay};
+  console.log('[HAPPYHOLO] action-preview-engine V3.4.1 OFFLINE · reflet lumineux local actif');
 })();

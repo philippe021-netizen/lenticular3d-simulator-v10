@@ -1,4 +1,4 @@
-/* HappyHolo V3.4.1 — simulation lenticulaire multi-couches + phares intégrés aux couches 3D */
+/* HappyHolo V3.4.2 — simulation multi-couches + phares + reflet local */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -65,7 +65,7 @@
     const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30);
     if(token!==buildToken)return;
     reliefLayers={w:SW,h:SH,bg,sub};
-    headlightCache=null;
+    headlightCache=null;glintCache=null;
     $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
     play();
   }
@@ -90,10 +90,42 @@
     return p.find(s=>s?.action==='headlight' && Array.isArray(s.actionZones) && s.actionZones.length);
   }
 
+  function activeGlintSelection(){
+    const p=window.happyHoloSelectionPlan||[];
+    return p.find(s=>s?.action==='glint'&&Array.isArray(s.actionZones)&&s.actionZones.length);
+  }
+
   // V3.4.1 — PHARES INTÉGRÉS AUX COUCHES 3D
   // Le masque lumineux est découpé avec les mêmes couches de profondeur que le véhicule.
   // Chaque morceau de phare reçoit donc EXACTEMENT le déplacement de sa couche.
   let headlightCache=null;
+  let glintCache=null;
+
+  function getGlintCache(){
+    const s=activeGlintSelection(),engine=window.HappyHoloActionPreviewEngine;
+    if(!s||!reliefLayers?.sub?.length||typeof engine?.buildGlintOverlay!=='function') return null;
+    const intensity=Number(s.intensity||50);
+    if(glintCache&&glintCache.zonesRef===s.actionZones&&glintCache.subRef===reliefLayers.sub&&glintCache.intensity===intensity) return glintCache;
+
+    const W=reliefLayers.w,H=reliefLayers.h;
+    const subject=document.createElement('canvas');subject.width=W;subject.height=H;
+    const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
+    const phases=[0,.17,.34,.5,.66,.83,1];
+    const frames=phases.map(phase=>engine.buildGlintOverlay({
+      layer:subject,phase,intensity:Math.max(.1,Math.min(1,intensity/100)),W,H,zones:s.actionZones
+    }));
+    glintCache={zonesRef:s.actionZones,subRef:reliefLayers.sub,intensity,frames,selection:s};
+    return glintCache;
+  }
+
+  function drawGlintEffect(r,norm){
+    const cache=getGlintCache();if(!cache?.frames?.length)return;
+    const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));
+    const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];
+    const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));
+    const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);
+    ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(frame,r.x+shift,r.y,r.w,r.h);ctx.restore();
+  }
 
   function headlightSignature(s){
     if(!s || !Array.isArray(s.actionZones)) return '';
@@ -260,6 +292,8 @@
       drawHeadlightEffectForLayer(i,r,shift,actionPulse);
     });
 
+    drawGlintEffect(r,norm);
+
     if(textDepth>=0) drawTextLayer(norm,r);
 
     ctx.restore();
@@ -290,9 +324,9 @@
 
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
-  window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;draw(0,0);});
+  window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;draw(0,0);});
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.4.1 · phares intégrés aux couches 3D');
+  console.log('[HAPPYHOLO] support-preview V3.4.2 · phares + reflet local intégrés');
 })();
