@@ -137,4 +137,3 @@
   setTimeout(ensureControlPanel,300);
   console.log('[HAPPYHOLO] V3.6.7 sélections + placement sujet indépendant actif');
 })();
-
