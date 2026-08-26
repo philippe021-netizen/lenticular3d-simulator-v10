@@ -1,4 +1,4 @@
-/* HappyHolo V3.4.3 — couches de profondeur exclusives, sans dédoublement */
+/* HappyHolo V3.4.4 — couches exclusives + fond de sécurité anti-fentes */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -37,6 +37,13 @@
   function ensureCanvas(){ const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2); const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} }
   function coverRect(sw,sh,dw,dh){const k=Math.max(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
 
+  function makeFlatLayer(img,W,H){
+    const c=document.createElement('canvas');c.width=W;c.height=H;
+    const x=c.getContext('2d'),r=coverRect(img.naturalWidth,img.naturalHeight,W,H);
+    x.drawImage(img,r.x,r.y,r.w,r.h);
+    return c;
+  }
+
   function makeDepthLayers(img,depth,SW,SH,count,_soft){
     const base=document.createElement('canvas');base.width=SW;base.height=SH;const bx=base.getContext('2d');const fr=coverRect(img.naturalWidth,img.naturalHeight,SW,SH);bx.drawImage(img,fr.x,fr.y,fr.w,fr.h);
     const dep=document.createElement('canvas');dep.width=SW;dep.height=SH;const dx=dep.getContext('2d');const dr=coverRect(depth.width,depth.height,SW,SH);dx.drawImage(depth,dr.x,dr.y,dr.w,dr.h);
@@ -69,7 +76,10 @@
     const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,4,.42);
     const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30);
     if(token!==buildToken)return;
-    reliefLayers={w:SW,h:SH,bg,sub};
+    // Ce fond neutre reste sous les plans mobiles. Il n'est visible que dans
+    // les fentes sub-pixel ouvertes entre deux couches exclusives.
+    const safetyBackground=makeFlatLayer(rs.backgroundImg,SW,SH);
+    reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
     headlightCache=null;glintCache=null;
     $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
     play();
@@ -279,6 +289,10 @@
 
     ctx.save();ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
 
+    if(reliefLayers.safetyBackground){
+      ctx.drawImage(reliefLayers.safetyBackground,r.x-1,r.y-1,r.w+2,r.h+2);
+    }
+
     for(const l of reliefLayers.bg){
       const z=(l.depth-.5)*2;
       const shift=norm*(4+5*z)*(canvas.width/320);
@@ -333,5 +347,5 @@
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
   apply();
-  console.log('[HAPPYHOLO] support-preview V3.4.3 · profondeur exclusive sans image fantôme');
+  console.log('[HAPPYHOLO] support-preview V3.4.4 · anti-dédoublement + anti-fentes noires');
 })();
