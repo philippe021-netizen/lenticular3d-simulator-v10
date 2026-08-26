@@ -1,4 +1,4 @@
-/* HappyHolo V3.3.8 — couche texte locale, rotation 3D sur axe vertical */
+/* HappyHolo V3.3.9 — couche texte locale, profondeur avant/arrière visible */
 (() => {
   'use strict';
 
@@ -14,7 +14,7 @@
     size:10,
     orientation:0,
     rotation3D:14,
-    depth:78,
+    depth:55,
     color:'#ffffff',
     outline:'#111111',
     outlineSize:5,
@@ -45,7 +45,11 @@
     const b=box||{x:0,y:0,w:ctx.canvas.width,h:ctx.canvas.height};
     const fontSize=Math.max(12,b.w*(Number(state.size)||10)/100);
     const lineHeight=fontSize*1.08;
-    const parallax=Number(norm||0)*(Number(state.depth)||0)/100*b.w*.065;
+    // Profondeur lenticulaire : valeur positive = premier plan, négative = arrière.
+    // À 100 %, l'écart total entre les vues extrêmes atteint 20 % de la largeur,
+    // suffisamment pour rester clairement visible sur l'aperçu miniature.
+    const depthValue=clamp(Number(state.depth)||0,-100,100);
+    const parallax=Number(norm||0)*(depthValue/100)*b.w*.10;
     const angle=Number(state.orientation)||0;
     const yaw=Number(norm||0)*(Number(state.rotation3D)||0);
     const face=Math.max(.34,Math.cos(Math.abs(yaw)*Math.PI/180));
@@ -137,7 +141,7 @@
       <div>
         <label><span>Taille</span> <b id="textSizeOut">10%</b></label><input id="textSize" type="range" min="4" max="24" value="10" step="1">
         <label><span>Orientation fixe</span> <b id="textOrientationOut">0°</b></label><input id="textOrientation" type="range" min="-180" max="180" value="0" step="1">
-        <label><span>Profondeur avant</span> <b id="textDepthOut">78%</b></label><input id="textDepth" type="range" min="0" max="100" value="78" step="1">
+        <label><span>Profondeur lenticulaire</span> <b id="textDepthOut">Avant +55</b></label><input id="textDepth" type="range" min="-100" max="100" value="55" step="1">
         <label><span>Rotation entre les vues</span> <b id="textRotationOut">±14°</b></label><input id="textRotation" type="range" min="0" max="35" value="14" step="1">
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button id="textCenter" type="button" class="secondary">Recentrer</button><span class="small" style="align-self:center">Déplace le texte directement sur la grande image.</span></div>
       </div>
@@ -155,7 +159,8 @@
   function syncOutputs(){
     $('#textSizeOut').textContent=`${state.size}%`;
     $('#textOrientationOut').textContent=`${state.orientation}°`;
-    $('#textDepthOut').textContent=`${state.depth}%`;
+    const d=Number(state.depth)||0;
+    $('#textDepthOut').textContent=d===0?'Plan image':(d>0?`Avant +${d}`:`Arrière ${d}`);
     $('#textRotationOut').textContent=`±${state.rotation3D}°`;
     $('#textOutlineOut').textContent=`${state.outlineSize}%`;
     tools.style.opacity=state.enabled?'1':'.48';
@@ -174,7 +179,7 @@
 
   enabled.checked=!!state.enabled;value.value=state.text||'';font.value=state.font||'system';
   color.value=state.color||'#ffffff';outline.value=state.outline||'#111111';outlineSize.value=state.outlineSize??5;
-  size.value=state.size??10;orientation.value=state.orientation??0;depth.value=state.depth??78;rotation.value=state.rotation3D??14;
+  size.value=state.size??10;orientation.value=state.orientation??0;depth.value=state.depth??55;rotation.value=state.rotation3D??14;
   [enabled,value,font,color,outline,outlineSize,size,orientation,depth,rotation].forEach(el=>el.addEventListener('input',pull));
   $('#textCenter').addEventListener('click',()=>{state.x=.5;state.y=.18;requestRedraw();});
 
@@ -202,5 +207,5 @@
   setTimeout(placeBeforeSupport,0);
   window.addEventListener('happyholo:selection-plan',placeBeforeSupport);
   syncOutputs();
-  console.log('[HAPPYHOLO] couche texte V3.3.8 · axe vertical actif');
+  console.log('[HAPPYHOLO] couche texte V3.3.9 · profondeur avant/arrière active');
 })();
