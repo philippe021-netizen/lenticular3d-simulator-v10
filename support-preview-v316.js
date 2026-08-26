@@ -1,4 +1,4 @@
-/* HappyHolo V3.7.2 — recto / verso / démo 360 sur tous les supports */
+/* HappyHolo V3.7.3 — verso non inversé + réglages dédiés */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -8,7 +8,7 @@
   let uploadedImage=null, objectUrl=null, backImage=null, backObjectUrl=null, raf=0, running=false, start=0, lastFrame=0;
   let flipRAF=0, flipAngle=0, flipping=false;
   let reliefLayers=null, buildToken=0;
-  const state={support:'keychain-vertical',fit:'contain',margin:0,zoom:100,x:0,y:0,rot:6,speed:5,showSafe:1,safe:6,face:'front'};
+  const state={support:'keychain-vertical',fit:'contain',margin:0,zoom:100,x:0,y:0,rot:6,speed:5,showSafe:1,safe:6,face:'front',backZoom:100,backX:0,backY:0};
 
   const host=document.createElement('section');
   host.className='support-card';
@@ -26,7 +26,15 @@
         <label><span>Vitesse</span><b id="speedOut">5.0 s</b></label><input id="supportSpeed" type="range" min="2" max="8" value="5" step="0.5">
         <label style="display:flex;align-items:center;gap:8px"><input id="supportShowSafe" type="checkbox" checked> Afficher la zone de sécurité carte</label>
         <label><span>Marge de sécurité</span><b id="safeOut">6%</b></label><input id="supportSafe" type="range" min="2" max="12" value="6" step="1">
-        <label>Image verso (optionnelle)</label><input id="supportBackFile" type="file" accept="image/*">
+        <div style="border:1px solid #c8c8c8;border-radius:14px;padding:12px;margin-top:8px;background:#fafafa">
+          <div style="font-weight:850;font-size:15px;margin-bottom:8px">Verso du support</div>
+          <label>Image du verso</label><input id="supportBackFile" type="file" accept="image/*" style="width:100%">
+          <div id="supportBackStatus" style="font-size:11px;color:#666;margin:6px 0 10px">Aucune image verso chargée</div>
+          <label><span>Zoom verso</span><b id="backZoomOut">100%</b></label><input id="supportBackZoom" type="range" min="60" max="180" value="100">
+          <label><span>Verso horizontal</span><b id="backXOut">0%</b></label><input id="supportBackX" type="range" min="-50" max="50" value="0">
+          <label><span>Verso vertical</span><b id="backYOut">0%</b></label><input id="supportBackY" type="range" min="-50" max="50" value="0">
+          <button id="supportBackReset" type="button" class="secondary" style="width:100%;margin-top:8px">Réinitialiser le verso</button>
+        </div>
         <div><button id="supportPlay">Lancer l’aperçu</button><button id="supportStop" class="secondary">Stop</button></div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
           <button id="supportFrontBtn" class="secondary" type="button">Recto</button>
@@ -38,7 +46,7 @@
     </div>`;
   document.querySelector('.card.grid')?.insertAdjacentElement('afterend',host);
 
-  const type=$('#supportType'),fit=$('#supportFit'),margin=$('#supportMargin'),zoom=$('#supportZoom'),xp=$('#supportX'),yp=$('#supportY'),rot=$('#supportRot'),speed=$('#supportSpeed'),showSafe=$('#supportShowSafe'),safe=$('#supportSafe'),backFile=$('#supportBackFile');
+  const type=$('#supportType'),fit=$('#supportFit'),margin=$('#supportMargin'),zoom=$('#supportZoom'),xp=$('#supportX'),yp=$('#supportY'),rot=$('#supportRot'),speed=$('#supportSpeed'),showSafe=$('#supportShowSafe'),safe=$('#supportSafe'),backFile=$('#supportBackFile'),backZoom=$('#supportBackZoom'),backX=$('#supportBackX'),backY=$('#supportBackY'),backReset=$('#supportBackReset'),backStatus=$('#supportBackStatus');
   const product=$('#productObject'),canvas=$('#supportCanvas'),empty=$('#supportEmpty'),ctx=canvas.getContext('2d');
 
   const frontBtn=$('#supportFrontBtn'), backBtn=$('#supportBackBtn'), demo360Btn=$('#supportDemo360Btn');
@@ -91,7 +99,7 @@
     }
   }
 
-  function updateText(){ $('#marginOut').textContent=`${state.margin}%`;$('#zoomOut').textContent=`${state.zoom}%`;$('#xOut').textContent=`${state.x}%`;$('#yOut').textContent=`${state.y}%`;$('#rotOut').textContent=`±${state.rot}°`;$('#speedOut').textContent=`${state.speed.toFixed(1)} s`; if($('#safeOut')) $('#safeOut').textContent=`${state.safe}%`; }
+  function updateText(){ $('#marginOut').textContent=`${state.margin}%`;$('#zoomOut').textContent=`${state.zoom}%`;$('#xOut').textContent=`${state.x}%`;$('#yOut').textContent=`${state.y}%`;$('#rotOut').textContent=`±${state.rot}°`;$('#speedOut').textContent=`${state.speed.toFixed(1)} s`; if($('#safeOut')) $('#safeOut').textContent=`${state.safe}%`; if($('#backZoomOut'))$('#backZoomOut').textContent=`${state.backZoom}%`;if($('#backXOut'))$('#backXOut').textContent=`${state.backX}%`;if($('#backYOut'))$('#backYOut').textContent=`${state.backY}%`; }
   function fitBox(sw,sh,dw,dh){ let k=(state.fit==='cover')?Math.max(dw/sw,dh/sh):Math.min(dw/sw,dh/sh); k*=state.zoom/100; if(state.fit==='preserve')k*=Math.max(.55,1-state.margin/100); const w=sw*k,h=sh*k; return {x:(dw-w)/2+(state.x/100)*dw*.5,y:(dh-h)/2+(state.y/100)*dh*.5,w,h}; }
   function ensureCanvas(){ const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2); const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} }
   function coverRect(sw,sh,dw,dh){const k=Math.max(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
@@ -232,11 +240,30 @@
   function applyHeadlightsFlat(r,pulse){const s=activeHeadlightSelection();if(!s)return;const zones=s.actionZones.filter(z=>z?.kind==='paint'&&Array.isArray(z.strokes));if(!zones.length)return;const intensity=Math.max(.1,Math.min(1,Number(s.intensity||50)/100));const mask=document.createElement('canvas');mask.width=canvas.width;mask.height=canvas.height;const mx=mask.getContext('2d');for(const z of zones){const zm=drawPaintMask(z,Math.max(2,Math.round(r.w)),Math.max(2,Math.round(r.h)));mx.drawImage(zm,r.x,r.y,r.w,r.h);}if((s.headlightMode||'off_to_on')==='off_to_on'){const dark=document.createElement('canvas');dark.width=canvas.width;dark.height=canvas.height;const dx=dark.getContext('2d');dx.fillStyle='#000';dx.fillRect(0,0,dark.width,dark.height);dx.globalCompositeOperation='destination-in';dx.drawImage(mask,0,0);ctx.save();ctx.globalAlpha=(1-pulse)*.58*intensity;ctx.drawImage(dark,0,0);ctx.restore();}const light=document.createElement('canvas');light.width=canvas.width;light.height=canvas.height;const lx=light.getContext('2d');lx.fillStyle='rgba(255,248,225,1)';lx.fillRect(0,0,light.width,light.height);lx.globalCompositeOperation='destination-in';lx.drawImage(mask,0,0);ctx.save();ctx.globalCompositeOperation='screen';ctx.globalAlpha=(.18+.82*pulse)*intensity;ctx.drawImage(light,0,0);ctx.restore();}
   function drawTextLayer(norm,r){window.HappyHoloTextLayer?.draw?.(ctx,norm,r);}
 
+  function backRect(img,W,H){
+    if(!img)return{x:0,y:0,w:W,h:H};
+    const iw=img.naturalWidth||img.width||1,ih=img.naturalHeight||img.height||1;
+    const sc=Math.max(W/iw,H/ih)*(Math.max(60,Math.min(180,Number(state.backZoom)||100))/100);
+    const w=iw*sc,h=ih*sc;
+    return{
+      x:(W-w)/2+(Number(state.backX)||0)/100*W*.5,
+      y:(H-h)/2+(Number(state.backY)||0)/100*H*.5,
+      w,h
+    };
+  }
+
   function drawBackFace(){
     ensureCanvas();
     ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // Le support DOM est déjà tourné de 180° : on retourne donc le dessin
+    // du verso horizontalement pour qu'il soit lisible normalement à l'écran.
+    ctx.save();
+    ctx.translate(canvas.width,0);
+    ctx.scale(-1,1);
+
     if(backImage){
-      const r=fitBox(backImage.naturalWidth,backImage.naturalHeight,canvas.width,canvas.height);
+      const r=backRect(backImage,canvas.width,canvas.height);
       ctx.drawImage(backImage,r.x,r.y,r.w,r.h);
     }else{
       const g=ctx.createLinearGradient(0,0,canvas.width,canvas.height);
@@ -246,16 +273,32 @@
         g.addColorStop(0,'#f2f2f3'); g.addColorStop(1,'#c9ccd3');
       }
       ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.strokeStyle='rgba(0,0,0,.12)'; ctx.lineWidth=Math.max(2,Math.round(Math.min(canvas.width,canvas.height)*0.014));
+      ctx.strokeStyle='rgba(0,0,0,.12)';
+      ctx.lineWidth=Math.max(2,Math.round(Math.min(canvas.width,canvas.height)*0.014));
       ctx.strokeRect(6,6,canvas.width-12,canvas.height-12);
       ctx.fillStyle='rgba(0,0,0,.62)';
       ctx.textAlign='center'; ctx.textBaseline='middle';
       ctx.font=`700 ${Math.max(16,Math.round(Math.min(canvas.width,canvas.height)*0.08))}px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif`;
       ctx.fillText('VERSO', canvas.width/2, canvas.height/2 - 10);
       ctx.font=`500 ${Math.max(10,Math.round(Math.min(canvas.width,canvas.height)*0.038))}px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif`;
-      ctx.fillText(backImage ? '' : 'Importe une image verso pour personnaliser cette face', canvas.width/2, canvas.height/2 + 22);
+      ctx.fillText('Charge une image dans le bloc « Verso du support »', canvas.width/2, canvas.height/2 + 22);
     }
-    drawCardGuides();
+
+    // Les guides doivent suivre le verso lui aussi.
+    if(isCardSupport() && state.showSafe){
+      const W=canvas.width,H=canvas.height;
+      const trimPad=Math.round(Math.min(W,H)*0.012);
+      const safePad=Math.round(Math.min(W,H)*(Number(state.safe)||6)/100);
+      ctx.strokeStyle='rgba(255,255,255,.92)';
+      ctx.lineWidth=Math.max(1,Math.round(Math.min(W,H)*0.006));
+      ctx.strokeRect(trimPad,trimPad,W-trimPad*2,H-trimPad*2);
+      ctx.setLineDash([Math.max(6,Math.round(W*0.02)),Math.max(4,Math.round(W*0.012))]);
+      ctx.strokeStyle='rgba(255,214,80,.95)';
+      ctx.lineWidth=Math.max(1,Math.round(Math.min(W,H)*0.005));
+      ctx.strokeRect(safePad,safePad,W-safePad*2,H-safePad*2);
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
   }
 
   function renderFaceByState(norm=0, actionPulse=0){
@@ -292,7 +335,7 @@
   function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');flipAngle=state.face==='back'?180:0;setProductTilt(flipAngle);renderFaceByState(0,0);}
   function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;applySupportShape();product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();updateFaceButtons();if(!flipping)setProductTilt(flipAngle);renderFaceByState(0,0);if(running)start=0;}
 
-  function animateToAngle(target,duration=760){
+  function animateToAngle(target,duration=900){
     cancelAnimationFrame(flipRAF);
     cancelAnimationFrame(raf);
     running=false;
@@ -334,22 +377,24 @@
   }
   function demo360(){
     const a=flipAngle;
-    animateToAngle(a+360,1200);
+    animateToAngle(a+360,2800);
   }
 
   [type,fit,margin,zoom,xp,yp,rot,speed,safe].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;state.safe=+safe.value;apply();}));
   showSafe.addEventListener('input',()=>{state.showSafe=showSafe.checked?1:0;apply();});
+  [backZoom,backX,backY].forEach(el=>el.addEventListener('input',()=>{state.backZoom=+backZoom.value;state.backX=+backX.value;state.backY=+backY.value;updateText();renderFaceByState(0,0);}));
+  backReset.addEventListener('click',()=>{state.backZoom=100;state.backX=0;state.backY=0;backZoom.value='100';backX.value='0';backY.value='0';updateText();renderFaceByState(0,0);});
   frontBtn.addEventListener('click',showRecto);
   backBtn.addEventListener('click',showBack);
   demo360Btn.addEventListener('click',demo360);
   $('#supportPlay').addEventListener('click',play);$('#supportStop').addEventListener('click',stop);
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
-  backFile.addEventListener('change',()=>{const f=backFile.files?.[0];if(!f)return;if(backObjectUrl)URL.revokeObjectURL(backObjectUrl);backObjectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{backImage=im;renderFaceByState(0,0);};im.src=backObjectUrl;});
+  backFile.addEventListener('change',()=>{const f=backFile.files?.[0];if(!f)return;if(backObjectUrl)URL.revokeObjectURL(backObjectUrl);backObjectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{backImage=im;backStatus.textContent=`✓ ${f.name}`;renderFaceByState(0,0);};im.src=backObjectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
   window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;renderFaceByState(0,0);});
   window.addEventListener('happyholo-background-changed',()=>renderFaceByState(0,0));
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.2 · recto/verso/démo 360');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.3 · verso lisible + réglages dédiés');
 })();
