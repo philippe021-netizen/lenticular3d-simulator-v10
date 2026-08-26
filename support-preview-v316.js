@@ -15,7 +15,7 @@
     <div class="support-head"><div><h2>Rendu support</h2><p>Simulation lenticulaire — couches de profondeur + actions locales.</p></div><span class="support-badge">Aperçu 3D</span></div>
     <div class="support-grid">
       <div class="support-controls">
-        <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round">Médaillon rond Ø30 mm</option></select>
+        <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round">Médaillon rond Ø30 mm</option><option value="business-card">Carte de visite 85,60 × 53,98 mm</option><option value="business-card-88">Carte 88 × 56 mm</option></select>
         <label>Cadrage</label><select id="supportFit"><option value="preserve">Préserver le sujet</option><option value="contain" selected>Placement maître — recommandé</option><option value="cover">Remplir — plein cadre</option></select>
         <label><span>Marge autour du sujet</span><b id="marginOut">0%</b></label><input id="supportMargin" type="range" min="0" max="30" value="0">
         <label><span>Zoom</span><b id="zoomOut">100%</b></label><input id="supportZoom" type="range" min="60" max="180" value="100">
@@ -31,6 +31,37 @@
 
   const type=$('#supportType'),fit=$('#supportFit'),margin=$('#supportMargin'),zoom=$('#supportZoom'),xp=$('#supportX'),yp=$('#supportY'),rot=$('#supportRot'),speed=$('#supportSpeed');
   const product=$('#productObject'),canvas=$('#supportCanvas'),empty=$('#supportEmpty'),ctx=canvas.getContext('2d');
+
+  const shell=product.querySelector('.shell');
+  const ring=product.querySelector('.ring');
+  const link=product.querySelector('.link');
+
+  function applySupportShape(){
+    if(!shell)return;
+    shell.style.width='';
+    shell.style.height='';
+    shell.style.borderRadius='';
+    if(ring)ring.style.display='';
+    if(link)link.style.display='';
+
+    if(state.support==='business-card'){
+      // Ratio ISO 85,60 / 53,98 = 1,5858
+      shell.style.width='300px';
+      shell.style.height='189px';
+      shell.style.borderRadius='14px';
+      if(ring)ring.style.display='none';
+      if(link)link.style.display='none';
+      $('#supportRecommendation').textContent='Carte de visite — 85,60 × 53,98 mm. Le texte en profondeur est repris dans les 9 vues.';
+    }else if(state.support==='business-card-88'){
+      // Ratio 88 / 56 = 1,5714
+      shell.style.width='300px';
+      shell.style.height='191px';
+      shell.style.borderRadius='14px';
+      if(ring)ring.style.display='none';
+      if(link)link.style.display='none';
+      $('#supportRecommendation').textContent='Carte — 88 × 56 mm. Le texte en profondeur est repris dans les 9 vues.';
+    }
+  }
 
   function updateText(){ $('#marginOut').textContent=`${state.margin}%`;$('#zoomOut').textContent=`${state.zoom}%`;$('#xOut').textContent=`${state.x}%`;$('#yOut').textContent=`${state.y}%`;$('#rotOut').textContent=`±${state.rot}°`;$('#speedOut').textContent=`${state.speed.toFixed(1)} s`; }
   function fitBox(sw,sh,dw,dh){ let k=(state.fit==='cover')?Math.max(dw/sw,dh/sh):Math.min(dw/sw,dh/sh); k*=state.zoom/100; if(state.fit==='preserve')k*=Math.max(.55,1-state.margin/100); const w=sw*k,h=sh*k; return {x:(dw-w)/2+(state.x/100)*dw*.5,y:(dh-h)/2+(state.y/100)*dh*.5,w,h}; }
@@ -174,7 +205,7 @@
   function tick(ts){if(!running)return;if(!start)start=ts;if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}lastFrame=ts;const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);draw(phase,headlightPulse(ts));raf=requestAnimationFrame(tick);}
   function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);product.classList.add('support-playing');cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
   function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');product.style.transform='perspective(620px) rotateY(0deg) translateX(0)';draw(0,0);}
-  function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0,0);if(running)start=0;}
+  function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;applySupportShape();product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();draw(0,0);if(running)start=0;}
   [type,fit,margin,zoom,xp,yp,rot,speed].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;apply();}));
   $('#supportPlay').addEventListener('click',play);$('#supportStop').addEventListener('click',stop);
   file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
@@ -184,6 +215,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>draw(0,0));
   window.addEventListener('resize',()=>draw(0,0));
-  apply();console.log('[HAPPYHOLO] support-preview V3.6.9 · fond immédiat + placement synchronisé');
-  
+  apply();console.log('[HAPPYHOLO] support-preview V3.7.0 · carte visite + texte relief compatible');
 })();
