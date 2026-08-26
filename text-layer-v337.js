@@ -1,4 +1,4 @@
-/* HappyHolo V3.3.7 — couche texte locale au premier plan */
+/* HappyHolo V3.3.8 — couche texte locale, rotation 3D sur axe vertical */
 (() => {
   'use strict';
 
@@ -46,14 +46,17 @@
     const fontSize=Math.max(12,b.w*(Number(state.size)||10)/100);
     const lineHeight=fontSize*1.08;
     const parallax=Number(norm||0)*(Number(state.depth)||0)/100*b.w*.065;
-    const angle=(Number(state.orientation)||0)+Number(norm||0)*(Number(state.rotation3D)||0);
-    const face=Math.max(.34,Math.cos(Math.abs(Number(norm||0)*(Number(state.rotation3D)||0))*Math.PI/180));
+    const angle=Number(state.orientation)||0;
+    const yaw=Number(norm||0)*(Number(state.rotation3D)||0);
+    const face=Math.max(.34,Math.cos(Math.abs(yaw)*Math.PI/180));
     const cx=b.x+clamp(Number(state.x)||.5,0,1)*b.w+parallax;
     const cy=b.y+clamp(Number(state.y)||.5,0,1)*b.h;
 
     ctx.save();
     ctx.translate(cx,cy);
     ctx.rotate(angle*Math.PI/180);
+    // Pivot gauche/droite autour de l’axe vertical : le texte se comprime
+    // horizontalement en perspective, sans pencher dans le plan de l’image.
     ctx.scale(face,1);
     ctx.textAlign='center';
     ctx.textBaseline='middle';
@@ -199,5 +202,5 @@
   setTimeout(placeBeforeSupport,0);
   window.addEventListener('happyholo:selection-plan',placeBeforeSupport);
   syncOutputs();
-  console.log('[HAPPYHOLO] couche texte V3.3.7 locale active');
+  console.log('[HAPPYHOLO] couche texte V3.3.8 · axe vertical actif');
 })();
