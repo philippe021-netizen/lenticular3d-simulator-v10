@@ -170,27 +170,58 @@ async function reconstructBackground(original, alphaCanvas){
   return await canvasToBlob(out);
 }
 
-/* 4 — DEPTH ANYTHING LOCAL */
+/* 4 — DEPTH ANYTHING LOCAL — V3.17 iPad mémoire */
 let estimator=null;
 async function getEstimator(){
   if(estimator) return estimator;
-  setStatus('3/5 Chargement de Depth Anything…');
+  setStatus('3/5 Chargement de Depth Anything (mode iPad)…');
   const {pipeline,env}=await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm');
   env.allowLocalModels=false;
   estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{dtype:'q4'});
   return estimator;
 }
 
+function fallbackDepth(img,maxSide=448){
+  const s=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+  const w=Math.max(64,Math.round(img.naturalWidth*s));
+  const h=Math.max(64,Math.round(img.naturalHeight*s));
+  const c=document.createElement('canvas'); c.width=w;c.height=h;
+  const x=c.getContext('2d',{willReadFrequently:true}); x.drawImage(img,0,0,w,h);
+  const src=x.getImageData(0,0,w,h), out=x.createImageData(w,h);
+  for(let yy=0;yy<h;yy++){
+    const vertical=1-Math.abs((yy/(h-1||1))-.52)*.38;
+    for(let xx=0;xx<w;xx++){
+      const i=(yy*w+xx)*4;
+      const lum=(src.data[i]*.2126+src.data[i+1]*.7152+src.data[i+2]*.0722)/255;
+      const center=1-Math.min(1,Math.hypot((xx-w*.5)/(w*.72),(yy-h*.5)/(h*.85)));
+      const d=Math.max(0,Math.min(1,.44+.16*center+.08*(lum-.5)+.06*vertical));
+      const v=Math.round(d*255);
+      out.data[i]=v;out.data[i+1]=v;out.data[i+2]=v;out.data[i+3]=255;
+    }
+  }
+  x.putImageData(out,0,0);
+  return c;
+}
+
+async function releaseEstimator(){
+  const e=estimator;
+  estimator=null;
+  try{ if(e && typeof e.dispose==='function') await e.dispose(); }catch(_){ }
+  await sleep(80);
+}
+
 async function estimateDepth(img,label){
   setStatus(label);
-  const maxSide=720;
+  const maxSide=512;
   const s=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
   const w=Math.max(64,Math.round(img.naturalWidth*s));
   const h=Math.max(64,Math.round(img.naturalHeight*s));
   const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
-  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.9)); const u=URL.createObjectURL(blob);
+  const blob=await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(new Error('Image profondeur impossible')),'image/jpeg',.84));
+  const u=URL.createObjectURL(blob);
   try{
-    const est=await getEstimator(); const r=await est(u); const raw=r.depth;
+    const est=await getEstimator();
+    const r=await est(u); const raw=r.depth;
     const src=document.createElement('canvas'); src.width=raw.width;src.height=raw.height;
     const sx=src.getContext('2d'); const id=sx.createImageData(raw.width,raw.height);
     for(let i=0;i<raw.width*raw.height;i++){
@@ -200,7 +231,14 @@ async function estimateDepth(img,label){
     const out=document.createElement('canvas'); out.width=w;out.height=h;
     const ox=out.getContext('2d'); ox.filter='blur(3px)'; ox.drawImage(src,0,0,w,h); ox.filter='none';
     return out;
-  }finally{ URL.revokeObjectURL(u); }
+  }catch(err){
+    console.warn('[HAPPYHOLO] Depth Anything indisponible, secours léger utilisé :',err);
+    setStatus('Mémoire iPad limitée : profondeur de secours locale utilisée.');
+    return fallbackDepth(img,448);
+  }finally{
+    URL.revokeObjectURL(u);
+    c.width=1;c.height=1;
+  }
 }
 
 /* 5 — RENDU MULTICOUCHE */
@@ -253,14 +291,18 @@ buildBtn.addEventListener('click',async()=>{
   if(!sourceFile){ setStatus('Choisis d’abord une photo.'); return; }
   buildBtn.disabled=true; exportBtn.disabled=true; downloadBtn.disabled=true;
   try{
+    /* V3.17 : une seule inférence profondeur, puis libération du modèle. */
+    subjectDepthCanvas=await estimateDepth(sourceImg,'1/5 Analyse de profondeur unique — mode iPad…');
+    backgroundDepthCanvas=subjectDepthCanvas;
+    await releaseEstimator();
+
     const subjectBlob=await window.localRemoveBackground(sourceFile); subjectImg=await blobToImage(subjectBlob);
     subjectAlphaCanvas=makeAlphaCanvas(subjectImg);
     const backgroundBlob=await reconstructBackground(sourceImg,subjectAlphaCanvas); backgroundImg=await blobToImage(backgroundBlob);
-    subjectDepthCanvas=await estimateDepth(subjectImg,'4/5 Analyse de profondeur du sujet…');
-    backgroundDepthCanvas=await estimateDepth(backgroundImg,'5/5 Analyse de profondeur du fond…');
+
     window.HappyHoloReliefState={sourceImg,subjectImg,backgroundImg,subjectDepthCanvas,backgroundDepthCanvas,view};
     window.dispatchEvent(new CustomEvent('happyholo-relief-ready'));
-    startPreview(); exportBtn.disabled=false; setStatus('V3.1 prête — détourage, fond et profondeur calculés localement.');
+    startPreview(); exportBtn.disabled=false; setStatus('V3.17 prête — mémoire iPad optimisée, profondeur calculée une seule fois.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
 });
@@ -275,17 +317,20 @@ exportBtn.addEventListener('click',async()=>{
     renderAt(poses[i],c); const b=await canvasToBlob(c); exported.push(b);
     const im=new Image(); im.src=URL.createObjectURL(b); framesEl.appendChild(im); await sleep(25);
   }
-  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.1 prêtes.');
+  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.17 prêtes.');
 });
 
 downloadBtn.addEventListener('click',async()=>{
   if(exported.length!==9) return;
   const zip=new JSZip(); exported.forEach((b,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,b));
   zip.file('manifest.json',JSON.stringify({
-    generator:'LentiPrint Relief 3D V3.1 local',localSegmentation:true,externalPaidApi:false,views:9,
+    generator:'HappyHolo Relief 3D V3.17 iPad memory',localSegmentation:true,externalPaidApi:false,views:9,
+    depthInference:'single-512-with-local-fallback',
     angle:Number(angle.value),subjectDepth:Number(subjectDepth.value),backgroundDepth:Number(bgDepth.value),edgeProtection:Number(edgeProtect.value)
   },null,2));
   const b=await zip.generateAsync({type:'blob'}); const u=URL.createObjectURL(b);
-  const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v31-local.zip'; a.click();
+  const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v317-ipad.zip'; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1500);
 });
+
+console.log('[HAPPYHOLO] relief-engine V3.17 iPad memory actif');
