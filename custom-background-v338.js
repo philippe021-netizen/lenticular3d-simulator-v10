@@ -137,4 +137,5 @@
   if(window.innerWidth<760)grid.style.gridTemplateColumns='1fr';
 
   console.log('[HAPPYHOLO] custom-background V3.3.9 + placement sujet indépendant actif');
+  
 })();
