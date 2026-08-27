@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>HappyHolo — Relief 3D V3.1.17 offline</title>
+<title>HappyHolo — Relief 3D V3.22</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
@@ -24,30 +24,93 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 .small{font-size:12px;color:#666;line-height:1.4;margin-top:8px}
 .frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:8px}
 .support-card{margin-top:18px;background:#fff;border:1px solid #ddd;border-radius:18px;padding:18px}.support-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.support-head h2{margin:0 0 4px}.support-head p{margin:0;color:#666}.support-badge{background:#e7f7eb;color:#17652c;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:800}.support-grid{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-top:16px}.support-controls select{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;background:#fff}.support-controls label{display:flex;justify-content:space-between;gap:10px}.support-stage-wrap{min-width:0}.support-stage{min-height:470px;border-radius:16px;background:#ececea;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}.support-empty{position:absolute;color:#666}.product-object{position:relative;transform-style:preserve-3d;will-change:transform;display:flex;flex-direction:column;align-items:center}.product-object .ring{width:64px;height:64px;border:8px solid #a7a7a7;border-radius:50%;box-shadow:inset 0 0 0 2px #eee}.product-object .link{width:16px;height:28px;border:5px solid #999;border-radius:10px;margin-top:-5px}.product-object .shell{background:linear-gradient(145deg,#fafafa,#c9c9c9);padding:7px;border-radius:15px;box-shadow:0 12px 26px #0003}.image-window{position:relative;overflow:hidden;background:#ddd;width:100%;height:100%}.image-window img,.image-window canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block}.image-window img{object-fit:cover}.keychain-vertical .shell{width:220px;height:330px}.keychain-horizontal{flex-direction:row;gap:0}.keychain-horizontal .ring{margin-right:-2px}.keychain-horizontal .link{width:28px;height:16px;margin:0 -2px 0 0}.keychain-horizontal .shell{width:330px;height:220px}.medallion-round .shell{width:245px;height:245px;border-radius:50%;padding:9px}.medallion-round .image-window{border-radius:50%}.support-note{margin-top:10px;padding:10px;border-radius:10px;background:#f3f3f3;font-size:13px}@media(max-width:800px){.support-grid{grid-template-columns:1fr}.support-stage{min-height:390px}.keychain-vertical .shell{width:180px;height:270px}.keychain-horizontal .shell{width:270px;height:180px}.medallion-round .shell{width:210px;height:210px}}
-.product-object{transform-origin:50% 55%;}.product-object.support-playing{animation:supportRock var(--support-speed,5s) ease-in-out infinite;will-change:transform;}@keyframes supportRock{0%,100%{transform:perspective(620px) rotateY(var(--support-neg,-6deg)) translateX(-5px);}50%{transform:perspective(620px) rotateY(var(--support-pos,6deg)) translateX(5px);}}.product-object.support-playing .shell{animation:supportShadow var(--support-speed,5s) ease-in-out infinite;}@keyframes supportShadow{0%,100%{box-shadow:10px 12px 24px #0004;}50%{box-shadow:-10px 12px 24px #0004;}}.mode-switch{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;margin-bottom:4px}.mode-switch button{min-width:170px;background:#e8e8e8;color:#111;border:2px solid transparent}.mode-switch button.mode-active{background:#111;color:#fff;border-color:#111}.mode-switch-note{font-size:12px;color:#666;margin-top:6px}
+.product-object{transform-origin:50% 55%}.product-object.support-playing{animation:supportRock var(--support-speed,5s) ease-in-out infinite;will-change:transform}@keyframes supportRock{0%,100%{transform:perspective(620px) rotateY(var(--support-neg,-6deg)) translateX(-5px)}50%{transform:perspective(620px) rotateY(var(--support-pos,6deg)) translateX(5px)}}.product-object.support-playing .shell{animation:supportShadow var(--support-speed,5s) ease-in-out infinite}@keyframes supportShadow{0%,100%{box-shadow:10px 12px 24px #0004}50%{box-shadow:-10px 12px 24px #0004}}
+.mode-switch{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;margin-bottom:4px}.mode-switch button{min-width:170px;background:#e8e8e8;color:#111;border:2px solid transparent}.mode-switch button.mode-active{background:#111;color:#fff;border-color:#111}.mode-switch-note{font-size:12px;color:#666;margin-top:6px}
 </style>
 </head>
 <body>
 <div class="wrap">
 <div id="networkModeBanner" style="position:sticky;top:0;z-index:99990;margin:0 0 14px;padding:14px 16px;border-radius:14px;font-size:18px;font-weight:900;text-align:center;letter-spacing:.02em;box-shadow:0 3px 16px #0002;background:#dff7e7;color:#0c5c29;border:2px solid #2c9b52">MODE CONNECTÉ — IA EN LIGNE DISPONIBLE</div>
-<h1>HappyHolo — Relief 3D V3.1.17 offline</h1>
+<div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:9999999;background:#ffcc00;color:#111;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:900">V3.22</div>
+<h1>HappyHolo — Relief 3D V3.22</h1>
 <div class="sub">Photo → détourage local → correction doigt/Pencil → fond reconstruit localement → profondeur séparée → 9 vues.</div>
-<div id="offlinePackCard" style="background:#fff;border:2px solid #111;border-radius:18px;padding:16px;margin:0 0 16px"><div style="font-size:18px;font-weight:850;margin-bottom:6px">Pack de secours iPad</div><div style="font-size:13px;line-height:1.45;color:#444">Le programme principal est mis en cache sur l’iPad. Les moteurs IA sont chargés au premier usage connecté afin d’éviter les dépassements mémoire Safari.</div><div class="mode-switch"><button id="modeOnline" type="button" aria-pressed="true">🌐 Mode EN LIGNE</button><button id="modeOffline" type="button" aria-pressed="false">📴 Mode HORS LIGNE</button></div><div class="mode-switch-note">Le mode hors ligne force l’utilisation du cache local même si le Wi‑Fi reste activé.</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button id="prepareOfflinePack" type="button">Télécharger / vérifier le pack hors ligne</button></div><div id="offlinePackStatus" style="margin-top:10px;padding:10px;border-radius:10px;background:#f2f2f2;font-size:13px;white-space:pre-wrap">Vérification…</div></div>
-<div class="card grid"><section><label>Photo</label><input id="file" type="file" accept="image/*"><label>Force profondeur sujet</label><div class="row"><span>Volume interne</span><b id="subjectOut">0.48</b></div><input id="subjectDepth" type="range" min="0.10" max="0.55" step="0.01" value="0.48"><label>Force profondeur fond</label><div class="row"><span>Décor</span><b id="bgOut">0.10</b></div><input id="bgDepth" type="range" min="0.02" max="0.25" step="0.01" value="0.10"><label>Amplitude</label><div class="row"><span>Parallaxe</span><b id="angleOut">±7°</b></div><input id="angle" type="range" min="2" max="8" step="1" value="7"><label>Protection contours</label><div class="row"><span>Cheveux / détails fins</span><b id="edgeOut">84%</b></div><input id="edgeProtect" type="range" min="55" max="95" step="1" value="84"><button id="build">Créer le relief 3D local</button><button id="export" class="secondary" disabled>Exporter 9 vues</button><button id="download" class="secondary" disabled>Télécharger ZIP</button><div id="status" class="status">Choisis une photo.</div><div class="small">Correction optimisée iPad — doigt + Apple Pencil.</div></section><section><canvas id="view" width="1024" height="768"></canvas><div id="frames" class="frames"></div></section></div>
+<div id="offlinePackCard" style="background:#fff;border:2px solid #111;border-radius:18px;padding:16px;margin:0 0 16px">
+<div style="font-size:18px;font-weight:850;margin-bottom:6px">Pack de secours iPad</div>
+<div style="font-size:13px;line-height:1.45;color:#444">Le programme principal est mis en cache sur l’iPad. Les moteurs IA sont chargés au premier usage connecté afin d’éviter les dépassements mémoire Safari.</div>
+<div class="mode-switch"><button id="modeOnline" type="button" aria-pressed="true">🌐 Mode EN LIGNE</button><button id="modeOffline" type="button" aria-pressed="false">📴 Mode HORS LIGNE</button></div>
+<div class="mode-switch-note">Le mode hors ligne force l’utilisation du cache local même si le Wi‑Fi reste activé.</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button id="prepareOfflinePack" type="button">Télécharger / vérifier le pack hors ligne</button></div>
+<div id="offlinePackStatus" style="margin-top:10px;padding:10px;border-radius:10px;background:#f2f2f2;font-size:13px;white-space:pre-wrap">Vérification…</div>
 </div>
-<script src="./relief-engine-v31.js"></script>
-<script src="./action-preview-engine.js"></script>
-<script src="./mask-editor-v315-panfix.js"></script>
-<script src="./mask-visibility-v318.js?v=321"></script>
-<script src="./selection-controls-v336.js"></script>
-<script src="./custom-background-v338.js"></script>
-<script src="./composition-advanced-v350.js"></script>
-<script src="./preview-sync-v355.js"></script>
-<script src="./text-layer-v337.js"></script>
-<script src="./v311-monotonic-patch.js"></script>
-<script src="./offline-manager-v317.js"></script>
-<script src="./support-preview-v316.js"></script>
-<script src="./support-placement-sync-v374.js"></script>
-<script>window.addEventListener('load',()=>{const ok=!!window.HappyHoloActionPreviewEngine;console.log('[HAPPYHOLO] intégration moteur actions :',ok?'OK':'ABSENTE');if(!ok){const s=document.querySelector('#status');if(s)s.textContent='ERREUR : moteur actions OFFLINE non chargé. Vérifie action-preview-engine.js.';}});</script>
+<div class="card grid">
+<section>
+<label>Photo</label><input id="file" type="file" accept="image/*">
+<label>Force profondeur sujet</label><div class="row"><span>Volume interne</span><b id="subjectOut">0.48</b></div><input id="subjectDepth" type="range" min="0.10" max="0.55" step="0.01" value="0.48">
+<label>Force profondeur fond</label><div class="row"><span>Décor</span><b id="bgOut">0.10</b></div><input id="bgDepth" type="range" min="0.02" max="0.25" step="0.01" value="0.10">
+<label>Amplitude</label><div class="row"><span>Parallaxe</span><b id="angleOut">±7°</b></div><input id="angle" type="range" min="2" max="8" step="1" value="7">
+<label>Protection contours</label><div class="row"><span>Cheveux / détails fins</span><b id="edgeOut">84%</b></div><input id="edgeProtect" type="range" min="55" max="95" step="1" value="84">
+<button id="build">Créer le relief 3D local</button><button id="export" class="secondary" disabled>Exporter 9 vues</button><button id="download" class="secondary" disabled>Télécharger ZIP</button>
+<div id="status" class="status">Choisis une photo.</div><div class="small">Correction optimisée iPad — doigt + Apple Pencil.</div>
+</section>
+<section><canvas id="view" width="1024" height="768"></canvas><div id="frames" class="frames"></div></section>
+</div>
+</div>
+<script src="./relief-engine-v31.js?v=322"></script>
+<script src="./action-preview-engine.js?v=322"></script>
+<script src="./mask-editor-v315-panfix.js?v=322"></script>
+<script src="./selection-controls-v336.js?v=322"></script>
+<script src="./custom-background-v338.js?v=322"></script>
+<script src="./composition-advanced-v350.js?v=322"></script>
+<script src="./preview-sync-v355.js?v=322"></script>
+<script src="./text-layer-v337.js?v=322"></script>
+<script src="./v311-monotonic-patch.js?v=322"></script>
+<script src="./offline-manager-v317.js?v=322"></script>
+<script src="./support-preview-v316.js?v=322"></script>
+<script src="./support-placement-sync-v374.js?v=322"></script>
+<script>
+(()=>{
+  'use strict';
+  const colors=['#ff3b30','#ffd60a','#34c759','#af52de'];
+  let picked='#ffd60a',opacity=.62;
+  function makePalette(){
+    if(document.getElementById('hhInlineMaskPalette'))return;
+    const p=document.createElement('div');p.id='hhInlineMaskPalette';
+    Object.assign(p.style,{position:'fixed',right:'12px',top:'72px',zIndex:'1000020',background:'#1d1d21',border:'2px solid #fff',borderRadius:'12px',padding:'10px',display:'none',width:'220px',boxShadow:'0 8px 28px #0008',color:'#fff'});
+    p.innerHTML='<b style="display:block;margin-bottom:8px">🎨 Couleur de sélection</b>';
+    const row=document.createElement('div');Object.assign(row.style,{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'6px'});p.appendChild(row);
+    colors.forEach(c=>{const b=document.createElement('button');b.type='button';Object.assign(b.style,{height:'34px',margin:'0',padding:'0',background:c,border:'2px solid #aaa',borderRadius:'8px'});b.onclick=()=>{picked=c;repaint();};row.appendChild(b);});
+    const lab=document.createElement('label');lab.textContent='Opacité';lab.style.cssText='display:block;font-size:11px;margin-top:8px';
+    const r=document.createElement('input');r.type='range';r.min='30';r.max='90';r.value='62';r.style.width='100%';r.oninput=()=>{opacity=Number(r.value)/100;repaint();};lab.appendChild(r);p.appendChild(lab);
+    document.body.appendChild(p);
+  }
+  function findEditor(){return [...document.querySelectorAll('div')].find(d=>getComputedStyle(d).position==='fixed'&&d.textContent?.includes('Correction du sujet')&&d.querySelector('canvas'))||null;}
+  function ensureButton(){
+    const m=findEditor();if(!m)return;
+    makePalette();
+    if(m.querySelector('#hhInlineColorButton'))return;
+    const b=document.createElement('button');b.id='hhInlineColorButton';b.type='button';b.textContent='🎨 Couleur zone';
+    Object.assign(b.style,{position:'absolute',right:'118px',top:'10px',zIndex:'1000030',padding:'10px 12px',borderRadius:'9px',border:'1px solid #777',background:'#2b2b30',color:'#fff',fontWeight:'850',margin:'0'});
+    b.onclick=()=>{const p=document.getElementById('hhInlineMaskPalette');p.style.display=p.style.display==='none'?'block':'none';repaint();};
+    m.appendChild(b);
+  }
+  function repaint(){
+    const m=findEditor();if(!m)return;
+    const cvs=[...m.querySelectorAll('canvas')];
+    for(const c of cvs){
+      const ctx=c.getContext?.('2d',{willReadFrequently:true});if(!ctx||!c.width||!c.height)continue;
+      try{
+        const im=ctx.getImageData(0,0,c.width,c.height),d=im.data;
+        const h=picked.replace('#','');const nr=parseInt(h.slice(0,2),16),ng=parseInt(h.slice(2,4),16),nb=parseInt(h.slice(4,6),16);
+        let changed=0;
+        for(let i=0;i<d.length;i+=4){const a=d[i+3],r=d[i],g=d[i+1],b=d[i+2];if(a>20&&b>140&&g>70&&b>r*1.15){d[i]=nr;d[i+1]=ng;d[i+2]=nb;d[i+3]=Math.max(a,Math.round(255*opacity));changed++;}}
+        if(changed)ctx.putImageData(im,0,0);
+      }catch(_){}
+    }
+  }
+  new MutationObserver(()=>ensureButton()).observe(document.documentElement,{childList:true,subtree:true});
+  setInterval(ensureButton,300);
+})();
+window.addEventListener('load',()=>{const ok=!!window.HappyHoloActionPreviewEngine;console.log('[HAPPYHOLO] intégration moteur actions :',ok?'OK':'ABSENTE');if(!ok){const s=document.querySelector('#status');if(s)s.textContent='ERREUR : moteur actions OFFLINE non chargé. Vérifie action-preview-engine.js.';}});
+</script>
 </body>
 </html>
