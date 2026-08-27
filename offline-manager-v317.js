@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const PACK_VERSION='happyholo-offline-v1.41';
+  const PACK_VERSION='happyholo-offline-v1.42';
   const PACK_KEY=`${PACK_VERSION}:ready`;
   const MODE_KEY='happyholo:network-mode';
   const $=s=>document.querySelector(s);
@@ -52,7 +52,7 @@
       const t=navigator.serviceWorker.controller||registration?.active;
       t?.postMessage({type:'CACHE_APP_SHELL'});
       localStorage.setItem(PACK_KEY,new Date().toISOString());
-      if(out)out.textContent='Pack hors ligne V1.41 préparé. Les anciens caches ont été remplacés.';
+      if(out)out.textContent='Pack hors ligne V1.42 préparé. Les anciens caches ont été remplacés.';
     }catch(e){
       if(out)out.textContent=`Erreur pack hors ligne : ${e?.message||e}`;
     }finally{
