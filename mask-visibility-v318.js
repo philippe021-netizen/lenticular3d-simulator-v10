@@ -1,5 +1,5 @@
-/* HappyHolo V3.19 — visibilité robuste des zones de masque
-   - injection garantie dans la colonne outils V3.17
+/* HappyHolo V3.20 — visibilité des zones de masque
+   - panneau placé juste avant Plans / sélections
    - couleur configurable
    - opacité configurable
    - presets rouge / jaune / vert / violet
@@ -9,8 +9,7 @@
   'use strict';
 
   const state={color:'#ff3b30',opacity:.62,outline:true};
-  let modal=null, editCanvas=null, sidebar=null, panel=null;
-  let scheduled=false, boundCanvas=null;
+  let modal=null,editCanvas=null,sidebar=null,panel=null,boundCanvas=null,scheduled=false;
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
   function rgb(hex){
@@ -19,27 +18,21 @@
     if(!/^[0-9a-f]{6}$/i.test(h))h='ff3b30';
     return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];
   }
-  function contrast(hex){
-    const [r,g,b]=rgb(hex);const lum=.2126*r+.7152*g+.0722*b;
-    return lum>145?'#000':'#fff';
-  }
+  function contrast(hex){const [r,g,b]=rgb(hex);return (.2126*r+.7152*g+.0722*b)>145?'#000':'#fff';}
 
   function findEditor(){
-    const fixed=[...document.querySelectorAll('div')].filter(d=>getComputedStyle(d).position==='fixed');
-    modal=fixed.find(d=>d.textContent?.includes('Correction du sujet')&&d.querySelector('canvas'))||null;
+    modal=[...document.querySelectorAll('div')].find(d=>getComputedStyle(d).position==='fixed'&&d.textContent?.includes('Correction du sujet')&&d.querySelector('canvas'))||null;
     if(!modal)return false;
-
-    const addBtn=[...modal.querySelectorAll('button')].find(b=>b.textContent?.trim().includes('Ajouter'))||null;
+    const addBtn=[...modal.querySelectorAll('button')].find(b=>b.textContent?.includes('Ajouter'))||null;
     sidebar=addBtn?.parentElement||null;
-
     const canvases=[...modal.querySelectorAll('canvas')];
-    editCanvas=canvases.find(c=>getComputedStyle(c).touchAction==='none'||c.style.touchAction==='none')||canvases[1]||null;
+    editCanvas=canvases.find(c=>c.style.touchAction==='none'||getComputedStyle(c).touchAction==='none')||canvases[1]||null;
     return !!(sidebar&&editCanvas);
   }
 
   let colorInput,opacityInput,opacityOut,outlineInput;
-  function makeButton(color,parent){
-    const b=document.createElement('button');b.type='button';b.setAttribute('aria-label',`Couleur ${color}`);
+  function swatch(color,parent){
+    const b=document.createElement('button');b.type='button';
     Object.assign(b.style,{margin:'0',padding:'0',minHeight:'30px',height:'30px',borderRadius:'8px',border:'2px solid #aaa',background:color});
     b.addEventListener('click',()=>{state.color=color;if(colorInput)colorInput.value=color;updateBorder();schedule();});
     parent.appendChild(b);
@@ -51,9 +44,9 @@
     if(existing){panel=existing;return;}
 
     panel=document.createElement('div');panel.id='happyHoloMaskVisibility';
-    Object.assign(panel.style,{padding:'10px',border:'2px solid #777',borderRadius:'12px',background:'#1e1e22',display:'flex',flexDirection:'column',gap:'8px',marginBottom:'4px'});
+    Object.assign(panel.style,{padding:'10px',border:'2px solid #888',borderRadius:'12px',background:'#1e1e22',display:'flex',flexDirection:'column',gap:'8px',margin:'4px 0'});
 
-    const title=document.createElement('div');title.textContent='Visibilité zone';Object.assign(title.style,{fontSize:'13px',fontWeight:'900',color:'#fff'});panel.appendChild(title);
+    const title=document.createElement('div');title.textContent='🎨 Visibilité zone';Object.assign(title.style,{fontSize:'13px',fontWeight:'900',color:'#fff'});panel.appendChild(title);
 
     const row=document.createElement('label');Object.assign(row.style,{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',fontSize:'11px',fontWeight:'700',color:'#fff',margin:'0'});
     const txt=document.createElement('span');txt.textContent='Couleur masque';row.appendChild(txt);
@@ -61,12 +54,12 @@
     colorInput.addEventListener('input',()=>{state.color=colorInput.value;updateBorder();schedule();});
 
     const presets=document.createElement('div');Object.assign(presets.style,{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'6px'});panel.appendChild(presets);
-    ['#ff3b30','#ffd60a','#34c759','#af52de'].forEach(c=>makeButton(c,presets));
+    ['#ff3b30','#ffd60a','#34c759','#af52de'].forEach(c=>swatch(c,presets));
 
     const opLab=document.createElement('label');Object.assign(opLab.style,{display:'flex',flexDirection:'column',gap:'5px',fontSize:'11px',color:'#fff',margin:'0'});
     const opHead=document.createElement('div');Object.assign(opHead.style,{display:'flex',justifyContent:'space-between'});
-    const o1=document.createElement('span');o1.textContent='Opacité';opacityOut=document.createElement('b');opacityOut.textContent=`${Math.round(state.opacity*100)}%`;opHead.append(o1,opacityOut);opLab.appendChild(opHead);
-    opacityInput=document.createElement('input');opacityInput.type='range';opacityInput.min='25';opacityInput.max='90';opacityInput.step='1';opacityInput.value=String(Math.round(state.opacity*100));opacityInput.style.width='100%';opLab.appendChild(opacityInput);panel.appendChild(opLab);
+    const os=document.createElement('span');os.textContent='Opacité';opacityOut=document.createElement('b');opacityOut.textContent=`${Math.round(state.opacity*100)}%`;opHead.append(os,opacityOut);opLab.appendChild(opHead);
+    opacityInput=document.createElement('input');opacityInput.type='range';opacityInput.min='25';opacityInput.max='90';opacityInput.value=String(Math.round(state.opacity*100));opacityInput.style.width='100%';opLab.appendChild(opacityInput);panel.appendChild(opLab);
     opacityInput.addEventListener('input',()=>{state.opacity=Number(opacityInput.value)/100;opacityOut.textContent=`${opacityInput.value}%`;schedule();});
 
     const ol=document.createElement('label');Object.assign(ol.style,{display:'flex',alignItems:'center',gap:'7px',fontSize:'10px',fontWeight:'750',color:'#fff',margin:'0'});
@@ -74,10 +67,15 @@
     const ot=document.createElement('span');ot.textContent='Contour contrasté';ol.append(outlineInput,ot);panel.appendChild(ol);
     outlineInput.addEventListener('change',()=>{state.outline=outlineInput.checked;updateBorder();schedule();});
 
-    const hint=document.createElement('div');hint.textContent='Sujet bleu : utilise jaune ou rouge.';Object.assign(hint.style,{fontSize:'10px',opacity:'.78,color:'#fff'});panel.appendChild(hint);
+    const hint=document.createElement('div');hint.textContent='Sur bleu/gris : jaune ou rouge.';Object.assign(hint.style,{fontSize:'10px',opacity:'.78',color:'#fff'});panel.appendChild(hint);
 
-    const firstButton=[...sidebar.children].find(n=>n.tagName==='BUTTON');
-    if(firstButton)sidebar.insertBefore(panel,firstButton);else sidebar.prepend(panel);
+    const plansTitle=[...sidebar.querySelectorAll('div')].find(d=>d.textContent?.trim()==='Plans / sélections');
+    const plansCard=plansTitle?.parentElement||null;
+    if(plansCard&&plansCard.parentElement===sidebar) sidebar.insertBefore(panel,plansCard);
+    else {
+      const resetBtn=[...sidebar.querySelectorAll('button')].find(b=>b.textContent?.includes('Réinit. masque'));
+      if(resetBtn?.nextSibling) sidebar.insertBefore(panel,resetBtn.nextSibling); else sidebar.appendChild(panel);
+    }
     updateBorder();
   }
 
@@ -98,9 +96,7 @@
       for(let i=0;i<d.length;i+=4){
         const a=d[i+3];if(a<12)continue;
         const r=d[i],g=d[i+1],b=d[i+2];
-        if(b>135 && g>65 && b>r*1.15){
-          d[i]=nr;d[i+1]=ng;d[i+2]=nb;d[i+3]=Math.max(a,Math.round(255*oa));
-        }
+        if(b>135&&g>65&&b>r*1.15){d[i]=nr;d[i+1]=ng;d[i+2]=nb;d[i+3]=Math.max(a,Math.round(255*oa));}
       }
       ctx.putImageData(im,0,0);
     }catch(_){}
@@ -111,19 +107,11 @@
     if(!editCanvas||boundCanvas===editCanvas)return;
     boundCanvas=editCanvas;
     ['pointerdown','pointermove','pointerup','pointercancel'].forEach(ev=>editCanvas.addEventListener(ev,schedule,{passive:true,capture:true}));
-    modal?.addEventListener('click',schedule,true);
-    modal?.addEventListener('input',schedule,true);
+    modal?.addEventListener('click',schedule,true);modal?.addEventListener('input',schedule,true);
   }
 
-  function boot(){
-    if(!findEditor())return;
-    buildPanel();bind();updateBorder();schedule();
-  }
-
-  const observer=new MutationObserver(boot);
-  observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
-  setInterval(boot,300);
-  document.addEventListener('pointerdown',()=>setTimeout(boot,0),true);
-
-  console.log('[HAPPYHOLO] mask visibility V3.19 active');
+  function boot(){if(!findEditor())return;buildPanel();bind();updateBorder();schedule();}
+  const observer=new MutationObserver(boot);observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
+  setInterval(boot,300);document.addEventListener('pointerdown',()=>setTimeout(boot,0),true);
+  console.log('[HAPPYHOLO] mask visibility V3.20 active');
 })();
