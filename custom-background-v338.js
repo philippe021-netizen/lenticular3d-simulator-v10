@@ -1,4 +1,4 @@
-/* HappyHolo V3.3.9 — arrière-plans A/B + placement indépendant du sujet */
+/* HappyHolo V3.4.2 — arrière-plans A/B + cadrage fond + placement indépendant du sujet */
 (() => {
   'use strict';
 
@@ -6,8 +6,8 @@
 
   const state={
     mode:'original',
-    a:{img:null,url:'',zoom:100,x:0,y:0,name:''},
-    b:{img:null,url:'',zoom:100,x:0,y:0,name:''},
+    a:{img:null,url:'',zoom:100,x:0,y:0,name:'',fit:'cover'},
+    b:{img:null,url:'',zoom:100,x:0,y:0,name:'',fit:'cover'},
     subject:{zoom:100,x:0,y:0}
   };
 
@@ -21,17 +21,23 @@
   function draw(ctx,norm,W,H,rect={x:0,y:0,w:W,h:H}){
     const slot=slotFor(norm);if(!slot?.img)return false;
     const img=slot.img,iw=img.naturalWidth||img.width||1,ih=img.naturalHeight||img.height||1;
-    const scale=Math.max(rect.w/iw,rect.h/ih)*(clamp(Number(slot.zoom)||100,60,180)/100);
+    const baseScale=slot.fit==='contain'
+      ? Math.min(rect.w/iw,rect.h/ih)
+      : Math.max(rect.w/iw,rect.h/ih);
+    const scale=baseScale*(clamp(Number(slot.zoom)||100,50,200)/100);
     const w=iw*scale,h=ih*scale;
     const x=rect.x+(rect.w-w)/2+(Number(slot.x)||0)/100*rect.w*.5;
     const y=rect.y+(rect.h-h)/2+(Number(slot.y)||0)/100*rect.h*.5;
-    ctx.drawImage(img,x,y,w,h);return true;
+    ctx.save();
+    ctx.beginPath();ctx.rect(rect.x,rect.y,rect.w,rect.h);ctx.clip();
+    ctx.drawImage(img,x,y,w,h);
+    ctx.restore();
+    return true;
   }
 
   function subjectRect(img,W,H,rect={x:0,y:0,w:W,h:H}){
     if(!img)return{x:rect.x,y:rect.y,w:rect.w,h:rect.h};
     const iw=img.naturalWidth||img.width||1,ih=img.naturalHeight||img.height||1;
-    // Le sujet est PRESERVE : on part d'un contain, puis l'utilisateur ajuste uniquement le sujet.
     const scale=Math.min(rect.w/iw,rect.h/ih)*(clamp(Number(state.subject.zoom)||100,50,200)/100);
     const w=iw*scale,h=ih*scale;
     const x=rect.x+(rect.w-w)/2+(Number(state.subject.x)||0)/100*rect.w*.5;
@@ -53,6 +59,7 @@
     return{
       mode:state.mode,
       a:state.a.name||null,b:state.b.name||null,
+      fitA:state.a.fit,fitB:state.b.fit,
       zoomA:state.a.zoom,xA:state.a.x,yA:state.a.y,
       zoomB:state.b.zoom,xB:state.b.x,yB:state.b.y,
       subjectZoom:state.subject.zoom,subjectX:state.subject.x,subjectY:state.subject.y
@@ -77,6 +84,18 @@
     wrap._input=input;wrap._out=out;wrap.append(text,input,out);return wrap;
   }
 
+  function selectControl(label,options,value,onChange){
+    const wrap=document.createElement('label');
+    wrap.style.cssText='display:grid;grid-template-columns:155px 1fr;align-items:center;gap:8px;font-size:12px;font-weight:700';
+    const text=document.createElement('span');text.textContent=label;
+    const select=document.createElement('select');
+    select.style.cssText='width:100%;padding:9px;border:1px solid #bbb;border-radius:9px;background:#fff;font:inherit';
+    options.forEach(([t,v])=>select.appendChild(new Option(t,v)));
+    select.value=value;
+    select.addEventListener('change',()=>{onChange(select.value);notify();});
+    wrap.append(text,select);return wrap;
+  }
+
   let modeSelect=null;
 
   function slotCard(key,title){
@@ -91,10 +110,16 @@
       if(slot.url)URL.revokeObjectURL(slot.url);slot.url=URL.createObjectURL(f);slot.name=f.name;
       const im=new Image();im.onload=()=>{slot.img=im;status.textContent=`✓ ${f.name}`;state.mode=key==='a'?'fixedA':'fixedB';if(modeSelect)modeSelect.value=state.mode;notify();};im.src=slot.url;
     });
-    card.append(head,file,status,
-      control('Zoom fond',60,180,100,v=>slot.zoom=v),
-      control('Fond horizontal',-50,50,0,v=>slot.x=v),
-      control('Fond vertical',-50,50,0,v=>slot.y=v));
+    card.append(
+      head,file,status,
+      selectControl('Cadrage fond',[
+        ['Remplir le cadre','cover'],
+        ['Image entière — sans recadrage','contain']
+      ],slot.fit,v=>slot.fit=v),
+      control('Zoom fond',50,200,100,v=>slot.zoom=v),
+      control('Fond horizontal',-70,70,0,v=>slot.x=v),
+      control('Fond vertical',-70,70,0,v=>slot.y=v)
+    );
     return card;
   }
 
@@ -102,7 +127,7 @@
   host.style.cssText='background:#fff;border:2px solid #111;border-radius:18px;padding:16px;margin:16px 0';
 
   const title=document.createElement('div');
-  title.innerHTML='<div style="font-size:20px;font-weight:900">Sujet et arrière-plan</div><div style="font-size:12px;color:#666;margin-top:3px">Le fond remplit le cadre. Le sujet reste indépendant et peut être déplacé sans forcer son zoom.</div>';
+  title.innerHTML='<div style="font-size:20px;font-weight:900">Sujet et arrière-plan</div><div style="font-size:12px;color:#666;margin-top:3px">Le fond peut remplir le cadre ou rester entier sans recadrage. Le sujet reste indépendant et peut être déplacé sans forcer son zoom.</div>';
 
   const subjectCard=document.createElement('div');
   subjectCard.style.cssText='margin-top:12px;border:2px solid #222;border-radius:14px;padding:12px;display:grid;gap:9px;background:#fff';
@@ -130,7 +155,7 @@
   grid.append(slotCard('a','Fond A'),slotCard('b','Fond B'));
 
   const hint=document.createElement('div');
-  hint.textContent='Le fond utilise toujours le plein cadre. Le sujet utilise un cadrage préservé indépendant avec zoom et déplacements X/Y.';
+  hint.textContent='Astuce : “Remplir le cadre” évite les bandes vides ; “Image entière” conserve tout le décor sans zoom forcé. Le sujet garde son propre zoom et ses déplacements X/Y.';
   hint.style.cssText='margin-top:10px;padding:9px;border-radius:9px;background:#f1f1f1;font-size:11px;color:#555';
 
   host.append(title,subjectCard,modeSelect,grid,hint);
@@ -138,6 +163,5 @@
   if(anchor?.parentNode)anchor.parentNode.insertBefore(host,anchor);else document.querySelector('.wrap')?.appendChild(host);
   if(window.innerWidth<760)grid.style.gridTemplateColumns='1fr';
 
-  console.log('[HAPPYHOLO] custom-background V3.4.1 + activation immédiate du fond');
-  
+  console.log('[HAPPYHOLO] custom-background V3.4.2 cadrage fond + placement sujet actif');
 })();
