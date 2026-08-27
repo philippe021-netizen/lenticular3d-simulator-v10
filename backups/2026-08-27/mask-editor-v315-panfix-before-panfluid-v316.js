@@ -1,4 +1,4 @@
-/* HappyHolo — éditeur masque V3.17
+/* HappyHolo — éditeur masque V3.16
    iPad / Apple Pencil
    Correction clin d’œil :
    - plus de rectangle imposé
@@ -2361,6 +2361,7 @@
           panY=p.y-startPanY;
 
           baseDirty=true;
+          maskDirty=true;
 
           continue;
         }
@@ -2431,12 +2432,11 @@
         }
       }
 
-      if(tool==='pan'){
-        requestRender(true,false);
-        return;
-      }
+      requestRender(
+        tool==='pan',
+        true
+      );
 
-      requestRender(false,true);
       requestLoupe();
 
     },{passive:false});
@@ -2870,7 +2870,7 @@
     };
 
   console.log(
-    '[HAPPYHOLO] mask-editor V3.17 — clin d’œil Pencil + zoom + pan fluide actif'
+    '[HAPPYHOLO] mask-editor V3.16 — clin d’œil Pencil + zoom + pan actif'
   );
 
 })();
