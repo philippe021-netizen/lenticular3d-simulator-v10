@@ -1,0 +1,7 @@
+const CACHE='happyholo-pages-v328';
+const APP=['./','./index.html','./hh-zip-local-v328.js','./action-local-integrated-v327.js','./relief-engine-v328.js','./mask-editor-v315-panfix.js','./v311-monotonic-patch.js','./support-preview-v316.js','./offline-manager-pages-v328.js'];
+const HOSTS=['cdn.jsdelivr.net','esm.sh','staticimgly.com','huggingface.co','www.huggingface.co','cdn-lfs.huggingface.co','cdn-lfs-us-1.huggingface.co','cdn-lfs-eu-1.huggingface.co'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(APP)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
+function ok(u){return u.origin===self.location.origin||HOSTS.some(h=>u.hostname===h||u.hostname.endsWith('.'+h));}
+self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(!ok(u))return;e.respondWith((async()=>{const c=await caches.match(e.request);try{const r=await fetch(e.request);if(r&&(r.ok||r.type==='opaque'))(await caches.open(CACHE)).put(e.request,r.clone()).catch(()=>{});return r;}catch(err){if(c)return c;if(e.request.mode==='navigate')return caches.match('./index.html');return new Response('Ressource absente du cache HappyHolo',{status:503});}})());});

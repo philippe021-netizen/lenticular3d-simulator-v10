@@ -1,0 +1,9 @@
+(() => {
+'use strict';
+const $=s=>document.querySelector(s); const KEY='happyholo-pages-v328-ready';
+async function reg(){if(!('serviceWorker' in navigator))throw new Error('Service Worker indisponible');const r=await navigator.serviceWorker.register('./service-worker-pages-v328.js',{scope:'./',updateViaCache:'none'});await navigator.serviceWorker.ready;return r;}
+function banner(t,ok=true){const b=$('#networkModeBanner');if(!b)return;b.textContent=t;b.style.background=ok?'#e8f6ec':'#fff0d8';b.style.color=ok?'#155b2b':'#7a3b00';b.style.border=ok?'2px solid #2c9b52':'2px solid #e29132';}
+async function prep(){const o=$('#offlinePackStatus'),bt=$('#prepareOfflinePack');try{if(bt)bt.disabled=true;if(o)o.textContent='Préparation du détourage local…';await reg();if(typeof window.happyHoloWarmOfflineEngines!=='function')throw new Error('Moteurs non chargés');await window.happyHoloWarmOfflineEngines(t=>{if(o)o.textContent=t});localStorage.setItem(KEY,new Date().toISOString());if(o)o.textContent='Pack autonome prêt. Coupe le Wi‑Fi puis recharge la page.';banner('PACK AUTONOME PRÊT — TEST SANS WI‑FI');}catch(e){console.error(e);if(o)o.textContent='Préparation incomplète : '+(e.message||e);banner('PRÉPARATION INCOMPLÈTE',false);}finally{if(bt)bt.disabled=false;}}
+function boot(){$('#prepareOfflinePack')?.addEventListener('click',prep);$('#modeOnline')?.addEventListener('click',()=>banner('MODE EN LIGNE — GITHUB PAGES'));$('#modeOffline')?.addEventListener('click',()=>banner(localStorage.getItem(KEY)?'MODE HORS LIGNE — PACK PRÊT':'MODE HORS LIGNE — PACK À PRÉPARER',!!localStorage.getItem(KEY)));banner(localStorage.getItem(KEY)?'PACK AUTONOME DÉJÀ PRÉPARÉ':'TEST GITHUB PAGES — EN LIGNE');reg().catch(()=>{});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+})();
