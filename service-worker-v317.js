@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.38';
+const CACHE_VERSION = 'happyholo-offline-v1.39';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -91,7 +91,6 @@ self.addEventListener('fetch',e=>{
   if(happyHoloMode==='local'){
     e.respondWith(cacheOnly(req));
   }else{
-    // V3.4.2 : connecté = réseau d'abord pour éviter les anciens JS après déploiement.
     e.respondWith(networkFirst(req));
   }
 });
