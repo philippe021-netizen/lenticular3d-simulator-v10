@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const PACK_VERSION='happyholo-offline-v1.44';
+  const PACK_VERSION='happyholo-offline-v1.45';
   const PACK_KEY=`${PACK_VERSION}:ready`;
   const MODE_KEY='happyholo:network-mode';
   const $=s=>document.querySelector(s);
@@ -10,7 +10,7 @@
   async function register(){if(!('serviceWorker' in navigator))return null;registration=await navigator.serviceWorker.register('./service-worker-v317.js',{scope:'./',updateViaCache:'none'});await registration.update().catch(()=>{});await navigator.serviceWorker.ready;return registration;}
   function postMode(){const t=navigator.serviceWorker.controller||registration?.active||registration?.waiting||registration?.installing;t?.postMessage({type:'SET_HAPPYHOLO_MODE',mode:appMode});}
   async function setMode(mode){appMode=mode==='local'?'local':'connected';localStorage.setItem(MODE_KEY,appMode);postMode();updateBanner();}
-  async function prepare(){const out=$('#offlinePackStatus'),btn=$('#prepareOfflinePack');if(!navigator.onLine){if(out)out.textContent='Connexion nécessaire pour préparer le pack hors ligne.';return;}try{if(btn)btn.disabled=true;await setMode('connected');await register();postMode();const t=navigator.serviceWorker.controller||registration?.active;t?.postMessage({type:'CACHE_APP_SHELL'});localStorage.setItem(PACK_KEY,new Date().toISOString());if(out)out.textContent='Pack hors ligne V1.44 préparé. Les anciens caches ont été remplacés.';}catch(e){if(out)out.textContent=`Erreur pack hors ligne : ${e?.message||e}`;}finally{if(btn)btn.disabled=false;}}
+  async function prepare(){const out=$('#offlinePackStatus'),btn=$('#prepareOfflinePack');if(!navigator.onLine){if(out)out.textContent='Connexion nécessaire pour préparer le pack hors ligne.';return;}try{if(btn)btn.disabled=true;await setMode('connected');await register();postMode();const t=navigator.serviceWorker.controller||registration?.active;t?.postMessage({type:'CACHE_APP_SHELL'});localStorage.setItem(PACK_KEY,new Date().toISOString());if(out)out.textContent='Pack hors ligne V1.45 préparé. Les anciens caches ont été remplacés.';}catch(e){if(out)out.textContent=`Erreur pack hors ligne : ${e?.message||e}`;}finally{if(btn)btn.disabled=false;}}
   async function boot(){$('#prepareOfflinePack')?.addEventListener('click',prepare);$('#modeOnline')?.addEventListener('click',()=>setMode('connected'));$('#modeOffline')?.addEventListener('click',()=>setMode('local'));updateBanner();try{await register();postMode();}catch(e){console.warn('[OFFLINE]',e);}}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
