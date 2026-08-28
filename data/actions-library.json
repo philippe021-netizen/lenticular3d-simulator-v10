@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "defaults": {
+    "duration": 2,
+    "quality": "540p",
+    "audio": false,
+    "motionMode": "normal"
+  },
+  "actions": [
+    {
+      "id": "head_turn",
+      "label": "Tourner la tête",
+      "categories": ["person", "group", "animal"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "person-default",
+      "variants": [
+        {
+          "id": "person-default",
+          "family": "person",
+          "prompt": "Turn head slightly left and back. Fixed camera. Preserve identity.",
+          "negativePrompt": "distorted face, camera movement, flicker",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        },
+        {
+          "id": "animal-default",
+          "family": "animal",
+          "prompt": "Turn head slightly right and back. Fixed camera. Preserve animal identity.",
+          "negativePrompt": "extra ears, distorted face, camera movement, flicker",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
+      "id": "group_hands_up",
+      "label": "Lever les bras",
+      "categories": ["group"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "group-default",
+      "variants": [
+        {
+          "id": "group-default",
+          "family": "group",
+          "prompt": "Everyone raises both arms. Fixed camera. Preserve all faces.",
+          "negativePrompt": "extra limbs, distorted faces, camera movement, flicker",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    }
+  ]
+}
