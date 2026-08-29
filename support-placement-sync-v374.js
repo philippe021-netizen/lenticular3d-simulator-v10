@@ -1,38 +1,28 @@
-/* HappyHolo V3.7.5 — placement support + hauteur iframe synchronisée */
+/* HappyHolo V3.7.6 — recto individualisé + hauteur iframe synchronisée */
 (() => {
   'use strict';
 
   const $ = s => document.querySelector(s);
 
-  function hideControl(inputId){
+  function showControl(inputId){
     const input=$(inputId);
     if(!input)return;
     const label=input.previousElementSibling;
-    if(label?.tagName==='LABEL')label.style.display='none';
-    input.style.display='none';
+    if(label?.tagName==='LABEL')label.style.display='';
+    input.style.display='';
   }
 
-  function setValue(id,value){
-    const el=$(id);
-    if(!el)return;
-    el.value=String(value);
-  }
-
-  function neutralizeSupportPlacement(){
+  function enableIndependentFrontPlacement(){
     const fit=$('#supportFit');
     if(!fit)return false;
 
-    setValue('#supportFit','contain');
-    setValue('#supportMargin',0);
-    setValue('#supportZoom',100);
-    setValue('#supportX',0);
-    setValue('#supportY',0);
-
-    hideControl('#supportFit');
-    hideControl('#supportMargin');
-    hideControl('#supportZoom');
-    hideControl('#supportX');
-    hideControl('#supportY');
+    // Le recto possède désormais ses propres réglages dans le simulateur.
+    // On ne réinitialise plus zoom/position à chaque changement de composition.
+    showControl('#supportFit');
+    showControl('#supportMargin');
+    showControl('#supportZoom');
+    showControl('#supportX');
+    showControl('#supportY');
 
     let note=document.getElementById('happyHoloMasterPlacementNote');
     if(!note){
@@ -40,13 +30,11 @@
       note.id='happyHoloMasterPlacementNote';
       note.className='support-note';
       note.style.marginTop='12px';
-      note.innerHTML='<b>Placement du recto synchronisé</b><br>Le sujet et le fond reprennent automatiquement la composition principale. Les réglages de déplacement se font uniquement dans « Sujet et arrière-plan ».';
       const supportType=$('#supportType');
       const controls=supportType?.closest('.support-controls');
       if(controls && supportType)controls.insertBefore(note,supportType.nextSibling);
     }
-
-    fit.dispatchEvent(new Event('input',{bubbles:true}));
+    note.innerHTML='<b>Recto individualisé</b><br>Le cadrage du recto est indépendant : ajuste ici le cadrage, le zoom et la position sans modifier la composition principale.';
     return true;
   }
 
@@ -63,11 +51,11 @@
   }
 
   function boot(){
-    if(!neutralizeSupportPlacement()){
+    if(!enableIndependentFrontPlacement()){
       let tries=0;
       const timer=setInterval(()=>{
         tries++;
-        if(neutralizeSupportPlacement()||tries>40)clearInterval(timer);
+        if(enableIndependentFrontPlacement()||tries>40)clearInterval(timer);
       },100);
     }
 
@@ -89,14 +77,7 @@
 
   window.addEventListener('load',syncFrameHeight);
   window.addEventListener('resize',syncFrameHeight);
-  window.addEventListener('happyholo-subject-placement-changed',()=>{
-    setValue('#supportFit','contain');
-    setValue('#supportMargin',0);
-    setValue('#supportZoom',100);
-    setValue('#supportX',0);
-    setValue('#supportY',0);
-    setTimeout(syncFrameHeight,50);
-  });
+  window.addEventListener('happyholo-subject-placement-changed',()=>setTimeout(syncFrameHeight,50));
 
-  console.log('[HAPPYHOLO] support placement sync V3.7.5 + iframe auto-height actif');
+  console.log('[HAPPYHOLO] recto individualisé V3.7.6 + iframe auto-height actif');
 })();
