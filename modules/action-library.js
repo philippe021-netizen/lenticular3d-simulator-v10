@@ -44,17 +44,10 @@ async function loadBundledLibrary() {
 function ensureFamilyOptions(library) {
   const select = document.getElementById('family');
   if (!select) return;
-  const labels = {
-    person: 'Personne',
-    group: 'Duo / Groupe',
-    animal: 'Animal',
-    logo: 'Logo / Objet'
-  };
+  const labels = { person: 'Personne', group: 'Duo / Groupe', animal: 'Animal', logo: 'Logo / Objet' };
   const families = new Set();
   for (const action of (library?.actions || [])) {
-    for (const variant of (action.variants || [])) {
-      if (variant?.family) families.add(variant.family);
-    }
+    for (const variant of (action.variants || [])) if (variant?.family) families.add(variant.family);
   }
   for (const family of families) {
     if ([...select.options].some(o => o.value === family)) continue;
@@ -93,14 +86,26 @@ export async function resetActionLibraryToBundled() {
   return library;
 }
 
+function resolveActionIdFromVisibleSelect(library, requestedId) {
+  try {
+    const select = document.getElementById('action');
+    const visibleLabel = select?.selectedOptions?.[0]?.textContent?.trim();
+    if (!visibleLabel) return requestedId;
+    const byLabel = library?.actions?.find(a => a.active !== false && a.label === visibleLabel);
+    if (byLabel && byLabel.id !== requestedId) return byLabel.id;
+  } catch (_) {}
+  return requestedId;
+}
+
 export function getActionVariant(library, actionId, family = null, variantId = null) {
-  const action = library?.actions?.find(a => a.id === actionId && a.active !== false);
-  if (!action) throw new Error(`Action inconnue : ${actionId}`);
+  const resolvedActionId = resolveActionIdFromVisibleSelect(library, actionId);
+  const action = library?.actions?.find(a => a.id === resolvedActionId && a.active !== false);
+  if (!action) throw new Error(`Action inconnue : ${resolvedActionId}`);
   let variant = null;
   if (variantId) variant = action.variants?.find(v => v.id === variantId);
   if (!variant && family) variant = action.variants?.find(v => v.family === family);
   if (!variant) variant = action.variants?.find(v => v.id === action.defaultVariantId) || action.variants?.[0];
-  if (!variant) throw new Error(`Aucune variante pour ${actionId}`);
+  if (!variant) throw new Error(`Aucune variante pour ${resolvedActionId}`);
   return { action, variant };
 }
 
