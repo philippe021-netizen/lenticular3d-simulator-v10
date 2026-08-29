@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.3 — recto + iPad + bascule simulation + aperçus fluidifiés + modales parent */
+/* HappyHolo V3.8.4 — recto + iPad + bascule simulation + aperçus fluidifiés + détection modales robuste */
 (() => {
   'use strict';
 
@@ -39,11 +39,15 @@
 
   function isFullscreenEditor(el){
     if(!(el instanceof HTMLElement)||el.style.display==='none')return false;
-    const z=Number(el.style.zIndex||getComputedStyle(el).zIndex||0);
+    const cs=getComputedStyle(el);
+    const z=Number(el.style.zIndex||cs.zIndex||0);
     if(z<999999)return false;
     const txt=(el.textContent||'').toLowerCase();
-    const bg=(el.style.background||getComputedStyle(el).backgroundColor||'').toLowerCase();
-    return txt.includes('correction du sujet')||txt.includes('définir zone')||txt.includes('aperçu action')||bg.includes('rgba(6, 6, 10')||bg.includes('rgba(8, 8, 10');
+    const bg=(el.style.background||cs.backgroundColor||'').toLowerCase();
+    const pos=(el.style.position||cs.position||'').toLowerCase();
+    const inset=String(el.style.inset||'').replace(/\s/g,'');
+    const fullByStyle=pos==='fixed'&&(inset==='0'||inset==='0px'||(el.style.left==='0px'&&el.style.top==='0px'));
+    return fullByStyle||txt.includes('correction du sujet')||txt.includes('définir zone')||txt.includes('aperçu action')||txt.includes('peindre l’objet du fond')||txt.includes("peindre l'objet du fond")||bg.includes('#09090b')||bg.includes('rgba(6, 6, 10')||bg.includes('rgba(8, 8, 10');
   }
 
   function findFullscreenEditors(){
@@ -76,10 +80,6 @@
   }
 
   function positionFullscreenEditors(){
-    // Sur iPad Safari, une modale fixed dans une iframe très haute se cale sur le
-    // viewport interne de l'iframe et ses commandes peuvent rester hors écran.
-    // On la promeut donc directement dans le document parent : son 100dvh devient
-    // le vrai écran visible de l'iPad, indépendamment du scroll de l'iframe.
     if(promoteFullscreenEditors())return;
     const modals=findFullscreenEditors();if(!modals.length)return;
     modals.forEach(modal=>{
@@ -92,7 +92,7 @@
     new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
     window.addEventListener('resize',schedule,{passive:true});
     try{window.parent?.addEventListener('scroll',schedule,{passive:true});window.parent?.addEventListener('resize',schedule,{passive:true});}catch(_){ }
-    setInterval(()=>{if(findFullscreenEditors().length)schedule();},120);
+    setInterval(()=>{if(findFullscreenEditors().length)schedule();},80);
   }
 
   function pixverseToggle(){return document.getElementById('pixverseSimulatorToggle');}
@@ -224,5 +224,5 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('load',syncFrameHeight);window.addEventListener('resize',syncFrameHeight);
-  console.log('[HAPPYHOLO] V3.8.3 — modales iPad promues dans le vrai viewport parent');
+  console.log('[HAPPYHOLO] V3.8.4 — détection robuste des éditeurs plein écran iPad');
 })();
