@@ -11,7 +11,7 @@ function once(target, event) {
   });
 }
 
-const nextFrame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function ensureMetadata(video) {
   if (Number.isFinite(video.duration) && video.duration > 0 && video.videoWidth > 0) return;
@@ -19,34 +19,43 @@ async function ensureMetadata(video) {
 }
 
 async function waitForDecodedFrame(video, targetTime) {
-  // Safari/iPadOS peut déclencher `seeked` avant que la nouvelle image vidéo
-  // soit réellement décodée. requestVideoFrameCallback attend le frame affichable.
+  // iPad/Safari peut annoncer `seeked` avant d'avoir remplacé l'image décodée.
+  // On attend donc un requestVideoFrameCallback dont mediaTime correspond
+  // réellement à la cible. L'ancienne version résolvait trop tôt si le premier
+  // callback pointait encore sur l'ancien frame.
   if (typeof video.requestVideoFrameCallback === 'function') {
     await new Promise(resolve => {
-      let done = false;
-      const finish = () => { if (!done) { done = true; resolve(); } };
-      const timeout = setTimeout(finish, 800);
-      video.requestVideoFrameCallback((_now, meta) => {
-        clearTimeout(timeout);
-        // mediaTime est le temps du frame effectivement décodé.
-        if (Number.isFinite(meta?.mediaTime) && Math.abs(meta.mediaTime - targetTime) > 0.08) {
-          requestAnimationFrame(finish);
-        } else {
-          finish();
-        }
-      });
+      const started = performance.now();
+      let stopped = false;
+      const finish = () => {
+        if (stopped) return;
+        stopped = true;
+        resolve();
+      };
+      const poll = () => {
+        if (stopped) return;
+        if (performance.now() - started > 1400) return finish();
+        video.requestVideoFrameCallback((_now, meta) => {
+          if (stopped) return;
+          const mediaTime = Number(meta?.mediaTime);
+          if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.055) {
+            finish();
+          } else {
+            requestAnimationFrame(poll);
+          }
+        });
+      };
+      poll();
     });
   } else {
-    await nextFrame();
+    // Repli pour navigateurs sans requestVideoFrameCallback.
+    await delay(140);
   }
 }
 
 async function seek(video, time) {
   const duration = Number(video.duration) || 0;
   const target = Math.max(0, Math.min(Math.max(0, duration - 0.001), time));
-
-  // Toujours provoquer un vrai seek pour chaque vue. Sur Safari, réutiliser le
-  // même currentTime peut laisser le buffer d'affichage sur l'ancien frame.
   const seeked = once(video, 'seeked');
   video.currentTime = target;
   await seeked;
@@ -58,6 +67,26 @@ function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Impossible de créer une vue extraite.')), type, quality);
   });
+}
+
+function fingerprintCanvas(ctx, width, height) {
+  // Empreinte légère d'un quadrillage de pixels. Elle sert uniquement à détecter
+  // le cas Safari où le même frame décodé est recopié plusieurs fois.
+  const stepsX = 12;
+  const stepsY = 8;
+  let h = 2166136261 >>> 0;
+  for (let y = 0; y < stepsY; y++) {
+    for (let x = 0; x < stepsX; x++) {
+      const px = Math.min(width - 1, Math.round((x + 0.5) * width / stepsX));
+      const py = Math.min(height - 1, Math.round((y + 0.5) * height / stepsY));
+      const d = ctx.getImageData(px, py, 1, 1).data;
+      for (let i = 0; i < 3; i++) {
+        h ^= d[i];
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+    }
+  }
+  return h.toString(16).padStart(8, '0');
 }
 
 export async function extractVideoFrames(video, {
@@ -83,26 +112,52 @@ export async function extractVideoFrames(video, {
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: false });
+  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   if (!ctx) throw new Error('Canvas d’extraction indisponible.');
 
   const wasPaused = video.paused;
   const originalTime = Number(video.currentTime) || 0;
   video.pause();
   const frames = [];
+  let previousFingerprint = null;
 
   try {
     for (let i = 0; i < frameCount; i++) {
       const ratio = frameCount === 1 ? 0.5 : i / (frameCount - 1);
       const requestedTime = start + span * ratio;
       onProgress?.({ index: i, count: frameCount, time: requestedTime });
-      const actualTime = await seek(video, requestedTime);
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      let actualTime = requestedTime;
+      let fingerprint = null;
+      let duplicateRetry = 0;
+
+      // Si Safari nous rend exactement le même frame que le précédent,
+      // on attend puis on resélectionne la cible. Maximum 3 tentatives.
+      do {
+        actualTime = await seek(video, requestedTime);
+        await delay(duplicateRetry ? 120 : 35);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
+        if (fingerprint !== previousFingerprint || i === 0) break;
+        duplicateRetry++;
+        await delay(100 + duplicateRetry * 80);
+      } while (duplicateRetry < 3);
+
       const blob = await canvasToBlob(canvas, type, quality);
       const url = URL.createObjectURL(blob);
-      frames.push({ index: i + 1, time: actualTime, blob, url, width: canvas.width, height: canvas.height });
+      frames.push({
+        index: i + 1,
+        time: actualTime,
+        requestedTime,
+        fingerprint,
+        duplicateRetry,
+        blob,
+        url,
+        width: canvas.width,
+        height: canvas.height
+      });
+      previousFingerprint = fingerprint;
     }
   } finally {
     try { await seek(video, Math.min(originalTime, Math.max(0, duration - 0.001))); } catch (_) {}
@@ -116,6 +171,7 @@ export async function extractVideoFrames(video, {
     width: canvas.width,
     height: canvas.height,
     frames,
+    distinctFingerprints: new Set(frames.map(frame => frame.fingerprint)).size,
     revoke() {
       frames.forEach(frame => URL.revokeObjectURL(frame.url));
     }
