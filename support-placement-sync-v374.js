@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.1 — recto + iPad + bascule simulation + aperçus fluidifiés */
+/* HappyHolo V3.8.2 — recto + iPad + bascule simulation + aperçus fluidifiés + modales visibles */
 (() => {
   'use strict';
 
@@ -35,29 +35,42 @@
     }catch(_){ }
   }
 
-  function findMaskEditor(){
-    return [...document.body.children].find(el=>el instanceof HTMLElement&&el.style.zIndex==='999999'&&(el.textContent||'').includes('Correction du sujet'))||null;
+  function findFullscreenEditors(){
+    return [...document.body.children].filter(el=>{
+      if(!(el instanceof HTMLElement)||el.style.display==='none')return false;
+      const z=Number(el.style.zIndex||getComputedStyle(el).zIndex||0);
+      if(z<999999)return false;
+      const txt=(el.textContent||'').toLowerCase();
+      const bg=(el.style.background||getComputedStyle(el).backgroundColor||'').toLowerCase();
+      return txt.includes('correction du sujet')||txt.includes('définir zone')||txt.includes('aperçu action')||bg.includes('rgba(6, 6, 10')||bg.includes('rgba(8, 8, 10');
+    });
   }
 
-  function positionMaskEditor(){
-    const modal=findMaskEditor();if(!modal||modal.style.display==='none')return;
+  function positionFullscreenEditors(){
+    const modals=findFullscreenEditors();if(!modals.length)return;
     try{
       const frame=window.frameElement,parentWin=window.parent;
-      if(!frame||!parentWin||parentWin===window){modal.style.position='fixed';modal.style.inset='0';modal.style.width='100vw';modal.style.height='100dvh';modal.style.maxHeight='100dvh';return;}
+      if(!frame||!parentWin||parentWin===window){
+        modals.forEach(modal=>{modal.style.position='fixed';modal.style.inset='0';modal.style.width='100vw';modal.style.height='100dvh';modal.style.maxHeight='100dvh';});
+        return;
+      }
       const r=frame.getBoundingClientRect(),viewportH=parentWin.innerHeight||800,viewportW=parentWin.innerWidth||1200;
-      const top=Math.max(0,-r.top),bottom=Math.min(r.height,viewportH-r.top),visibleH=Math.max(480,bottom-top);
-      modal.style.position='absolute';modal.style.inset='auto';modal.style.left='0';modal.style.top=`${top}px`;
-      modal.style.width=`${Math.max(320,Math.min(r.width||viewportW,viewportW))}px`;modal.style.height=`${visibleH}px`;modal.style.maxHeight=`${visibleH}px`;modal.style.overflow='hidden';
+      const top=Math.max(0,-r.top),bottom=Math.min(r.height,viewportH-r.top),visibleH=Math.max(420,bottom-top);
+      const visibleW=Math.max(320,Math.min(r.width||viewportW,viewportW));
+      modals.forEach(modal=>{
+        modal.style.position='absolute';modal.style.inset='auto';modal.style.left='0';modal.style.top=`${top}px`;
+        modal.style.width=`${visibleW}px`;modal.style.height=`${visibleH}px`;modal.style.maxHeight=`${visibleH}px`;modal.style.overflow='hidden';
+      });
       requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
     }catch(_){ }
   }
 
   function installMaskEditorViewportFix(){
-    let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;positionMaskEditor();});};
+    let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;positionFullscreenEditors();});};
     new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
     window.addEventListener('resize',schedule,{passive:true});
     try{window.parent?.addEventListener('scroll',schedule,{passive:true});window.parent?.addEventListener('resize',schedule,{passive:true});}catch(_){ }
-    setInterval(()=>{const m=findMaskEditor();if(m&&m.style.display!=='none')schedule();},250);
+    setInterval(()=>{if(findFullscreenEditors().length)schedule();},180);
   }
 
   function parentDoc(){try{return window.parent&&window.parent!==window?window.parent.document:null;}catch(_){return null;}}
@@ -106,9 +119,7 @@
     normalRAF=requestAnimationFrame(drawNormalComposite);
   }
 
-  function installCleanNormalPreview(){
-    cancelAnimationFrame(normalRAF);normalRAF=requestAnimationFrame(drawNormalComposite);
-  }
+  function installCleanNormalPreview(){cancelAnimationFrame(normalRAF);normalRAF=requestAnimationFrame(drawNormalComposite);}
 
   function installSmoothPixVersePreview(){
     if(pixSmoothBound)return;
@@ -123,17 +134,11 @@
       Object.assign(ghost.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'contain',objectPosition:'center',zIndex:'19',pointerEvents:'none',display:'none',opacity:'0',transition:'opacity 170ms linear',backfaceVisibility:'hidden',maxWidth:'none',maxHeight:'none'});
       win.appendChild(ghost);
     }
-    const copyPlacement=()=>{
-      ghost.style.objectFit=img.style.objectFit||'contain';
-      ghost.style.objectPosition=img.style.objectPosition||'center';
-      ghost.style.transformOrigin=img.style.transformOrigin||'50% 50%';
-      ghost.style.transform=img.style.transform||'';
-    };
+    const copyPlacement=()=>{ghost.style.objectFit=img.style.objectFit||'contain';ghost.style.objectPosition=img.style.objectPosition||'center';ghost.style.transformOrigin=img.style.transformOrigin||'50% 50%';ghost.style.transform=img.style.transform||'';};
     new MutationObserver(()=>{
       const next=img.getAttribute('src')||'';
       if(!next||next===previousSrc){copyPlacement();return;}
-      const old=previousSrc;previousSrc=next;
-      if(!old)return;
+      const old=previousSrc;previousSrc=next;if(!old)return;
       copyPlacement();ghost.src=old;ghost.style.display='block';ghost.style.opacity='1';
       requestAnimationFrame(()=>requestAnimationFrame(()=>{ghost.style.opacity='0';}));
       setTimeout(()=>{if(ghost.style.opacity==='0')ghost.style.display='none';},210);
@@ -142,13 +147,9 @@
 
   function setSimulationMode(mode){
     const t=pixverseToggle();
-    if(mode==='pixverse'){
-      if(!pixverseAvailable())return false;
-      if(!pixverseIsOn())t.click();
-      installSmoothPixVersePreview();
-    }else if(t&&pixverseIsOn())t.click();
-    refreshParentSwitch();
-    return true;
+    if(mode==='pixverse'){if(!pixverseAvailable())return false;if(!pixverseIsOn())t.click();installSmoothPixVersePreview();}
+    else if(t&&pixverseIsOn())t.click();
+    refreshParentSwitch();return true;
   }
 
   function refreshParentSwitch(){
@@ -167,9 +168,7 @@
       box=pd.createElement('div');box.id='hhSimSwitch';
       Object.assign(box.style,{position:'fixed',right:'14px',top:'64px',zIndex:'10050',background:'#fff',border:'2px solid #111',borderRadius:'14px',padding:'8px',boxShadow:'0 4px 18px rgba(0,0,0,.18)',width:'220px'});
       box.innerHTML='<div style="font-size:11px;font-weight:900;margin-bottom:6px">SIMULATION</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button id="hhSimNormal" type="button" style="margin:0;padding:9px;border-radius:9px;border:0;font-weight:850">Normale</button><button id="hhSimPixverse" type="button" style="margin:0;padding:9px;border-radius:9px;border:0;font-weight:850">PixVerse</button></div><div id="hhSimSwitchMsg" style="font-size:10px;color:#555;margin-top:5px"></div>';
-      pd.body.appendChild(box);
-      pd.getElementById('hhSimNormal').onclick=()=>setSimulationMode('normal');
-      pd.getElementById('hhSimPixverse').onclick=()=>setSimulationMode('pixverse');
+      pd.body.appendChild(box);pd.getElementById('hhSimNormal').onclick=()=>setSimulationMode('normal');pd.getElementById('hhSimPixverse').onclick=()=>setSimulationMode('pixverse');
     }
     refreshParentSwitch();setInterval(refreshParentSwitch,500);
   }
@@ -204,5 +203,5 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('load',syncFrameHeight);window.addEventListener('resize',syncFrameHeight);
-  console.log('[HAPPYHOLO] V3.8.1 — simulation normale et PixVerse fluidifiées');
+  console.log('[HAPPYHOLO] V3.8.2 — modales iPad recalées dans la zone réellement visible');
 })();
