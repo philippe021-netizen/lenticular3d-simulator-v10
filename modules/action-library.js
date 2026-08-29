@@ -35,14 +35,19 @@ async function idbSet(value) {
   });
 }
 
-export async function loadActionLibrary() {
-  const saved = await idbGet();
-  if (saved) return saved;
+async function loadBundledLibrary() {
   const r = await fetch('./data/actions-library.json', { cache: 'no-store' });
   if (!r.ok) throw new Error('Bibliothèque d’actions introuvable.');
-  const library = await r.json();
-  await idbSet(library);
-  return library;
+  return r.json();
+}
+
+export async function loadActionLibrary() {
+  const [saved, bundled] = await Promise.all([idbGet(), loadBundledLibrary()]);
+  if (!saved || Number(bundled?.version || 0) > Number(saved?.version || 0)) {
+    await idbSet(bundled);
+    return bundled;
+  }
+  return saved;
 }
 
 export async function saveActionLibrary(library) {
@@ -53,9 +58,7 @@ export async function saveActionLibrary(library) {
 }
 
 export async function resetActionLibraryToBundled() {
-  const r = await fetch('./data/actions-library.json', { cache: 'no-store' });
-  if (!r.ok) throw new Error('Bibliothèque intégrée introuvable.');
-  const library = await r.json();
+  const library = await loadBundledLibrary();
   await idbSet(library);
   return library;
 }
