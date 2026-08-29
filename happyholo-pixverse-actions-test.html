@@ -11,7 +11,7 @@
 <body>
 <div class="bar"><b>HappyHolo + PixVerse</b><span class="badge">TEST ISOLÉ</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=pixverse-test" title="HappyHolo"></iframe>
+  <iframe id="hhApp" src="./relief3d-test-v31.html?v=pixverse-test-20260829b" title="HappyHolo"></iframe>
   <aside class="side">
     <h2>Action PixVerse</h2>
     <p>Prépare l’image dans HappyHolo à gauche, puis lance une action. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
@@ -26,7 +26,7 @@
       <b>Deux extractions séparées</b>
       <button id="downloadStatic" class="secondary">ZIP 9 vues — image statique</button>
       <button id="downloadPixVerse" class="pixbtn" disabled>ZIP 9 vues — PixVerse</button>
-      <div class="small">Statique = les 9 vues 3D HappyHolo. PixVerse = les 9 images extraites de la vidéo.</div>
+      <div class="small">Statique = les 9 vues 3D HappyHolo. PixVerse = les 9 images extraites de la vidéo, adaptées au support choisi.</div>
     </section>
 
     <section id="framesBlock" class="frames-block">
@@ -34,7 +34,7 @@
       <div class="frames-head"><b>9 images de la vidéo PixVerse</b><span id="framesMeta" class="small"></span></div>
       <div id="framesDiag" class="diag"></div>
       <div id="framesGrid" class="frames-grid"></div>
-      <div class="frames-note">Ces 9 images viennent du MP4 PixVerse. Le bouton vert ci-dessus télécharge uniquement ces vues.</div>
+      <div class="frames-note">Ces 9 images viennent du MP4 PixVerse. Le ZIP vert les recadre au format exact du support choisi.</div>
     </section>
     <video id="video" controls playsinline loop></video>
     <button id="rerun" style="display:none;background:#e8e8e8;color:#111">Relancer la même action</button>
@@ -42,9 +42,9 @@
   </aside>
 </div>
 <script type="module">
-import { loadActionLibrary, getActionVariant } from './modules/action-library.js';
-import { runPixVerseAction } from './modules/pixverse-client.js';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js';
+import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=20260829b';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=20260829b';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=20260829b';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -85,13 +85,39 @@ function renderFrames(result){
   requestAnimationFrame(()=>framesBlock.scrollIntoView({behavior:'smooth',block:'start'}));
 }
 async function extractNineViews(){setStatus('5/5 — Extraction automatique des 9 vues…');const result=await extractVideoFrames(video,{count:9,type:'image/png',onProgress:p=>setStatus(`5/5 — Extraction vue ${p.index+1}/9…`)});renderFrames(result);return result}
+
+function currentSupportSpec(){
+  const doc=iframe.contentDocument;
+  const id=doc?.getElementById('supportType')?.value||'keychain-vertical';
+  const map={
+    'keychain-vertical':{id,label:'porte-cle-vertical',width:1024,height:1536},
+    'keychain-horizontal':{id,label:'porte-cle-horizontal',width:1536,height:1024},
+    'medallion-round':{id,label:'medaillon-rond',width:1024,height:1024},
+    'business-card':{id,label:'carte-85x54',width:1536,height:969},
+    'business-card-88':{id,label:'carte-88x56',width:1536,height:978}
+  };
+  return map[id]||map['keychain-vertical'];
+}
+function blobToImage(blob){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(blob);const img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Impossible de lire une vue PixVerse.'))};img.src=url})}
+function canvasToPng(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Impossible de créer le PNG final.')),'image/png'))}
+async function fitFrameToSupport(frameBlob,spec){
+  const img=await blobToImage(frameBlob);const c=document.createElement('canvas');c.width=spec.width;c.height=spec.height;const x=c.getContext('2d',{alpha:false});
+  if(!x)throw new Error('Canvas de recadrage indisponible.');
+  const scale=Math.max(spec.width/img.naturalWidth,spec.height/img.naturalHeight);const w=img.naturalWidth*scale,h=img.naturalHeight*scale;
+  x.drawImage(img,(spec.width-w)/2,(spec.height-h)/2,w,h);return canvasToPng(c)
+}
 async function downloadPixVerseZip(){
   if(!extracted?.frames||extracted.frames.length!==9)throw new Error('Les 9 vues PixVerse ne sont pas prêtes.');
   const ZipCtor=iframe.contentWindow?.JSZip||window.JSZip;if(!ZipCtor)throw new Error('JSZip indisponible.');
-  const zip=new ZipCtor();extracted.frames.forEach((frame,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,frame.blob));
+  const spec=currentSupportSpec();const zip=new ZipCtor();
+  for(let i=0;i<extracted.frames.length;i++){
+    setStatus(`PixVerse ${i+1}/9 — adaptation ${spec.width}×${spec.height}…`);
+    const fitted=await fitFrameToSupport(extracted.frames[i].blob,spec);
+    zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
+  }
   const distinct=extracted.distinctFingerprints ?? new Set(extracted.frames.map(f=>f.fingerprint)).size;
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,views:9,distinctFrames:distinct,width:extracted.width,height:extracted.height,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
-  const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,views:9,distinctFrames:distinct,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,fit:'cover-center',times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
+  const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
 }
 async function launch(){
   if(!navigator.onLine){setStatus('PixVerse nécessite Internet.',true);return}
@@ -100,7 +126,7 @@ async function launch(){
 }
 family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
 downloadStatic.onclick=()=>{const btn=iframe.contentDocument?.getElementById('download');if(!btn){setStatus('Bouton ZIP statique introuvable.',true);return}if(btn.disabled){setStatus('Crée d’abord les 9 vues statiques à gauche.',true);return}btn.click()};
-downloadPixVerse.onclick=async()=>{try{setStatus('Création du ZIP PixVerse…');await downloadPixVerseZip();setStatus('ZIP PixVerse prêt : 9 vues vidéo incluses.',false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
+downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height}…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt au format ${spec.width}×${spec.height}.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
 iframe.addEventListener('load',()=>setStatus('HappyHolo chargé. Prépare une image puis lance l’action.'));
 try{library=await loadActionLibrary();refresh()}catch(e){setStatus(`Bibliothèque indisponible : ${e.message}`,true)}
 </script>
