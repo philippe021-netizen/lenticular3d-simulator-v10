@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "defaults": {
     "duration": 2,
     "quality": "540p",
@@ -58,6 +58,66 @@
       ]
     },
     {
+      "id": "person_full_dance",
+      "label": "Danse dynamique",
+      "categories": ["person"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "person-default",
+      "variants": [
+        {
+          "id": "person-default",
+          "family": "person",
+          "prompt": "Person performs one energetic dance move with a strong hip shift, one arm sweeping upward and the torso turning slightly, ending in a clear celebratory dance pose and holding it. Natural anatomy and balance. Static tripod shot. Exact same framing and scale. Background stays frozen. Preserve face, clothing and identity.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, extra limbs, broken hands, broken anatomy, distorted face, wardrobe change",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
+      "id": "person_jump_joy",
+      "label": "Saut de joie",
+      "categories": ["person"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "person-default",
+      "variants": [
+        {
+          "id": "person-default",
+          "family": "person",
+          "prompt": "Person makes one clear joyful jump with arms rising outward and upward, landing in a strong happy pose and holding it. Keep the body fully visible and anatomically natural. Static tripod shot. Exact same framing and scale. Background stays frozen. Preserve face, clothing and identity.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, extra limbs, floating body, broken anatomy, distorted face",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
+      "id": "person_half_spin",
+      "label": "Demi-tour stylé",
+      "categories": ["person"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "person-default",
+      "variants": [
+        {
+          "id": "person-default",
+          "family": "person",
+          "prompt": "Person performs a stylish half-turn of the body, rotating shoulders and hips clearly to one side while keeping the face visible, then holds the final pose. Natural balance and anatomy. Static tripod shot. Exact same framing and scale. Background stays frozen. Preserve face, clothing and identity.",
+          "negativePrompt": "full spin, back facing camera, zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, extra limbs, broken anatomy, distorted face",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
       "id": "group_kiss",
       "label": "Baiser",
       "categories": ["group"],
@@ -69,6 +129,26 @@
           "id": "group-default",
           "family": "group",
           "prompt": "The two adult people naturally lean toward each other and share a clear affectionate kiss, then hold the final close pose. Preserve both identities and original clothing. Static tripod shot. Exact same framing and scale. Background stays frozen.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, merged faces, distorted faces, extra limbs, body fusion",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
+      "id": "group_cheek_kiss",
+      "label": "Bisou sur la joue",
+      "categories": ["group"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "group-default",
+      "variants": [
+        {
+          "id": "group-default",
+          "family": "group",
+          "prompt": "One adult person leans naturally toward the other and gives a clear affectionate kiss on the cheek, while the other smiles, then both hold the close final pose. Preserve both identities and original clothing. Static tripod shot. Exact same framing and scale. Background stays frozen.",
           "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, merged faces, distorted faces, extra limbs, body fusion",
           "duration": 2,
           "quality": "540p",
@@ -90,6 +170,26 @@
           "family": "group",
           "prompt": "Everyone raises both arms high in a joyful celebratory pose and holds the final pose. Static tripod shot. Exact same framing and scale. Background stays frozen. Preserve all faces.",
           "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, extra limbs, distorted faces",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
+      "id": "group_dance",
+      "label": "Danse à deux",
+      "categories": ["group"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "group-default",
+      "variants": [
+        {
+          "id": "group-default",
+          "family": "group",
+          "prompt": "The two adult people perform one synchronized energetic dance move together, shifting hips and shoulders in the same direction, then finish in a strong joyful pose and hold it. Preserve both identities and clothing. Static tripod shot. Exact same framing and scale. Background stays frozen.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, merged bodies, extra limbs, distorted faces, body fusion",
           "duration": 2,
           "quality": "540p",
           "audio": false,
@@ -138,6 +238,26 @@
       ]
     },
     {
+      "id": "animal_jump",
+      "label": "Animal bondit",
+      "categories": ["animal"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "animal-default",
+      "variants": [
+        {
+          "id": "animal-default",
+          "family": "animal",
+          "prompt": "Animal makes one clear playful forward-upward hop or pounce, with natural leg and body motion, then lands and holds an alert final pose. Keep the same animal, fur pattern and proportions. Static tripod shot. Exact same framing and scale. Background stays frozen.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, extra legs, extra ears, stretched body, distorted animal",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
       "id": "logo_laser_reveal",
       "label": "Logo créé au laser",
       "categories": ["logo"],
@@ -149,6 +269,46 @@
           "id": "logo-default",
           "family": "logo",
           "prompt": "Bright laser beams and energetic sparks trace the exact contours of the existing logo, progressively creating and revealing the complete logo from darkness. The final frame shows the original logo fully formed, sharp and unchanged, surrounded by a few fading sparks. Static camera. Exact same framing and scale. Background remains fixed.",
+          "negativePrompt": "zoom, camera movement, camera shake, reframing, crop change, logo deformation, misspelled text, altered letters, changed symbol, duplicated logo, warped logo, background movement, flicker",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
+      "id": "logo_particles_reform",
+      "label": "Logo explose et se reforme",
+      "categories": ["logo"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "logo-default",
+      "variants": [
+        {
+          "id": "logo-default",
+          "family": "logo",
+          "prompt": "The existing logo breaks into a burst of bright glowing particles and sparks, then the particles rapidly converge and reform the exact original logo, ending fully sharp, complete and unchanged. Keep all letters and symbols exactly correct. Static camera. Exact same framing and scale. Background remains fixed.",
+          "negativePrompt": "zoom, camera movement, camera shake, reframing, crop change, logo deformation, misspelled text, altered letters, changed symbol, duplicated logo, warped logo, incomplete logo, background movement, flicker",
+          "duration": 2,
+          "quality": "540p",
+          "audio": false,
+          "motionMode": "normal"
+        }
+      ]
+    },
+    {
+      "id": "logo_energy_outline",
+      "label": "Contour électrique",
+      "categories": ["logo"],
+      "active": true,
+      "status": "test",
+      "defaultVariantId": "logo-default",
+      "variants": [
+        {
+          "id": "logo-default",
+          "family": "logo",
+          "prompt": "A bright electric energy line races around the exact outer and inner contours of the existing logo, throwing controlled sparks as it completes the shape, then the full original logo glows strongly and holds. Keep all letters and symbols exact. Static camera. Exact same framing and scale. Background remains fixed.",
           "negativePrompt": "zoom, camera movement, camera shake, reframing, crop change, logo deformation, misspelled text, altered letters, changed symbol, duplicated logo, warped logo, background movement, flicker",
           "duration": 2,
           "quality": "540p",
