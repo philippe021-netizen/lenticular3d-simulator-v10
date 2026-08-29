@@ -18,6 +18,7 @@ let pixversePreviewFrames = null;
 let pixversePreviewEnabled = false;
 let pixversePreviewStart = 0;
 let pixversePlacementBound = false;
+let pixverseLastFrameIndex = -1;
 
 function simulatorTarget() {
   const iframe = document.getElementById('hhApp');
@@ -100,7 +101,7 @@ function ensurePixVerseOverlay() {
       position: 'absolute', inset: '0', width: '100%', height: '100%',
       objectFit: 'contain', objectPosition: 'center', display: 'none',
       zIndex: '20', pointerEvents: 'none', borderRadius: 'inherit',
-      maxWidth: 'none', maxHeight: 'none'
+      maxWidth: 'none', maxHeight: 'none', backfaceVisibility: 'hidden'
     });
     imageWindow.appendChild(img);
   }
@@ -123,15 +124,23 @@ function ensurePixVerseOverlay() {
 
 function simulatorSpeedMs(doc) {
   const seconds = Number(doc?.getElementById('supportSpeed')?.value || 5);
-  return Math.max(2000, Math.min(8000, seconds * 1000));
+  return Math.max(2500, Math.min(8000, seconds * 1000));
 }
 
-function ensureSupportRocking(doc, product) {
-  if (!doc || !product) return;
-  const play = doc.getElementById('supportPlay');
-  if (!product.classList.contains('support-playing') && play) {
-    try { play.click(); } catch (_) {}
-  }
+function simulatorRotation(doc) {
+  const deg = Number(doc?.getElementById('supportRot')?.value || 6);
+  return Math.max(0, Math.min(8, deg));
+}
+
+function stabilizeProductForPixVerse(product) {
+  if (!product) return;
+  // La simulation d'origine anime déjà le même transform via CSS. La cumuler avec
+  // notre synchronisation PixVerse créait le tremblement visible sur iPad.
+  product.classList.remove('support-playing');
+  product.style.animation = 'none';
+  product.style.willChange = 'transform';
+  const shell = product.querySelector('.shell');
+  if (shell) shell.style.animation = 'none';
 }
 
 function animatePixVersePreview(now) {
@@ -144,17 +153,27 @@ function animatePixVersePreview(now) {
     return;
   }
 
-  ensureSupportRocking(doc, product);
+  stabilizeProductForPixVerse(product);
   const period = simulatorSpeedMs(doc);
   const elapsed = Math.max(0, now - pixversePreviewStart);
-  // 0 -> 1 -> 0 sur un cycle, synchronisé au balancement du support.
   const phase = (elapsed % period) / period;
   const sweep = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+
+  // Un seul mouvement pilote à la fois le porte-clé et les 9 vues : aucun conflit CSS/JS.
+  if (product) {
+    const rot = simulatorRotation(doc);
+    const angle = -rot + sweep * rot * 2;
+    const shift = -4 + sweep * 8;
+    product.style.transform = `perspective(620px) rotateY(${angle.toFixed(3)}deg) translateX(${shift.toFixed(2)}px)`;
+  }
+
   const idx = Math.max(0, Math.min(pixversePreviewFrames.length - 1, Math.round(sweep * (pixversePreviewFrames.length - 1))));
-  const frame = pixversePreviewFrames[idx];
-  if (img.src !== frame.url) img.src = frame.url;
-  badge.textContent = `PIXVERSE ${frame.index || idx + 1}/${pixversePreviewFrames.length}`;
-  applyPixVersePlacement();
+  if (idx !== pixverseLastFrameIndex) {
+    pixverseLastFrameIndex = idx;
+    const frame = pixversePreviewFrames[idx];
+    img.src = frame.url;
+    badge.textContent = `PIXVERSE ${frame.index || idx + 1}/${pixversePreviewFrames.length}`;
+  }
   pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
 }
 
@@ -164,12 +183,20 @@ export function stopPixVerseSimulatorPreview(clearFrames = false) {
     pixversePreviewRAF = 0;
   }
   pixversePreviewEnabled = false;
-  const { doc } = simulatorTarget();
+  pixverseLastFrameIndex = -1;
+  const { doc, product } = simulatorTarget();
   const img = doc?.getElementById('pixverseSimulatorImage');
   const badge = doc?.getElementById('pixverseSimulatorBadge');
   const btn = doc?.getElementById('pixverseSimulatorToggle');
   if (img) img.style.display = 'none';
   if (badge) badge.style.display = 'none';
+  if (product) {
+    product.style.transform = '';
+    product.style.animation = '';
+    product.style.willChange = '';
+    const shell = product.querySelector('.shell');
+    if (shell) shell.style.animation = '';
+  }
   if (btn) {
     btn.textContent = pixversePreviewFrames?.length ? 'Aperçu PixVerse : OFF' : 'Aperçu PixVerse : indisponible';
     btn.disabled = !pixversePreviewFrames?.length;
@@ -184,8 +211,11 @@ export function showPixVerseFramesInSimulator(frames) {
   const overlay = ensurePixVerseOverlay();
   if (!overlay) return false;
   if (pixversePreviewRAF) cancelAnimationFrame(pixversePreviewRAF);
+  const { product } = simulatorTarget();
+  stabilizeProductForPixVerse(product);
   pixversePreviewEnabled = true;
   pixversePreviewStart = performance.now();
+  pixverseLastFrameIndex = 0;
   overlay.img.src = frames[0].url;
   overlay.img.style.display = 'block';
   overlay.badge.textContent = `PIXVERSE 1/${frames.length}`;
