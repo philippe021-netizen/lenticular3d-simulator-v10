@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>HappyHolo — Actions PixVerse test</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:10;background:#111;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 50px)}iframe{width:100%;height:calc(100vh - 50px);border:0;background:#fff}.side{padding:16px;background:#fff;border-left:1px solid #ddd;overflow:auto}h2{margin:0 0 5px}p{font-size:13px;color:#555;line-height:1.4}label{display:block;font-size:13px;font-weight:750;margin:13px 0 6px}select,button{width:100%;font:inherit;padding:12px;border-radius:11px}select{border:1px solid #ccc;background:#fff}button{border:0;background:#111;color:#fff;font-weight:800;margin-top:12px}button:disabled{opacity:.45}.prompt,.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;line-height:1.4}.status{white-space:pre-wrap}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.small{font-size:11px;color:#666;margin-top:8px}.frames-block{display:none;margin-top:14px;padding:12px;border:2px solid #19a45b;border-radius:12px;background:#f4fff7}.frames-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.frames-head b{font-size:14px;color:#126b3d}.frames-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.frame{position:relative;border-radius:9px;overflow:hidden;background:#111;aspect-ratio:3/4;cursor:pointer}.frame img{width:100%;height:100%;object-fit:cover;display:block}.frame span{position:absolute;left:5px;bottom:5px;background:#000b;color:#fff;font-size:10px;padding:3px 5px;border-radius:6px}.frames-note{font-size:11px;color:#456;line-height:1.35;margin-top:7px}.pixverse-label{font-size:11px;font-weight:800;color:#126b3d;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #ddd}.layout iframe{height:58vh}.bar{position:relative}}
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:10;background:#111;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 50px)}iframe{width:100%;height:calc(100vh - 50px);border:0;background:#fff}.side{padding:16px;background:#fff;border-left:1px solid #ddd;overflow:auto}h2{margin:0 0 5px}p{font-size:13px;color:#555;line-height:1.4}label{display:block;font-size:13px;font-weight:750;margin:13px 0 6px}select,button{width:100%;font:inherit;padding:12px;border-radius:11px}select{border:1px solid #ccc;background:#fff}button{border:0;background:#111;color:#fff;font-weight:800;margin-top:12px}button:disabled{opacity:.45}.prompt,.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;line-height:1.4}.status{white-space:pre-wrap}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.small{font-size:11px;color:#666;margin-top:8px}.frames-block{display:none;margin-top:14px;padding:12px;border:2px solid #19a45b;border-radius:12px;background:#f4fff7}.frames-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.frames-head b{font-size:14px;color:#126b3d}.frames-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.frame{position:relative;border-radius:9px;overflow:hidden;background:#111;aspect-ratio:3/4;cursor:pointer}.frame img{width:100%;height:100%;object-fit:cover;display:block}.frame span{position:absolute;left:5px;bottom:5px;background:#000b;color:#fff;font-size:10px;padding:3px 5px;border-radius:6px}.frames-note{font-size:11px;color:#456;line-height:1.35;margin-top:7px}.pixverse-label{font-size:11px;font-weight:800;color:#126b3d;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.diag{margin-top:8px;padding:8px 10px;border-radius:9px;background:#e7f7eb;color:#17652c;font-size:12px;font-weight:700}.diag.bad{background:#ffe9e7;color:#8b1f17}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #ddd}.layout iframe{height:58vh}.bar{position:relative}}
 </style>
 </head>
 <body>
@@ -24,6 +24,7 @@
     <section id="framesBlock" class="frames-block">
       <div class="pixverse-label">Résultat PixVerse — pas les 9 vues 3D de gauche</div>
       <div class="frames-head"><b>9 images de la vidéo PixVerse</b><span id="framesMeta" class="small"></span></div>
+      <div id="framesDiag" class="diag"></div>
       <div id="framesGrid" class="frames-grid"></div>
       <div class="frames-note">Ces 9 images viennent du MP4 PixVerse. Touche une vignette pour télécharger cette vue.</div>
     </section>
@@ -48,6 +49,7 @@ const rerun=document.getElementById('rerun');
 const framesBlock=document.getElementById('framesBlock');
 const framesGrid=document.getElementById('framesGrid');
 const framesMeta=document.getElementById('framesMeta');
+const framesDiag=document.getElementById('framesDiag');
 let library=null;
 let extracted=null;
 
@@ -65,6 +67,8 @@ function clearFrames(){
   extracted=null;
   framesGrid.innerHTML='';
   framesMeta.textContent='';
+  framesDiag.textContent='';
+  framesDiag.className='diag';
   framesBlock.style.display='none';
 }
 function renderFrames(result){
@@ -77,7 +81,7 @@ function renderFrames(result){
     card.className='frame';
     card.style.padding='0';
     card.style.margin='0';
-    card.title=`Vue ${frame.index} — ${frame.time.toFixed(2)} s`;
+    card.title=`Vue ${frame.index} — ${frame.time.toFixed(2)} s — ${frame.fingerprint||'sans empreinte'}`;
     const img=document.createElement('img');img.src=frame.url;img.alt=`Vue ${frame.index}`;
     const label=document.createElement('span');label.textContent=`${frame.index} · ${frame.time.toFixed(2)}s`;
     card.append(img,label);
@@ -85,6 +89,9 @@ function renderFrames(result){
     framesGrid.appendChild(card);
   });
   framesMeta.textContent=`${result.width}×${result.height}`;
+  const distinct=result.distinctFingerprints ?? new Set(result.frames.map(f=>f.fingerprint)).size;
+  framesDiag.textContent=`Contrôle extraction : ${distinct}/9 images réellement distinctes`;
+  framesDiag.className=`diag${distinct<9?' bad':''}`;
   framesBlock.style.display='block';
   requestAnimationFrame(()=>framesBlock.scrollIntoView({behavior:'smooth',block:'start'}));
 }
@@ -115,9 +122,14 @@ async function launch(){
     });
     const views=await extractNineViews();
     rerun.style.display='block';
-    setStatus(`Connexion validée — vidéo #${result.videoId} + ${views.frames.length} vues PixVerse extraites.`,false,true);
+    const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;
+    if(distinct<9){
+      setStatus(`Vidéo récupérée, mais extraction iPad incomplète : ${distinct}/9 images distinctes.`,true);
+    }else{
+      setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues PixVerse distinctes.`,false,true);
+    }
     try{await video.play()}catch(_){}
-    window.HappyHoloLastPixVerseResult={...result,actionId:s.action.id,variantId:s.variant.id,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height}))};
+    window.HappyHoloLastPixVerseResult={...result,actionId:s.action.id,variantId:s.variant.id,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))};
   }catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
 }
 family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
