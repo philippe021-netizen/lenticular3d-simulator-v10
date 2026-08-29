@@ -13,18 +13,19 @@ function once(target, event) {
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-let pixversePreviewTimer = null;
+let pixversePreviewRAF = 0;
 let pixversePreviewFrames = null;
-let pixversePreviewIndex = 0;
-let pixversePreviewDirection = 1;
 let pixversePreviewEnabled = false;
+let pixversePreviewStart = 0;
+let pixversePlacementBound = false;
 
 function simulatorTarget() {
   const iframe = document.getElementById('hhApp');
   const doc = iframe?.contentDocument;
   const supportCanvas = doc?.getElementById('supportCanvas');
   const imageWindow = supportCanvas?.parentElement;
-  return { doc, imageWindow };
+  const product = doc?.getElementById('productObject');
+  return { doc, imageWindow, product };
 }
 
 function ensurePixVersePreviewControls() {
@@ -51,6 +52,42 @@ function ensurePixVersePreviewControls() {
   return btn;
 }
 
+function currentFrontPlacement(doc) {
+  const fit = doc?.getElementById('supportFit')?.value || 'contain';
+  const zoom = Number(doc?.getElementById('supportZoom')?.value || 100);
+  const x = Number(doc?.getElementById('supportX')?.value || 0);
+  const y = Number(doc?.getElementById('supportY')?.value || 0);
+  const margin = Number(doc?.getElementById('supportMargin')?.value || 0);
+  return { fit, zoom, x, y, margin };
+}
+
+function applyPixVersePlacement() {
+  const { doc } = simulatorTarget();
+  const img = doc?.getElementById('pixverseSimulatorImage');
+  if (!doc || !img) return;
+  const p = currentFrontPlacement(doc);
+  img.style.objectFit = p.fit === 'cover' ? 'cover' : 'contain';
+  img.style.objectPosition = 'center';
+  let scale = Math.max(0.1, p.zoom / 100);
+  if (p.fit === 'preserve') scale *= Math.max(0.55, 1 - p.margin / 100);
+  img.style.transformOrigin = '50% 50%';
+  img.style.transform = `translate(${p.x * 0.5}%, ${p.y * 0.5}%) scale(${scale})`;
+}
+
+function bindPixVersePlacementControls() {
+  if (pixversePlacementBound) return;
+  const { doc } = simulatorTarget();
+  if (!doc) return;
+  ['supportFit','supportMargin','supportZoom','supportX','supportY','supportType'].forEach(id => {
+    const el = doc.getElementById(id);
+    if (!el || el.dataset.pixversePlacementBound === '1') return;
+    el.dataset.pixversePlacementBound = '1';
+    el.addEventListener('input', applyPixVersePlacement);
+    el.addEventListener('change', applyPixVersePlacement);
+  });
+  pixversePlacementBound = true;
+}
+
 function ensurePixVerseOverlay() {
   const { doc, imageWindow } = simulatorTarget();
   if (!doc || !imageWindow) return null;
@@ -61,8 +98,9 @@ function ensurePixVerseOverlay() {
     img.id = 'pixverseSimulatorImage';
     Object.assign(img.style, {
       position: 'absolute', inset: '0', width: '100%', height: '100%',
-      objectFit: 'cover', objectPosition: 'center', display: 'none',
-      zIndex: '20', pointerEvents: 'none', borderRadius: 'inherit'
+      objectFit: 'contain', objectPosition: 'center', display: 'none',
+      zIndex: '20', pointerEvents: 'none', borderRadius: 'inherit',
+      maxWidth: 'none', maxHeight: 'none'
     });
     imageWindow.appendChild(img);
   }
@@ -78,13 +116,52 @@ function ensurePixVerseOverlay() {
     });
     imageWindow.appendChild(badge);
   }
+  bindPixVersePlacementControls();
+  applyPixVersePlacement();
   return { img, badge };
 }
 
+function simulatorSpeedMs(doc) {
+  const seconds = Number(doc?.getElementById('supportSpeed')?.value || 5);
+  return Math.max(2000, Math.min(8000, seconds * 1000));
+}
+
+function ensureSupportRocking(doc, product) {
+  if (!doc || !product) return;
+  const play = doc.getElementById('supportPlay');
+  if (!product.classList.contains('support-playing') && play) {
+    try { play.click(); } catch (_) {}
+  }
+}
+
+function animatePixVersePreview(now) {
+  if (!pixversePreviewEnabled || !pixversePreviewFrames?.length) return;
+  const { doc, product } = simulatorTarget();
+  const img = doc?.getElementById('pixverseSimulatorImage');
+  const badge = doc?.getElementById('pixverseSimulatorBadge');
+  if (!doc || !img || !badge) {
+    pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
+    return;
+  }
+
+  ensureSupportRocking(doc, product);
+  const period = simulatorSpeedMs(doc);
+  const elapsed = Math.max(0, now - pixversePreviewStart);
+  // 0 -> 1 -> 0 sur un cycle, synchronisé au balancement du support.
+  const phase = (elapsed % period) / period;
+  const sweep = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  const idx = Math.max(0, Math.min(pixversePreviewFrames.length - 1, Math.round(sweep * (pixversePreviewFrames.length - 1))));
+  const frame = pixversePreviewFrames[idx];
+  if (img.src !== frame.url) img.src = frame.url;
+  badge.textContent = `PIXVERSE ${frame.index || idx + 1}/${pixversePreviewFrames.length}`;
+  applyPixVersePlacement();
+  pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
+}
+
 export function stopPixVerseSimulatorPreview(clearFrames = false) {
-  if (pixversePreviewTimer) {
-    clearInterval(pixversePreviewTimer);
-    pixversePreviewTimer = null;
+  if (pixversePreviewRAF) {
+    cancelAnimationFrame(pixversePreviewRAF);
+    pixversePreviewRAF = 0;
   }
   pixversePreviewEnabled = false;
   const { doc } = simulatorTarget();
@@ -106,32 +183,19 @@ export function showPixVerseFramesInSimulator(frames) {
   const controls = ensurePixVersePreviewControls();
   const overlay = ensurePixVerseOverlay();
   if (!overlay) return false;
-  if (pixversePreviewTimer) clearInterval(pixversePreviewTimer);
-  pixversePreviewIndex = 0;
-  pixversePreviewDirection = 1;
+  if (pixversePreviewRAF) cancelAnimationFrame(pixversePreviewRAF);
   pixversePreviewEnabled = true;
+  pixversePreviewStart = performance.now();
   overlay.img.src = frames[0].url;
   overlay.img.style.display = 'block';
   overlay.badge.textContent = `PIXVERSE 1/${frames.length}`;
   overlay.badge.style.display = 'block';
+  applyPixVersePlacement();
   if (controls) {
     controls.disabled = false;
     controls.textContent = 'Aperçu PixVerse : ON';
   }
-  pixversePreviewTimer = setInterval(() => {
-    if (!pixversePreviewEnabled || !pixversePreviewFrames?.length) return;
-    pixversePreviewIndex += pixversePreviewDirection;
-    if (pixversePreviewIndex >= pixversePreviewFrames.length - 1) {
-      pixversePreviewIndex = pixversePreviewFrames.length - 1;
-      pixversePreviewDirection = -1;
-    } else if (pixversePreviewIndex <= 0) {
-      pixversePreviewIndex = 0;
-      pixversePreviewDirection = 1;
-    }
-    const frame = pixversePreviewFrames[pixversePreviewIndex];
-    overlay.img.src = frame.url;
-    overlay.badge.textContent = `PIXVERSE ${frame.index || pixversePreviewIndex + 1}/${pixversePreviewFrames.length}`;
-  }, 125);
+  pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
   return true;
 }
 
