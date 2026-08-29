@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "defaults": {
     "duration": 2,
     "quality": "540p",
@@ -18,8 +18,8 @@
         {
           "id": "person-default",
           "family": "person",
-          "prompt": "Turn head slightly left and back. Fixed camera. Preserve identity.",
-          "negativePrompt": "distorted face, camera movement, flicker",
+          "prompt": "Only the person moves: turn the head slightly left and back. Camera locked. Background completely static. Preserve identity.",
+          "negativePrompt": "camera movement, camera shake, zoom, pan, tilt, dolly, background movement, background wobble, parallax shift, flicker, distorted face",
           "duration": 2,
           "quality": "540p",
           "audio": false,
@@ -28,8 +28,8 @@
         {
           "id": "animal-default",
           "family": "animal",
-          "prompt": "Turn head slightly right and back. Fixed camera. Preserve animal identity.",
-          "negativePrompt": "extra ears, distorted face, camera movement, flicker",
+          "prompt": "Only the animal moves: turn the head slightly right and back. Camera locked. Background completely static. Preserve animal identity.",
+          "negativePrompt": "camera movement, camera shake, zoom, pan, tilt, dolly, background movement, background wobble, parallax shift, flicker, extra ears, distorted face",
           "duration": 2,
           "quality": "540p",
           "audio": false,
@@ -48,8 +48,8 @@
         {
           "id": "group-default",
           "family": "group",
-          "prompt": "Everyone raises both arms. Fixed camera. Preserve all faces.",
-          "negativePrompt": "extra limbs, distorted faces, camera movement, flicker",
+          "prompt": "Only the people move: everyone raises both arms. Camera locked. Background completely static. Preserve all faces.",
+          "negativePrompt": "camera movement, camera shake, zoom, pan, tilt, dolly, background movement, background wobble, parallax shift, flicker, extra limbs, distorted faces",
           "duration": 2,
           "quality": "540p",
           "audio": false,
