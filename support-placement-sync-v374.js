@@ -1,8 +1,9 @@
-/* HappyHolo V3.7.9 — recto + iPad + bascule simulation + mode normal stable */
+/* HappyHolo V3.8.0 — recto + iPad + bascule simulation + aperçu normal propre */
 (() => {
   'use strict';
 
   const $ = s => document.querySelector(s);
+  let normalRAF=0;
 
   function showControl(inputId){
     const input=$(inputId);
@@ -62,22 +63,49 @@
   function pixverseToggle(){return document.getElementById('pixverseSimulatorToggle');}
   function pixverseAvailable(){const t=pixverseToggle();return !!t&&!t.disabled&&!/indisponible/i.test(t.textContent||'');}
   function pixverseIsOn(){return /ON/i.test(pixverseToggle()?.textContent||'');}
-  function currentFamily(){return parentDoc()?.getElementById('family')?.value||'';}
 
-  function stabilizeNormalPreview(){
-    const stop=document.getElementById('supportStop');
-    const play=document.getElementById('supportPlay');
-    const product=document.getElementById('productObject');
-    const isLogo=currentFamily()==='logo';
-    if(isLogo){
-      // Les cartes de profondeur sur un logo très contrasté peuvent fragmenter le dessin.
-      // En mode normal, on garde donc la vue centrale propre et stable.
-      stop?.click();
-      if(product){product.classList.remove('support-playing');product.style.transform='perspective(620px) rotateY(0deg)';}
-    }else{
-      // Pour photo/personne/animal, conserver la simulation locale déjà prévue.
-      if(play && !product?.classList.contains('support-playing'))play.click();
+  function normalOverlay(){
+    const win=document.querySelector('#supportCanvas')?.closest('.image-window');
+    if(!win)return null;
+    let c=document.getElementById('happyHoloNormalPreviewOverlay');
+    if(!c){
+      c=document.createElement('canvas');c.id='happyHoloNormalPreviewOverlay';
+      Object.assign(c.style,{position:'absolute',inset:'0',width:'100%',height:'100%',zIndex:'15',pointerEvents:'none',display:'none'});
+      win.appendChild(c);
     }
+    return c;
+  }
+
+  function drawNormalComposite(ts=0){
+    const overlay=normalOverlay();
+    if(!overlay)return;
+    if(pixverseIsOn()){overlay.style.display='none';normalRAF=requestAnimationFrame(drawNormalComposite);return;}
+    const src=document.getElementById('view');
+    if(!src||!src.width||!src.height){overlay.style.display='none';normalRAF=requestAnimationFrame(drawNormalComposite);return;}
+    const r=overlay.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);
+    const W=Math.max(2,Math.round(r.width*d)),H=Math.max(2,Math.round(r.height*d));
+    if(overlay.width!==W||overlay.height!==H){overlay.width=W;overlay.height=H;}
+    const ctx=overlay.getContext('2d',{alpha:false});if(!ctx)return;
+    ctx.clearRect(0,0,W,H);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+    const fit=document.getElementById('supportFit')?.value||'contain';
+    const zoom=(Number(document.getElementById('supportZoom')?.value)||100)/100;
+    const px=(Number(document.getElementById('supportX')?.value)||0)/100;
+    const py=(Number(document.getElementById('supportY')?.value)||0)/100;
+    const rot=Number(document.getElementById('supportRot')?.value)||0;
+    const speed=Math.max(2,Number(document.getElementById('supportSpeed')?.value)||5);
+    let k=fit==='cover'?Math.max(W/src.width,H/src.height):Math.min(W/src.width,H/src.height);
+    k*=zoom*1.015;
+    const phase=Math.sin((ts/(speed*1000))*Math.PI*2);
+    const travel=phase*(rot/8)*W*0.018;
+    const w=src.width*k,h=src.height*k;
+    const x=(W-w)/2+px*W*.5+travel,y=(H-h)/2+py*H*.5;
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(src,x,y,w,h);
+    overlay.style.display='block';
+    normalRAF=requestAnimationFrame(drawNormalComposite);
+  }
+
+  function installCleanNormalPreview(){
+    cancelAnimationFrame(normalRAF);normalRAF=requestAnimationFrame(drawNormalComposite);
   }
 
   function setSimulationMode(mode){
@@ -85,10 +113,7 @@
     if(mode==='pixverse'){
       if(!pixverseAvailable())return false;
       if(!pixverseIsOn())t.click();
-    }else{
-      if(t&&pixverseIsOn())t.click();
-      requestAnimationFrame(stabilizeNormalPreview);
-    }
+    }else if(t&&pixverseIsOn())t.click();
     refreshParentSwitch();
     return true;
   }
@@ -96,10 +121,10 @@
   function refreshParentSwitch(){
     const pd=parentDoc();if(!pd)return;
     const normal=pd.getElementById('hhSimNormal'),pix=pd.getElementById('hhSimPixverse'),msg=pd.getElementById('hhSimSwitchMsg');if(!normal||!pix)return;
-    const available=pixverseAvailable(),on=pixverseIsOn(),isLogo=currentFamily()==='logo';
+    const available=pixverseAvailable(),on=pixverseIsOn();
     normal.style.background=on?'#ececec':'#111';normal.style.color=on?'#111':'#fff';
     pix.style.background=on?'#17652c':'#ececec';pix.style.color=on?'#fff':'#111';pix.disabled=!available;
-    if(msg)msg.textContent=available?(on?'Simulation PixVerse active':(isLogo?'Simulation normale stable — logo':'Simulation normale active')):'PixVerse disponible après génération';
+    if(msg)msg.textContent=available?(on?'Simulation PixVerse active':'Simulation normale propre active'):'PixVerse disponible après génération';
   }
 
   function installParentSimulationSwitch(){
@@ -112,7 +137,6 @@
       pd.body.appendChild(box);
       pd.getElementById('hhSimNormal').onclick=()=>setSimulationMode('normal');
       pd.getElementById('hhSimPixverse').onclick=()=>setSimulationMode('pixverse');
-      pd.getElementById('family')?.addEventListener('change',()=>{if(!pixverseIsOn())requestAnimationFrame(stabilizeNormalPreview);refreshParentSwitch();});
     }
     refreshParentSwitch();setInterval(refreshParentSwitch,500);
   }
@@ -140,12 +164,12 @@
   function boot(){
     if(!enableIndependentFrontPlacement()){let tries=0;const timer=setInterval(()=>{tries++;if(enableIndependentFrontPlacement()||tries>40)clearInterval(timer);},100);}
     syncFrameHeight();setTimeout(syncFrameHeight,150);setTimeout(syncFrameHeight,600);setTimeout(syncFrameHeight,1500);
-    installMaskEditorViewportFix();installParentSimulationSwitch();bindSceneInvalidation();
+    installMaskEditorViewportFix();installParentSimulationSwitch();bindSceneInvalidation();installCleanNormalPreview();
     if('ResizeObserver' in window){const ro=new ResizeObserver(()=>requestAnimationFrame(syncFrameHeight));ro.observe(document.documentElement);if(document.body)ro.observe(document.body);}
     new MutationObserver(()=>requestAnimationFrame(syncFrameHeight)).observe(document.documentElement,{childList:true,subtree:true,attributes:true});
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('load',syncFrameHeight);window.addEventListener('resize',syncFrameHeight);
-  console.log('[HAPPYHOLO] V3.7.9 — mode normal stable pour logos + bascule PixVerse');
+  console.log('[HAPPYHOLO] V3.8.0 — simulation normale sur composition finale propre + PixVerse séparé');
 })();
