@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.50';
+const CACHE_VERSION = 'happyholo-offline-v1.51';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -12,7 +12,7 @@ async function injectIpadFix(response,url){
   try{
     const html=await response.clone().text();
     if(html.includes('background-object-editor-ipad-fix.js'))return response;
-    const patched=html.replace('</body>','<script src="./background-object-editor-ipad-fix.js?v=20260829a"></script></body>');
+    const patched=html.replace('</body>','<script src="./background-object-editor-ipad-fix.js?v=20260829b"></script></body>');
     const headers=new Headers(response.headers);headers.set('content-type','text/html; charset=utf-8');headers.delete('content-length');
     return new Response(patched,{status:response.status,statusText:response.statusText,headers});
   }catch(_){return response;}
