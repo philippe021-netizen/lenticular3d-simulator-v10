@@ -1,4 +1,4 @@
-/* HappyHolo V3.7.6 — recto individualisé + hauteur iframe synchronisée */
+/* HappyHolo V3.7.7 — recto individualisé + hauteur iframe + masque iPad */
 (() => {
   'use strict';
 
@@ -16,8 +16,6 @@
     const fit=$('#supportFit');
     if(!fit)return false;
 
-    // Le recto possède désormais ses propres réglages dans le simulateur.
-    // On ne réinitialise plus zoom/position à chaque changement de composition.
     showControl('#supportFit');
     showControl('#supportMargin');
     showControl('#supportZoom');
@@ -50,6 +48,67 @@
     }catch(_){ }
   }
 
+  function findMaskEditor(){
+    return [...document.body.children].find(el=>{
+      if(!(el instanceof HTMLElement))return false;
+      if(el.style.zIndex!=='999999')return false;
+      return (el.textContent||'').includes('Correction du sujet');
+    })||null;
+  }
+
+  function positionMaskEditor(){
+    const modal=findMaskEditor();
+    if(!modal || modal.style.display==='none')return;
+    try{
+      const frame=window.frameElement;
+      const parentWin=window.parent;
+      if(!frame || !parentWin || parentWin===window){
+        modal.style.position='fixed';
+        modal.style.inset='0';
+        modal.style.width='100vw';
+        modal.style.height='100dvh';
+        modal.style.maxHeight='100dvh';
+        return;
+      }
+
+      const r=frame.getBoundingClientRect();
+      const viewportH=parentWin.innerHeight||800;
+      const viewportW=parentWin.innerWidth||1200;
+      const top=Math.max(0,-r.top);
+      const bottom=Math.min(r.height,viewportH-r.top);
+      const visibleH=Math.max(480,bottom-top);
+
+      modal.style.position='absolute';
+      modal.style.inset='auto';
+      modal.style.left='0';
+      modal.style.top=`${top}px`;
+      modal.style.width=`${Math.max(320,Math.min(r.width||viewportW,viewportW))}px`;
+      modal.style.height=`${visibleH}px`;
+      modal.style.maxHeight=`${visibleH}px`;
+      modal.style.overflow='hidden';
+
+      requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
+    }catch(_){ }
+  }
+
+  function installMaskEditorViewportFix(){
+    let raf=0;
+    const schedule=()=>{
+      if(raf)return;
+      raf=requestAnimationFrame(()=>{raf=0;positionMaskEditor();});
+    };
+    new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
+    window.addEventListener('resize',schedule,{passive:true});
+    try{
+      window.parent?.addEventListener('scroll',schedule,{passive:true});
+      window.parent?.addEventListener('resize',schedule,{passive:true});
+    }catch(_){ }
+    setInterval(()=>{
+      const m=findMaskEditor();
+      if(m&&m.style.display!=='none')schedule();
+    },250);
+  }
+
   function boot(){
     if(!enableIndependentFrontPlacement()){
       let tries=0;
@@ -63,6 +122,7 @@
     setTimeout(syncFrameHeight,150);
     setTimeout(syncFrameHeight,600);
     setTimeout(syncFrameHeight,1500);
+    installMaskEditorViewportFix();
 
     if('ResizeObserver' in window){
       const ro=new ResizeObserver(()=>requestAnimationFrame(syncFrameHeight));
@@ -79,5 +139,5 @@
   window.addEventListener('resize',syncFrameHeight);
   window.addEventListener('happyholo-subject-placement-changed',()=>setTimeout(syncFrameHeight,50));
 
-  console.log('[HAPPYHOLO] recto individualisé V3.7.6 + iframe auto-height actif');
+  console.log('[HAPPYHOLO] recto individualisé V3.7.7 + correctif écran noir masque iPad actif');
 })();
