@@ -11,7 +11,7 @@
 <body>
 <div class="bar"><b>HappyHolo + PixVerse</b><span class="badge">TEST ISOLÉ</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=pixverse-test-20260829c" title="HappyHolo"></iframe>
+  <iframe id="hhApp" src="./relief3d-test-v31.html?v=pixverse-test-20260829e" title="HappyHolo"></iframe>
   <aside class="side">
     <h2>Action PixVerse</h2>
     <p>Prépare l’image dans HappyHolo à gauche, puis lance une action. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
@@ -26,7 +26,7 @@
       <b>Deux extractions séparées</b>
       <button id="downloadStatic" class="secondary">ZIP 9 vues — image statique</button>
       <button id="downloadPixVerse" class="pixbtn" disabled>ZIP 9 vues — PixVerse</button>
-      <div class="small">Statique = les 9 vues 3D HappyHolo. PixVerse = les 9 images extraites de la vidéo, adaptées au support choisi.</div>
+      <div class="small">Les deux ZIP reprennent exactement le cadrage du simulateur : support, zoom et positions X/Y du recto.</div>
     </section>
 
     <section id="framesBlock" class="frames-block">
@@ -34,7 +34,7 @@
       <div class="frames-head"><b>9 images de la vidéo PixVerse</b><span id="framesMeta" class="small"></span></div>
       <div id="framesDiag" class="diag"></div>
       <div id="framesGrid" class="frames-grid"></div>
-      <div class="frames-note">Ces 9 images viennent du MP4 PixVerse. Le ZIP vert les recadre au format exact du support choisi.</div>
+      <div class="frames-note">Ces 9 images viennent du MP4 PixVerse. Le ZIP vert reprend le cadrage exact du support sélectionné.</div>
     </section>
     <video id="video" controls playsinline loop></video>
     <button id="rerun" style="display:none;background:#e8e8e8;color:#111">Relancer la même action</button>
@@ -42,9 +42,9 @@
   </aside>
 </div>
 <script type="module">
-import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=20260829c';
-import { runPixVerseAction } from './modules/pixverse-client.js?v=20260829c';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=20260829c';
+import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=20260829e';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=20260829e';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=20260829e';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -98,25 +98,56 @@ function currentSupportSpec(){
   };
   return map[id]||map['keychain-vertical'];
 }
-function blobToImage(blob){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(blob);const img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Impossible de lire une vue PixVerse.'))};img.src=url})}
+function currentSupportPlacement(){
+  const doc=iframe.contentDocument;
+  return {
+    fit:doc?.getElementById('supportFit')?.value||'contain',
+    margin:Number(doc?.getElementById('supportMargin')?.value||0),
+    zoom:Number(doc?.getElementById('supportZoom')?.value||100),
+    x:Number(doc?.getElementById('supportX')?.value||0),
+    y:Number(doc?.getElementById('supportY')?.value||0)
+  };
+}
+function blobToImage(blob){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(blob);const img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Impossible de lire une vue.'))};img.src=url})}
+function urlToBlob(url){return fetch(url).then(r=>{if(!r.ok)throw new Error('Vue statique illisible.');return r.blob()})}
 function canvasToPng(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Impossible de créer le PNG final.')),'image/png'))}
-async function fitFrameToSupport(frameBlob,spec){
+async function fitFrameToSupport(frameBlob,spec,placement=currentSupportPlacement()){
   const img=await blobToImage(frameBlob);const c=document.createElement('canvas');c.width=spec.width;c.height=spec.height;const x=c.getContext('2d',{alpha:false});
   if(!x)throw new Error('Canvas de recadrage indisponible.');
-  const scale=Math.max(spec.width/img.naturalWidth,spec.height/img.naturalHeight);const w=img.naturalWidth*scale,h=img.naturalHeight*scale;
-  x.drawImage(img,(spec.width-w)/2,(spec.height-h)/2,w,h);return canvasToPng(c)
+  x.fillStyle='#fff';x.fillRect(0,0,spec.width,spec.height);
+  const contain=placement.fit!=='cover';
+  let scale=contain?Math.min(spec.width/img.naturalWidth,spec.height/img.naturalHeight):Math.max(spec.width/img.naturalWidth,spec.height/img.naturalHeight);
+  scale*=Math.max(.1,placement.zoom/100);
+  if(placement.fit==='preserve')scale*=Math.max(.55,1-placement.margin/100);
+  const w=img.naturalWidth*scale,h=img.naturalHeight*scale;
+  const dx=(spec.width-w)/2+(placement.x/100)*spec.width*.5;
+  const dy=(spec.height-h)/2+(placement.y/100)*spec.height*.5;
+  x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,dx,dy,w,h);return canvasToPng(c)
+}
+async function downloadStaticSupportZip(){
+  const doc=iframe.contentDocument;const imgs=[...(doc?.querySelectorAll('#frames img')||[])];
+  if(imgs.length!==9)throw new Error('Crée d’abord les 9 vues statiques avec « Exporter 9 vues ».');
+  const ZipCtor=iframe.contentWindow?.JSZip||window.JSZip;if(!ZipCtor)throw new Error('JSZip indisponible.');
+  const spec=currentSupportSpec(),placement=currentSupportPlacement(),zip=new ZipCtor();
+  for(let i=0;i<9;i++){
+    setStatus(`Statique ${i+1}/9 — cadrage impression ${spec.width}×${spec.height}…`);
+    const raw=await urlToBlob(imgs[i].src);const fitted=await fitFrameToSupport(raw,spec,placement);
+    zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
+  }
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo static support print',source:'happyholo-static-9-views',views:9,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,placement},null,2));
+  const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`9-vues-statique-${spec.label}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);
 }
 async function downloadPixVerseZip(){
   if(!extracted?.frames||extracted.frames.length!==9)throw new Error('Les 9 vues PixVerse ne sont pas prêtes.');
   const ZipCtor=iframe.contentWindow?.JSZip||window.JSZip;if(!ZipCtor)throw new Error('JSZip indisponible.');
-  const spec=currentSupportSpec();const zip=new ZipCtor();
+  const spec=currentSupportSpec(),placement=currentSupportPlacement(),zip=new ZipCtor();
   for(let i=0;i<extracted.frames.length;i++){
-    setStatus(`PixVerse ${i+1}/9 — adaptation ${spec.width}×${spec.height}…`);
-    const fitted=await fitFrameToSupport(extracted.frames[i].blob,spec);
+    setStatus(`PixVerse ${i+1}/9 — cadrage impression ${spec.width}×${spec.height}…`);
+    const fitted=await fitFrameToSupport(extracted.frames[i].blob,spec,placement);
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
   const distinct=extracted.distinctFingerprints ?? new Set(extracted.frames.map(f=>f.fingerprint)).size;
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,views:9,distinctFrames:distinct,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,fit:'cover-center',times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,views:9,distinctFrames:distinct,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,placement,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
   const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
 }
 async function launch(){
@@ -128,29 +159,18 @@ async function launch(){
 function stabilizeLocalSupport(){
   const doc=iframe.contentDocument;if(!doc)return;
   let style=doc.getElementById('happyHoloStableSupportStyle');
-  if(!style){
-    style=doc.createElement('style');style.id='happyHoloStableSupportStyle';
-    style.textContent='.product-object.support-playing{animation:none!important;transform:none!important}.product-object.support-playing .shell{animation:none!important}';
-    doc.head.appendChild(style);
-  }
+  if(!style){style=doc.createElement('style');style.id='happyHoloStableSupportStyle';style.textContent='.product-object.support-playing{animation:none!important;transform:none!important}.product-object.support-playing .shell{animation:none!important}';doc.head.appendChild(style)}
 }
 function invalidatePixVerseAfterSceneEdit(){
-  if(!extracted&&!lastVideoId)return;
-  clearFrames();
-  video.pause();video.removeAttribute('src');video.load();video.style.display='none';rerun.style.display='none';
-  delete window.HappyHoloLastPixVerseResult;
-  setStatus('Le fond ou le placement a changé : l’ancien PixVerse a été retiré. Relance PixVerse pour générer les 9 vues avec cette nouvelle composition.',false,false);
+  if(!extracted&&!lastVideoId)return;clearFrames();video.pause();video.removeAttribute('src');video.load();video.style.display='none';rerun.style.display='none';delete window.HappyHoloLastPixVerseResult;setStatus('Le fond ou le placement a changé : l’ancien PixVerse a été retiré. Relance PixVerse pour générer les 9 vues avec cette nouvelle composition.',false,false)
 }
 function bindHappyHoloSceneChanges(){
-  const w=iframe.contentWindow;if(!w||w.__happyHoloPixverseSceneBound)return;
-  w.__happyHoloPixverseSceneBound=true;
-  w.addEventListener('happyholo-background-changed',invalidatePixVerseAfterSceneEdit);
-  w.addEventListener('happyholo-subject-placement-changed',invalidatePixVerseAfterSceneEdit);
+  const w=iframe.contentWindow;if(!w||w.__happyHoloPixverseSceneBound)return;w.__happyHoloPixverseSceneBound=true;w.addEventListener('happyholo-background-changed',invalidatePixVerseAfterSceneEdit);w.addEventListener('happyholo-subject-placement-changed',invalidatePixVerseAfterSceneEdit)
 }
 
 family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
-downloadStatic.onclick=()=>{const btn=iframe.contentDocument?.getElementById('download');if(!btn){setStatus('Bouton ZIP statique introuvable.',true);return}if(btn.disabled){setStatus('Crée d’abord les 9 vues statiques à gauche.',true);return}btn.click()};
-downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height}…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt au format ${spec.width}×${spec.height}.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
+downloadStatic.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP statique ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadStaticSupportZip();setStatus(`ZIP statique prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP statique : ${e.message}`,true)}};
+downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
 iframe.addEventListener('load',()=>{stabilizeLocalSupport();bindHappyHoloSceneChanges();setStatus('HappyHolo chargé. Prépare une image puis lance l’action.')});
 try{library=await loadActionLibrary();refresh()}catch(e){setStatus(`Bibliothèque indisponible : ${e.message}`,true)}
 </script>
