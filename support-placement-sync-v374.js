@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.2 — recto + iPad + bascule simulation + aperçus fluidifiés + modales visibles */
+/* HappyHolo V3.8.3 — recto + iPad + bascule simulation + aperçus fluidifiés + modales parent */
 (() => {
   'use strict';
 
@@ -35,34 +35,56 @@
     }catch(_){ }
   }
 
+  function parentDoc(){try{return window.parent&&window.parent!==window?window.parent.document:null;}catch(_){return null;}}
+
+  function isFullscreenEditor(el){
+    if(!(el instanceof HTMLElement)||el.style.display==='none')return false;
+    const z=Number(el.style.zIndex||getComputedStyle(el).zIndex||0);
+    if(z<999999)return false;
+    const txt=(el.textContent||'').toLowerCase();
+    const bg=(el.style.background||getComputedStyle(el).backgroundColor||'').toLowerCase();
+    return txt.includes('correction du sujet')||txt.includes('définir zone')||txt.includes('aperçu action')||bg.includes('rgba(6, 6, 10')||bg.includes('rgba(8, 8, 10');
+  }
+
   function findFullscreenEditors(){
-    return [...document.body.children].filter(el=>{
-      if(!(el instanceof HTMLElement)||el.style.display==='none')return false;
-      const z=Number(el.style.zIndex||getComputedStyle(el).zIndex||0);
-      if(z<999999)return false;
-      const txt=(el.textContent||'').toLowerCase();
-      const bg=(el.style.background||getComputedStyle(el).backgroundColor||'').toLowerCase();
-      return txt.includes('correction du sujet')||txt.includes('définir zone')||txt.includes('aperçu action')||bg.includes('rgba(6, 6, 10')||bg.includes('rgba(8, 8, 10');
+    return [...document.body.children].filter(isFullscreenEditor);
+  }
+
+  function promoteFullscreenEditors(){
+    const pd=parentDoc();
+    if(!pd)return false;
+    const editors=findFullscreenEditors();
+    if(!editors.length)return false;
+    editors.forEach(modal=>{
+      try{
+        if(modal.ownerDocument!==pd)pd.body.appendChild(modal);
+        Object.assign(modal.style,{
+          position:'fixed',
+          inset:'0',
+          left:'0',
+          top:'0',
+          width:'100vw',
+          height:'100dvh',
+          maxHeight:'100dvh',
+          zIndex:'20000000',
+          overflow:'hidden'
+        });
+      }catch(_){ }
     });
+    try{pd.documentElement.style.overscrollBehavior='none';}catch(_){ }
+    return true;
   }
 
   function positionFullscreenEditors(){
+    // Sur iPad Safari, une modale fixed dans une iframe très haute se cale sur le
+    // viewport interne de l'iframe et ses commandes peuvent rester hors écran.
+    // On la promeut donc directement dans le document parent : son 100dvh devient
+    // le vrai écran visible de l'iPad, indépendamment du scroll de l'iframe.
+    if(promoteFullscreenEditors())return;
     const modals=findFullscreenEditors();if(!modals.length)return;
-    try{
-      const frame=window.frameElement,parentWin=window.parent;
-      if(!frame||!parentWin||parentWin===window){
-        modals.forEach(modal=>{modal.style.position='fixed';modal.style.inset='0';modal.style.width='100vw';modal.style.height='100dvh';modal.style.maxHeight='100dvh';});
-        return;
-      }
-      const r=frame.getBoundingClientRect(),viewportH=parentWin.innerHeight||800,viewportW=parentWin.innerWidth||1200;
-      const top=Math.max(0,-r.top),bottom=Math.min(r.height,viewportH-r.top),visibleH=Math.max(420,bottom-top);
-      const visibleW=Math.max(320,Math.min(r.width||viewportW,viewportW));
-      modals.forEach(modal=>{
-        modal.style.position='absolute';modal.style.inset='auto';modal.style.left='0';modal.style.top=`${top}px`;
-        modal.style.width=`${visibleW}px`;modal.style.height=`${visibleH}px`;modal.style.maxHeight=`${visibleH}px`;modal.style.overflow='hidden';
-      });
-      requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
-    }catch(_){ }
+    modals.forEach(modal=>{
+      Object.assign(modal.style,{position:'fixed',inset:'0',width:'100vw',height:'100dvh',maxHeight:'100dvh',overflow:'hidden'});
+    });
   }
 
   function installMaskEditorViewportFix(){
@@ -70,10 +92,9 @@
     new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
     window.addEventListener('resize',schedule,{passive:true});
     try{window.parent?.addEventListener('scroll',schedule,{passive:true});window.parent?.addEventListener('resize',schedule,{passive:true});}catch(_){ }
-    setInterval(()=>{if(findFullscreenEditors().length)schedule();},180);
+    setInterval(()=>{if(findFullscreenEditors().length)schedule();},120);
   }
 
-  function parentDoc(){try{return window.parent&&window.parent!==window?window.parent.document:null;}catch(_){return null;}}
   function pixverseToggle(){return document.getElementById('pixverseSimulatorToggle');}
   function pixverseAvailable(){const t=pixverseToggle();return !!t&&!t.disabled&&!/indisponible/i.test(t.textContent||'');}
   function pixverseIsOn(){return /ON/i.test(pixverseToggle()?.textContent||'');}
@@ -203,5 +224,5 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('load',syncFrameHeight);window.addEventListener('resize',syncFrameHeight);
-  console.log('[HAPPYHOLO] V3.8.2 — modales iPad recalées dans la zone réellement visible');
+  console.log('[HAPPYHOLO] V3.8.3 — modales iPad promues dans le vrai viewport parent');
 })();
