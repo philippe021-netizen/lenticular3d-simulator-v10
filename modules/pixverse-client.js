@@ -4,17 +4,23 @@ async function readJson(r) {
   const text = await r.text();
   let data = null;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-  if (!r.ok) throw new Error(data?.error || data?.message || `Erreur HTTP ${r.status}`);
+  if (!r.ok) throw new Error(data?.error || data?.message || data?.ErrMsg || `Erreur HTTP ${r.status}`);
+  if (Number(data?.ErrCode) && Number(data.ErrCode) !== 0) {
+    throw new Error(data?.ErrMsg || `Erreur PixVerse ${data.ErrCode}`);
+  }
   return data;
 }
 
 export async function uploadPixVerseImage(file) {
   const form = new FormData();
-  form.append('file', file);
+  // PixVerse attend impérativement le champ multipart nommé "image".
+  form.append('image', file, file.name || `happyholo-${Date.now()}.png`);
   const r = await fetch('/api/pixverse-upload', { method: 'POST', body: form });
   const data = await readJson(r);
   const imgId = data?.Resp?.img_id ?? data?.img_id ?? data?.data?.img_id;
-  if (!imgId) throw new Error('PixVerse n’a pas renvoyé de img_id.');
+  if (imgId === undefined || imgId === null || imgId === '') {
+    throw new Error(`PixVerse n’a pas renvoyé de img_id${data?.ErrMsg ? ` : ${data.ErrMsg}` : ''}.`);
+  }
   return { imgId, raw: data };
 }
 
@@ -35,7 +41,7 @@ export async function createPixVerseVideo({ imgId, prompt, negativePrompt = '', 
   });
   const data = await readJson(r);
   const videoId = data?.Resp?.video_id ?? data?.video_id ?? data?.data?.video_id;
-  if (!videoId) throw new Error('PixVerse n’a pas renvoyé de video_id.');
+  if (videoId === undefined || videoId === null || videoId === '') throw new Error('PixVerse n’a pas renvoyé de video_id.');
   return { videoId, raw: data };
 }
 
