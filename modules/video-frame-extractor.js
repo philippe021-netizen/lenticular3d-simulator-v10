@@ -11,16 +11,47 @@ function once(target, event) {
   });
 }
 
+const nextFrame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
 async function ensureMetadata(video) {
   if (Number.isFinite(video.duration) && video.duration > 0 && video.videoWidth > 0) return;
   await once(video, 'loadedmetadata');
 }
 
+async function waitForDecodedFrame(video, targetTime) {
+  // Safari/iPadOS peut déclencher `seeked` avant que la nouvelle image vidéo
+  // soit réellement décodée. requestVideoFrameCallback attend le frame affichable.
+  if (typeof video.requestVideoFrameCallback === 'function') {
+    await new Promise(resolve => {
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      const timeout = setTimeout(finish, 800);
+      video.requestVideoFrameCallback((_now, meta) => {
+        clearTimeout(timeout);
+        // mediaTime est le temps du frame effectivement décodé.
+        if (Number.isFinite(meta?.mediaTime) && Math.abs(meta.mediaTime - targetTime) > 0.08) {
+          requestAnimationFrame(finish);
+        } else {
+          finish();
+        }
+      });
+    });
+  } else {
+    await nextFrame();
+  }
+}
+
 async function seek(video, time) {
-  const target = Math.max(0, Math.min(Number(video.duration) || 0, time));
-  if (Math.abs(video.currentTime - target) < 0.002) return;
+  const duration = Number(video.duration) || 0;
+  const target = Math.max(0, Math.min(Math.max(0, duration - 0.001), time));
+
+  // Toujours provoquer un vrai seek pour chaque vue. Sur Safari, réutiliser le
+  // même currentTime peut laisser le buffer d'affichage sur l'ancien frame.
+  const seeked = once(video, 'seeked');
   video.currentTime = target;
-  await once(video, 'seeked');
+  await seeked;
+  await waitForDecodedFrame(video, target);
+  return target;
 }
 
 function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
@@ -31,7 +62,7 @@ function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
 
 export async function extractVideoFrames(video, {
   count = 9,
-  edgePaddingSeconds = 0.06,
+  edgePaddingSeconds = 0.08,
   type = 'image/jpeg',
   quality = 0.96,
   onProgress
@@ -52,26 +83,29 @@ export async function extractVideoFrames(video, {
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: false });
   if (!ctx) throw new Error('Canvas d’extraction indisponible.');
 
   const wasPaused = video.paused;
+  const originalTime = Number(video.currentTime) || 0;
   video.pause();
   const frames = [];
 
   try {
     for (let i = 0; i < frameCount; i++) {
       const ratio = frameCount === 1 ? 0.5 : i / (frameCount - 1);
-      const time = start + span * ratio;
-      onProgress?.({ index: i, count: frameCount, time });
-      await seek(video, time);
+      const requestedTime = start + span * ratio;
+      onProgress?.({ index: i, count: frameCount, time: requestedTime });
+      const actualTime = await seek(video, requestedTime);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const blob = await canvasToBlob(canvas, type, quality);
       const url = URL.createObjectURL(blob);
-      frames.push({ index: i + 1, time, blob, url, width: canvas.width, height: canvas.height });
+      frames.push({ index: i + 1, time: actualTime, blob, url, width: canvas.width, height: canvas.height });
     }
   } finally {
-    try { await seek(video, start); } catch (_) {}
+    try { await seek(video, Math.min(originalTime, Math.max(0, duration - 0.001))); } catch (_) {}
     if (!wasPaused) {
       try { await video.play(); } catch (_) {}
     }
