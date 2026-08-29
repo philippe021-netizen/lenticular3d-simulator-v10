@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "defaults": {
     "duration": 2,
     "quality": "540p",
@@ -18,8 +18,8 @@
         {
           "id": "person-default",
           "family": "person",
-          "prompt": "Only the person moves: turn the head slightly left and back. Camera locked. Background completely static. Preserve identity.",
-          "negativePrompt": "camera movement, camera shake, zoom, pan, tilt, dolly, background movement, background wobble, parallax shift, flicker, distorted face",
+          "prompt": "Head turns slightly left, then returns. Static tripod shot. Exact same framing and scale. Background stays frozen. Preserve identity.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, distorted face",
           "duration": 2,
           "quality": "540p",
           "audio": false,
@@ -28,8 +28,8 @@
         {
           "id": "animal-default",
           "family": "animal",
-          "prompt": "Only the animal moves: turn the head slightly right and back. Camera locked. Background completely static. Preserve animal identity.",
-          "negativePrompt": "camera movement, camera shake, zoom, pan, tilt, dolly, background movement, background wobble, parallax shift, flicker, extra ears, distorted face",
+          "prompt": "Animal turns head slightly right, then returns. Static tripod shot. Exact same framing and scale. Background stays frozen. Preserve animal identity.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, extra ears, distorted face",
           "duration": 2,
           "quality": "540p",
           "audio": false,
@@ -48,8 +48,8 @@
         {
           "id": "group-default",
           "family": "group",
-          "prompt": "Only the people move: everyone raises both arms. Camera locked. Background completely static. Preserve all faces.",
-          "negativePrompt": "camera movement, camera shake, zoom, pan, tilt, dolly, background movement, background wobble, parallax shift, flicker, extra limbs, distorted faces",
+          "prompt": "Everyone raises both arms. Static tripod shot. Exact same framing and scale. Background stays frozen. Preserve all faces.",
+          "negativePrompt": "zoom in, zoom out, reframing, crop change, camera movement, camera shake, pan, tilt, dolly, push in, pull out, background movement, background wobble, parallax shift, flicker, extra limbs, distorted faces",
           "duration": 2,
           "quality": "540p",
           "audio": false,
