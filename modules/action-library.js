@@ -41,25 +41,55 @@ async function loadBundledLibrary() {
   return r.json();
 }
 
+function ensureFamilyOptions(library) {
+  const select = document.getElementById('family');
+  if (!select) return;
+  const labels = {
+    person: 'Personne',
+    group: 'Duo / Groupe',
+    animal: 'Animal',
+    logo: 'Logo / Objet'
+  };
+  const families = new Set();
+  for (const action of (library?.actions || [])) {
+    for (const variant of (action.variants || [])) {
+      if (variant?.family) families.add(variant.family);
+    }
+  }
+  for (const family of families) {
+    if ([...select.options].some(o => o.value === family)) continue;
+    const option = document.createElement('option');
+    option.value = family;
+    option.textContent = labels[family] || family;
+    select.appendChild(option);
+  }
+}
+
 export async function loadActionLibrary() {
   const [saved, bundled] = await Promise.all([idbGet(), loadBundledLibrary()]);
+  let library;
   if (!saved || Number(bundled?.version || 0) > Number(saved?.version || 0)) {
     await idbSet(bundled);
-    return bundled;
+    library = bundled;
+  } else {
+    library = saved;
   }
-  return saved;
+  ensureFamilyOptions(library);
+  return library;
 }
 
 export async function saveActionLibrary(library) {
   const copy = structuredClone(library);
   copy.lastUpdated = new Date().toISOString();
   await idbSet(copy);
+  ensureFamilyOptions(copy);
   return copy;
 }
 
 export async function resetActionLibraryToBundled() {
   const library = await loadBundledLibrary();
   await idbSet(library);
+  ensureFamilyOptions(library);
   return library;
 }
 
