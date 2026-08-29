@@ -4,7 +4,7 @@ function isAllowedPixVerseHost(hostname) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') return res.status(405).send('Method not allowed');
+  if (req.method !== 'GET' && req.method !== 'HEAD') return res.status(405).send('Method not allowed');
 
   const url = String(req.query.url || '');
   if (!/^https:\/\//i.test(url)) return res.status(400).send('URL invalide');
@@ -19,8 +19,19 @@ export default async function handler(req, res) {
     const timeout = setTimeout(() => controller.abort(), 120000);
 
     try {
-      const r = await fetch(url, { signal: controller.signal, redirect: 'follow' });
-      if (!r.ok) return res.status(r.status).send('Vidéo inaccessible');
+      const range = String(req.headers.range || '');
+      const headers = {};
+      if (range) headers.Range = range;
+      headers['Accept-Encoding'] = 'identity';
+
+      const r = await fetch(url, {
+        method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+        headers,
+        signal: controller.signal,
+        redirect: 'follow'
+      });
+
+      if (!r.ok && r.status !== 206) return res.status(r.status).send('Vidéo inaccessible');
 
       const finalUrl = new URL(r.url || url);
       if (!isAllowedPixVerseHost(finalUrl.hostname)) {
@@ -32,21 +43,27 @@ export default async function handler(req, res) {
         return res.status(415).send('Réponse PixVerse non vidéo');
       }
 
-      const declaredLength = Number(r.headers.get('content-length') || 0);
       const maxBytes = 100 * 1024 * 1024;
-      if (declaredLength > maxBytes) {
-        return res.status(413).send('Vidéo PixVerse trop volumineuse');
-      }
-
-      const ab = await r.arrayBuffer();
-      if (ab.byteLength > maxBytes) {
-        return res.status(413).send('Vidéo PixVerse trop volumineuse');
-      }
+      const declaredLength = Number(r.headers.get('content-length') || 0);
+      if (declaredLength > maxBytes) return res.status(413).send('Vidéo PixVerse trop volumineuse');
 
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Length', String(ab.byteLength));
-      res.setHeader('Cache-Control', 'private, max-age=300');
-      res.status(200).send(Buffer.from(ab));
+      res.setHeader('Accept-Ranges', r.headers.get('accept-ranges') || 'bytes');
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+
+      const contentRange = r.headers.get('content-range');
+      if (contentRange) res.setHeader('Content-Range', contentRange);
+      if (declaredLength) res.setHeader('Content-Length', String(declaredLength));
+
+      if (req.method === 'HEAD') return res.status(r.status === 206 ? 206 : 200).end();
+
+      const ab = await r.arrayBuffer();
+      if (ab.byteLength > maxBytes) return res.status(413).send('Vidéo PixVerse trop volumineuse');
+      if (!declaredLength) res.setHeader('Content-Length', String(ab.byteLength));
+
+      // Safari/iPad demande souvent des plages d'octets pour lire les métadonnées MP4.
+      // On conserve donc le 206 du CDN PixVerse au lieu de transformer la réponse en 200.
+      res.status(r.status === 206 ? 206 : 200).send(Buffer.from(ab));
     } finally {
       clearTimeout(timeout);
     }
