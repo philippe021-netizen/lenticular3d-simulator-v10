@@ -11,12 +11,12 @@
 <body>
 <div class="bar"><b>HappyHolo + PixVerse</b><span class="badge">TEST ISOLÉ</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=pixverse-test-20260829b" title="HappyHolo"></iframe>
+  <iframe id="hhApp" src="./relief3d-test-v31.html?v=pixverse-test-20260829c" title="HappyHolo"></iframe>
   <aside class="side">
     <h2>Action PixVerse</h2>
     <p>Prépare l’image dans HappyHolo à gauche, puis lance une action. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
     <label>Catégorie</label>
-    <select id="family"><option value="person">Personne</option><option value="group">Duo / Groupe</option><option value="animal">Animal</option></select>
+    <select id="family"><option value="person">Personne</option><option value="group">Duo / Groupe</option><option value="animal">Animal</option><option value="logo">Logo / Objet</option></select>
     <label>Action</label><select id="action"></select>
     <div id="prompt" class="prompt">Chargement…</div>
     <button id="run" disabled>Lancer PixVerse</button>
@@ -42,9 +42,9 @@
   </aside>
 </div>
 <script type="module">
-import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=20260829b';
-import { runPixVerseAction } from './modules/pixverse-client.js?v=20260829b';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=20260829b';
+import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=20260829c';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=20260829c';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=20260829c';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -124,10 +124,34 @@ async function launch(){
   const s=selection();if(!s)return;run.disabled=true;video.style.display='none';rerun.style.display='none';clearFrames();
   try{setStatus('Préparation de l’image finale HappyHolo…');const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(distinct<9)setStatus(`Vidéo récupérée, mais extraction iPad incomplète : ${distinct}/9 images distinctes.`,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues PixVerse distinctes.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,actionId:s.action.id,variantId:s.variant.id,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}}catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
 }
+
+function stabilizeLocalSupport(){
+  const doc=iframe.contentDocument;if(!doc)return;
+  let style=doc.getElementById('happyHoloStableSupportStyle');
+  if(!style){
+    style=doc.createElement('style');style.id='happyHoloStableSupportStyle';
+    style.textContent='.product-object.support-playing{animation:none!important;transform:none!important}.product-object.support-playing .shell{animation:none!important}';
+    doc.head.appendChild(style);
+  }
+}
+function invalidatePixVerseAfterSceneEdit(){
+  if(!extracted&&!lastVideoId)return;
+  clearFrames();
+  video.pause();video.removeAttribute('src');video.load();video.style.display='none';rerun.style.display='none';
+  delete window.HappyHoloLastPixVerseResult;
+  setStatus('Le fond ou le placement a changé : l’ancien PixVerse a été retiré. Relance PixVerse pour générer les 9 vues avec cette nouvelle composition.',false,false);
+}
+function bindHappyHoloSceneChanges(){
+  const w=iframe.contentWindow;if(!w||w.__happyHoloPixverseSceneBound)return;
+  w.__happyHoloPixverseSceneBound=true;
+  w.addEventListener('happyholo-background-changed',invalidatePixVerseAfterSceneEdit);
+  w.addEventListener('happyholo-subject-placement-changed',invalidatePixVerseAfterSceneEdit);
+}
+
 family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
 downloadStatic.onclick=()=>{const btn=iframe.contentDocument?.getElementById('download');if(!btn){setStatus('Bouton ZIP statique introuvable.',true);return}if(btn.disabled){setStatus('Crée d’abord les 9 vues statiques à gauche.',true);return}btn.click()};
 downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height}…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt au format ${spec.width}×${spec.height}.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
-iframe.addEventListener('load',()=>setStatus('HappyHolo chargé. Prépare une image puis lance l’action.'));
+iframe.addEventListener('load',()=>{stabilizeLocalSupport();bindHappyHoloSceneChanges();setStatus('HappyHolo chargé. Prépare une image puis lance l’action.')});
 try{library=await loadActionLibrary();refresh()}catch(e){setStatus(`Bibliothèque indisponible : ${e.message}`,true)}
 </script>
 </body>
