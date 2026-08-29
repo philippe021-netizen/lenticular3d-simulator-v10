@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>HappyHolo — Actions PixVerse test</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:10;background:#111;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;min-height:calc(100vh - 50px)}iframe{width:100%;height:calc(100vh - 50px);border:0;background:#fff}.side{padding:16px;background:#fff;border-left:1px solid #ddd;overflow:auto}h2{margin:0 0 5px}p{font-size:13px;color:#555;line-height:1.4}label{display:block;font-size:13px;font-weight:750;margin:13px 0 6px}select,button{width:100%;font:inherit;padding:12px;border-radius:11px}select{border:1px solid #ccc;background:#fff}button{border:0;background:#111;color:#fff;font-weight:800;margin-top:12px}button:disabled{opacity:.45}.prompt,.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;line-height:1.4}.status{white-space:pre-wrap}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.small{font-size:11px;color:#666;margin-top:8px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #ddd}.layout iframe{height:58vh}.bar{position:relative}}
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:10;background:#111;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 50px)}iframe{width:100%;height:calc(100vh - 50px);border:0;background:#fff}.side{padding:16px;background:#fff;border-left:1px solid #ddd;overflow:auto}h2{margin:0 0 5px}p{font-size:13px;color:#555;line-height:1.4}label{display:block;font-size:13px;font-weight:750;margin:13px 0 6px}select,button{width:100%;font:inherit;padding:12px;border-radius:11px}select{border:1px solid #ccc;background:#fff}button{border:0;background:#111;color:#fff;font-weight:800;margin-top:12px}button:disabled{opacity:.45}.prompt,.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;line-height:1.4}.status{white-space:pre-wrap}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.small{font-size:11px;color:#666;margin-top:8px}.frames-block{display:none;margin-top:16px;padding-top:14px;border-top:1px solid #ddd}.frames-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.frames-head b{font-size:14px}.frames-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.frame{position:relative;border-radius:9px;overflow:hidden;background:#111;aspect-ratio:3/4;cursor:pointer}.frame img{width:100%;height:100%;object-fit:cover;display:block}.frame span{position:absolute;left:5px;bottom:5px;background:#000b;color:#fff;font-size:10px;padding:3px 5px;border-radius:6px}.frames-note{font-size:11px;color:#666;line-height:1.35;margin-top:7px}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #ddd}.layout iframe{height:58vh}.bar{position:relative}}
 </style>
 </head>
 <body>
@@ -23,12 +23,18 @@
     <div id="status" class="status">Attends que HappyHolo soit chargé.</div>
     <video id="video" controls playsinline loop></video>
     <button id="rerun" style="display:none;background:#e8e8e8;color:#111">Relancer la même action</button>
+    <section id="framesBlock" class="frames-block">
+      <div class="frames-head"><b>9 vues extraites automatiquement</b><span id="framesMeta" class="small"></span></div>
+      <div id="framesGrid" class="frames-grid"></div>
+      <div class="frames-note">Répartition régulière sur les 2 secondes, en évitant les toutes premières et dernières images. Touche une vignette pour télécharger cette vue.</div>
+    </section>
     <div class="small">Aucune modification de main. Résultat conservé uniquement pour ce test.</div>
   </aside>
 </div>
 <script type="module">
 import { loadActionLibrary, getActionVariant } from './modules/action-library.js';
 import { runPixVerseAction } from './modules/pixverse-client.js';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -38,7 +44,11 @@ const run=document.getElementById('run');
 const status=document.getElementById('status');
 const video=document.getElementById('video');
 const rerun=document.getElementById('rerun');
+const framesBlock=document.getElementById('framesBlock');
+const framesGrid=document.getElementById('framesGrid');
+const framesMeta=document.getElementById('framesMeta');
 let library=null;
+let extracted=null;
 
 function setStatus(text,error=false,ok=false){status.textContent=text;status.style.background=error?'#ffe9e7':ok?'#e7f7eb':'#f2f2f2';status.style.color=error?'#8b1f17':ok?'#17652c':'#333'}
 function selection(){return action.value?getActionVariant(library,action.value,family.value):null}
@@ -49,18 +59,63 @@ function refresh(){
   if(s){const v=s.variant;prompt.innerHTML=`<b>${s.action.label}</b><br>${v.prompt}<br><span style="color:#666">${v.duration||2} s · ${v.quality||'540p'} · audio ${v.audio?'ON':'OFF'}</span>`;run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}
 }
 function canvasToFile(canvas){return new Promise((resolve,reject)=>{if(!canvas)return reject(new Error('Canvas final HappyHolo introuvable.'));canvas.toBlob(blob=>blob?resolve(new File([blob],`happyholo-${Date.now()}.png`,{type:'image/png'})):reject(new Error('Impossible de préparer l’image finale.')),'image/png',.95)})}
+function clearFrames(){
+  extracted?.revoke?.();
+  extracted=null;
+  framesGrid.innerHTML='';
+  framesMeta.textContent='';
+  framesBlock.style.display='none';
+}
+function renderFrames(result){
+  clearFrames();
+  extracted=result;
+  framesGrid.innerHTML='';
+  result.frames.forEach(frame=>{
+    const card=document.createElement('button');
+    card.type='button';
+    card.className='frame';
+    card.style.padding='0';
+    card.style.margin='0';
+    card.title=`Vue ${frame.index} — ${frame.time.toFixed(2)} s`;
+    const img=document.createElement('img');img.src=frame.url;img.alt=`Vue ${frame.index}`;
+    const label=document.createElement('span');label.textContent=`${frame.index} · ${frame.time.toFixed(2)}s`;
+    card.append(img,label);
+    card.onclick=()=>downloadExtractedFrame(frame,'happyholo-pixverse');
+    framesGrid.appendChild(card);
+  });
+  framesMeta.textContent=`${result.width}×${result.height}`;
+  framesBlock.style.display='block';
+}
+async function extractNineViews(){
+  setStatus('5/5 — Extraction automatique des 9 vues…');
+  const result=await extractVideoFrames(video,{count:9,onProgress:p=>setStatus(`5/5 — Extraction vue ${p.index+1}/9…`)});
+  renderFrames(result);
+  return result;
+}
 async function launch(){
   if(!navigator.onLine){setStatus('PixVerse nécessite Internet.',true);return}
   const s=selection();if(!s)return;
-  run.disabled=true;video.style.display='none';rerun.style.display='none';
+  run.disabled=true;video.style.display='none';rerun.style.display='none';clearFrames();
   try{
     setStatus('Préparation de l’image finale HappyHolo…');
     const doc=iframe.contentDocument;
     const canvas=doc?.getElementById('view');
     const file=await canvasToFile(canvas);
-    const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/4 — Envoi image…',create:'2/4 — Génération 2 s / 540p lancée…',processing:'3/4 — Génération PixVerse en cours…',done:'4/4 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});
-    video.src=result.videoUrl;video.style.display='block';rerun.style.display='block';setStatus(`Connexion validée — vidéo #${result.videoId} récupérée dans HappyHolo.`,false,true);try{await video.play()}catch(_){}
-    window.HappyHoloLastPixVerseResult={...result,actionId:s.action.id,variantId:s.variant.id};
+    const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});
+    video.src=result.videoUrl;
+    video.style.display='block';
+    video.load();
+    await new Promise((resolve,reject)=>{
+      if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();
+      const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};
+      const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};
+      video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true});
+    });
+    const views=await extractNineViews();
+    rerun.style.display='block';
+    setStatus(`Connexion validée — vidéo #${result.videoId} + ${views.frames.length} vues extraites dans HappyHolo.`,false,true);
+    try{await video.play()}catch(_){}
+    window.HappyHoloLastPixVerseResult={...result,actionId:s.action.id,variantId:s.variant.id,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height}))};
   }catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
 }
 family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
