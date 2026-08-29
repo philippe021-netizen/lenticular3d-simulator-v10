@@ -1,7 +1,4 @@
-/* HappyHolo V3.7.4 — placement support synchronisé avec la composition principale
-   Neutralise le second cadrage du recto sans toucher au verso, aux cartes,
-   aux actions locales, à la zone de sécurité ni à la démo 360.
-*/
+/* HappyHolo V3.7.5 — placement support + hauteur iframe synchronisée */
 (() => {
   'use strict';
 
@@ -25,7 +22,6 @@
     const fit=$('#supportFit');
     if(!fit)return false;
 
-    // Le recto reprend désormais le cadrage maître : aucune seconde translation/échelle.
     setValue('#supportFit','contain');
     setValue('#supportMargin',0);
     setValue('#supportZoom',100);
@@ -50,32 +46,57 @@
       if(controls && supportType)controls.insertBefore(note,supportType.nextSibling);
     }
 
-    // Un seul événement suffit pour faire relire les valeurs par la V3.7.3.
     fit.dispatchEvent(new Event('input',{bubbles:true}));
     return true;
   }
 
+  function syncFrameHeight(){
+    try{
+      const frame=window.frameElement;
+      if(!frame)return;
+      const h=Math.max(document.documentElement?.scrollHeight||0,document.body?.scrollHeight||0,900);
+      frame.style.height=`${h+24}px`;
+      frame.style.minHeight=`${h+24}px`;
+      frame.style.overflow='visible';
+      frame.setAttribute('scrolling','no');
+    }catch(_){ }
+  }
+
   function boot(){
-    if(neutralizeSupportPlacement())return;
-    let tries=0;
-    const timer=setInterval(()=>{
-      tries++;
-      if(neutralizeSupportPlacement()||tries>40)clearInterval(timer);
-    },100);
+    if(!neutralizeSupportPlacement()){
+      let tries=0;
+      const timer=setInterval(()=>{
+        tries++;
+        if(neutralizeSupportPlacement()||tries>40)clearInterval(timer);
+      },100);
+    }
+
+    syncFrameHeight();
+    setTimeout(syncFrameHeight,150);
+    setTimeout(syncFrameHeight,600);
+    setTimeout(syncFrameHeight,1500);
+
+    if('ResizeObserver' in window){
+      const ro=new ResizeObserver(()=>requestAnimationFrame(syncFrameHeight));
+      ro.observe(document.documentElement);
+      if(document.body)ro.observe(document.body);
+    }
+    new MutationObserver(()=>requestAnimationFrame(syncFrameHeight)).observe(document.documentElement,{childList:true,subtree:true,attributes:true});
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
 
-  // Si le placement maître change, le support reste neutre et se reconstruit via
-  // l'événement déjà écouté par support-preview-v316.js.
+  window.addEventListener('load',syncFrameHeight);
+  window.addEventListener('resize',syncFrameHeight);
   window.addEventListener('happyholo-subject-placement-changed',()=>{
     setValue('#supportFit','contain');
     setValue('#supportMargin',0);
     setValue('#supportZoom',100);
     setValue('#supportX',0);
     setValue('#supportY',0);
+    setTimeout(syncFrameHeight,50);
   });
 
-  console.log('[HAPPYHOLO] support placement sync V3.7.4 actif');
+  console.log('[HAPPYHOLO] support placement sync V3.7.5 + iframe auto-height actif');
 })();
