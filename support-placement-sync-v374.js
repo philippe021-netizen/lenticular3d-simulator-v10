@@ -1,9 +1,10 @@
-/* HappyHolo V3.8.0 — recto + iPad + bascule simulation + aperçu normal propre */
+/* HappyHolo V3.8.1 — recto + iPad + bascule simulation + aperçus fluidifiés */
 (() => {
   'use strict';
 
   const $ = s => document.querySelector(s);
   let normalRAF=0;
+  let pixSmoothBound=false;
 
   function showControl(inputId){
     const input=$(inputId);
@@ -96,7 +97,8 @@
     let k=fit==='cover'?Math.max(W/src.width,H/src.height):Math.min(W/src.width,H/src.height);
     k*=zoom*1.015;
     const phase=Math.sin((ts/(speed*1000))*Math.PI*2);
-    const travel=phase*(rot/8)*W*0.018;
+    const eased=phase*(0.82+0.18*(1-Math.abs(phase)));
+    const travel=eased*(rot/8)*W*0.016;
     const w=src.width*k,h=src.height*k;
     const x=(W-w)/2+px*W*.5+travel,y=(H-h)/2+py*H*.5;
     ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(src,x,y,w,h);
@@ -108,11 +110,42 @@
     cancelAnimationFrame(normalRAF);normalRAF=requestAnimationFrame(drawNormalComposite);
   }
 
+  function installSmoothPixVersePreview(){
+    if(pixSmoothBound)return;
+    const win=document.querySelector('#supportCanvas')?.closest('.image-window');
+    const img=document.getElementById('pixverseSimulatorImage');
+    if(!win||!img){setTimeout(installSmoothPixVersePreview,250);return;}
+    pixSmoothBound=true;
+    let previousSrc=img.getAttribute('src')||'';
+    let ghost=document.getElementById('pixverseSimulatorGhost');
+    if(!ghost){
+      ghost=document.createElement('img');ghost.id='pixverseSimulatorGhost';
+      Object.assign(ghost.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'contain',objectPosition:'center',zIndex:'19',pointerEvents:'none',display:'none',opacity:'0',transition:'opacity 170ms linear',backfaceVisibility:'hidden',maxWidth:'none',maxHeight:'none'});
+      win.appendChild(ghost);
+    }
+    const copyPlacement=()=>{
+      ghost.style.objectFit=img.style.objectFit||'contain';
+      ghost.style.objectPosition=img.style.objectPosition||'center';
+      ghost.style.transformOrigin=img.style.transformOrigin||'50% 50%';
+      ghost.style.transform=img.style.transform||'';
+    };
+    new MutationObserver(()=>{
+      const next=img.getAttribute('src')||'';
+      if(!next||next===previousSrc){copyPlacement();return;}
+      const old=previousSrc;previousSrc=next;
+      if(!old)return;
+      copyPlacement();ghost.src=old;ghost.style.display='block';ghost.style.opacity='1';
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ghost.style.opacity='0';}));
+      setTimeout(()=>{if(ghost.style.opacity==='0')ghost.style.display='none';},210);
+    }).observe(img,{attributes:true,attributeFilter:['src','style']});
+  }
+
   function setSimulationMode(mode){
     const t=pixverseToggle();
     if(mode==='pixverse'){
       if(!pixverseAvailable())return false;
       if(!pixverseIsOn())t.click();
+      installSmoothPixVersePreview();
     }else if(t&&pixverseIsOn())t.click();
     refreshParentSwitch();
     return true;
@@ -124,7 +157,7 @@
     const available=pixverseAvailable(),on=pixverseIsOn();
     normal.style.background=on?'#ececec':'#111';normal.style.color=on?'#111':'#fff';
     pix.style.background=on?'#17652c':'#ececec';pix.style.color=on?'#fff':'#111';pix.disabled=!available;
-    if(msg)msg.textContent=available?(on?'Simulation PixVerse active':'Simulation normale propre active'):'PixVerse disponible après génération';
+    if(msg)msg.textContent=available?(on?'Simulation PixVerse fluide active':'Simulation normale fluide active'):'PixVerse disponible après génération';
   }
 
   function installParentSimulationSwitch(){
@@ -164,12 +197,12 @@
   function boot(){
     if(!enableIndependentFrontPlacement()){let tries=0;const timer=setInterval(()=>{tries++;if(enableIndependentFrontPlacement()||tries>40)clearInterval(timer);},100);}
     syncFrameHeight();setTimeout(syncFrameHeight,150);setTimeout(syncFrameHeight,600);setTimeout(syncFrameHeight,1500);
-    installMaskEditorViewportFix();installParentSimulationSwitch();bindSceneInvalidation();installCleanNormalPreview();
+    installMaskEditorViewportFix();installParentSimulationSwitch();bindSceneInvalidation();installCleanNormalPreview();installSmoothPixVersePreview();
     if('ResizeObserver' in window){const ro=new ResizeObserver(()=>requestAnimationFrame(syncFrameHeight));ro.observe(document.documentElement);if(document.body)ro.observe(document.body);}
     new MutationObserver(()=>requestAnimationFrame(syncFrameHeight)).observe(document.documentElement,{childList:true,subtree:true,attributes:true});
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
   window.addEventListener('load',syncFrameHeight);window.addEventListener('resize',syncFrameHeight);
-  console.log('[HAPPYHOLO] V3.8.0 — simulation normale sur composition finale propre + PixVerse séparé');
+  console.log('[HAPPYHOLO] V3.8.1 — simulation normale et PixVerse fluidifiées');
 })();
