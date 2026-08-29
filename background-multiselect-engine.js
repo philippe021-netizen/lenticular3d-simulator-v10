@@ -1,0 +1,24 @@
+/* HappyHolo — moteur multi-sélections du fond V1
+   Rend plusieurs objets de fond indépendants avec profondeur propre.
+*/
+(()=>{
+'use strict';
+const bg=window.HappyHoloCustomBackground;
+if(!bg?.state||typeof bg.draw!=='function')return;
+const state=bg.state,baseDraw=bg.draw;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const makeDefault=(i=0)=>({id:`bg-${Date.now()}-${i}`,name:`Fond ${i+1}`,enabled:true,slot:'a',strokes:[],bbox:null,depth:.18,zoom:100,x:0,y:0,yaw:0,pitch:0,follow:true,followStrength:45,driver:'subject'});
+if(!Array.isArray(state.bgObjects)||!state.bgObjects.length){
+  const first=Object.assign(makeDefault(0),state.bgObject||{});
+  state.bgObjects=[first];state.bgObject=first;state.bgObjectActive=0;
+}else{
+  state.bgObjects=state.bgObjects.slice(0,6).map((o,i)=>Object.assign(makeDefault(i),o||{}));
+  state.bgObjectActive=clamp(Number(state.bgObjectActive)||0,0,state.bgObjects.length-1);state.bgObject=state.bgObjects[state.bgObjectActive];
+}
+function slotFor(obj,norm){if(obj.slot==='a')return state.a;if(obj.slot==='b')return state.b;if(state.mode==='fixedA')return state.a;if(state.mode==='fixedB')return state.b;if(state.mode==='flipAB')return Number(norm||0)<=0?state.a:state.b;return state.a?.img?state.a:state.b;}
+function displayedRect(slot,rect){const img=slot?.img;if(!img)return null;const iw=img.naturalWidth||img.width||1,ih=img.naturalHeight||img.height||1;const base=slot.fit==='contain'?Math.min(rect.w/iw,rect.h/ih):Math.max(rect.w/iw,rect.h/ih);const s=base*(clamp(Number(slot.zoom)||100,50,200)/100);const w=iw*s,h=ih*s;return{x:rect.x+(rect.w-w)/2+(Number(slot.x)||0)/100*rect.w*.5,y:rect.y+(rect.h-h)/2+(Number(slot.y)||0)/100*rect.h*.5,w,h};}
+function drawOne(ctx,obj,norm,W,H,rect){if(!obj?.enabled||!obj.strokes?.length)return;const slot=slotFor(obj,norm);if(!slot?.img)return;const dr=displayedRect(slot,rect);if(!dr)return;const src=document.createElement('canvas');src.width=W;src.height=H;const sx=src.getContext('2d');sx.drawImage(slot.img,dr.x,dr.y,dr.w,dr.h);const mask=document.createElement('canvas');mask.width=W;mask.height=H;const mx=mask.getContext('2d');mx.lineCap='round';mx.lineJoin='round';mx.strokeStyle='#fff';mx.fillStyle='#fff';for(const st of obj.strokes){const pts=st.points||[];if(!pts.length)continue;mx.save();mx.globalCompositeOperation=st.erase?'destination-out':'source-over';mx.lineWidth=Math.max(2,(Number(st.size)||.014)*Math.max(dr.w,dr.h));mx.beginPath();const p0=pts[0];mx.moveTo(dr.x+p0[0]*dr.w,dr.y+p0[1]*dr.h);if(pts.length===1){mx.arc(dr.x+p0[0]*dr.w,dr.y+p0[1]*dr.h,mx.lineWidth/2,0,Math.PI*2);mx.fill();}else{for(let i=1;i<pts.length;i++){const p=pts[i];mx.lineTo(dr.x+p[0]*dr.w,dr.y+p[1]*dr.h);}mx.stroke();}mx.restore();}sx.globalCompositeOperation='destination-in';sx.drawImage(mask,0,0);sx.globalCompositeOperation='source-over';const b=obj.bbox||{x:.25,y:.25,w:.5,h:.5};const bx=dr.x+b.x*dr.w,by=dr.y+b.y*dr.h,bw=b.w*dr.w,bh=b.h*dr.h;const depth=clamp(Number(obj.depth)||.18,.02,.75);const phase=Number(norm)||0;const travel=phase*rect.w*.05*(depth/.35);const follow=obj.follow?clamp(Number(obj.followStrength)||45,0,100)/100:0;const cx=bx+bw/2+(Number(obj.x)||0)/100*rect.w*.35+travel*follow;const cy=by+bh/2+(Number(obj.y)||0)/100*rect.h*.35;const zoom=clamp(Number(obj.zoom)||100,60,160)/100;const yaw=(clamp(Number(obj.yaw)||0,-15,15)+phase*5*follow)*Math.PI/180;const pitch=(clamp(Number(obj.pitch)||0,-12,12)+phase*2*follow)*Math.PI/180;ctx.save();ctx.beginPath();ctx.rect(rect.x,rect.y,rect.w,rect.h);ctx.clip();ctx.translate(cx,cy);ctx.transform(Math.max(.84,Math.cos(yaw))*zoom,Math.tan(pitch)*.10,Math.tan(yaw)*.12,Math.max(.86,Math.cos(pitch))*zoom,0,0);ctx.translate(-(bx+bw/2),-(by+bh/2));ctx.drawImage(src,0,0);ctx.restore();}
+bg.draw=function(ctx,norm,W,H,rect={x:0,y:0,w:W,h:H}){const active=state.bgObject;if(active)active.enabled=false;let ok=false;try{ok=baseDraw(ctx,norm,W,H,rect);}finally{if(active)active.enabled=true;}const list=(state.bgObjects||[]).filter(o=>o?.enabled&&o.strokes?.length).sort((a,b)=>(Number(a.depth)||0)-(Number(b.depth)||0));for(const o of list)drawOne(ctx,o,norm,W,H,rect);return ok;};
+window.HappyHoloBackgroundSelections={state,list:()=>state.bgObjects,setActive:i=>{state.bgObjectActive=clamp(i,0,state.bgObjects.length-1);state.bgObject=state.bgObjects[state.bgObjectActive];},newObject:()=>makeDefault(state.bgObjects.length)};
+console.log('[HAPPYHOLO] multi-sélections fond V1 actif');
+})();
