@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<title>HappyHolo — Studio unifié</title>
+<style>
+:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171717;background:#f1f1ef}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}body{padding-bottom:env(safe-area-inset-bottom)}
+header{position:sticky;top:0;z-index:1000;background:rgba(255,255,255,.96);backdrop-filter:blur(14px);border-bottom:1px solid #d7d7d2;padding:10px 12px 8px}
+.top{max-width:1280px;margin:auto;display:flex;gap:10px;align-items:center;justify-content:space-between}.brand{font-size:20px;font-weight:900}.build{font-size:11px;font-weight:800;background:#111;color:#fff;padding:6px 9px;border-radius:999px}
+.tabs{max-width:1280px;margin:9px auto 0;display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tab{white-space:nowrap;border:1px solid #c9c9c5;background:#ededeb;color:#171717;border-radius:12px;padding:10px 13px;font:inherit;font-size:13px;font-weight:850}.tab.active{background:#111;color:#fff;border-color:#111}
+main{max-width:1280px;margin:auto;padding:12px}.notice{background:#fff;border:1px solid #d8d8d4;border-radius:14px;padding:10px 12px;margin-bottom:10px;font-size:13px;line-height:1.4}.notice b{font-weight:900}.status{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.chip{font-size:11px;font-weight:800;border-radius:999px;padding:5px 8px;background:#e8f4ea;color:#185a29}.chip.todo{background:#fff0ce;color:#735400}
+.stage{background:#fff;border:1px solid #d8d8d4;border-radius:16px;overflow:hidden;min-height:72vh}.panel{display:none}.panel.active{display:block}.frame{width:100%;height:calc(100dvh - 138px);min-height:700px;border:0;background:#fff;display:block}
+#photoPanel .frame{height:calc(100dvh - 138px)}
+.helper{padding:10px 12px;background:#f7f7f5;border-bottom:1px solid #deded9;font-size:12px;color:#555;display:flex;justify-content:space-between;gap:10px;align-items:center}.helper button{border:0;border-radius:9px;background:#111;color:#fff;padding:8px 10px;font-weight:800}
+@media(max-width:720px){header{padding-left:8px;padding-right:8px}.brand{font-size:18px}main{padding:8px}.frame{min-height:650px;height:calc(100dvh - 132px)}.notice{font-size:12px}.helper{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top"><div class="brand">HappyHolo — Studio</div><div class="build">UNIFIED TABS · TEST</div></div>
+  <nav class="tabs" aria-label="Sections HappyHolo">
+    <button class="tab active" data-tab="photo" type="button">1 · Photo & relief</button>
+    <button class="tab" data-tab="edit" type="button">2 · Détourage / fond / effets</button>
+    <button class="tab" data-tab="support" type="button">3 · Supports</button>
+    <button class="tab" data-tab="card" type="button">4 · Carte de visite</button>
+    <button class="tab" data-tab="pixverse" type="button">5 · Actions PixVerse</button>
+  </nav>
+</header>
+<main>
+  <div id="notice" class="notice">
+    <b>Photo & relief.</b> Le moteur existant reste intact. Les onglets Photo, Détourage/Effets et Supports utilisent la même session afin de ne pas perdre l’image, les sélections ni les réglages.
+    <div class="status">
+      <span class="chip">Détourage iPad/Pencil</span><span class="chip">5 sélections</span><span class="chip">Profondeur indépendante</span><span class="chip">Actions locales</span><span class="chip">Fonds</span><span class="chip">9 vues + ZIP</span><span class="chip">Porte-clés</span><span class="chip">Médaillon rond</span><span class="chip">Cartes</span><span class="chip">Verso / 360°</span><span class="chip todo">Médaillons chat/chien dédiés à compléter</span><span class="chip todo">Formats photo souvenir à ajouter</span>
+    </div>
+  </div>
+
+  <section id="photoPanel" class="stage panel active">
+    <div class="helper"><span id="photoHint">Charge la photo puis crée le relief. Les outils de correction et de composition restent ceux déjà validés.</span><button id="focusPhoto" type="button">Revenir en haut</button></div>
+    <iframe id="photoFrame" class="frame" src="./relief3d-test-v31.html?v=324-unified" title="Studio photo HappyHolo"></iframe>
+  </section>
+
+  <section id="cardPanel" class="stage panel">
+    <div class="helper"><span>Studio carte de visite : analyse IA, fidélité sujet, concepts, PixVerse, textes/logos indépendants, simulation et ZIP.</span></div>
+    <iframe id="cardFrame" class="frame" data-src="./happyholo-business-card-studio.html?v=20260830-unified" title="Studio carte de visite HappyHolo"></iframe>
+  </section>
+
+  <section id="pixversePanel" class="stage panel">
+    <div class="helper"><span>Bibliothèque d’actions IA : personne, couple/groupe, animaux et logos. Zone de test séparée du moteur de production.</span></div>
+    <iframe id="pixverseFrame" class="frame" data-src="./happyholo-pixverse-actions-test.html?v=20260830-unified" title="Actions PixVerse HappyHolo"></iframe>
+  </section>
+</main>
+<script>
+(()=>{
+  const tabs=[...document.querySelectorAll('.tab')];
+  const photoPanel=document.getElementById('photoPanel'),cardPanel=document.getElementById('cardPanel'),pixversePanel=document.getElementById('pixversePanel');
+  const photoFrame=document.getElementById('photoFrame'),cardFrame=document.getElementById('cardFrame'),pixverseFrame=document.getElementById('pixverseFrame');
+  const notice=document.getElementById('notice'),photoHint=document.getElementById('photoHint');
+
+  const copy={
+    photo:['Photo & relief','Charge la photo, règle sujet/fond/amplitude puis crée le relief 3D local.'],
+    edit:['Détourage / fond / effets','Même projet, sans rechargement : correction du sujet, plans/sélections, fonds, texte et petites actions locales.'],
+    support:['Supports','Même projet, sans rechargement : porte-clés, médaillon rond et cartes avec cadrage, recto/verso et simulation.'],
+    card:['Carte de visite','Parcours professionnel séparé : IA + PixVerse + texte/logo protégé + simulation + export.'],
+    pixverse:['Actions PixVerse','Bibliothèque de mouvements IA en test : personne, groupe/couple, animal et logo.']
+  };
+
+  function lazy(frame){if(!frame.src && frame.dataset.src)frame.src=frame.dataset.src;}
+  function childDoc(){try{return photoFrame.contentDocument||photoFrame.contentWindow.document;}catch(_){return null;}}
+  function scrollPhoto(target){
+    const d=childDoc();if(!d)return;
+    let el=null;
+    if(target==='support')el=d.querySelector('.support-card');
+    else if(target==='edit'){
+      el=d.querySelector('.card.grid');
+      const st=d.getElementById('status');
+      if(st && !/choisis une photo/i.test(st.textContent||'')) st.scrollIntoView({behavior:'smooth',block:'start'});
+    } else el=d.querySelector('.card.grid')||d.body;
+    (el||d.body)?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function setPhotoHint(mode){
+    if(mode==='edit') photoHint.textContent='Les outils déjà présents restent actifs : correction masque doigt/Pencil, jusqu’à 5 sélections, profondeur par zone, fond/composition, texte et actions locales.';
+    else if(mode==='support') photoHint.textContent='Le même projet est conservé. Ajuste support, cadrage, zoom, position, rotation, vitesse, zone de sécurité et verso sans refaire le détourage.';
+    else photoHint.textContent='Charge la photo puis crée le relief. Les outils de correction et de composition restent ceux déjà validés.';
+  }
+  function activate(mode){
+    tabs.forEach(b=>b.classList.toggle('active',b.dataset.tab===mode));
+    photoPanel.classList.toggle('active',['photo','edit','support'].includes(mode));
+    cardPanel.classList.toggle('active',mode==='card');
+    pixversePanel.classList.toggle('active',mode==='pixverse');
+    const [title,desc]=copy[mode];
+    notice.firstChild && (notice.firstChild.textContent='');
+    const b=notice.querySelector('b'); if(b)b.textContent=title+'.';
+    const textNode=[...notice.childNodes].find(n=>n.nodeType===3 && n.textContent.trim());
+    if(textNode)textNode.textContent=' '+desc+' ';
+    if(['photo','edit','support'].includes(mode)){setPhotoHint(mode);setTimeout(()=>scrollPhoto(mode),80);}
+    if(mode==='card')lazy(cardFrame);
+    if(mode==='pixverse')lazy(pixverseFrame);
+    history.replaceState(null,'','#'+mode);
+  }
+  tabs.forEach(b=>b.addEventListener('click',()=>activate(b.dataset.tab)));
+  document.getElementById('focusPhoto').addEventListener('click',()=>scrollPhoto('photo'));
+  photoFrame.addEventListener('load',()=>{const mode=(location.hash||'#photo').slice(1);if(['edit','support'].includes(mode))setTimeout(()=>scrollPhoto(mode),500);});
+  const initial=(location.hash||'#photo').slice(1);if(copy[initial])activate(initial);
+})();
+</script>
+</body>
+</html>
