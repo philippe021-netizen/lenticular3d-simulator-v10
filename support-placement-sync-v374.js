@@ -1,81 +1,228 @@
-/* HappyHolo V3.7.4 — placement support synchronisé avec la composition principale
-   Neutralise le second cadrage du recto sans toucher au verso, aux cartes,
-   aux actions locales, à la zone de sécurité ni à la démo 360.
-*/
+/* HappyHolo V3.8.4 — recto + iPad + bascule simulation + aperçus fluidifiés + détection modales robuste */
 (() => {
   'use strict';
 
   const $ = s => document.querySelector(s);
+  let normalRAF=0;
+  let pixSmoothBound=false;
 
-  function hideControl(inputId){
+  function showControl(inputId){
     const input=$(inputId);
     if(!input)return;
     const label=input.previousElementSibling;
-    if(label?.tagName==='LABEL')label.style.display='none';
-    input.style.display='none';
+    if(label?.tagName==='LABEL')label.style.display='';
+    input.style.display='';
   }
 
-  function setValue(id,value){
-    const el=$(id);
-    if(!el)return;
-    el.value=String(value);
-  }
-
-  function neutralizeSupportPlacement(){
+  function enableIndependentFrontPlacement(){
     const fit=$('#supportFit');
     if(!fit)return false;
-
-    // Le recto reprend désormais le cadrage maître : aucune seconde translation/échelle.
-    setValue('#supportFit','contain');
-    setValue('#supportMargin',0);
-    setValue('#supportZoom',100);
-    setValue('#supportX',0);
-    setValue('#supportY',0);
-
-    hideControl('#supportFit');
-    hideControl('#supportMargin');
-    hideControl('#supportZoom');
-    hideControl('#supportX');
-    hideControl('#supportY');
-
+    showControl('#supportFit');showControl('#supportMargin');showControl('#supportZoom');showControl('#supportX');showControl('#supportY');
     let note=document.getElementById('happyHoloMasterPlacementNote');
     if(!note){
-      note=document.createElement('div');
-      note.id='happyHoloMasterPlacementNote';
-      note.className='support-note';
-      note.style.marginTop='12px';
-      note.innerHTML='<b>Placement du recto synchronisé</b><br>Le sujet et le fond reprennent automatiquement la composition principale. Les réglages de déplacement se font uniquement dans « Sujet et arrière-plan ».';
-      const supportType=$('#supportType');
-      const controls=supportType?.closest('.support-controls');
-      if(controls && supportType)controls.insertBefore(note,supportType.nextSibling);
+      note=document.createElement('div');note.id='happyHoloMasterPlacementNote';note.className='support-note';note.style.marginTop='12px';
+      const supportType=$('#supportType');const controls=supportType?.closest('.support-controls');if(controls&&supportType)controls.insertBefore(note,supportType.nextSibling);
     }
-
-    // Un seul événement suffit pour faire relire les valeurs par la V3.7.3.
-    fit.dispatchEvent(new Event('input',{bubbles:true}));
+    note.innerHTML='<b>Recto individualisé</b><br>Le cadrage du recto est indépendant : ajuste ici le cadrage, le zoom et la position sans modifier la composition principale.';
     return true;
   }
 
-  function boot(){
-    if(neutralizeSupportPlacement())return;
-    let tries=0;
-    const timer=setInterval(()=>{
-      tries++;
-      if(neutralizeSupportPlacement()||tries>40)clearInterval(timer);
-    },100);
+  function syncFrameHeight(){
+    try{
+      const frame=window.frameElement;if(!frame)return;
+      const h=Math.max(document.documentElement?.scrollHeight||0,document.body?.scrollHeight||0,900);
+      frame.style.height=`${h+24}px`;frame.style.minHeight=`${h+24}px`;frame.style.overflow='visible';frame.setAttribute('scrolling','no');
+    }catch(_){ }
   }
 
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
-  else boot();
+  function parentDoc(){try{return window.parent&&window.parent!==window?window.parent.document:null;}catch(_){return null;}}
 
-  // Si le placement maître change, le support reste neutre et se reconstruit via
-  // l'événement déjà écouté par support-preview-v316.js.
-  window.addEventListener('happyholo-subject-placement-changed',()=>{
-    setValue('#supportFit','contain');
-    setValue('#supportMargin',0);
-    setValue('#supportZoom',100);
-    setValue('#supportX',0);
-    setValue('#supportY',0);
-  });
+  function isFullscreenEditor(el){
+    if(!(el instanceof HTMLElement)||el.style.display==='none')return false;
+    const cs=getComputedStyle(el);
+    const z=Number(el.style.zIndex||cs.zIndex||0);
+    if(z<999999)return false;
+    const txt=(el.textContent||'').toLowerCase();
+    const bg=(el.style.background||cs.backgroundColor||'').toLowerCase();
+    const pos=(el.style.position||cs.position||'').toLowerCase();
+    const inset=String(el.style.inset||'').replace(/\s/g,'');
+    const fullByStyle=pos==='fixed'&&(inset==='0'||inset==='0px'||(el.style.left==='0px'&&el.style.top==='0px'));
+    return fullByStyle||txt.includes('correction du sujet')||txt.includes('définir zone')||txt.includes('aperçu action')||txt.includes('peindre l’objet du fond')||txt.includes("peindre l'objet du fond")||bg.includes('#09090b')||bg.includes('rgba(6, 6, 10')||bg.includes('rgba(8, 8, 10');
+  }
 
-  console.log('[HAPPYHOLO] support placement sync V3.7.4 actif');
+  function findFullscreenEditors(){
+    return [...document.body.children].filter(isFullscreenEditor);
+  }
+
+  function promoteFullscreenEditors(){
+    const pd=parentDoc();
+    if(!pd)return false;
+    const editors=findFullscreenEditors();
+    if(!editors.length)return false;
+    editors.forEach(modal=>{
+      try{
+        if(modal.ownerDocument!==pd)pd.body.appendChild(modal);
+        Object.assign(modal.style,{
+          position:'fixed',
+          inset:'0',
+          left:'0',
+          top:'0',
+          width:'100vw',
+          height:'100dvh',
+          maxHeight:'100dvh',
+          zIndex:'20000000',
+          overflow:'hidden'
+        });
+      }catch(_){ }
+    });
+    try{pd.documentElement.style.overscrollBehavior='none';}catch(_){ }
+    return true;
+  }
+
+  function positionFullscreenEditors(){
+    if(promoteFullscreenEditors())return;
+    const modals=findFullscreenEditors();if(!modals.length)return;
+    modals.forEach(modal=>{
+      Object.assign(modal.style,{position:'fixed',inset:'0',width:'100vw',height:'100dvh',maxHeight:'100dvh',overflow:'hidden'});
+    });
+  }
+
+  function installMaskEditorViewportFix(){
+    let raf=0;const schedule=()=>{if(raf)return;raf=requestAnimationFrame(()=>{raf=0;positionFullscreenEditors();});};
+    new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['style']});
+    window.addEventListener('resize',schedule,{passive:true});
+    try{window.parent?.addEventListener('scroll',schedule,{passive:true});window.parent?.addEventListener('resize',schedule,{passive:true});}catch(_){ }
+    setInterval(()=>{if(findFullscreenEditors().length)schedule();},80);
+  }
+
+  function pixverseToggle(){return document.getElementById('pixverseSimulatorToggle');}
+  function pixverseAvailable(){const t=pixverseToggle();return !!t&&!t.disabled&&!/indisponible/i.test(t.textContent||'');}
+  function pixverseIsOn(){return /ON/i.test(pixverseToggle()?.textContent||'');}
+
+  function normalOverlay(){
+    const win=document.querySelector('#supportCanvas')?.closest('.image-window');
+    if(!win)return null;
+    let c=document.getElementById('happyHoloNormalPreviewOverlay');
+    if(!c){
+      c=document.createElement('canvas');c.id='happyHoloNormalPreviewOverlay';
+      Object.assign(c.style,{position:'absolute',inset:'0',width:'100%',height:'100%',zIndex:'15',pointerEvents:'none',display:'none'});
+      win.appendChild(c);
+    }
+    return c;
+  }
+
+  function drawNormalComposite(ts=0){
+    const overlay=normalOverlay();
+    if(!overlay)return;
+    if(pixverseIsOn()){overlay.style.display='none';normalRAF=requestAnimationFrame(drawNormalComposite);return;}
+    const src=document.getElementById('view');
+    if(!src||!src.width||!src.height){overlay.style.display='none';normalRAF=requestAnimationFrame(drawNormalComposite);return;}
+    const r=overlay.getBoundingClientRect(),d=Math.min(window.devicePixelRatio||1,2);
+    const W=Math.max(2,Math.round(r.width*d)),H=Math.max(2,Math.round(r.height*d));
+    if(overlay.width!==W||overlay.height!==H){overlay.width=W;overlay.height=H;}
+    const ctx=overlay.getContext('2d',{alpha:false});if(!ctx)return;
+    ctx.clearRect(0,0,W,H);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+    const fit=document.getElementById('supportFit')?.value||'contain';
+    const zoom=(Number(document.getElementById('supportZoom')?.value)||100)/100;
+    const px=(Number(document.getElementById('supportX')?.value)||0)/100;
+    const py=(Number(document.getElementById('supportY')?.value)||0)/100;
+    const rot=Number(document.getElementById('supportRot')?.value)||0;
+    const speed=Math.max(2,Number(document.getElementById('supportSpeed')?.value)||5);
+    let k=fit==='cover'?Math.max(W/src.width,H/src.height):Math.min(W/src.width,H/src.height);
+    k*=zoom*1.015;
+    const phase=Math.sin((ts/(speed*1000))*Math.PI*2);
+    const eased=phase*(0.82+0.18*(1-Math.abs(phase)));
+    const travel=eased*(rot/8)*W*0.016;
+    const w=src.width*k,h=src.height*k;
+    const x=(W-w)/2+px*W*.5+travel,y=(H-h)/2+py*H*.5;
+    ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(src,x,y,w,h);
+    overlay.style.display='block';
+    normalRAF=requestAnimationFrame(drawNormalComposite);
+  }
+
+  function installCleanNormalPreview(){cancelAnimationFrame(normalRAF);normalRAF=requestAnimationFrame(drawNormalComposite);}
+
+  function installSmoothPixVersePreview(){
+    if(pixSmoothBound)return;
+    const win=document.querySelector('#supportCanvas')?.closest('.image-window');
+    const img=document.getElementById('pixverseSimulatorImage');
+    if(!win||!img){setTimeout(installSmoothPixVersePreview,250);return;}
+    pixSmoothBound=true;
+    let previousSrc=img.getAttribute('src')||'';
+    let ghost=document.getElementById('pixverseSimulatorGhost');
+    if(!ghost){
+      ghost=document.createElement('img');ghost.id='pixverseSimulatorGhost';
+      Object.assign(ghost.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'contain',objectPosition:'center',zIndex:'19',pointerEvents:'none',display:'none',opacity:'0',transition:'opacity 170ms linear',backfaceVisibility:'hidden',maxWidth:'none',maxHeight:'none'});
+      win.appendChild(ghost);
+    }
+    const copyPlacement=()=>{ghost.style.objectFit=img.style.objectFit||'contain';ghost.style.objectPosition=img.style.objectPosition||'center';ghost.style.transformOrigin=img.style.transformOrigin||'50% 50%';ghost.style.transform=img.style.transform||'';};
+    new MutationObserver(()=>{
+      const next=img.getAttribute('src')||'';
+      if(!next||next===previousSrc){copyPlacement();return;}
+      const old=previousSrc;previousSrc=next;if(!old)return;
+      copyPlacement();ghost.src=old;ghost.style.display='block';ghost.style.opacity='1';
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ghost.style.opacity='0';}));
+      setTimeout(()=>{if(ghost.style.opacity==='0')ghost.style.display='none';},210);
+    }).observe(img,{attributes:true,attributeFilter:['src','style']});
+  }
+
+  function setSimulationMode(mode){
+    const t=pixverseToggle();
+    if(mode==='pixverse'){if(!pixverseAvailable())return false;if(!pixverseIsOn())t.click();installSmoothPixVersePreview();}
+    else if(t&&pixverseIsOn())t.click();
+    refreshParentSwitch();return true;
+  }
+
+  function refreshParentSwitch(){
+    const pd=parentDoc();if(!pd)return;
+    const normal=pd.getElementById('hhSimNormal'),pix=pd.getElementById('hhSimPixverse'),msg=pd.getElementById('hhSimSwitchMsg');if(!normal||!pix)return;
+    const available=pixverseAvailable(),on=pixverseIsOn();
+    normal.style.background=on?'#ececec':'#111';normal.style.color=on?'#111':'#fff';
+    pix.style.background=on?'#17652c':'#ececec';pix.style.color=on?'#fff':'#111';pix.disabled=!available;
+    if(msg)msg.textContent=available?(on?'Simulation PixVerse fluide active':'Simulation normale fluide active'):'PixVerse disponible après génération';
+  }
+
+  function installParentSimulationSwitch(){
+    const pd=parentDoc();if(!pd)return;
+    let box=pd.getElementById('hhSimSwitch');
+    if(!box){
+      box=pd.createElement('div');box.id='hhSimSwitch';
+      Object.assign(box.style,{position:'fixed',right:'14px',top:'64px',zIndex:'10050',background:'#fff',border:'2px solid #111',borderRadius:'14px',padding:'8px',boxShadow:'0 4px 18px rgba(0,0,0,.18)',width:'220px'});
+      box.innerHTML='<div style="font-size:11px;font-weight:900;margin-bottom:6px">SIMULATION</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button id="hhSimNormal" type="button" style="margin:0;padding:9px;border-radius:9px;border:0;font-weight:850">Normale</button><button id="hhSimPixverse" type="button" style="margin:0;padding:9px;border-radius:9px;border:0;font-weight:850">PixVerse</button></div><div id="hhSimSwitchMsg" style="font-size:10px;color:#555;margin-top:5px"></div>';
+      pd.body.appendChild(box);pd.getElementById('hhSimNormal').onclick=()=>setSimulationMode('normal');pd.getElementById('hhSimPixverse').onclick=()=>setSimulationMode('pixverse');
+    }
+    refreshParentSwitch();setInterval(refreshParentSwitch,500);
+  }
+
+  function invalidateStalePixVerseUI(){
+    try{
+      setSimulationMode('normal');
+      const pd=parentDoc();if(!pd)return;
+      const frames=pd.getElementById('framesBlock'),grid=pd.getElementById('framesGrid'),diag=pd.getElementById('framesDiag'),meta=pd.getElementById('framesMeta');
+      const video=pd.getElementById('video'),zip=pd.getElementById('downloadPixVerse'),rerun=pd.getElementById('rerun'),status=pd.getElementById('status');
+      if(frames)frames.style.display='none';if(grid)grid.innerHTML='';if(diag)diag.textContent='';if(meta)meta.textContent='';
+      if(video){try{video.pause();}catch(_){}video.style.display='none';}
+      if(zip)zip.disabled=true;if(rerun)rerun.style.display='none';
+      if(status){status.textContent='Composition modifiée : ancien résultat PixVerse retiré. Relance PixVerse pour cette nouvelle image.';status.style.background='#fff4d8';status.style.color='#725400';}
+      refreshParentSwitch();
+    }catch(_){ }
+  }
+
+  function bindSceneInvalidation(){
+    if(window.__hhSceneInvalidationBound)return;window.__hhSceneInvalidationBound=true;
+    window.addEventListener('happyholo-background-changed',invalidateStalePixVerseUI);
+    window.addEventListener('happyholo-subject-placement-changed',()=>{setTimeout(syncFrameHeight,50);invalidateStalePixVerseUI();});
+  }
+
+  function boot(){
+    if(!enableIndependentFrontPlacement()){let tries=0;const timer=setInterval(()=>{tries++;if(enableIndependentFrontPlacement()||tries>40)clearInterval(timer);},100);}
+    syncFrameHeight();setTimeout(syncFrameHeight,150);setTimeout(syncFrameHeight,600);setTimeout(syncFrameHeight,1500);
+    installMaskEditorViewportFix();installParentSimulationSwitch();bindSceneInvalidation();installCleanNormalPreview();installSmoothPixVersePreview();
+    if('ResizeObserver' in window){const ro=new ResizeObserver(()=>requestAnimationFrame(syncFrameHeight));ro.observe(document.documentElement);if(document.body)ro.observe(document.body);}
+    new MutationObserver(()=>requestAnimationFrame(syncFrameHeight)).observe(document.documentElement,{childList:true,subtree:true,attributes:true});
+  }
+
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+  window.addEventListener('load',syncFrameHeight);window.addEventListener('resize',syncFrameHeight);
+  console.log('[HAPPYHOLO] V3.8.4 — détection robuste des éditeurs plein écran iPad');
 })();
