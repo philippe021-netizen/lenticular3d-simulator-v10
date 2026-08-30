@@ -7,8 +7,15 @@ function readOutputText(data){
 
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
-  const key=process.env.OPENAI_API_KEY;
-  if(!key)return res.status(503).json({error:'Analyse IA non configurée : OPENAI_API_KEY absente dans Vercel.'});
+
+  // Priorité au Vercel AI Gateway : sur Vercel, VERCEL_OIDC_TOKEN permet
+  // d'authentifier le projet sans demander une clé OpenAI au navigateur.
+  const gatewayKey=process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN;
+  const openaiKey=process.env.OPENAI_API_KEY;
+  const useGateway=!!gatewayKey;
+  const key=gatewayKey||openaiKey;
+  if(!key)return res.status(503).json({error:'Analyse IA indisponible : aucune authentification AI Gateway / OpenAI trouvée côté serveur.'});
+
   try{
     const body=typeof req.body==='string'?JSON.parse(req.body):(req.body||{});
     const image=String(body.image||'');
@@ -21,22 +28,25 @@ export default async function handler(req,res){
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),120000);
     try{
-      const r=await fetch('https://api.openai.com/v1/responses',{
+      const endpoint=useGateway?'https://ai-gateway.vercel.sh/v1/responses':'https://api.openai.com/v1/responses';
+      const model=useGateway?'openai/gpt-5.6-luna':'gpt-5.6-luna';
+      const r=await fetch(endpoint,{
         method:'POST',
         headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
         body:JSON.stringify({
-          model:'gpt-5.6-luna',
-          input:[{role:'user',content:[{type:'input_text',text:`${instructions}\n\n${userText}`},{type:'input_image',image_url:image}]}],
+          model,
+          input:[{role:'user',content:[{type:'input_text',text:`${instructions}\n\n${userText}`},{type:'input_image',image_url:image,detail:'auto'}]}],
           max_output_tokens:2200
         }),
         signal:controller.signal
       });
       const data=await r.json().catch(()=>({}));
-      if(!r.ok)return res.status(r.status).json({error:data?.error?.message||'Erreur OpenAI.'});
+      if(!r.ok)return res.status(r.status).json({error:data?.error?.message||`Erreur ${useGateway?'AI Gateway':'OpenAI'}.`});
       const text=readOutputText(data).trim().replace(/^```json\s*/i,'').replace(/```$/,'').trim();
       let parsed;
       try{parsed=JSON.parse(text);}catch(_){return res.status(502).json({error:'Réponse IA illisible.',raw:text.slice(0,1000)});}
       if(!Array.isArray(parsed.concepts)||parsed.concepts.length<3)return res.status(502).json({error:'L’IA n’a pas renvoyé 3 concepts exploitables.'});
+      parsed.provider=useGateway?'vercel-ai-gateway':'openai-direct';
       return res.status(200).json(parsed);
     }finally{clearTimeout(timeout)}
   }catch(e){
