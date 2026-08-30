@@ -27,7 +27,8 @@ export default async function handler(req,res){
     const fidelityRule=strict
       ?`FIDELITY RULE — The uploaded source image is the visual authority. Preserve the exact existing main subject. ${subject?`Detected subject: ${subject}. `:''}If it is a person, keep the same face, apparent age, hair, clothing, body proportions and pose; do not substitute another person. If it is a machine, vehicle, building, product, mascot or illustration, preserve its exact type, silhouette, proportions, colors and graphic identity. Modify only surrounding ambience, background treatment, lighting and subtle presentation.`
       :'Creative mode: keep the business identity and palette coherent, but broader visual reinterpretation is allowed.';
-    const fullPrompt=`${prompt}\n\n${variation}\n${fidelityRule}\nIMPORTANT: remove or omit all readable text, letters, numbers, contact details and generated typography from the animated visual layer. No watermark, no signage. Keep clean negative-space areas so HappyHolo can restore the original text later. Horizontal business-card composition, realistic professional advertising image, suitable for subtle animation.`;
+    const textRemoval=`TEXT-FREE SOURCE RULE — This output is NOT the finished business card. It is ONLY the clean visual plate that will be sent to PixVerse. Remove every piece of typography visible in the uploaded card: names, titles, slogans, phone numbers, email, website, address, hours, labels, QR codes, logos containing letters, icons containing letters, signs, captions and decorative pseudo-writing. Reconstruct the areas behind removed text naturally from the surrounding background. DO NOT replace removed text with invented words, fake letters, glyphs, symbols, scribbles, placeholder text or typographic-looking marks. No readable or unreadable typography anywhere in the image. Keep useful blank/background space where the original information was located. Preserve non-text visual subjects faithfully.`;
+    const fullPrompt=`${prompt}\n\n${variation}\n${fidelityRule}\n${textRemoval}\nHorizontal business-card visual plate, realistic professional advertising image, clean continuous background, suitable for subtle lenticular animation. The result must look like a finished background/subject photograph or illustration with ZERO typography, not like a business card mockup.`;
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),120000);
     try{
@@ -53,7 +54,7 @@ export default async function handler(req,res){
       if(!r.ok)return res.status(r.status).json({error:data?.error?.message||'Erreur génération image OpenAI.'});
       const b64=data?.data?.[0]?.b64_json;
       if(!b64)return res.status(502).json({error:'Aucune image retournée par OpenAI.'});
-      return res.status(200).json({image:`data:image/png;base64,${b64}`,variant,model:'gpt-image-2',mode:sourceBlob?'edit-fidelity':'generation'});
+      return res.status(200).json({image:`data:image/png;base64,${b64}`,variant,model:'gpt-image-2',mode:sourceBlob?'edit-fidelity-textfree':'generation-textfree'});
     }finally{clearTimeout(timeout)}
   }catch(e){
     return res.status(500).json({error:e?.name==='AbortError'?'Délai de génération image dépassé.':(e?.message||'Erreur génération image')});
