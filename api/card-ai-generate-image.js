@@ -19,7 +19,7 @@ export default async function handler(req,res){
       const r=await fetch('https://api.openai.com/v1/images/generations',{
         method:'POST',
         headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
-        body:JSON.stringify({model:'gpt-image-2',prompt:fullPrompt,size:'1536x1024',quality:'medium',n:1,response_format:'b64_json'}),
+        body:JSON.stringify({model:'gpt-image-2',prompt:fullPrompt,size:'1536x1024',quality:'medium',n:1}),
         signal:controller.signal
       });
       const data=await r.json().catch(()=>({}));
