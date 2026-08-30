@@ -7,7 +7,7 @@ export default async function handler(req,res){
     const r=await fetch('https://api.openai.com/v1/responses',{
       method:'POST',
       headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},
-      body:JSON.stringify({model:'gpt-5.6-luna',input:'Réponds uniquement OK.',max_output_tokens:8})
+      body:JSON.stringify({model:'gpt-5.6-luna',input:'Réponds uniquement OK.',max_output_tokens:16})
     });
     const data=await r.json().catch(()=>({}));
     if(!r.ok){
