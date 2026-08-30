@@ -241,7 +241,7 @@ async function estimateDepth(img,label){
   }
 }
 
-/* 5 — RENDU MULTICOUCHE V3.4.2 — fond + placement sujet maître */
+/* 5 — RENDU MULTICOUCHE V3.24 — fond + placement sujet synchronisés */
 function renderAt(norm,target=view){
   const x=target.getContext('2d'); const W=target.width,H=target.height; x.clearRect(0,0,W,H);
   const amplitude=Number(angle.value)/4;
@@ -256,7 +256,8 @@ function renderAt(norm,target=view){
   const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
   if(textDepth<0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
   const tmp=document.createElement('canvas'); tmp.width=W;tmp.height=H; const tx=tmp.getContext('2d');
-  const fs=fitCover(subjectImg,W,H); tx.drawImage(subjectImg,fs.x,fs.y,fs.w,fs.h);
+  const fs=window.HappyHoloSubjectPlacement?.rect?.(subjectImg,W,H,{x:0,y:0,w:W,h:H})||fitCover(subjectImg,W,H);
+  tx.drawImage(subjectImg,fs.x,fs.y,fs.w,fs.h);
   const subShift=norm*18*amplitude*subK; const strips=96;
   let depthData=null;
   try{ const dctx=subjectDepthCanvas.getContext('2d',{willReadFrequently:true}); depthData=dctx.getImageData(0,0,subjectDepthCanvas.width,subjectDepthCanvas.height).data; }catch{}
@@ -274,6 +275,7 @@ function renderAt(norm,target=view){
   x.globalAlpha=0.24+protect*0.28; x.drawImage(tmp,subShift,0); x.globalAlpha=1;
   if(textDepth>=0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
 }
+window.renderAt=renderAt;
 
 function startPreview(){
   cancelAnimationFrame(anim); const t0=performance.now();
@@ -308,7 +310,7 @@ buildBtn.addEventListener('click',async()=>{
 
     window.HappyHoloReliefState={sourceImg,subjectImg,backgroundImg,subjectDepthCanvas,backgroundDepthCanvas,view};
     window.dispatchEvent(new CustomEvent('happyholo-relief-ready'));
-    startPreview(); exportBtn.disabled=false; setStatus('V3.17 prête — mémoire iPad optimisée, profondeur calculée une seule fois.');
+    startPreview(); exportBtn.disabled=false; setStatus('V3.24 prête — fond et placement sujet synchronisés avec l’aperçu et les 9 vues.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
 });
@@ -323,20 +325,20 @@ exportBtn.addEventListener('click',async()=>{
     renderAt(poses[i],c); const b=await canvasToBlob(c); exported.push(b);
     const im=new Image(); im.src=URL.createObjectURL(b); framesEl.appendChild(im); await sleep(25);
   }
-  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.17 prêtes.');
+  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.24 prêtes.');
 });
 
 downloadBtn.addEventListener('click',async()=>{
   if(exported.length!==9) return;
   const zip=new JSZip(); exported.forEach((b,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,b));
   zip.file('manifest.json',JSON.stringify({
-    generator:'HappyHolo Relief 3D V3.17 iPad memory',localSegmentation:true,externalPaidApi:false,views:9,
+    generator:'HappyHolo Relief 3D V3.24 render sync',localSegmentation:true,externalPaidApi:false,views:9,
     depthInference:'single-512-with-local-fallback',
     angle:Number(angle.value),subjectDepth:Number(subjectDepth.value),backgroundDepth:Number(bgDepth.value),edgeProtection:Number(edgeProtect.value),
     textLayer:window.HappyHoloTextLayer?.serialize?.()||null,
     customBackground:window.HappyHoloCustomBackground?.serialize?.()||null
   },null,2));
   const b=await zip.generateAsync({type:'blob'}); const u=URL.createObjectURL(b);
-  const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v317-ipad.zip'; a.click();
+  const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v324-render-sync.zip'; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1500);
 });
