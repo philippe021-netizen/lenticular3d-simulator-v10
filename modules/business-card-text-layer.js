@@ -1,5 +1,6 @@
 // HappyHolo — objets texte/logo indépendants pour carte de visite
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const PARALLAX_SCALE=.015;
 const fonts={
   system:'-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
   rounded:'ui-rounded,"Arial Rounded MT Bold",-apple-system,sans-serif',
@@ -36,11 +37,11 @@ function fittedFontSize(ctx,line,w,requested){
 }
 function drawOneText(ctx,o,norm,b){
   if(!o?.text)return;const requested=Math.max(8,b.w*(Number(o.size)||6)/100),family=objectFamily(o);ctx.save();ctx.font=`800 ${requested}px ${family}`;let fontSize=requested;const maxW=Math.max(40,b.w*(Number(o.maxWidth)||.9));const measured=ctx.measureText(o.text).width;if(measured>maxW&&measured>0)fontSize=Math.max(8,requested*(maxW/measured));
-  const depth=clamp(Number(o.depth)||0,-100,100),parallax=Number(norm||0)*(depth/100)*b.w*.035,yaw=Number(norm||0)*(Number(o.rotation3D)||0),face=Math.max(.60,Math.cos(Math.abs(yaw)*Math.PI/180));
+  const depth=clamp(Number(o.depth)||0,-100,100),parallax=Number(norm||0)*(depth/100)*b.w*PARALLAX_SCALE,yaw=Number(norm||0)*(Number(o.rotation3D)||0),face=Math.max(.60,Math.cos(Math.abs(yaw)*Math.PI/180));
   const cx=b.x+clamp(Number(o.x)||.5,0,1)*b.w+parallax,cy=b.y+clamp(Number(o.y)||.5,0,1)*b.h;ctx.translate(cx,cy);ctx.rotate((Number(o.orientation)||0)*Math.PI/180);ctx.scale(face,1);ctx.textAlign='center';ctx.textBaseline='middle';ctx.font=`800 ${fontSize}px ${family}`;ctx.lineJoin='round';ctx.miterLimit=2;ctx.shadowColor='rgba(0,0,0,.25)';ctx.shadowBlur=Math.max(1,fontSize*.06);ctx.shadowOffsetY=Math.max(1,fontSize*.025);const stroke=Math.max(0,Number(o.outlineSize)||0)*fontSize/100;if(stroke>.2){ctx.lineWidth=stroke*2;ctx.strokeStyle=o.outline||'#111';ctx.strokeText(o.text,0,0,maxW);}ctx.fillStyle=o.color||'#fff';ctx.fillText(o.text,0,0,maxW);ctx.restore();
 }
 function drawOneLogo(ctx,o,norm,b){
-  const img=o?._img;if(!img||!img.complete)return;const depth=clamp(Number(o.depth)||0,-100,100),parallax=Number(norm||0)*(depth/100)*b.w*.035;const width=b.w*clamp(Number(o.size)||12,2,60)/100;const ratio=(img.naturalHeight||1)/(img.naturalWidth||1);const height=width*ratio;const cx=b.x+clamp(Number(o.x)||.5,0,1)*b.w+parallax,cy=b.y+clamp(Number(o.y)||.5,0,1)*b.h;const yaw=Number(norm||0)*(Number(o.rotation3D)||0),face=Math.max(.60,Math.cos(Math.abs(yaw)*Math.PI/180));ctx.save();ctx.translate(cx,cy);ctx.rotate((Number(o.orientation)||0)*Math.PI/180);ctx.scale(face,1);ctx.drawImage(img,-width/2,-height/2,width,height);ctx.restore();
+  const img=o?._img;if(!img||!img.complete)return;const depth=clamp(Number(o.depth)||0,-100,100),parallax=Number(norm||0)*(depth/100)*b.w*PARALLAX_SCALE;const width=b.w*clamp(Number(o.size)||12,2,60)/100;const ratio=(img.naturalHeight||1)/(img.naturalWidth||1);const height=width*ratio;const cx=b.x+clamp(Number(o.x)||.5,0,1)*b.w+parallax,cy=b.y+clamp(Number(o.y)||.5,0,1)*b.h;const yaw=Number(norm||0)*(Number(o.rotation3D)||0),face=Math.max(.60,Math.cos(Math.abs(yaw)*Math.PI/180));ctx.save();ctx.translate(cx,cy);ctx.rotate((Number(o.orientation)||0)*Math.PI/180);ctx.scale(face,1);ctx.drawImage(img,-width/2,-height/2,width,height);ctx.restore();
 }
 
 export function drawBusinessCardText(ctx,state,norm=0,box=null){
@@ -87,7 +88,7 @@ function liveFrames(){return [...document.querySelectorAll('#framesGrid .frame i
 function drawLiveSimulator(state,now){
   if(!liveCanvas||!liveCtx)return;const d=Math.min(devicePixelRatio||1,2),cssW=liveCanvas.clientWidth||320,cssH=cssW/1.5858,w=Math.max(2,Math.round(cssW*d)),h=Math.max(2,Math.round(cssH*d));if(liveCanvas.width!==w||liveCanvas.height!==h){liveCanvas.width=w;liveCanvas.height=h;}
   liveCtx.clearRect(0,0,w,h);const frames=liveFrames();if(!frames.length){liveCtx.fillStyle='#171717';liveCtx.fillRect(0,0,w,h);liveCtx.fillStyle='#aaa';liveCtx.font=`${14*d}px -apple-system,sans-serif`;liveCtx.textAlign='center';liveCtx.fillText('Les 9 vues apparaîtront ici',w/2,h/2);return;}
-  if(!liveStart)liveStart=now||performance.now();const elapsed=(now||performance.now())-liveStart;const phase=(Math.sin(elapsed/1500*Math.PI)+1)/2;const fi=Math.max(0,Math.min(frames.length-1,Math.round(phase*(frames.length-1))));const img=frames[fi];liveCtx.drawImage(img,0,0,w,h);const norm=frames.length>1?(fi-(frames.length-1)/2)/((frames.length-1)/2):0;drawBusinessCardText(liveCtx,state,norm,{x:0,y:0,w,h});const o=selectedObject(state);if(o){liveCtx.save();liveCtx.strokeStyle='rgba(255,214,10,.9)';liveCtx.lineWidth=Math.max(2,d);const cx=clamp(Number(o.x)||.5,0,1)*w+norm*(clamp(Number(o.depth)||0,-100,100)/100)*w*.035,cy=clamp(Number(o.y)||.5,0,1)*h;liveCtx.beginPath();liveCtx.arc(cx,cy,8*d,0,Math.PI*2);liveCtx.stroke();liveCtx.restore();}
+  if(!liveStart)liveStart=now||performance.now();const elapsed=(now||performance.now())-liveStart;const phase=(Math.sin(elapsed/1500*Math.PI)+1)/2;const fi=Math.max(0,Math.min(frames.length-1,Math.round(phase*(frames.length-1))));const img=frames[fi];liveCtx.drawImage(img,0,0,w,h);const norm=frames.length>1?(fi-(frames.length-1)/2)/((frames.length-1)/2):0;drawBusinessCardText(liveCtx,state,norm,{x:0,y:0,w,h});const o=selectedObject(state);if(o){liveCtx.save();liveCtx.strokeStyle='rgba(255,214,10,.9)';liveCtx.lineWidth=Math.max(2,d);const cx=clamp(Number(o.x)||.5,0,1)*w+norm*(clamp(Number(o.depth)||0,-100,100)/100)*w*PARALLAX_SCALE,cy=clamp(Number(o.y)||.5,0,1)*h;liveCtx.beginPath();liveCtx.arc(cx,cy,8*d,0,Math.PI*2);liveCtx.stroke();liveCtx.restore();}
 }
 function liveLoop(now){if(!livePanel?.isConnected)return;if(liveRunning)drawLiveSimulator(studioState,now);liveRAF=requestAnimationFrame(liveLoop);}
 function ensureLiveSimulator(state){
