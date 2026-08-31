@@ -1,5 +1,6 @@
-/* HappyHolo — mini-actions locales, interface unifiée
-   Réutilise uniquement les moteurs OFFLINE déjà présents et validés.
+/* HappyHolo — mini-actions locales, interface unifiée V2
+   Réutilise uniquement les moteurs OFFLINE déjà présents.
+   Important : aucune observation globale du DOM pendant le détourage.
 */
 (()=>{
   'use strict';
@@ -23,13 +24,13 @@
   }
 
   function setAction(index,action,intensity){
-    const p=plan(),item=p[index]; if(!item)return;
+    const item=plan()[index]; if(!item)return;
     item.action=action;
     if(Number.isFinite(intensity)) item.intensity=intensity;
-    notify();
-    relabelCoreOptions();
     const selects=findActionSelects();
-    if(selects[index]){selects[index].value=action;selects[index].dispatchEvent(new Event('change',{bubbles:true}));}
+    if(selects[index]) selects[index].value=action;
+    notify();
+    render();
   }
 
   function makeButton(label,action,index,intensity){
@@ -39,6 +40,7 @@
   }
 
   function render(){
+    relabelCoreOptions();
     const p=plan();
     let host=document.getElementById('happyHoloLocalMiniActions');
     if(!p.length){if(host)host.remove();return;}
@@ -47,7 +49,7 @@
       Object.assign(host.style,{background:'#fff',border:'2px solid #111',borderRadius:'18px',padding:'16px',margin:'16px 0'});
       const controls=document.getElementById('happyHoloSelectionControls');
       if(controls?.parentNode)controls.parentNode.insertBefore(host,controls.nextSibling);
-      else document.querySelector('.card.grid')?.insertAdjacentElement('afterend',host);
+      else return;
     }
     host.innerHTML='<div style="font-size:19px;font-weight:900">Mini-actions locales</div><div style="font-size:12px;color:#666;margin:4px 0 12px">Sans PixVerse ni réseau. Ces effets utilisent les moteurs déjà intégrés aux aperçus et aux 9 vues.</div>';
     p.forEach((s,i)=>{
@@ -66,10 +68,13 @@
     });
   }
 
-  const refresh=()=>{relabelCoreOptions();render();};
-  window.addEventListener('happyholo-relief-ready',()=>setTimeout(refresh,100));
-  window.addEventListener('happyholo-action-plan-changed',()=>setTimeout(refresh,80));
-  new MutationObserver(()=>{relabelCoreOptions();if(plan().length&&!document.getElementById('happyHoloLocalMiniActions'))render();}).observe(document.documentElement,{childList:true,subtree:true});
-  setTimeout(refresh,600);setTimeout(refresh,1600);
-  console.log('[HAPPYHOLO] mini-actions locales UI active');
+  // On ne se branche que sur les événements métier HappyHolo.
+  // Le détourage reste totalement indépendant et ne subit aucun MutationObserver.
+  window.addEventListener('happyholo-relief-ready',()=>setTimeout(render,120));
+  window.addEventListener('happyholo-action-plan-changed',()=>setTimeout(render,80));
+  window.addEventListener('happyholo-selection-plan-changed',()=>setTimeout(render,100));
+
+  // Tentatives limitées uniquement au chargement, puis arrêt complet.
+  [900,1800,3000].forEach(ms=>setTimeout(()=>{if(plan().length)render();},ms));
+  console.log('[HAPPYHOLO] mini-actions locales UI V2 active · détourage isolé');
 })();
