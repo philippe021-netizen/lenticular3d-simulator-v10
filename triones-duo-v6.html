@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Triones Duo V6 — Diagnostic BLE</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#0b0d12;color:#f4f7fb}*{box-sizing:border-box}body{margin:0;padding:20px;max-width:780px;margin:auto}h1{font-size:24px;margin:0 0 6px}.sub{color:#9da8b8;margin:0 0 18px}.card{background:#151923;border:1px solid #2b3342;border-radius:16px;padding:16px;margin:12px 0}.row{display:flex;gap:10px;flex-wrap:wrap}button{appearance:none;border:0;border-radius:12px;padding:14px 16px;font-weight:700;background:#2f6fed;color:white;font-size:15px}button.alt{background:#293241}button.danger{background:#8a2d38}button:disabled{opacity:.45}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#252d3a;color:#cbd5e1;font-size:12px}.ok{color:#67e8a5}.warn{color:#ffd166}.bad{color:#ff7b88}.device{border-top:1px solid #2a3140;padding-top:12px;margin-top:12px}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;word-break:break-all;background:#0e1118;border-radius:10px;padding:10px;white-space:pre-wrap}.small{font-size:13px;color:#aab5c5}label{display:block;font-size:13px;color:#aab5c5;margin-bottom:6px}input{width:100%;background:#0f131b;border:1px solid #303847;border-radius:10px;padding:12px;color:white}.hidden{display:none}
+</style>
+</head>
+<body>
+<h1>Triones Duo V6</h1>
+<p class="sub">Diagnostic Bluetooth sans filtre de nom</p>
+
+<div class="card">
+  <div id="support"></div>
+  <p class="small">Cette version ne cherche plus uniquement « Triones ». Le sélecteur Bluetooth doit afficher tout périphérique BLE que le navigateur autorise à voir.</p>
+  <div class="row">
+    <button id="scanLeft">Scanner / connecter GAUCHE</button>
+    <button id="scanRight">Scanner / connecter DROIT</button>
+    <button id="known" class="alt">Voir appareils déjà autorisés</button>
+  </div>
+</div>
+
+<div class="card">
+  <strong>GAUCHE</strong> <span id="leftState" class="pill">non connecté</span>
+  <div id="leftInfo" class="device mono">—</div>
+</div>
+
+<div class="card">
+  <strong>DROIT</strong> <span id="rightState" class="pill">non connecté</span>
+  <div id="rightInfo" class="device mono">—</div>
+</div>
+
+<div class="card">
+  <strong>Journal diagnostic</strong>
+  <div id="log" class="mono">Prêt.</div>
+</div>
+
+<div class="card">
+  <strong>Ce qu'on cherche</strong>
+  <p class="small">Si le boîtier apparaît avec un autre nom, note-le. Après connexion, V6 affiche l'identifiant BLE, les services et caractéristiques accessibles. Ça permettra de remettre le pilotage sans dépendre du nom du périphérique.</p>
+</div>
+
+<script>
+const state={left:null,right:null};
+const $=id=>document.getElementById(id);
+function log(msg){const t=new Date().toLocaleTimeString(); $('log').textContent=`[${t}] ${msg}\n`+$('log').textContent}
+function supported(){return !!navigator.bluetooth}
+function setSupport(){
+  if(!supported()) $('support').innerHTML='<span class="bad">Web Bluetooth indisponible dans ce navigateur.</span><p class="small">Sur iPhone, ouvre cette page avec le même navigateur BLE que celui utilisé auparavant (par ex. Bluefy/WebBLE si c’était ton cas).</p>';
+  else $('support').innerHTML='<span class="ok">Web Bluetooth disponible.</span>';
+  ['scanLeft','scanRight','known'].forEach(id=>$(id).disabled=!supported());
+}
+async function describe(device,side){
+  const out=[];
+  out.push(`Nom: ${device.name || '(sans nom)'}`);
+  out.push(`ID: ${device.id || '(non fourni)'}`);
+  out.push(`Connecté: ${device.gatt?.connected ? 'oui':'non'}`);
+  if(!device.gatt) return out.join('\n');
+  try{
+    const server=device.gatt.connected?device.gatt:await device.gatt.connect();
+    const services=await server.getPrimaryServices();
+    out.push(`Services: ${services.length}`);
+    for(const s of services){
+      out.push(`  • ${s.uuid}`);
+      try{
+        const chars=await s.getCharacteristics();
+        for(const c of chars){
+          const p=c.properties;
+          const flags=['read','write','writeWithoutResponse','notify','indicate'].filter(k=>p[k]);
+          out.push(`      - ${c.uuid} [${flags.join(', ')}]`);
+        }
+      }catch(e){out.push(`      (caractéristiques non lisibles: ${e.message})`)}
+    }
+    device.addEventListener('gattserverdisconnected',()=>{
+      $(`${side}State`).textContent='déconnecté';
+      log(`${side.toUpperCase()}: déconnexion détectée`);
+    });
+  }catch(e){out.push(`Erreur GATT: ${e.name}: ${e.message}`)}
+  return out.join('\n');
+}
+async function choose(side){
+  try{
+    log(`${side.toUpperCase()}: ouverture du sélecteur BLE sans filtre de nom…`);
+    const device=await navigator.bluetooth.requestDevice({
+      acceptAllDevices:true,
+      optionalServices:[
+        '0000ffd0-0000-1000-8000-00805f9b34fb',
+        '0000ffd5-0000-1000-8000-00805f9b34fb',
+        '0000ffe0-0000-1000-8000-00805f9b34fb',
+        '0000fff0-0000-1000-8000-00805f9b34fb',
+        '0000ffb0-0000-1000-8000-00805f9b34fb',
+        '0000ffa0-0000-1000-8000-00805f9b34fb'
+      ]
+    });
+    state[side]=device;
+    $(`${side}State`).textContent='connexion…';
+    const info=await describe(device,side);
+    $(`${side}Info`).textContent=info;
+    $(`${side}State`).textContent=device.gatt?.connected?'connecté':'détecté';
+    log(`${side.toUpperCase()}: ${device.name || '(sans nom)'} / ${device.id || 'ID inconnu'}`);
+  }catch(e){
+    log(`${side.toUpperCase()}: ${e.name}: ${e.message}`);
+    if(e.name!=='NotFoundError') $(`${side}State`).textContent='erreur';
+  }
+}
+async function known(){
+  if(!navigator.bluetooth.getDevices){log('getDevices() non disponible dans ce navigateur.');return}
+  try{
+    const devices=await navigator.bluetooth.getDevices();
+    if(!devices.length){log('Aucun appareil BLE déjà autorisé enregistré par ce navigateur.');return}
+    log('Appareils déjà autorisés: '+devices.map(d=>`${d.name||'(sans nom)'} | ${d.id}`).join(' ; '));
+  }catch(e){log(`getDevices: ${e.name}: ${e.message}`)}
+}
+$('scanLeft').onclick=()=>choose('left');
+$('scanRight').onclick=()=>choose('right');
+$('known').onclick=known;
+setSupport();
+</script>
+</body>
+</html>
