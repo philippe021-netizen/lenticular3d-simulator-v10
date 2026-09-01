@@ -15,7 +15,8 @@
     h1 span{color:var(--blue)}
     .status{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
     .stage{position:relative;overflow:hidden;border-radius:20px;background:#fff;box-shadow:0 22px 65px #0009,0 0 0 1px #57bff344;touch-action:none;user-select:none;cursor:ew-resize;aspect-ratio:3/2}
-    .stage img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
+    .stage img{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;will-change:opacity}
+    #frameB{opacity:0}
     .hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:8px 12px;border-radius:999px;background:#061019c9;color:#fff;font-size:13px;backdrop-filter:blur(8px);transition:opacity .25s;white-space:nowrap}
     .stage.active .hint{opacity:0}
     .controls{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;margin-top:14px;padding:12px;border-radius:18px;background:#0c1721df;border:1px solid #ffffff17}
@@ -36,12 +37,13 @@
       <div class="status"><strong id="viewLabel">Vue 1 / 9</strong><br><span id="stateLabel">Moto assemblée</span></div>
     </header>
     <section class="stage" id="stage" aria-label="Simulation ExplodeView tactile">
-      <img id="frame" src="vue-01.webp" alt="Rocket 3 assemblée">
+      <img id="frameA" src="vue-01.webp" alt="Rocket 3 assemblée">
+      <img id="frameB" src="vue-02.webp" alt="" aria-hidden="true">
       <div class="hint">Glissez horizontalement sur l’image</div>
     </section>
     <div class="controls">
       <button class="primary" id="play" type="button">▶ Lecture</button>
-      <input id="scrub" type="range" min="1" max="9" step="1" value="1" aria-label="Choisir une vue">
+      <input id="scrub" type="range" min="0" max="8" step="0.01" value="0" aria-label="Balayer continuellement les neuf vues">
       <button id="full" type="button">⛶ Plein écran</button>
     </div>
     <div class="dots" id="dots" aria-label="Navigation entre les neuf vues"></div>
@@ -50,9 +52,10 @@
   <script>
     const total=9;
     const paths=Array.from({length:total},(_,i)=>`vue-${String(i+1).padStart(2,'0')}.webp`);
-    const states=['Moto assemblée','Début de séparation','Séparation partielle','Train avant dégagé','Moteur en dégagement','Éclatement général','Composants dispersés','Vue presque totale','Vue éclatée complète'];
+    const states=['Moto assemblée','Selle passager et rétroviseurs','Sièges, commandes et éclairage','Roues et train avant','Échappements et suspensions','Réservoir et radiateur','Moteur sorti du châssis','Petites pièces libérées','Vue éclatée complète'];
     paths.forEach(src=>{const image=new Image();image.src=src});
-    const frame=document.querySelector('#frame');
+    const frameA=document.querySelector('#frameA');
+    const frameB=document.querySelector('#frameB');
     const stage=document.querySelector('#stage');
     const scrub=document.querySelector('#scrub');
     const play=document.querySelector('#play');
@@ -60,28 +63,42 @@
     const viewLabel=document.querySelector('#viewLabel');
     const stateLabel=document.querySelector('#stateLabel');
     const dots=document.querySelector('#dots');
-    let index=0,timer=null,direction=1;
-    const dotButtons=paths.map((_,i)=>{const b=document.createElement('button');b.type='button';b.ariaLabel=`Vue ${i+1}`;b.addEventListener('click',()=>show(i));dots.append(b);return b});
-    function show(next){
-      index=Math.max(0,Math.min(total-1,next));
-      frame.src=paths[index];frame.alt=states[index];scrub.value=index+1;
-      viewLabel.textContent=`Vue ${index+1} / ${total}`;stateLabel.textContent=states[index];
-      dotButtons.forEach((b,i)=>b.setAttribute('aria-current',i===index?'true':'false'));
+    let position=0,animation=null,startedAt=0;
+    const dotButtons=paths.map((_,i)=>{const b=document.createElement('button');b.type='button';b.ariaLabel=`Vue ${i+1}`;b.addEventListener('click',()=>{stop();render(i)});dots.append(b);return b});
+    function render(next){
+      position=Math.max(0,Math.min(total-1,next));
+      const lower=Math.floor(position);
+      const upper=Math.min(total-1,lower+1);
+      const blend=upper===lower?0:position-lower;
+      if(frameA.dataset.index!==String(lower)){frameA.src=paths[lower];frameA.dataset.index=lower}
+      if(frameB.dataset.index!==String(upper)){frameB.src=paths[upper];frameB.dataset.index=upper}
+      frameB.style.opacity=blend.toFixed(3);
+      const nearest=Math.round(position);
+      frameA.alt=states[nearest];scrub.value=position;
+      viewLabel.textContent=`Vue ${nearest+1} / ${total}`;stateLabel.textContent=states[nearest];
+      dotButtons.forEach((b,i)=>b.setAttribute('aria-current',i===nearest?'true':'false'));
     }
-    function stop(){clearInterval(timer);timer=null;play.textContent='▶ Lecture'}
+    function stop(){if(animation)cancelAnimationFrame(animation);animation=null;play.textContent='▶ Lecture'}
     function start(){
-      stop();play.textContent='⏸ Pause';direction=index===total-1?-1:1;
-      timer=setInterval(()=>{if(index===total-1)direction=-1;if(index===0)direction=1;show(index+direction)},520);
+      stop();play.textContent='⏸ Pause';
+      const phase=Math.acos(1-(position/(total-1))*2)/(Math.PI*2);
+      startedAt=performance.now()-phase*12000;
+      const animate=now=>{
+        const cycle=((now-startedAt)%12000)/12000;
+        render((1-Math.cos(cycle*Math.PI*2))*.5*(total-1));
+        animation=requestAnimationFrame(animate);
+      };
+      animation=requestAnimationFrame(animate);
     }
-    play.addEventListener('click',()=>timer?stop():start());
-    scrub.addEventListener('input',e=>{stop();show(Number(e.target.value)-1)});
-    function pointerToFrame(e){const r=stage.getBoundingClientRect();show(Math.round(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*(total-1)))}
+    play.addEventListener('click',()=>animation?stop():start());
+    scrub.addEventListener('input',e=>{stop();render(Number(e.target.value))});
+    function pointerToFrame(e){const r=stage.getBoundingClientRect();render(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*(total-1))}
     stage.addEventListener('pointerdown',e=>{stop();stage.setPointerCapture(e.pointerId);stage.classList.add('active');pointerToFrame(e)});
     stage.addEventListener('pointermove',e=>{if(stage.hasPointerCapture(e.pointerId))pointerToFrame(e)});
     stage.addEventListener('pointerup',e=>{stage.releasePointerCapture(e.pointerId);stage.classList.remove('active')});
     full.addEventListener('click',()=>stage.requestFullscreen?.());
-    document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();show(index+1)}if(e.key==='ArrowLeft'){stop();show(index-1)}if(e.key===' '){e.preventDefault();timer?stop():start()}});
-    show(0);
+    document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'){stop();render(Math.round(position)+1)}if(e.key==='ArrowLeft'){stop();render(Math.round(position)-1)}if(e.key===' '){e.preventDefault();animation?stop():start()}});
+    render(0);
   </script>
 </body>
 </html>

@@ -16,8 +16,20 @@
   ],
   "positions": [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1],
   "direction": "assembled-to-exploded",
+  "stages": [
+    "moto assemblée",
+    "selle passager et rétroviseurs",
+    "sièges, commandes et éclairage",
+    "roues et train avant",
+    "échappements et suspensions",
+    "réservoir et radiateur",
+    "moteur sorti du châssis",
+    "petites pièces libérées",
+    "vue éclatée complète"
+  ],
+  "preview": "continuous-neighbour-crossfade",
   "recommendedLpi": 60,
   "width": 1536,
   "height": 1024,
-  "notes": "Prototype de validation visuelle. Les neuf vues conservent la vue 06 native."
+  "notes": "Progression mécanique ordonnée. Les neuf vues restent les fichiers d’impression; le mélange continu ne concerne que la simulation."
 }
