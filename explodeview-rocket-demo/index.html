@@ -52,7 +52,7 @@
   <script>
     const total=9;
     const paths=Array.from({length:total},(_,i)=>`vue-${String(i+1).padStart(2,'0')}.webp`);
-    const states=['Moto assemblée','Selle passager et rétroviseurs','Sièges, commandes et éclairage','Roues et train avant','Échappements et suspensions','Réservoir et radiateur','Moteur sorti du châssis','Petites pièces libérées','Vue éclatée complète'];
+    const states=['Moto assemblée','Selles dégagées','Bloc optique dégagé','Roues dégagées','Échappement dégagé','Réservoir et radiateur dégagés','Moteur-boîte sorti du châssis','Trains avant et arrière séparés','Grands ensembles — éclaté complet'];
     paths.forEach(src=>{const image=new Image();image.src=src});
     const frameA=document.querySelector('#frameA');
     const frameB=document.querySelector('#frameB');
@@ -82,9 +82,9 @@
     function start(){
       stop();play.textContent='⏸ Pause';
       const phase=Math.acos(1-(position/(total-1))*2)/(Math.PI*2);
-      startedAt=performance.now()-phase*12000;
+      startedAt=performance.now()-phase*18000;
       const animate=now=>{
-        const cycle=((now-startedAt)%12000)/12000;
+        const cycle=((now-startedAt)%18000)/18000;
         render((1-Math.cos(cycle*Math.PI*2))*.5*(total-1));
         animation=requestAnimationFrame(animate);
       };

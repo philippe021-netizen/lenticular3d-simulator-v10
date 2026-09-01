@@ -18,18 +18,18 @@
   "direction": "assembled-to-exploded",
   "stages": [
     "moto assemblée",
-    "selle passager et rétroviseurs",
-    "sièges, commandes et éclairage",
-    "roues et train avant",
-    "échappements et suspensions",
-    "réservoir et radiateur",
-    "moteur sorti du châssis",
-    "petites pièces libérées",
-    "vue éclatée complète"
+    "selles dégagées",
+    "bloc optique dégagé",
+    "roues dégagées",
+    "échappement dégagé",
+    "réservoir et radiateur dégagés",
+    "moteur-boîte sorti du châssis",
+    "trains avant et arrière séparés",
+    "grands ensembles — éclaté complet"
   ],
   "preview": "continuous-neighbour-crossfade",
   "recommendedLpi": 60,
   "width": 1536,
   "height": 1024,
-  "notes": "Progression mécanique ordonnée. Les neuf vues restent les fichiers d’impression; le mélange continu ne concerne que la simulation."
+  "notes": "Progression mécanique ordonnée, limitée aux grands sous-ensembles, sans vis ni petites pièces. Les neuf vues restent les fichiers d’impression; le mélange continu ne concerne que la simulation."
 }
