@@ -1,0 +1,23 @@
+{
+  "generator": "HappyHolo ExplodeView prototype",
+  "effect": "explodeview",
+  "title": "Rocket 3 — assemblée vers vue éclatée",
+  "views": 9,
+  "sequence": [
+    "vue-01.png",
+    "vue-02.png",
+    "vue-03.png",
+    "vue-04.png",
+    "vue-05.png",
+    "vue-06.png",
+    "vue-07.png",
+    "vue-08.png",
+    "vue-09.png"
+  ],
+  "positions": [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1],
+  "direction": "assembled-to-exploded",
+  "recommendedLpi": 60,
+  "width": 1536,
+  "height": 1024,
+  "notes": "Prototype de validation visuelle. Les neuf vues conservent la vue 06 native."
+}
