@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Triones Duo V6.1 — Stable</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#0b0d12;color:#f4f7fb}*{box-sizing:border-box}body{margin:0;padding:18px;max-width:820px;margin:auto}h1{font-size:24px;margin:0 0 4px}.sub{color:#a9b3c1;margin:0 0 16px}.card{background:#151923;border:1px solid #2b3342;border-radius:16px;padding:15px;margin:12px 0}.row{display:flex;gap:9px;flex-wrap:wrap}button{appearance:none;border:0;border-radius:12px;padding:13px 15px;font-weight:700;background:#2f6fed;color:#fff;font-size:15px}button.alt{background:#293241}button.red{background:#8f2f3b}button.green{background:#25744f}button:disabled{opacity:.45}.pill{display:inline-block;padding:5px 9px;border-radius:999px;background:#252d3a;color:#cbd5e1;font-size:12px}.ok{color:#67e8a5}.bad{color:#ff7b88}.small{font-size:13px;color:#aab5c5}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;background:#0e1118;border-radius:10px;padding:10px;max-height:270px;overflow:auto}.device{border-top:1px solid #2a3140;padding-top:10px;margin-top:10px}.colors{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.colors button{padding:15px 6px}input[type=range]{width:100%}
+</style>
+</head>
+<body>
+<h1>Triones Duo V6.1</h1>
+<p class="sub">Version stable — mémorisation gauche/droite + reconnexion rapide</p>
+<div class="card"><div id="support"></div><p class="small">Sur iPhone, utilise Bluefy ou WebBLE. Après une première sélection gauche/droite, l'app mémorise les identifiants autorisés dans ce navigateur.</p><div class="row"><button id="reconnect" class="green">Reconnecter les 2</button><button id="scanLeft">Choisir GAUCHE</button><button id="scanRight">Choisir DROIT</button><button id="forget" class="alt">Oublier l'affectation</button></div></div>
+<div class="card"><strong>Commande des 2 phares</strong><div class="row" style="margin-top:10px"><button class="green" data-cmd="on">ON</button><button class="red" data-cmd="off">OFF</button><button class="alt" data-cmd="white">BLANC</button></div><p class="small">Couleurs</p><div class="colors"><button data-rgb="255,0,0">Rouge</button><button data-rgb="0,255,0">Vert</button><button data-rgb="0,0,255">Bleu</button><button data-rgb="255,0,255">Violet</button><button data-rgb="0,255,255">Cyan</button><button data-rgb="255,160,0">Orange</button><button data-rgb="255,255,0">Jaune</button><button data-rgb="255,255,255">Blanc</button></div><p class="small">Luminosité</p><input id="brightness" type="range" min="5" max="100" value="100"><div class="row" style="margin-top:10px"><button class="alt" data-mode="37">Fondu</button><button class="alt" data-mode="38">Flash</button><button class="alt" data-mode="39">Strobe</button></div></div>
+<div class="card"><strong>GAUCHE</strong> <span id="leftState" class="pill">non connecté</span><div id="leftInfo" class="device mono">—</div></div>
+<div class="card"><strong>DROIT</strong> <span id="rightState" class="pill">non connecté</span><div id="rightInfo" class="device mono">—</div></div>
+<div class="card"><strong>Journal</strong><div id="log" class="mono">Prêt.</div></div>
+<script>
+const KEY='triones-duo-v61-map';
+const S={left:{device:null,char:null},right:{device:null,char:null},brightness:100}; const $=id=>document.getElementById(id);
+function log(m){$('log').textContent=`[${new Date().toLocaleTimeString()}] ${m}\n`+$('log').textContent}
+function setSupport(){const ok=!!navigator.bluetooth;$('support').innerHTML=ok?'<span class="ok">Bluetooth Web disponible.</span>':'<span class="bad">Bluetooth Web indisponible dans ce navigateur.</span>';['scanLeft','scanRight','reconnect','forget'].forEach(i=>$(i).disabled=!ok)}
+function hex(a){return [...a].map(x=>x.toString(16).padStart(2,'0')).join(' ')}
+function loadMap(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch{return {}}}
+function saveSide(side,d){const m=loadMap();m[side]={id:d.id||null,name:d.name||''};localStorage.setItem(KEY,JSON.stringify(m));}
+function clearMap(){localStorage.removeItem(KEY);log('Affectation gauche/droite effacée.');}
+async function findWritable(server){const services=await server.getPrimaryServices(); let fallback=null, desc=[];for(const s of services){desc.push(`SERVICE ${s.uuid}`);let cs=[];try{cs=await s.getCharacteristics()}catch{}for(const c of cs){const p=c.properties;const flags=['read','write','writeWithoutResponse','notify','indicate'].filter(k=>p[k]);desc.push(`  ${c.uuid} [${flags.join(', ')}]`);if(p.write||p.writeWithoutResponse){if(!fallback) fallback=c;if(/ffe9|ffd9|ff01|fff3/i.test(c.uuid)) return {char:c,desc}}}}return {char:fallback,desc}}
+async function attach(side,d){S[side].device=d;$(`${side}State`).textContent='connexion…';const server=d.gatt.connected?d.gatt:await d.gatt.connect();const r=await findWritable(server);S[side].char=r.char;$(`${side}Info`).textContent=`Nom: ${d.name||'(sans nom)'}\nID: ${d.id||'?'}\nConnecté: oui\nWritable: ${r.char?r.char.uuid:'NON TROUVÉ'}\n\n${r.desc.join('\n')}`;$(`${side}State`).textContent=r.char?'prêt':'connecté';d.addEventListener('gattserverdisconnected',()=>{$(`${side}State`).textContent='déconnecté';S[side].char=null;log(`${side}: déconnecté`)},{once:true});saveSide(side,d);log(`${side}: ${d.name||'(sans nom)'} / writable=${r.char?.uuid||'aucune'}`)}
+async function choose(side){try{log(`${side}: ouverture du sélecteur sans filtre…`);const d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:['0000ffe5-0000-1000-8000-00805f9b34fb','0000ffd5-0000-1000-8000-00805f9b34fb','0000ffd0-0000-1000-8000-00805f9b34fb','0000ffe0-0000-1000-8000-00805f9b34fb','0000fff0-0000-1000-8000-00805f9b34fb','0000ffb0-0000-1000-8000-00805f9b34fb','0000ffa0-0000-1000-8000-00805f9b34fb']});await attach(side,d)}catch(e){log(`${side}: ${e.name}: ${e.message}`);$(`${side}State`).textContent='erreur'}}
+async function reconnectAll(){if(!navigator.bluetooth.getDevices){log('Reconnexion automatique non disponible dans ce navigateur.');return}try{const map=loadMap();const ds=await navigator.bluetooth.getDevices();if(!ds.length){log('Aucun appareil autorisé enregistré. Utilise Choisir GAUCHE/DROIT une première fois.');return}for(const side of ['left','right']){const wanted=map[side];if(!wanted){log(`${side}: aucune affectation mémorisée`);continue}const d=ds.find(x=>x.id===wanted.id)||(wanted.name?ds.find(x=>x.name===wanted.name):null);if(!d){log(`${side}: appareil mémorisé introuvable`);continue}try{await attach(side,d)}catch(e){log(`${side}: reconnexion impossible: ${e.message}`)}}}catch(e){log(`reconnexion: ${e.name}: ${e.message}`)}}
+async function writeTo(side,data){const c=S[side].char;if(!c)return false;try{if(c.properties.writeWithoutResponse)await c.writeValueWithoutResponse(data);else await c.writeValue(data);return true}catch(e){log(`${side}: écriture refusée ${e.message}`);return false}}
+async function both(data,label){let n=0;for(const side of ['left','right'])if(await writeTo(side,data))n++;log(`${label}: ${hex(data)} -> ${n}/2`)}
+function rgbCmd(r,g,b){const k=S.brightness/100;return new Uint8Array([0x56,Math.round(r*k),Math.round(g*k),Math.round(b*k),0x00,0xF0,0xAA])}
+function power(on){return new Uint8Array([0xCC,on?0x23:0x24,0x33])}
+function mode(m){return new Uint8Array([0xBB,m,0x25,0x44])}
+$('scanLeft').onclick=()=>choose('left');$('scanRight').onclick=()=>choose('right');$('reconnect').onclick=reconnectAll;$('forget').onclick=clearMap;
+document.querySelectorAll('[data-rgb]').forEach(b=>b.onclick=()=>{const [r,g,bl]=b.dataset.rgb.split(',').map(Number);both(rgbCmd(r,g,bl),`RGB ${r},${g},${bl}`)});
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>both(mode(Number(b.dataset.mode)),`Mode ${b.dataset.mode}`));
+document.querySelectorAll('[data-cmd]').forEach(b=>b.onclick=()=>{const x=b.dataset.cmd;if(x==='on')both(power(true),'ON');if(x==='off')both(power(false),'OFF');if(x==='white')both(rgbCmd(255,255,255),'BLANC')});
+$('brightness').oninput=e=>{S.brightness=Number(e.target.value);log(`Luminosité ${S.brightness}%`)};setSupport();
+window.addEventListener('load',()=>setTimeout(()=>reconnectAll(),500));
+</script>
+</body></html>
