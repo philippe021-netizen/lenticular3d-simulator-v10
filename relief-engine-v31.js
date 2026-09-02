@@ -312,7 +312,7 @@ buildBtn.addEventListener('click',async()=>{
 
     window.HappyHoloReliefState={sourceImg,subjectImg,backgroundImg,subjectDepthCanvas,backgroundDepthCanvas,view};
     window.dispatchEvent(new CustomEvent('happyholo-relief-ready'));
-    startPreview(); exportBtn.disabled=false; setStatus('V3.27 prête — Relief 3D et ExplodeView machines disponibles pour les 9 vues.');
+    startPreview(); exportBtn.disabled=false; setStatus('V3.28 prête — Découpage automatique corrigible et ExplodeView disponibles pour les 9 vues.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
 });

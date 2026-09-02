@@ -101,6 +101,7 @@
         return;
       }
       if(statusBox)statusBox.textContent='Ouverture de l’écran de sélection des roues et des autres pièces…';
+      window.HappyHoloPendingAutoPieceSplit=true;
       build.click();
     });
     const sync=()=>{

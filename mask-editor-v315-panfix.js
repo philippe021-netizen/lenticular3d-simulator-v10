@@ -31,6 +31,7 @@
   let selections=[];
   let activeSelection=0;
   let planCard, planList, planDepth, planDepthOut, planAction, planIntensity, planIntensityOut, planTiming;
+  let autoSplitButton, autoSplitInfo;
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
@@ -91,6 +92,256 @@
     return d;
   }
 
+  function resampleMask(img,targetW,targetH){
+    if(img.width===targetW&&img.height===targetH)return cloneImageData(img);
+    const source=document.createElement('canvas');
+    source.width=img.width;source.height=img.height;
+    source.getContext('2d').putImageData(img,0,0);
+    const target=document.createElement('canvas');
+    target.width=targetW;target.height=targetH;
+    const ctx=target.getContext('2d',{willReadFrequently:true});
+    ctx.imageSmoothingEnabled=true;
+    ctx.imageSmoothingQuality='high';
+    ctx.drawImage(source,0,0,targetW,targetH);
+    return ctx.getImageData(0,0,targetW,targetH);
+  }
+
+  function machineSectionName(meta,index,gridW,gridH,used){
+    const bw=meta.maxX-meta.minX+1;
+    const bh=meta.maxY-meta.minY+1;
+    const ratio=bw/Math.max(1,bh);
+    const cx=(meta.minX+meta.maxX+1)/(2*gridW);
+    const cy=(meta.minY+meta.maxY+1)/(2*gridH);
+    let base;
+
+    if(cy>.54 && ratio>.55 && ratio<1.55){
+      base=cx<.45?'Roue gauche':cx>.55?'Roue droite':'Roue centrale';
+    }else if(cy<.38){
+      base=ratio>1.45?'Partie haute':'Élément supérieur';
+    }else if(cy>.68){
+      base='Élément inférieur';
+    }else if(cx<.36){
+      base='Section gauche';
+    }else if(cx>.64){
+      base='Section droite';
+    }else{
+      base='Section centrale';
+    }
+
+    const count=(used.get(base)||0)+1;
+    used.set(base,count);
+    return count===1?base:`${base} ${count}`;
+  }
+
+  async function proposeMachineSections({automatic=false}={}){
+    if(!originalPixels || !selections[0]?.mask){
+      if(!automatic)alert('Le détourage doit être terminé avant le découpage automatique.');
+      return;
+    }
+
+    if(selections.length>1 && !automatic){
+      const ok=confirm('Remplacer les sélections actuelles par une nouvelle proposition automatique ?');
+      if(!ok)return;
+    }
+
+    const previousText=autoSplitButton?.textContent||'✨ Proposer le découpage automatique';
+    if(autoSplitButton){autoSplitButton.disabled=true;autoSplitButton.textContent='Analyse des grandes sections…';}
+    if(autoSplitInfo)autoSplitInfo.textContent='Analyse locale de la forme, des couleurs et de la position des éléments…';
+
+    await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,20)));
+
+    try{
+      saveActiveSelection();
+
+      const full=cloneImageData(selections[0].mask);
+      const w=full.width;
+      const h=full.height;
+      const gridScale=Math.min(1,190/Math.max(w,h));
+      const gridW=Math.max(32,Math.round(w*gridScale));
+      const gridH=Math.max(32,Math.round(h*gridScale));
+      const cells=gridW*gridH;
+      const foreground=new Uint8Array(cells);
+      const red=new Float32Array(cells);
+      const green=new Float32Array(cells);
+      const blue=new Float32Array(cells);
+      const points=[];
+
+      for(let gy=0;gy<gridH;gy++){
+        const sy=Math.min(h-1,Math.floor((gy+.5)*h/gridH));
+        for(let gx=0;gx<gridW;gx++){
+          const sx=Math.min(w-1,Math.floor((gx+.5)*w/gridW));
+          const src=(sy*w+sx)*4;
+          const cell=gy*gridW+gx;
+          if(full.data[src+3]<48)continue;
+          foreground[cell]=1;
+          red[cell]=originalPixels[src]/255;
+          green[cell]=originalPixels[src+1]/255;
+          blue[cell]=originalPixels[src+2]/255;
+          points.push(cell);
+        }
+      }
+
+      if(points.length<120)throw new Error('La machine détourée est trop petite pour proposer ses sections.');
+
+      const mode=window.HappyHoloExplodeViewState?.mode||'simple';
+      const wantedTotal=mode==='technical'?11:mode==='detailed'?8:5;
+      const clusterCount=Math.max(3,Math.min(wantedTotal,Math.floor(points.length/45)));
+      const centroids=[];
+      const feature=cell=>{
+        const x=cell%gridW;
+        const y=Math.floor(cell/gridW);
+        return [red[cell],green[cell],blue[cell],x/Math.max(1,gridW-1),y/Math.max(1,gridH-1)];
+      };
+      const distance=(a,b)=>{
+        const dr=a[0]-b[0],dg=a[1]-b[1],db=a[2]-b[2];
+        const dx=a[3]-b[3],dy=a[4]-b[4];
+        return 1.9*(dr*dr+dg*dg+db*db)+.82*(dx*dx+dy*dy);
+      };
+
+      let first=points[0],bestCenter=Infinity;
+      for(const cell of points){
+        const f=feature(cell);
+        const d=(f[3]-.5)*(f[3]-.5)+(f[4]-.52)*(f[4]-.52);
+        if(d<bestCenter){bestCenter=d;first=cell;}
+      }
+      centroids.push(feature(first));
+
+      while(centroids.length<clusterCount){
+        let farthest=points[0],farDistance=-1;
+        for(const cell of points){
+          const f=feature(cell);
+          let nearest=Infinity;
+          for(const c of centroids)nearest=Math.min(nearest,distance(f,c));
+          if(nearest>farDistance){farDistance=nearest;farthest=cell;}
+        }
+        centroids.push(feature(farthest));
+      }
+
+      const labels=new Int16Array(cells);
+      labels.fill(-1);
+      for(let iteration=0;iteration<11;iteration++){
+        const sums=Array.from({length:clusterCount},()=>[0,0,0,0,0,0]);
+        for(const cell of points){
+          const f=feature(cell);
+          let best=0,bestDistance=Infinity;
+          for(let k=0;k<clusterCount;k++){
+            const d=distance(f,centroids[k]);
+            if(d<bestDistance){bestDistance=d;best=k;}
+          }
+          labels[cell]=best;
+          const s=sums[best];
+          s[0]+=f[0];s[1]+=f[1];s[2]+=f[2];s[3]+=f[3];s[4]+=f[4];s[5]++;
+        }
+        for(let k=0;k<clusterCount;k++){
+          const s=sums[k];
+          if(s[5])centroids[k]=[s[0]/s[5],s[1]/s[5],s[2]/s[5],s[3]/s[5],s[4]/s[5]];
+        }
+      }
+
+      const componentMap=new Int16Array(cells);
+      componentMap.fill(-1);
+      const visited=new Uint8Array(cells);
+      const queue=new Int32Array(cells);
+      const components=[];
+
+      for(const start of points){
+        if(visited[start])continue;
+        const label=labels[start];
+        let head=0,tail=0,area=0,minX=gridW,minY=gridH,maxX=-1,maxY=-1;
+        queue[tail++]=start;
+        visited[start]=1;
+        const componentIndex=components.length;
+
+        while(head<tail){
+          const cell=queue[head++];
+          componentMap[cell]=componentIndex;
+          area++;
+          const x=cell%gridW;
+          const y=Math.floor(cell/gridW);
+          if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
+          const neighbours=[cell-1,cell+1,cell-gridW,cell+gridW];
+          for(let n=0;n<4;n++){
+            const next=neighbours[n];
+            if(next<0||next>=cells||visited[next]||!foreground[next]||labels[next]!==label)continue;
+            if(n===0&&x===0||n===1&&x===gridW-1)continue;
+            visited[next]=1;
+            queue[tail++]=next;
+          }
+        }
+        components.push({id:componentIndex,area,minX,minY,maxX,maxY});
+      }
+
+      const minimumArea=Math.max(7,Math.round(points.length*.009));
+      const useful=components.filter(c=>c.area>=minimumArea).sort((a,b)=>b.area-a.area);
+      const chosen=useful.slice(1,wantedTotal);
+      if(chosen.length<2)throw new Error('Les zones sont trop uniformes. Utilise la Baguette ou le pinceau pour compléter la proposition.');
+
+      const chosenIds=new Set(chosen.map(c=>c.id));
+      const storageScale=Math.min(1,960/Math.max(w,h));
+      const storageW=Math.max(32,Math.round(w*storageScale));
+      const storageH=Math.max(32,Math.round(h*storageScale));
+      const masks=new Map();
+      for(const meta of chosen)masks.set(meta.id,blankMask(storageW,storageH));
+
+      for(let y=0;y<storageH;y++){
+        const sourceY=Math.min(h-1,Math.floor((y+.5)*h/storageH));
+        const gy=Math.min(gridH-1,Math.floor(y*gridH/storageH));
+        for(let x=0;x<storageW;x++){
+          const sourceX=Math.min(w-1,Math.floor((x+.5)*w/storageW));
+          const src=(sourceY*w+sourceX)*4;
+          const alpha=full.data[src+3];
+          if(alpha<16)continue;
+          const gx=Math.min(gridW-1,Math.floor(x*gridW/storageW));
+          const id=componentMap[gy*gridW+gx];
+          if(!chosenIds.has(id))continue;
+          const mask=masks.get(id);
+          const dst=(y*storageW+x)*4;
+          mask.data[dst]=255;mask.data[dst+1]=255;mask.data[dst+2]=255;mask.data[dst+3]=alpha;
+        }
+      }
+
+      const base={
+        id:Date.now(),name:'Structure principale',depth:0.48,action:'explodeview',intensity:65,timing:'all',
+        explodeOrder:chosen.length+1,explodeDirection:'stay',explodeMode:mode,actionZones:[],
+        mask:cloneImageData(full),initialMask:cloneImageData(full)
+      };
+      const usedNames=new Map();
+      const proposed=chosen.map((meta,index)=>{
+        const mask=masks.get(meta.id);
+        return{
+          id:Date.now()+index+1,
+          name:machineSectionName(meta,index,gridW,gridH,usedNames),
+          depth:.34+index*.025,
+          action:'explodeview',
+          intensity:65,
+          timing:'all',
+          explodeOrder:index+1,
+          explodeDirection:'auto',
+          explodeMode:mode,
+          actionZones:[],
+          storeWidth:storageW,
+          storeHeight:storageH,
+          mask,
+          initialMask:mask
+        };
+      });
+
+      selections=[base,...proposed];
+      activeSelection=proposed.length?1:0;
+      loadActiveSelection();
+      renderPlanList();
+      updatePlanControls();
+      if(autoSplitInfo)autoSplitInfo.textContent=`${selections.length} grandes sections proposées. Choisis chaque section, puis corrige avec Ajouter, Gomme ou Baguette.`;
+      planCard?.scrollIntoView({block:'start',behavior:'smooth'});
+    }catch(error){
+      console.error('[HAPPYHOLO AUTO SECTIONS]',error);
+      if(autoSplitInfo)autoSplitInfo.textContent=error?.message||String(error);
+      if(!automatic)alert(error?.message||String(error));
+    }finally{
+      if(autoSplitButton){autoSplitButton.disabled=false;autoSplitButton.textContent=previousText;}
+    }
+  }
+
   function el(tag, props={}, parent){
     const n=document.createElement(tag);
     Object.entries(props).forEach(([k,v])=>{
@@ -134,14 +385,18 @@
     if(!selections.length || !maskCanvas.width) return;
     const s=selections[activeSelection];
     if(!s) return;
-    s.mask=cloneImageData(mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height));
+    const edited=mctx.getImageData(0,0,maskCanvas.width,maskCanvas.height);
+    s.mask=s.storeWidth&&s.storeHeight
+      ?resampleMask(edited,s.storeWidth,s.storeHeight)
+      :cloneImageData(edited);
   }
 
   function loadActiveSelection(){
     const s=selections[activeSelection];
     if(!s || !s.mask) return;
-    mctx.putImageData(cloneImageData(s.mask),0,0);
-    history=[cloneImageData(s.mask)];
+    const displayed=resampleMask(s.mask,maskCanvas.width,maskCanvas.height);
+    mctx.putImageData(displayed,0,0);
+    history=[cloneImageData(displayed)];
     redoStack=[];
     maskDirty=true;
     updateHistory();
@@ -250,6 +505,17 @@
     el('div',{
       text:'Chaque zone peut avoir sa propre profondeur et sa propre action.',
       style:{fontSize:'10px',opacity:'.72',lineHeight:'1.3'}
+    },card);
+
+    autoSplitButton=button('✨ Proposer le découpage automatique',card,()=>proposeMachineSections());
+    autoSplitButton.style.padding='9px';
+    autoSplitButton.style.minHeight='42px';
+    autoSplitButton.style.background='#28a8ee';
+    autoSplitButton.style.color='#00121d';
+
+    autoSplitInfo=el('div',{
+      text:'ExplodeView : proposition locale de 4 à 6 grandes sections, puis correction manuelle.',
+      style:{fontSize:'10px',lineHeight:'1.35',color:'#b9ddf3'}
     },card);
 
     planList=el('div',{},card);
@@ -2239,14 +2505,12 @@
 
     if(!s?.initialMask) return;
 
-    mctx.putImageData(
-      cloneImageData(s.initialMask),
-      0,
-      0
-    );
+    const initial=resampleMask(s.initialMask,maskCanvas.width,maskCanvas.height);
+
+    mctx.putImageData(initial,0,0);
 
     history=[
-      cloneImageData(s.initialMask)
+      cloneImageData(initial)
     ];
 
     redoStack=[];
@@ -2816,6 +3080,9 @@
     modal.style.display='flex';
     document.body.style.overflow='hidden';
 
+    const automaticMachineSplit=window.HappyHoloPendingAutoPieceSplit===true;
+    window.HappyHoloPendingAutoPieceSplit=false;
+
     setTimeout(()=>{
       resize();
       fit();
@@ -2825,6 +3092,10 @@
       resize();
       fit();
     },220);
+
+    if(automaticMachineSplit){
+      setTimeout(()=>proposeMachineSections({automatic:true}),360);
+    }
 
     return new Promise(resolve=>{
       resolveEditor=resolve;
