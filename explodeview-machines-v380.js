@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.0 — ExplodeView générique pour machines et objets techniques */
+/* HappyHolo V3.8.1 — ExplodeView générique pour machines et objets techniques */
 (() => {
   'use strict';
 
@@ -86,6 +86,31 @@
     if(status)status.textContent=statusText();
   }
 
+  function setupMainSelectionButton(){
+    const start=document.getElementById('startPieceSelection');
+    const file=document.getElementById('file');
+    const build=document.getElementById('build');
+    const statusBox=document.getElementById('status');
+    if(!start||!file||!build||start.dataset.ready==='1')return;
+    start.dataset.ready='1';
+    start.addEventListener('click',()=>{
+      if(!file.files?.length){
+        if(statusBox)statusBox.textContent='Choisis d’abord la photo de la machine.';
+        file.scrollIntoView({block:'center',behavior:'smooth'});
+        file.click();
+        return;
+      }
+      if(statusBox)statusBox.textContent='Ouverture de l’écran de sélection des roues et des autres pièces…';
+      build.click();
+    });
+    const sync=()=>{
+      start.disabled=build.disabled;
+      start.textContent=build.disabled?'Ouverture de la sélection…':'Sélectionner les pièces de la machine';
+    };
+    new MutationObserver(sync).observe(build,{attributes:true,attributeFilter:['disabled']});
+    sync();
+  }
+
   function drawBackground(ctx,norm,W,H,api){
     if(window.HappyHoloCustomBackground?.draw?.(ctx,norm,W,H,{x:0,y:0,w:W,h:H}))return;
     const bg=api.bgImage?.();if(!bg)return;
@@ -129,6 +154,6 @@
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(ensurePanel,40));
   window.addEventListener('happyholo-action-plan-changed',updatePanel);
   window.addEventListener('happyholo-relief-ready',()=>setTimeout(ensurePanel,60));
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(ensurePanel,350),{once:true});else setTimeout(ensurePanel,350);
-  console.log('[HAPPYHOLO] ExplodeView machines V3.8.0 actif');
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setupMainSelectionButton();setTimeout(ensurePanel,350);},{once:true});else{setupMainSelectionButton();setTimeout(ensurePanel,350);}
+  console.log('[HAPPYHOLO] ExplodeView machines V3.8.1 actif');
 })();

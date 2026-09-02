@@ -299,18 +299,20 @@ buildBtn.addEventListener('click',async()=>{
   if(!sourceFile){ setStatus('Choisis d’abord une photo.'); return; }
   buildBtn.disabled=true; exportBtn.disabled=true; downloadBtn.disabled=true;
   try{
-    /* V3.17 : une seule inférence profondeur, puis libération du modèle. */
-    subjectDepthCanvas=await estimateDepth(sourceImg,'1/5 Analyse de profondeur unique — mode iPad…');
+    /* V3.27 : le détourage et la sélection des pièces s'ouvrent avant l'analyse de profondeur. */
+    setStatus('Ouverture de la sélection des pièces…');
+    const subjectBlob=await window.localRemoveBackground(sourceFile); subjectImg=await blobToImage(subjectBlob);
+    subjectAlphaCanvas=makeAlphaCanvas(subjectImg);
+
+    subjectDepthCanvas=await estimateDepth(sourceImg,'Analyse de profondeur — les pièces sont sélectionnées…');
     backgroundDepthCanvas=subjectDepthCanvas;
     await releaseEstimator();
 
-    const subjectBlob=await window.localRemoveBackground(sourceFile); subjectImg=await blobToImage(subjectBlob);
-    subjectAlphaCanvas=makeAlphaCanvas(subjectImg);
     const backgroundBlob=await reconstructBackground(sourceImg,subjectAlphaCanvas); backgroundImg=await blobToImage(backgroundBlob);
 
     window.HappyHoloReliefState={sourceImg,subjectImg,backgroundImg,subjectDepthCanvas,backgroundDepthCanvas,view};
     window.dispatchEvent(new CustomEvent('happyholo-relief-ready'));
-    startPreview(); exportBtn.disabled=false; setStatus('V3.25 prête — Relief 3D et ExplodeView machines disponibles pour les 9 vues.');
+    startPreview(); exportBtn.disabled=false; setStatus('V3.27 prête — Relief 3D et ExplodeView machines disponibles pour les 9 vues.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
 });

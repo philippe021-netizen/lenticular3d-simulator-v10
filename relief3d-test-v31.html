@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>HappyHolo — Relief 3D V3.26 ExplodeView</title>
+<title>HappyHolo — Relief 3D V3.27 ExplodeView</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
@@ -25,6 +25,7 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 .support-card{margin-top:18px;background:#fff;border:1px solid #ddd;border-radius:18px;padding:18px}.support-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.support-head h2{margin:0 0 4px}.support-head p{margin:0;color:#666}.support-badge{background:#e7f7eb;color:#17652c;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:800}.support-grid{display:grid;grid-template-columns:320px 1fr;gap:18px;margin-top:16px}.support-controls select{width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;background:#fff}.support-controls label{display:flex;justify-content:space-between;gap:10px}.support-stage-wrap{min-width:0}.support-stage{min-height:470px;border-radius:16px;background:#ececea;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}.support-empty{position:absolute;color:#666}.product-object{position:relative;transform-style:preserve-3d;will-change:transform;display:flex;flex-direction:column;align-items:center}.product-object .ring{width:64px;height:64px;border:8px solid #a7a7a7;border-radius:50%;box-shadow:inset 0 0 0 2px #eee}.product-object .link{width:16px;height:28px;border:5px solid #999;border-radius:10px;margin-top:-5px}.product-object .shell{background:linear-gradient(145deg,#fafafa,#c9c9c9);padding:7px;border-radius:15px;box-shadow:0 12px 26px #0003}.image-window{position:relative;overflow:hidden;background:#ddd;width:100%;height:100%}.image-window img,.image-window canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block}.image-window img{object-fit:cover}.keychain-vertical .shell{width:220px;height:330px}.keychain-horizontal{flex-direction:row;gap:0}.keychain-horizontal .ring{margin-right:-2px}.keychain-horizontal .link{width:28px;height:16px;margin:0 -2px 0 0}.keychain-horizontal .shell{width:330px;height:220px}.medallion-round .shell{width:245px;height:245px;border-radius:50%;padding:9px}.medallion-round .image-window{border-radius:50%}.support-note{margin-top:10px;padding:10px;border-radius:10px;background:#f3f3f3;font-size:13px}@media(max-width:800px){.support-grid{grid-template-columns:1fr}.support-stage{min-height:390px}.keychain-vertical .shell{width:180px;height:270px}.keychain-horizontal .shell{width:270px;height:180px}.medallion-round .shell{width:210px;height:210px}}
 .product-object{transform-origin:50% 55%}.product-object.support-playing{animation:supportRock var(--support-speed,5s) ease-in-out infinite;will-change:transform}@keyframes supportRock{0%,100%{transform:perspective(620px) rotateY(var(--support-neg,-6deg)) translateX(-5px)}50%{transform:perspective(620px) rotateY(var(--support-pos,6deg)) translateX(5px)}}.product-object.support-playing .shell{animation:supportShadow var(--support-speed,5s) ease-in-out infinite}@keyframes supportShadow{0%,100%{box-shadow:10px 12px 24px #0004}50%{box-shadow:-10px 12px 24px #0004}}
 .mode-switch{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;margin-bottom:4px}.mode-switch button{min-width:170px;background:#e8e8e8;color:#111;border:2px solid transparent}.mode-switch button.mode-active{background:#111;color:#fff;border-color:#111}.mode-switch-note{font-size:12px;color:#666;margin-top:6px}
+.piece-start{margin:0 0 16px;padding:18px;border:3px solid #28a8ee;border-radius:18px;background:linear-gradient(145deg,#071018,#102536);color:#fff;box-shadow:0 12px 32px #00111f26}.piece-start h2{margin:0 0 6px;font-size:22px}.piece-start p{margin:0;color:#d8e7f1;font-size:14px;line-height:1.45}.piece-start button{width:100%;margin:14px 0 0;background:#28a8ee;color:#00121d;font-size:18px;min-height:54px}.piece-start-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.piece-start-steps span{padding:9px;border-radius:10px;background:#ffffff12;font-size:12px;line-height:1.35}.piece-start-steps b{color:#62c7ff}@media(max-width:700px){.piece-start-steps{grid-template-columns:1fr}.piece-start h2{font-size:20px}}
 </style>
 </head>
 <body>
@@ -43,8 +44,8 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 </div>
 <div class="wrap">
 <div id="networkModeBanner" style="position:sticky;top:0;z-index:99990;margin:0 0 14px;padding:14px 16px;border-radius:14px;font-size:18px;font-weight:900;text-align:center;letter-spacing:.02em;box-shadow:0 3px 16px #0002;background:#dff7e7;color:#0c5c29;border:2px solid #2c9b52">MODE CONNECTÉ — IA EN LIGNE DISPONIBLE</div>
-<div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:10000049;background:#28a8ee;color:#00121d;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:900">V3.26 • ExplodeView</div>
-<h1>HappyHolo — Relief 3D V3.26</h1>
+<div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:10000049;background:#28a8ee;color:#00121d;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:900">V3.27 • ExplodeView</div>
+<h1>HappyHolo — Relief 3D V3.27</h1>
 <div class="sub">Photo → détourage local → grandes pièces mécaniques → ExplodeView progressif → 9 vues.</div>
 <div id="offlinePackCard" style="background:#fff;border:2px solid #111;border-radius:18px;padding:16px;margin:0 0 16px">
 <div style="font-size:18px;font-weight:850;margin-bottom:6px">Pack de secours iPad</div>
@@ -54,6 +55,16 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button id="prepareOfflinePack" type="button">Télécharger / vérifier le pack hors ligne</button></div>
 <div id="offlinePackStatus" style="margin-top:10px;padding:10px;border-radius:10px;background:#f2f2f2;font-size:13px;white-space:pre-wrap">Vérification…</div>
 </div>
+<section id="pieceSelectionStart" class="piece-start">
+  <h2>⚙️ Sélection des pièces — machines</h2>
+  <p>C’est ici que tu démarres la sélection des roues, de la selle, du moteur et des autres gros éléments.</p>
+  <div class="piece-start-steps">
+    <span><b>1.</b> Choisis la photo juste en dessous.</span>
+    <span><b>2.</b> Appuie sur le grand bouton bleu.</span>
+    <span><b>3.</b> Dans l’éditeur, utilise « + Nouvelle sélection » pour chaque pièce.</span>
+  </div>
+  <button id="startPieceSelection" type="button">Sélectionner les pièces de la machine</button>
+</section>
 <div class="card grid">
 <section>
 <label>Photo</label><input id="file" type="file" accept="image/*">
@@ -67,7 +78,7 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 <section><canvas id="view" width="1024" height="768"></canvas><div id="frames" class="frames"></div></section>
 </div>
 </div>
-<script src="./relief-engine-v31.js?v=325"></script>
+<script src="./relief-engine-v31.js?v=327"></script>
 <script src="./action-preview-engine.js?v=325"></script>
 <script src="./mask-editor-v315-panfix.js?v=326"></script>
 <script src="./selection-controls-v336.js?v=325"></script>
@@ -76,10 +87,10 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 <script src="./preview-sync-v355.js?v=323"></script>
 <script src="./text-layer-v337.js?v=323"></script>
 <script src="./v311-monotonic-patch.js?v=325"></script>
-<script src="./offline-manager-v317.js?v=323"></script>
+<script src="./offline-manager-v317.js?v=327"></script>
 <script src="./support-preview-v316.js?v=325"></script>
 <script src="./support-placement-sync-v374.js?v=323"></script>
-<script src="./explodeview-machines-v380.js?v=325"></script>
+<script src="./explodeview-machines-v380.js?v=327"></script>
 <script>
 (()=>{
   const btn=document.getElementById('hhStaticMaskButton');
