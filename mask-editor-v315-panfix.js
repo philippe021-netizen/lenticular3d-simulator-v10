@@ -30,7 +30,7 @@
 
   let selections=[];
   let activeSelection=0;
-  let planList, planDepth, planDepthOut, planAction, planIntensity, planIntensityOut, planTiming;
+  let planCard, planList, planDepth, planDepthOut, planAction, planIntensity, planIntensityOut, planTiming;
 
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
@@ -232,7 +232,7 @@
   }
 
   function buildPlanCard(parent){
-    const card=el('div',{style:{
+    const card=planCard=el('div',{id:'happyHoloPiecePlans',style:{
       padding:'10px',
       border:'1px solid #3b3b3f',
       borderRadius:'12px',
@@ -533,6 +533,8 @@
       const s=selections[activeSelection];
       if(s) s.timing=planTiming.value;
     });
+
+    return card;
   }
 
   /* ==========================================================
@@ -1157,6 +1159,18 @@
     modal._undo=button('↶',top,undo);
     modal._redo=button('↷',top,redo);
 
+    const piecesButton=button('⚙️ Pièces',top,()=>{
+      if(!planCard) return;
+      planCard.scrollIntoView({block:'start',behavior:'smooth'});
+      planCard.animate?.([
+        {boxShadow:'0 0 0 0 rgba(40,168,238,0)'},
+        {boxShadow:'0 0 0 5px rgba(40,168,238,.85)'},
+        {boxShadow:'0 0 0 0 rgba(40,168,238,0)'}
+      ],{duration:900});
+    },true);
+    piecesButton.style.background='#28a8ee';
+    piecesButton.style.color='#00121d';
+
     button('✓ Valider',top,validateEditor,true);
 
     const body=el('div',{
@@ -1185,13 +1199,13 @@
     modal._wand=button('🪄 Baguette',tools,()=>setTool('wand'));
     modal._pan=button('✋ Déplacer',tools,()=>setTool('pan'));
 
+    buildPlanCard(tools);
+
     button('＋ Zoom',tools,()=>setZoom(zoom*1.35));
     button('− Zoom',tools,()=>setZoom(zoom/1.35));
     button('Ajuster',tools,fit);
     button('100 %',tools,()=>setZoom(1));
     button('Réinit. masque',tools,resetMask);
-
-    buildPlanCard(tools);
 
     const wandCard=el('div',{style:{
       marginTop:'2px',
