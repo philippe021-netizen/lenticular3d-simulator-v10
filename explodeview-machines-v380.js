@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.1 — ExplodeView générique pour machines et objets techniques */
+/* HappyHolo V3.8.2 — ExplodeView générique pour machines et objets techniques */
 (() => {
   'use strict';
 
@@ -12,6 +12,29 @@
   const engine=()=>window.HappyHoloActionPreviewEngine;
   const explodeSelections=()=>plan().filter(s=>s?.action==='explodeview');
 
+  let slimSAMLoading=null;
+  function loadSlimSAM(){
+    if(window.HappyHoloSlimSAM?.open)return Promise.resolve(window.HappyHoloSlimSAM);
+    if(slimSAMLoading)return slimSAMLoading;
+    slimSAMLoading=new Promise((resolve,reject)=>{
+      const existing=document.querySelector('script[data-happyholo-slimsam]');
+      if(existing){
+        const done=()=>window.HappyHoloSlimSAM?.open?resolve(window.HappyHoloSlimSAM):reject(new Error('Module SlimSAM chargé sans API.'));
+        window.addEventListener('happyholo-slimsam-ready',done,{once:true});
+        setTimeout(done,2500);
+        return;
+      }
+      const s=document.createElement('script');
+      s.src='./slimsam-piece-selector-v330.js?v=330';
+      s.async=true;
+      s.dataset.happyholoSlimsam='1';
+      s.onload=()=>window.HappyHoloSlimSAM?.open?resolve(window.HappyHoloSlimSAM):reject(new Error('API SlimSAM absente.'));
+      s.onerror=()=>reject(new Error('Impossible de charger le sélecteur SlimSAM.'));
+      document.head.appendChild(s);
+    }).catch(e=>{slimSAMLoading=null;throw e;});
+    return slimSAMLoading;
+  }
+
   function maskStats(mask){
     const d=mask?.data,w=mask?.width,h=mask?.height;if(!d||!w||!h)return null;
     let minX=w,minY=h,maxX=-1,maxY=-1,pixels=0;
@@ -23,8 +46,8 @@
 
   function statusText(){
     const all=plan(),pieces=explodeSelections(),[min,max]=expectedRange();
-    if(all.length<2)return 'Crée au moins 2 sélections : la machine complète, puis ses grosses pièces.';
-    if(!pieces.length)return `${all.length} sélections prêtes. Lance la répartition automatique.`;
+    if(all.length<2)return 'Crée la machine complète, puis utilise « IA — toucher une pièce » pour sélectionner les grands sous-ensembles.';
+    if(!pieces.length)return `${all.length} sélections prêtes. Lance la répartition ExplodeView.`;
     const range=pieces.length<min?`Ajoute encore ${min-pieces.length} grosse${min-pieces.length>1?'s':''} pièce${min-pieces.length>1?'s':''} pour ce mode.`:pieces.length>max?'Trop de détails pour ce mode : réduis le nombre de petites pièces.':'Nombre de pièces cohérent pour ce mode.';
     return `${pieces.length} pièces ExplodeView • ${range}`;
   }
@@ -38,9 +61,9 @@
 
   function configureAutomatically(){
     const selections=plan();
-    if(selections.length<2){alert('ExplodeView a besoin de plusieurs grosses pièces. Dans l’éditeur de sélection, garde la machine complète en Sélection 1, puis ajoute les roues, la selle, le moteur ou les grands sous-ensembles.');return;}
+    if(selections.length<2){alert('ExplodeView a besoin de plusieurs grosses pièces. Utilise « IA — toucher une pièce » pour sélectionner les roues, la selle, le moteur ou les grands sous-ensembles.');return;}
     const ranked=selections.map((s,i)=>({s,i,stats:maskStats(s.mask)})).filter(x=>x.stats).sort((a,b)=>a.stats.area-b.stats.area);
-    if(ranked.length<2){alert('Les sélections sont vides. Peins au moins deux grandes pièces avant de préparer ExplodeView.');return;}
+    if(ranked.length<2){alert('Les sélections sont vides. Sélectionne au moins deux grandes pièces avant de préparer ExplodeView.');return;}
     ranked.forEach((item,rank)=>{
       item.s.action='explodeview';item.s.explodeOrder=rank+1;item.s.explodeMode=state.mode;
       item.s.explodeDirection=rank===ranked.length-1?'stay':'auto';
@@ -65,9 +88,20 @@
       panel=document.createElement('section');panel.id='happyHoloExplodeViewControls';
       panel.style.cssText='background:linear-gradient(145deg,#071018,#102536);color:#fff;border:2px solid #28a8ee;border-radius:18px;padding:16px;margin:16px 0;box-shadow:0 12px 32px #00111f26';
       panel.innerHTML='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-size:20px;font-weight:900">⚙️ ExplodeView — machines</div><div style="font-size:12px;color:#bdd0df;line-height:1.45;margin-top:4px">Moto, voiture, outil, moteur, montre, appareil ou machine industrielle. Uniquement les grands sous-ensembles : pas de vis ni de micro-pièces.</div></div><span style="background:#28a8ee;color:#00121d;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:900">9 vues progressives</span></div>';
+
+      const aiBtn=document.createElement('button');aiBtn.type='button';aiBtn.textContent='🎯 IA — toucher une pièce';aiBtn.style.cssText='width:100%;margin:13px 0 0;min-height:50px;background:#fff;color:#071018;border:0;border-radius:11px;font-weight:950;font-size:16px;padding:10px 14px';
+      const aiInfo=document.createElement('div');aiInfo.textContent='Nouveau : touche une roue, un phare, une selle ou un grand élément. SlimSAM calcule le masque complet, puis tu peux recommencer pour la pièce suivante.';aiInfo.style.cssText='margin-top:7px;color:#c9dce9;font-size:11px;line-height:1.45';
+      aiBtn.addEventListener('click',async()=>{
+        const old=aiBtn.textContent;aiBtn.disabled=true;aiBtn.textContent='Chargement du sélecteur IA…';
+        try{const api=await loadSlimSAM();aiBtn.textContent=old;await api.open();}
+        catch(e){console.error('[SlimSAM loader]',e);alert('Sélection IA indisponible : '+(e?.message||e));}
+        finally{aiBtn.disabled=false;aiBtn.textContent=old;}
+      });
+      panel.append(aiBtn,aiInfo);
+
       const controls=document.createElement('div');controls.style.cssText='display:grid;grid-template-columns:minmax(170px,1fr) minmax(190px,1.35fr) minmax(150px,.8fr);gap:9px;margin-top:13px';
       modeSelect=document.createElement('select');[['Simple • 4–6 pièces','simple'],['Détaillé • 7–9 pièces','detailed'],['Technique • 10–12 pièces','technical']].forEach(([t,v])=>modeSelect.appendChild(new Option(t,v)));modeSelect.value=state.mode;modeSelect.style.cssText='width:100%;min-height:44px;padding:9px;border-radius:10px;border:1px solid #527085;background:#0b1a25;color:#fff;font-weight:800';
-      const prepare=document.createElement('button');prepare.type='button';prepare.textContent='Préparer et répartir automatiquement';prepare.style.cssText='margin:0;min-height:44px;background:#28a8ee;color:#00121d;border:0;border-radius:10px;font-weight:900;padding:9px 12px';
+      const prepare=document.createElement('button');prepare.type='button';prepare.textContent='Répartir les pièces dans ExplodeView';prepare.style.cssText='margin:0;min-height:44px;background:#28a8ee;color:#00121d;border:0;border-radius:10px;font-weight:900;padding:9px 12px';
       const stop=document.createElement('button');stop.type='button';stop.textContent='Désactiver';stop.style.cssText='margin:0;min-height:44px;background:#233746;color:#fff;border:1px solid #527085;border-radius:10px;font-weight:800;padding:9px 12px';
       controls.append(modeSelect,prepare,stop);panel.appendChild(controls);
       status=document.createElement('div');status.style.cssText='margin-top:10px;padding:10px 11px;border-radius:10px;background:#ffffff12;color:#dce9f2;font-size:12px;line-height:1.4';panel.appendChild(status);
@@ -95,7 +129,6 @@
     if(!start||!file||!build||start.dataset.ready==='1')return;
     start.dataset.ready='1';
 
-    /* Capture avant le gestionnaire Relief : les deux boutons déclenchent le même découpage. */
     build.addEventListener('click',()=>{
       window.HappyHoloPendingAutoPieceSplit=autoEnabled?.checked!==false;
     },true);
@@ -159,10 +192,10 @@
     return{effect:'explodeview',mode:state.mode,direction:'assembled-to-exploded',views:9,parts:parts.map((s,i)=>({name:s.name||`Pièce ${i+1}`,order:Number(s.explodeOrder)||i+1,direction:s.explodeDirection||'auto',intensity:Number(s.intensity)||65})),notes:'Déplacement progressif des grands sous-ensembles, sans vis ni micro-pièces. La simulation est continue ; l’impression reste composée de neuf vues.'};
   }
 
-  window.HappyHoloExplodeView={state,configureAutomatically,disable,serialize,render:explodeRender};
+  window.HappyHoloExplodeView={state,configureAutomatically,disable,serialize,render:explodeRender,selectWithAI:async()=>{const api=await loadSlimSAM();return api.open();}};
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(ensurePanel,40));
   window.addEventListener('happyholo-action-plan-changed',updatePanel);
   window.addEventListener('happyholo-relief-ready',()=>setTimeout(ensurePanel,60));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setupMainSelectionButton();setTimeout(ensurePanel,350);},{once:true});else{setupMainSelectionButton();setTimeout(ensurePanel,350);}
-  console.log('[HAPPYHOLO] ExplodeView machines V3.8.1 actif');
+  console.log('[HAPPYHOLO] ExplodeView machines V3.8.2 + SlimSAM actif');
 })();
