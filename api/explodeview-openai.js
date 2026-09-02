@@ -4,17 +4,47 @@ function getKey(){return process.env.OPENAI_API_KEY||process.env['CLÉ_API_OPENA
 function cleanType(v){const s=String(v||'objet').toLowerCase();if(s.includes('moto'))return'motorcycle';if(s.includes('voiture')||s.includes('car'))return'car';if(s.includes('outil')||s.includes('tool'))return'tool';if(s.includes('machine'))return'industrial machine';return'object';}
 function parseDataUrl(dataUrl){const m=/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/s.exec(dataUrl||'');if(!m)throw new Error('Image invalide');return{type:m[1],buffer:Buffer.from(m[2],'base64')};}
 function extFor(type){return type.includes('png')?'png':type.includes('webp')?'webp':'jpg';}
-function promptFor(type){return `Use the uploaded reference photo as the ONLY identity reference. Create ONE square 3 by 3 contact sheet containing exactly 9 equal panels, read left-to-right then top-to-bottom. Every panel must show the EXACT SAME ${type} from the reference photo, preserving its distinctive body, proportions, colors, trim, camera viewpoint and visual identity. Do not replace or redesign it. No text, labels, numbers, captions, UI, panel borders or decorative graphics.
+function promptFor(type){return `Use the uploaded reference photo as the ONLY identity reference. Create ONE square 3 by 3 contact sheet containing exactly 9 equal panels, read left-to-right then top-to-bottom. Every panel must show the EXACT SAME ${type} from the reference photo, preserving the same body, proportions, colors, trim, camera viewpoint, perspective, scale and visual identity. Do not redesign or substitute the object. No text, labels, numbers, captions, UI, borders or decorative overlays.
 
-This is a progressive technical ExplodeView sequence for a 9-view lenticular animation. Keep a consistent modern technical photographic rendering and the exact same simple coherent background in all panels. The visual goal is elegant and technical: parts should FLOAT around the object in clean exploded-view positions, never be dropped on the floor, never scattered randomly, and never look like junk.
+THIS IS NOT 9 INDEPENDENT IMAGES. Treat the sequence as ONE CUMULATIVE STATE MACHINE.
 
-MOST IMPORTANT CONTINUITY RULE: once a component is detached in any panel, that exact same component MUST remain visible in EVERY later panel, at the exact same exploded position, orientation, scale and side of the object. Detached components never disappear, never move again, never reattach, never duplicate and never swap sides. Each new panel only adds one new detached group while preserving all previously detached groups unchanged. Think cumulative exploded-view layers.
+STATE-MACHINE RULE:
+- Panel N+1 must be Panel N plus exactly ONE newly detached major group.
+- Every previously detached piece is LOCKED after detachment.
+- LOCKED means its x/y position, distance from the object, rotation, scale, orientation and side of the object must remain unchanged in all later panels.
+- A locked piece must remain visible in every later panel.
+- A locked piece can NEVER disappear, reappear elsewhere, move again, rotate again, change scale, return to the object, swap sides, merge into another piece or be duplicated.
+- The central object/chassis must also stay in the exact same camera position and scale in all 9 panels.
+- Think of transparent animation layers: once a layer is moved out, freeze that layer forever and only animate the next new layer.
 
-For a CAR, use this logical order unless the reference clearly requires an equivalent variation: Panel 1 fully assembled. Panel 2 wheels detach and float at fixed positions beside their original hubs. Panel 3 doors detach and remain fixed. Panel 4 hood detaches and remains fixed above/front of the vehicle. Panel 5 windshield detaches and remains fixed above the cabin. Panel 6 front bumper detaches and remains fixed in front. Panel 7 rear bumper detaches and remains fixed behind. Panel 8 major side panels / rocker panels / fenders detach and remain fixed around the body. Panel 9 final clean technical exploded view: chassis/cell/core remains central while ALL previously detached parts are STILL present at their exact previous positions. Do not make the car suddenly bare by deleting those parts.
+VISUAL RULE:
+Keep the result elegant, technical and modern. Detached pieces must FLOAT cleanly around the object at deliberate exploded-view offsets. Never place detached components on the floor. Never scatter them randomly. Maintain balanced spacing so all detached groups stay readable through panel 9. Use a consistent clean technical/studio background in every panel.
 
-For motorcycles, tools and machines, follow the same cumulative logic with equivalent large assemblies: one new major assembly separates at a time, and every previously detached assembly remains frozen in place through all later panels.
+FOR A CAR, use this exact cumulative ledger:
+P1 = complete vehicle.
+P2 = P1 + detach all 4 wheels only. Lock all 4 wheels at fixed floating positions near their original hubs.
+P3 = P2 + detach left and right doors only. Lock both doors. Wheels remain exactly where they were in P2.
+P4 = P3 + detach hood only. Lock hood above/front. Wheels and doors remain pixel-position consistent.
+P5 = P4 + detach windshield only. Lock windshield above cabin. Wheels, doors and hood remain unchanged.
+P6 = P5 + detach front bumper only. Lock it in front. All earlier detached groups remain unchanged.
+P7 = P6 + detach rear bumper only. Lock it behind. All earlier detached groups remain unchanged.
+P8 = P7 + detach major fenders / rocker panels / large side panels as one readable group. Lock them. All earlier detached groups remain unchanged.
+P9 = P8 + reveal the final chassis/cell/core and, only if visually appropriate, separate the engine/transmission as ONE large block. EVERY detached component from P2-P8 must still be present at the exact same locked position.
 
-CRITICAL: ONLY large meaningful assemblies. ABSOLUTELY NO screws, bolts, nuts, clips, washers, loose cables, tiny brackets or micro-parts. Never disassemble an engine internally. No duplicated wheels or duplicated parts. No component may appear if it was not part of the original reference. No component may disappear after detaching. No floor placement. The progression must be smooth, cumulative, mechanically logical and visually clean for lenticular 1→9→1 viewing.`;}
+FOR MOTORCYCLES, TOOLS AND MACHINES: use the identical cumulative-state principle with equivalent large assemblies. One new major group per panel, then freeze it forever.
+
+HARD CONSTRAINTS:
+- NO screws, bolts, nuts, clips, washers, tiny brackets, loose cables or micro-parts.
+- NO internal engine teardown.
+- NO disappearing parts.
+- NO reappearing parts.
+- NO duplicated parts.
+- NO new invented parts.
+- NO floor placement.
+- NO camera or background jumps.
+- NO change of vehicle/object identity.
+
+Before rendering each panel, mentally verify this ledger: previous detached groups = PRESENT + SAME POSITION; new group = DETACHED ONCE; all other groups = STILL ATTACHED. The full 9-panel sheet must read as a mechanically logical, cumulative, lenticular-friendly 1→9→1 ExplodeView.`;}
 
 async function callOpenAI(key,imageDataUrl,type){
  const src=parseDataUrl(imageDataUrl);
@@ -46,6 +76,6 @@ export default async function handler(req,res){
   const {imageDataUrl,objectType='object'}=req.body||{};
   const b64=await callOpenAI(key,imageDataUrl,cleanType(objectType));
   res.setHeader('Cache-Control','no-store');
-  return res.status(200).json({boardDataUrl:'data:image/jpeg;base64,'+b64,mode:'single-board-3x3-cumulative'});
+  return res.status(200).json({boardDataUrl:'data:image/jpeg;base64,'+b64,mode:'single-board-3x3-state-machine-v341'});
  }catch(e){console.error('[explodeview-openai]',e);return res.status(500).json({error:e?.message||'Erreur OpenAI ExplodeView'});}
 }
