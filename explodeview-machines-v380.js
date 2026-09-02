@@ -91,17 +91,25 @@
     const file=document.getElementById('file');
     const build=document.getElementById('build');
     const statusBox=document.getElementById('status');
+    const autoEnabled=document.getElementById('autoPieceSelectionEnabled');
     if(!start||!file||!build||start.dataset.ready==='1')return;
     start.dataset.ready='1';
+
+    /* Capture avant le gestionnaire Relief : les deux boutons déclenchent le même découpage. */
+    build.addEventListener('click',()=>{
+      window.HappyHoloPendingAutoPieceSplit=autoEnabled?.checked!==false;
+    },true);
+
     start.addEventListener('click',()=>{
       if(!file.files?.length){
+        window.HappyHoloPendingAutoPieceSplit=autoEnabled?.checked!==false;
         if(statusBox)statusBox.textContent='Choisis d’abord la photo de la machine.';
         file.scrollIntoView({block:'center',behavior:'smooth'});
         file.click();
         return;
       }
       if(statusBox)statusBox.textContent='Ouverture de l’écran de sélection des roues et des autres pièces…';
-      window.HappyHoloPendingAutoPieceSplit=true;
+      window.HappyHoloPendingAutoPieceSplit=autoEnabled?.checked!==false;
       build.click();
     });
     const sync=()=>{

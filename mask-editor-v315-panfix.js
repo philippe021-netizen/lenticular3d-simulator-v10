@@ -156,6 +156,7 @@
       const full=cloneImageData(selections[0].mask);
       const w=full.width;
       const h=full.height;
+      console.info('[HAPPYHOLO AUTO SECTIONS] démarrage',{width:w,height:h,automatic});
       const gridScale=Math.min(1,190/Math.max(w,h));
       const gridW=Math.max(32,Math.round(w*gridScale));
       const gridH=Math.max(32,Math.round(h*gridScale));
@@ -331,12 +332,15 @@
       loadActiveSelection();
       renderPlanList();
       updatePlanControls();
+      window.HappyHoloAutoSplitDiagnostics={ok:true,count:selections.length,grid:`${gridW}x${gridH}`,storage:`${storageW}x${storageH}`,at:new Date().toISOString()};
+      console.info('[HAPPYHOLO AUTO SECTIONS] terminé',window.HappyHoloAutoSplitDiagnostics);
       if(autoSplitInfo)autoSplitInfo.textContent=`${selections.length} grandes sections proposées. Choisis chaque section, puis corrige avec Ajouter, Gomme ou Baguette.`;
       planCard?.scrollIntoView({block:'start',behavior:'smooth'});
     }catch(error){
       console.error('[HAPPYHOLO AUTO SECTIONS]',error);
+      window.HappyHoloAutoSplitDiagnostics={ok:false,error:error?.message||String(error),at:new Date().toISOString()};
       if(autoSplitInfo)autoSplitInfo.textContent=error?.message||String(error);
-      if(!automatic)alert(error?.message||String(error));
+      alert(`Découpage automatique impossible : ${error?.message||String(error)}\n\nL’éditeur reste ouvert pour une sélection manuelle.`);
     }finally{
       if(autoSplitButton){autoSplitButton.disabled=false;autoSplitButton.textContent=previousText;}
     }

@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="manifest" href="./manifest.webmanifest">
-<title>HappyHolo — Relief 3D V3.28 ExplodeView</title>
+<title>HappyHolo — Relief 3D V3.29 ExplodeView</title>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:Inter,system-ui,sans-serif;color:#171717;background:#f4f4f2}
@@ -26,6 +26,7 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 .product-object{transform-origin:50% 55%}.product-object.support-playing{animation:supportRock var(--support-speed,5s) ease-in-out infinite;will-change:transform}@keyframes supportRock{0%,100%{transform:perspective(620px) rotateY(var(--support-neg,-6deg)) translateX(-5px)}50%{transform:perspective(620px) rotateY(var(--support-pos,6deg)) translateX(5px)}}.product-object.support-playing .shell{animation:supportShadow var(--support-speed,5s) ease-in-out infinite}@keyframes supportShadow{0%,100%{box-shadow:10px 12px 24px #0004}50%{box-shadow:-10px 12px 24px #0004}}
 .mode-switch{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;margin-bottom:4px}.mode-switch button{min-width:170px;background:#e8e8e8;color:#111;border:2px solid transparent}.mode-switch button.mode-active{background:#111;color:#fff;border-color:#111}.mode-switch-note{font-size:12px;color:#666;margin-top:6px}
 .piece-start{margin:0 0 16px;padding:18px;border:3px solid #28a8ee;border-radius:18px;background:linear-gradient(145deg,#071018,#102536);color:#fff;box-shadow:0 12px 32px #00111f26}.piece-start h2{margin:0 0 6px;font-size:22px}.piece-start p{margin:0;color:#d8e7f1;font-size:14px;line-height:1.45}.piece-start button{width:100%;margin:14px 0 0;background:#28a8ee;color:#00121d;font-size:18px;min-height:54px}.piece-start-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.piece-start-steps span{padding:9px;border-radius:10px;background:#ffffff12;font-size:12px;line-height:1.35}.piece-start-steps b{color:#62c7ff}@media(max-width:700px){.piece-start-steps{grid-template-columns:1fr}.piece-start h2{font-size:20px}}
+.piece-auto-toggle{display:flex;align-items:center;gap:10px;margin-top:12px;padding:11px 12px;border:2px solid #62c7ff;border-radius:12px;background:#ffffff12;font-size:14px;font-weight:850}.piece-auto-toggle input{width:24px;height:24px;flex:0 0 auto;accent-color:#28a8ee}
 </style>
 </head>
 <body>
@@ -44,8 +45,8 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 </div>
 <div class="wrap">
 <div id="networkModeBanner" style="position:sticky;top:0;z-index:99990;margin:0 0 14px;padding:14px 16px;border-radius:14px;font-size:18px;font-weight:900;text-align:center;letter-spacing:.02em;box-shadow:0 3px 16px #0002;background:#dff7e7;color:#0c5c29;border:2px solid #2c9b52">MODE CONNECTÉ — IA EN LIGNE DISPONIBLE</div>
-<div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:10000049;background:#28a8ee;color:#00121d;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:900">V3.28 • Découpage auto</div>
-<h1>HappyHolo — Relief 3D V3.28</h1>
+<div id="buildMarker" style="position:fixed;right:8px;bottom:8px;z-index:10000049;background:#28a8ee;color:#00121d;padding:5px 8px;border-radius:8px;font-size:11px;font-weight:900">V3.29 • Auto actif</div>
+<h1>HappyHolo — Relief 3D V3.29</h1>
 <div class="sub">Photo → détourage local → grandes pièces mécaniques → ExplodeView progressif → 9 vues.</div>
 <div id="offlinePackCard" style="background:#fff;border:2px solid #111;border-radius:18px;padding:16px;margin:0 0 16px">
 <div style="font-size:18px;font-weight:850;margin-bottom:6px">Pack de secours iPad</div>
@@ -63,6 +64,7 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
     <span><b>2.</b> Appuie sur le grand bouton bleu.</span>
     <span><b>3.</b> Dans l’éditeur, utilise « + Nouvelle sélection » pour chaque pièce.</span>
   </div>
+  <label class="piece-auto-toggle"><input id="autoPieceSelectionEnabled" type="checkbox" checked>Découpage automatique activé</label>
   <button id="startPieceSelection" type="button">Sélectionner les pièces de la machine</button>
 </section>
 <div class="card grid">
@@ -80,17 +82,17 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 </div>
 <script src="./relief-engine-v31.js?v=327"></script>
 <script src="./action-preview-engine.js?v=325"></script>
-<script src="./mask-editor-v315-panfix.js?v=328"></script>
+<script src="./mask-editor-v315-panfix.js?v=329"></script>
 <script src="./selection-controls-v336.js?v=325"></script>
 <script src="./custom-background-v338.js?v=323"></script>
 <script src="./composition-advanced-v350.js?v=323"></script>
 <script src="./preview-sync-v355.js?v=323"></script>
 <script src="./text-layer-v337.js?v=323"></script>
 <script src="./v311-monotonic-patch.js?v=325"></script>
-<script src="./offline-manager-v317.js?v=328"></script>
+<script src="./offline-manager-v317.js?v=329"></script>
 <script src="./support-preview-v316.js?v=325"></script>
 <script src="./support-placement-sync-v374.js?v=323"></script>
-<script src="./explodeview-machines-v380.js?v=328"></script>
+<script src="./explodeview-machines-v380.js?v=329"></script>
 <script>
 (()=>{
   const btn=document.getElementById('hhStaticMaskButton');
