@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo — ExplodeView IA V3.32</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#05080b;overflow:hidden;font-family:system-ui,sans-serif}
+#bar{position:fixed;z-index:999999;left:0;right:0;top:0;height:48px;background:#0b1a25;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 12px;box-sizing:border-box;border-bottom:2px solid #62c7ff;font-size:13px;font-weight:800}
+#bar b{color:#62c7ff}.ok{color:#7ef29a}.bad{color:#ff8c8c}
+iframe{position:absolute;left:0;top:48px;width:100%;height:calc(100% - 48px);border:0;background:#fff}
+</style>
+</head>
+<body>
+<div id="bar"><span><b>HappyHolo V3.32</b> — MagicTouch</span><span id="state">Chargement…</span></div>
+<iframe id="app" src="./relief3d-test-v31.html?fresh=3320902"></iframe>
+<script>
+(()=>{
+ const frame=document.getElementById('app'),state=document.getElementById('state');
+ const set=(t,ok=true)=>{state.textContent=t;state.className=ok?'ok':'bad'};
+ frame.addEventListener('load',()=>{
+   const w=frame.contentWindow,d=frame.contentDocument;
+   try{
+     if('serviceWorker' in w.navigator){w.navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});}
+     const auto=d.getElementById('autoPieceSelectionEnabled');if(auto?.closest('label'))auto.closest('label').style.display='none';
+     const steps=d.querySelector('.piece-start-steps');if(steps)steps.innerHTML='<span><b>1.</b> Choisis la photo.</span><span><b>2.</b> Crée le relief global une fois.</span><span><b>3.</b> Touche une grosse pièce, corrige avec Ajouter/Retirer, puis valide.</span>';
+     const intro=d.querySelector('#pieceSelectionStart p');if(intro)intro.textContent='Sélection précise des grosses pièces avec Google MediaPipe MagicTouch. Plus de découpage automatique par petites zones.';
+     const old=d.getElementById('startPieceSelection');
+     if(old){
+       const fresh=old.cloneNode(true);old.replaceWith(fresh);fresh.textContent='✨ MagicTouch — sélectionner les pièces';
+       fresh.addEventListener('click',async()=>{
+         const file=d.getElementById('file')?.files?.[0];
+         if(!file){d.getElementById('file')?.click();return;}
+         if(!Array.isArray(w.happyHoloSelectionPlan)||!w.happyHoloSelectionPlan?.[0]?.mask){
+           const build=d.getElementById('build');
+           if(build){d.getElementById('status').textContent='Création du détourage global avant MagicTouch…';build.click();}
+           return;
+         }
+         fresh.disabled=true;fresh.textContent='Chargement MagicTouch…';
+         try{
+           if(!w.HappyHoloMagicTouch?.open){
+             await new Promise((resolve,reject)=>{const s=d.createElement('script');s.src='./mediapipe-piece-selector-v332.js?fresh=3320902';s.onload=resolve;s.onerror=reject;d.head.appendChild(s);});
+           }
+           if(!w.HappyHoloMagicTouch?.open)throw new Error('MagicTouch non chargé');
+           await w.HappyHoloMagicTouch.open();
+         }catch(e){console.error(e);alert('MagicTouch indisponible : '+(e?.message||e));}
+         finally{fresh.disabled=false;fresh.textContent='✨ MagicTouch — sélectionner les pièces';}
+       });
+     }
+     const marker=d.getElementById('buildMarker');if(marker){marker.textContent='V3.32 • MagicTouch';marker.style.background='#62c7ff';}
+     set('MagicTouch prêt',true);
+   }catch(e){console.error(e);set('Erreur V3.32',false);}
+ });
+})();
+</script>
+</body>
+</html>
