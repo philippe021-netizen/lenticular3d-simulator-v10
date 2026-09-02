@@ -152,7 +152,7 @@
   }
 
   function addSelection(){
-    if(selections.length>=5) return;
+    if(selections.length>=12){alert('12 sélections maximum pour préserver la mémoire de l’iPad.');return;}
 
     saveActiveSelection();
 
@@ -301,6 +301,7 @@
 
     [
       ['Aucune action','none'],
+      ['Machine — ExplodeView (grosse pièce)','explodeview'],
       ['Moto/voiture — appel de phare','headlight'],
       ['Reflet lumineux local','glint'],
       ['Sujet — rotation 3D verticale légère','yaw3d'],
@@ -2555,6 +2556,9 @@
         action:s.action,
         intensity:s.intensity,
         timing:s.timing,
+        explodeOrder:Number(s.explodeOrder)||i+1,
+        explodeDirection:s.explodeDirection||'auto',
+        explodeMode:s.explodeMode||window.HappyHoloExplodeViewState?.mode||'simple',
         actionZone:s.actionZone||null,
         actionZones:Array.isArray(s.actionZones)
           ? s.actionZones

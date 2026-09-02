@@ -194,7 +194,7 @@
 
   function activeHeadlightSelection(){const p=window.happyHoloSelectionPlan||[];return p.find(s=>s?.action==='headlight'&&Array.isArray(s.actionZones)&&s.actionZones.length);}
   function activeGlintSelection(){const p=window.happyHoloSelectionPlan||[];return p.find(s=>s?.action==='glint'&&Array.isArray(s.actionZones)&&s.actionZones.length);}
-  function transformSelections(){const p=window.happyHoloSelectionPlan||[];return p.filter(s=>s?.action==='yaw3d');}
+  function transformSelections(){const p=window.happyHoloSelectionPlan||[];return p.filter(s=>s?.action==='yaw3d'||s?.action==='explodeview');}
   let headlightCache=null,glintCache=null,transformCache=null;
 
   function selectionMask(s,W,H){
@@ -213,12 +213,12 @@
     const W=reliefLayers.w,H=reliefLayers.h;const subject=document.createElement('canvas');subject.width=W;subject.height=H;const sx=subject.getContext('2d');reliefLayers.sub.forEach(l=>sx.drawImage(l.canvas,0,0));
     const masks=plan.map(s=>selectionMask(s,W,H));const base=document.createElement('canvas');base.width=W;base.height=H;const bx=base.getContext('2d');bx.drawImage(subject,0,0);bx.globalCompositeOperation='destination-out';masks.forEach(m=>{if(m)bx.drawImage(m,0,0);});bx.globalCompositeOperation='source-over';
     const layers=new Map();plan.forEach((s,i)=>{const own=masks[i];if(!own)return;const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.drawImage(subject,0,0);x.globalCompositeOperation='destination-in';x.drawImage(own,0,0);for(let j=i+1;j<plan.length;j++)if(masks[j]){x.globalCompositeOperation='destination-out';x.drawImage(masks[j],0,0);}x.globalCompositeOperation='source-over';layers.set(i,c);});
-    const activeIndices=plan.map((s,i)=>s?.action==='yaw3d'?i:-1).filter(i=>i>=0);const norms=[-1,-.66,-.33,0,.33,.66,1];
+    const hasExplode=active.some(s=>s?.action==='explodeview');const activeIndices=plan.map((s,i)=>(s?.action==='yaw3d'||s?.action==='explodeview')?i:-1).filter(i=>i>=0);const norms=hasExplode?[-1,-.75,-.5,-.25,0,.25,.5,.75,1]:[-1,-.66,-.33,0,.33,.66,1];
     const frames=engine.generateActionFrames({base,layers,selections:plan,activeIndices,W,H,phases:norms,phaseForSelection:(_s,n)=>(n+1)/2});
-    transformCache={subRef:reliefLayers.sub,planRef:plan,frames,selection:active[0]};return transformCache;
+    transformCache={subRef:reliefLayers.sub,planRef:plan,frames,selection:active[0],hasExplode};return transformCache;
   }
 
-  function drawTransformSubject(r,norm){const cache=getTransformCache();if(!cache?.frames?.length)return false;const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2));const frame=cache.frames[Math.min(cache.frames.length-1,Math.round(p*(cache.frames.length-1)))];const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);ctx.drawImage(frame,r.x+shift,r.y,r.w,r.h);return true;}
+  function drawTransformSubject(r,norm){const cache=getTransformCache();if(!cache?.frames?.length)return false;const p=Math.max(0,Math.min(1,(Number(norm||0)+1)/2)),pos=p*(cache.frames.length-1),lo=Math.floor(pos),hi=Math.min(cache.frames.length-1,lo+1),mix=pos-lo;const d=Math.max(.02,Math.min(.80,Number(cache.selection.depth)||.35));const shift=Number(norm||0)*(10+22*(d/.80))*(canvas.width/320);ctx.save();ctx.globalAlpha=1;ctx.drawImage(cache.frames[lo],r.x+shift,r.y,r.w,r.h);if(hi!==lo&&mix>.001){ctx.globalAlpha=mix;ctx.drawImage(cache.frames[hi],r.x+shift,r.y,r.w,r.h);}ctx.restore();return true;}
 
   function getGlintCache(){
     const s=activeGlintSelection(),engine=window.HappyHoloActionPreviewEngine;if(!s||!reliefLayers?.sub?.length||typeof engine?.buildGlintOverlay!=='function')return null;

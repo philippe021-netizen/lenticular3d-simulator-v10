@@ -1,5 +1,5 @@
-/* HappyHolo V3.2.7 — moteur d'actions OFFLINE
-   7 frames locales, sans API : rotation légère, appel de phare, clin d'œil.
+/* HappyHolo V3.8.0 — moteur d'actions OFFLINE
+   Actions locales, dont ExplodeView progressif pour les grandes pièces mécaniques.
 */
 (() => {
   'use strict';
@@ -102,7 +102,64 @@
       if(data[(y*W+x)*4+3]<12) continue;
       if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;
     }
-    return maxX<minX?null:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1,cx:(minX+maxX)/2};
+    return maxX<minX?null:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1,cx:(minX+maxX)/2,cy:(minY+maxY)/2};
+  }
+
+  function smoothstep(v){const t=clamp(v,0,1);return t*t*(3-2*t);}
+
+  function explodeVector(direction,bounds,index,count,W,H,groupCenter){
+    const fixed={
+      left:[-1,0],right:[1,0],up:[0,-1],down:[0,1],
+      'up-left':[-.72,-.72],'up-right':[.72,-.72],
+      'down-left':[-.72,.72],'down-right':[.72,.72],stay:[0,0]
+    };
+    if(fixed[direction])return fixed[direction];
+    const gx=groupCenter?.x??W/2,gy=groupCenter?.y??H/2;
+    let dx=(bounds?.cx??W/2)-gx,dy=(bounds?.cy??H/2)-gy;
+    const length=Math.hypot(dx,dy);
+    if(length>Math.min(W,H)*.055)return[dx/length,dy/length];
+    const angle=(-Math.PI/2)+(Math.PI*2*Math.max(0,index))/(Math.max(1,count));
+    return[Math.cos(angle),Math.sin(angle)];
+  }
+
+  function explodeProgress(phase,order,count){
+    const p=clamp(Number(phase)||0,0,1);
+    const rank=clamp((Number(order)||1)-1,0,Math.max(0,count-1));
+    const start=count<=1?0:(rank/Math.max(1,count-1))*.60;
+    return smoothstep((p-start)/Math.max(.001,1-start));
+  }
+
+  function buildExplodeFrame({layer,phase=0,intensity=.65,W,H,selection={},index=0,selections=[],layers=null,groupCenter=null}){
+    const out=document.createElement('canvas');out.width=W;out.height=H;
+    const x=out.getContext('2d');
+    const explodeSelections=selections.filter(s=>s?.action==='explodeview');
+    const count=Math.max(1,explodeSelections.length);
+    const localIndex=Math.max(0,explodeSelections.indexOf(selection));
+    const order=clamp(Number(selection.explodeOrder)||localIndex+1,1,count);
+    const progress=explodeProgress(phase,order,count);
+    const bounds=alphaBounds(layer);
+    let center=groupCenter;
+    if(!center&&layers){
+      const boxes=explodeSelections.map(s=>{
+        const i=selections.indexOf(s);return alphaBounds(layers.get(i));
+      }).filter(Boolean);
+      if(boxes.length)center={x:boxes.reduce((a,b)=>a+b.cx,0)/boxes.length,y:boxes.reduce((a,b)=>a+b.cy,0)/boxes.length};
+    }
+    const vector=explodeVector(selection.explodeDirection||'auto',bounds,localIndex,count,W,H,center);
+    const mode=selection.explodeMode||window.HappyHoloExplodeViewState?.mode||'simple';
+    const modeScale=mode==='technical'?1.16:mode==='detailed'?1.08:1;
+    const k=clamp(Number(intensity)||.65,.1,1);
+    const distance=Math.min(W,H)*(.07+.26*k)*modeScale*progress;
+    const dx=vector[0]*distance,dy=vector[1]*distance;
+    x.save();x.translate(dx,dy);
+    if(progress>.02&&selection.explodeDirection!=='stay'){
+      x.shadowColor=`rgba(0,0,0,${.10+.20*progress})`;
+      x.shadowBlur=Math.max(2,Math.min(W,H)*.012*progress);
+      x.shadowOffsetX=-vector[0]*Math.min(W,H)*.008*progress;
+      x.shadowOffsetY=Math.min(W,H)*.010*progress;
+    }
+    x.drawImage(layer,0,0,W,H);x.restore();
+    return out;
   }
 
   function drawHeadlightPaint(ctx,layer,phase,intensity,W,H,zone,mode='off_to_on'){
@@ -301,6 +358,10 @@
     const action=s.action||'none';
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
     if(action==='yaw3d') return drawYaw3D(ctx,layer,phase,intensity,W,H);
+    if(action==='explodeview'){
+      const frame=buildExplodeFrame({layer,phase,intensity,W,H,selection:s,index:meta.index||0,selections:meta.selections||[],layers:meta.layers||null,groupCenter:meta.groupCenter||null});
+      return ctx.drawImage(frame,0,0,W,H);
+    }
     if(action==='headlight'){
       const zones=Array.isArray(s.actionZones)&&s.actionZones.length?s.actionZones:(s.actionZone?[s.actionZone]:[]);
       ctx.drawImage(layer,0,0,W,H);
@@ -324,7 +385,7 @@
       selections.forEach((s,i)=>{
         const layer=layers.get(i); if(!layer) return;
         const localPhase=typeof phaseForSelection==='function'?phaseForSelection(s,phase,i):phase;
-        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,localPhase,W,H);
+        if(activeIndices.includes(i) && (s.action||'none')!=='none') renderAction(x,layer,s,localPhase,W,H,{index:i,selections,layers});
         else x.drawImage(layer,0,0,W,H);
       });
       out.push(c);
@@ -332,6 +393,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame};
-  console.log('[HAPPYHOLO] action-preview-engine V3.6.6 OFFLINE · actions locales fiables uniquement');
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildExplodeFrame,explodeProgress,alphaBounds};
+  console.log('[HAPPYHOLO] action-preview-engine V3.8.0 OFFLINE · ExplodeView machines actif');
 })();

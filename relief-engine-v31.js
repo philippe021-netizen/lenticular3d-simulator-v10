@@ -310,7 +310,7 @@ buildBtn.addEventListener('click',async()=>{
 
     window.HappyHoloReliefState={sourceImg,subjectImg,backgroundImg,subjectDepthCanvas,backgroundDepthCanvas,view};
     window.dispatchEvent(new CustomEvent('happyholo-relief-ready'));
-    startPreview(); exportBtn.disabled=false; setStatus('V3.24 prête — fond et placement sujet synchronisés avec l’aperçu et les 9 vues.');
+    startPreview(); exportBtn.disabled=false; setStatus('V3.25 prête — Relief 3D et ExplodeView machines disponibles pour les 9 vues.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
 });
@@ -325,20 +325,21 @@ exportBtn.addEventListener('click',async()=>{
     renderAt(poses[i],c); const b=await canvasToBlob(c); exported.push(b);
     const im=new Image(); im.src=URL.createObjectURL(b); framesEl.appendChild(im); await sleep(25);
   }
-  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.24 prêtes.');
+  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.25 prêtes.');
 });
 
 downloadBtn.addEventListener('click',async()=>{
   if(exported.length!==9) return;
   const zip=new JSZip(); exported.forEach((b,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,b));
   zip.file('manifest.json',JSON.stringify({
-    generator:'HappyHolo Relief 3D V3.24 render sync',localSegmentation:true,externalPaidApi:false,views:9,
+    generator:'HappyHolo Relief 3D V3.25 ExplodeView',localSegmentation:true,externalPaidApi:false,views:9,
     depthInference:'single-512-with-local-fallback',
     angle:Number(angle.value),subjectDepth:Number(subjectDepth.value),backgroundDepth:Number(bgDepth.value),edgeProtection:Number(edgeProtect.value),
     textLayer:window.HappyHoloTextLayer?.serialize?.()||null,
-    customBackground:window.HappyHoloCustomBackground?.serialize?.()||null
+    customBackground:window.HappyHoloCustomBackground?.serialize?.()||null,
+    explodeView:window.HappyHoloExplodeView?.serialize?.()||null
   },null,2));
   const b=await zip.generateAsync({type:'blob'}); const u=URL.createObjectURL(b);
-  const a=document.createElement('a'); a.href=u; a.download='9-vues-relief-3d-v324-render-sync.zip'; a.click();
+  const a=document.createElement('a'); a.href=u; a.download='9-vues-happyholo-v325-explodeview.zip'; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1500);
 });

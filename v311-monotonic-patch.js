@@ -11,7 +11,7 @@
   const framesEl = document.querySelector('#frames');
   if (!downloadBtn || !framesEl) return;
 
-  const VERSION = 'V3.2.0';
+  const VERSION = 'V3.25';
   const DEFAULT_LPI = 75;
 
   const PROFILES = {
@@ -93,15 +93,22 @@
 
   function getSelectedProfile() {
     const supportType = document.querySelector('#supportType')?.value;
-    if (supportType && PROFILES[supportType]) return PROFILES[supportType];
+    let profile = supportType && PROFILES[supportType] ? PROFILES[supportType] : null;
 
     const firstImg = framesEl.querySelector('img');
-    if (firstImg) {
+    if (!profile && firstImg) {
       const sw = firstImg.naturalWidth || firstImg.width || 1;
       const sh = firstImg.naturalHeight || firstImg.height || 1;
-      return sw >= sh ? PROFILES['keychain-horizontal'] : PROFILES['keychain-vertical'];
+      profile = sw >= sh ? PROFILES['keychain-horizontal'] : PROFILES['keychain-vertical'];
     }
-    return PROFILES['keychain-vertical'];
+    profile ||= PROFILES['keychain-vertical'];
+    const explode = window.HappyHoloExplodeView?.serialize?.();
+    if (!explode) return profile;
+    return {
+      ...profile,
+      lpi: 60,
+      filename: profile.filename.replace('75lpi-v320','60lpi-v325-explodeview')
+    };
   }
 
   async function normalizeBlob(blob, profile) {
@@ -246,7 +253,9 @@
         subjectDepth: Number(subjectDepth?.value ?? 0.48),
         backgroundDepth: Number(bgDepth?.value ?? 0.10),
         edgeProtection: Number(edgeProtect?.value ?? 84),
-        textLayer: window.HappyHoloTextLayer?.serialize?.() || null
+        textLayer: window.HappyHoloTextLayer?.serialize?.() || null,
+        customBackground: window.HappyHoloCustomBackground?.serialize?.() || null,
+        explodeView: window.HappyHoloExplodeView?.serialize?.() || null
       }, null, 2));
 
       const out = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });

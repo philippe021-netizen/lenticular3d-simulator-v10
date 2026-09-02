@@ -1,8 +1,8 @@
-const CACHE_VERSION = 'happyholo-offline-v1.49';
+const CACHE_VERSION = 'happyholo-offline-v1.50';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
-const APP_SHELL = ['./relief3d-test-v31.html','./relief-engine-v31.js','./action-preview-engine.js','./mask-editor-v315-panfix.js','./selection-controls-v336.js','./custom-background-v338.js','./composition-advanced-v350.js','./preview-sync-v355.js','./text-layer-v337.js','./v311-monotonic-patch.js','./support-preview-v316.js','./support-placement-sync-v374.js','./offline-manager-v317.js','./manifest.webmanifest'];
+const APP_SHELL = ['./relief3d-test-v31.html','./relief-engine-v31.js','./action-preview-engine.js','./mask-editor-v315-panfix.js','./selection-controls-v336.js','./custom-background-v338.js','./composition-advanced-v350.js','./preview-sync-v355.js','./text-layer-v337.js','./v311-monotonic-patch.js','./support-preview-v316.js','./support-placement-sync-v374.js','./explodeview-machines-v380.js','./offline-manager-v317.js','./manifest.webmanifest'];
 const CACHEABLE_HOSTS=['cdn.jsdelivr.net','esm.sh','staticimgly.com','huggingface.co','www.huggingface.co','cdn-lfs.huggingface.co','cdn-lfs-us-1.huggingface.co','cdn-lfs-eu-1.huggingface.co'];
 function cacheable(url){return url.origin===self.location.origin||CACHEABLE_HOSTS.some(h=>url.hostname===h||url.hostname.endsWith(`.${h}`));}
 self.addEventListener('install',e=>{e.waitUntil(caches.open(APP_CACHE).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting()));});

@@ -1,4 +1,4 @@
-/* HappyHolo V3.6.7 — sélections + placement sujet indépendant */
+/* HappyHolo V3.8.0 — sélections + ExplodeView machines */
 (() => {
   'use strict';
 
@@ -7,6 +7,7 @@
 
   const actionOptions=[
     ['Aucune action','none'],
+    ['Machine — ExplodeView (grosse pièce)','explodeview'],
     ['Moto/voiture — appel de phare','headlight'],
     ['Reflet lumineux local','glint'],
     ['Sujet — rotation 3D verticale légère','yaw3d'],
@@ -59,9 +60,11 @@
     const fx=engine.buildGlintOverlay({layer,phase:clamp((Number(norm)||0)+1,0,2)/2,intensity:clamp(Number(s.intensity||50)/100,.1,1),W,H,zones:s.actionZones});
     ctx.save();ctx.globalCompositeOperation='screen';ctx.drawImage(fx,shift,0);ctx.restore();
   }
-  function actionLayer(s,layer,norm,W,H){
+  function actionLayer(s,layer,norm,W,H,index=0,selections=plan()){
     if(!layer)return layer;const engine=window.HappyHoloActionPreviewEngine,signedNorm=clamp(Number(norm)||0,-1,1),phase=(signedNorm+1)/2,intensity=clamp(Number(s.intensity||50)/100,.1,1);
-    if(s?.action==='yaw3d'&&typeof engine?.buildYawFrame==='function')return engine.buildYawFrame({layer,phase,intensity,W,H});return layer;
+    if(s?.action==='yaw3d'&&typeof engine?.buildYawFrame==='function')return engine.buildYawFrame({layer,phase,intensity,W,H});
+    if(s?.action==='explodeview'&&typeof engine?.buildExplodeFrame==='function')return engine.buildExplodeFrame({layer,phase,intensity,W,H,selection:s,index,selections});
+    return layer;
   }
 
   function multiRenderAt(norm,target){
@@ -77,8 +80,8 @@
     const order=selections.map((s,i)=>({s,i,d:Number(s.depth)||0})).sort((a,b)=>a.d-b.d);
     for(const it of order){
       const layer=getExclusiveLayer(it.i,W,H);if(!layer)continue;const k=clamp((Number(it.s.depth)||.02)/.30,.05,3),shift=norm*18*amplitude*k;
-      const rendered=actionLayer(it.s,layer,norm,W,H);x.drawImage(rendered,shift,0);
-      if(it.s.action!=='yaw3d'){x.globalAlpha=.18;x.drawImage(layer,shift*.985,0);x.globalAlpha=1;}
+      const rendered=actionLayer(it.s,layer,norm,W,H,it.i,selections);x.drawImage(rendered,shift,0);
+      if(it.s.action!=='yaw3d'&&it.s.action!=='explodeview'){x.globalAlpha=.18;x.drawImage(layer,shift*.985,0);x.globalAlpha=1;}
       drawGlintForSelection(x,it.s,layer,norm,W,H,shift);
     }
     if(textDepth>=0)window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
@@ -107,8 +110,9 @@
     const layers=new Map();selections.forEach((s,i)=>layers.set(i,getExclusiveLayer(i,W,H)));const engine=window.HappyHoloActionPreviewEngine;if(!engine){alert('Moteur actions indisponible. Recharge la page.');return;}
     for(const i of valid){const s=selections[i];if(s.action==='headlight'&&!(Array.isArray(s.actionZones)&&s.actionZones.length)){alert('Définis d’abord au moins une zone de phare.');return;}if(s.action==='glint'&&!(Array.isArray(s.actionZones)&&s.actionZones.length)){alert('Définis d’abord au moins une zone de reflet.');return;}}
     const base=document.createElement('canvas');base.width=W;base.height=H;const bx=base.getContext('2d'),bg=bgImage()||src;if(!window.HappyHoloCustomBackground?.draw?.(bx,0,W,H,{x:0,y:0,w:W,h:H})){const bf=fitCoverLocal(bg,W,H);bx.drawImage(bg,bf.x,bf.y,bf.w,bf.h);}
-    const frames=engine.generateActionFrames({base,layers,selections,activeIndices:valid,W,H});mainActionPreviewModal._title.textContent=titleText||'Aperçu action';mainActionPreviewModal.style.display='flex';cancelAnimationFrame(mainActionPreviewRAF);const start=performance.now(),speed=Math.max(700,Math.min(...valid.map(i=>Number(selections[i].actionSpeed||2000))));
-    const frame=now=>{if(mainActionPreviewModal.style.display==='none')return;const t=((now-start)%speed)/speed,x=mainActionPreviewCtx;x.clearRect(0,0,W,H);x.drawImage(frames[Math.min(6,Math.floor(t*7))],0,0,W,H);mainActionPreviewRAF=requestAnimationFrame(frame);};mainActionPreviewRAF=requestAnimationFrame(frame);
+    const isExplode=valid.some(i=>selections[i].action==='explodeview');const phases=isExplode?[0,.125,.25,.375,.5,.625,.75,.875,1]:undefined;
+    const frames=engine.generateActionFrames({base,layers,selections,activeIndices:valid,W,H,...(phases?{phases}: {})});mainActionPreviewModal._title.textContent=titleText||'Aperçu action';mainActionPreviewModal.style.display='flex';cancelAnimationFrame(mainActionPreviewRAF);const start=performance.now(),speed=isExplode?12000:Math.max(700,Math.min(...valid.map(i=>Number(selections[i].actionSpeed||2000))));
+    const frame=now=>{if(mainActionPreviewModal.style.display==='none')return;const cycle=((now-start)%speed)/speed,t=isExplode?(1-Math.cos(cycle*Math.PI*2))*.5:cycle,pos=t*(frames.length-1),lo=Math.floor(pos),hi=Math.min(frames.length-1,lo+1),mix=pos-lo,x=mainActionPreviewCtx;x.clearRect(0,0,W,H);x.globalAlpha=1;x.drawImage(frames[lo],0,0,W,H);if(hi!==lo&&mix>.001){x.globalAlpha=mix;x.drawImage(frames[hi],0,0,W,H);x.globalAlpha=1;}mainActionPreviewRAF=requestAnimationFrame(frame);};mainActionPreviewRAF=requestAnimationFrame(frame);
   }
 
   function ensureControlPanel(){
@@ -121,9 +125,12 @@
       const awrap=document.createElement('div'),alab=document.createElement('div');alab.textContent='Action';Object.assign(alab.style,{fontSize:'12px',fontWeight:'700',marginBottom:'5px'});awrap.appendChild(alab);const asel=makeSelect();actionOptions.forEach(([t,v])=>asel.appendChild(new Option(t,v)));asel.value=s.action||'none';awrap.appendChild(asel);
       const speed=document.createElement('select');[['Rapide · 1 s',1000],['Normal · 2 s',2000],['Doux · 3 s',3000]].forEach(([t,v])=>speed.appendChild(new Option(t,String(v))));speed.value=String(s.actionSpeed||2000);s.actionSpeed=Number(speed.value);Object.assign(speed.style,{width:'100%',padding:'7px',borderRadius:'8px',marginTop:'7px'});speed.addEventListener('change',()=>{s.actionSpeed=Number(speed.value);notifyActionPlan();});awrap.appendChild(speed);
       const headlightMode=document.createElement('select');[['Réaliste · déjà allumé → appel','already_on'],['Visible · quasi éteint → 100 %','off_to_on']].forEach(([t,v])=>headlightMode.appendChild(new Option(t,v)));headlightMode.value=s.headlightMode||'already_on';s.headlightMode=headlightMode.value;Object.assign(headlightMode.style,{display:'none',width:'100%',padding:'7px',borderRadius:'8px',marginTop:'7px'});headlightMode.addEventListener('change',()=>{s.headlightMode=headlightMode.value;notifyActionPlan();});awrap.appendChild(headlightMode);
+      const explodeSettings=document.createElement('div');Object.assign(explodeSettings.style,{display:'none',gridTemplateColumns:'1fr 1fr',gap:'7px',marginTop:'7px'});
+      const explodeOrder=document.createElement('select');for(let n=1;n<=12;n++)explodeOrder.appendChild(new Option(`Étape ${n}`,String(n)));explodeOrder.value=String(s.explodeOrder||i+1);Object.assign(explodeOrder.style,{width:'100%',padding:'7px',borderRadius:'8px'});explodeOrder.addEventListener('change',()=>{s.explodeOrder=Number(explodeOrder.value);notifyActionPlan();});
+      const explodeDirection=document.createElement('select');[['Direction automatique','auto'],['Reste au centre','stay'],['Gauche','left'],['Droite','right'],['Haut','up'],['Bas','down'],['Haut gauche','up-left'],['Haut droite','up-right'],['Bas gauche','down-left'],['Bas droite','down-right']].forEach(([t,v])=>explodeDirection.appendChild(new Option(t,v)));explodeDirection.value=s.explodeDirection||'auto';Object.assign(explodeDirection.style,{width:'100%',padding:'7px',borderRadius:'8px'});explodeDirection.addEventListener('change',()=>{s.explodeDirection=explodeDirection.value;notifyActionPlan();});explodeSettings.append(explodeOrder,explodeDirection);awrap.appendChild(explodeSettings);
       const zoneBtn=document.createElement('button');zoneBtn.type='button';Object.assign(zoneBtn.style,{display:'none',width:'100%',padding:'9px',borderRadius:'9px',border:'1px solid #888',background:'#fff',fontWeight:'800',marginTop:'7px'});const removeZone=document.createElement('button');removeZone.type='button';removeZone.textContent='− Supprimer dernière zone';Object.assign(removeZone.style,{display:'none',width:'100%',padding:'7px',borderRadius:'9px',border:'1px solid #bbb',background:'#f3f3f3',marginTop:'5px'});
-      const updateZone=()=>{headlightMode.style.display=s.action==='headlight'?'block':'none';if(s.action==='headlight'||s.action==='glint'){s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];zoneBtn.style.display='block';removeZone.style.display=s.actionZones.length?'block':'none';zoneBtn.textContent=`＋ Ajouter zone ${s.action==='glint'?'reflet':'plein phare'} (${s.actionZones.length}/4)`;}else{zoneBtn.style.display='none';removeZone.style.display='none';}};
-      zoneBtn.addEventListener('click',async()=>{if(typeof window.HappyHoloChooseActionZone!=='function'){alert('Outil de zone indisponible. Recharge la page.');return;}s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];if(s.actionZones.length>=4){alert('4 zones maximum.');return;}const z=await window.HappyHoloChooseActionZone({actionZone:null},`${s.action==='glint'?'Zone reflet':'Zone plein phare'} ${s.actionZones.length+1}`);if(z)s.actionZones.push(z);updateZone();notifyActionPlan();});removeZone.addEventListener('click',()=>{if(Array.isArray(s.actionZones)&&s.actionZones.length)s.actionZones.pop();updateZone();notifyActionPlan();});asel.addEventListener('change',()=>{s.action=asel.value;if(s.action!=='headlight'&&s.action!=='glint')s.actionZones=[];updateZone();notifyActionPlan();});awrap.append(zoneBtn,removeZone);
+      const updateZone=()=>{headlightMode.style.display=s.action==='headlight'?'block':'none';explodeSettings.style.display=s.action==='explodeview'?'grid':'none';if(s.action==='headlight'||s.action==='glint'){s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];zoneBtn.style.display='block';removeZone.style.display=s.actionZones.length?'block':'none';zoneBtn.textContent=`＋ Ajouter zone ${s.action==='glint'?'reflet':'plein phare'} (${s.actionZones.length}/4)`;}else{zoneBtn.style.display='none';removeZone.style.display='none';}};
+      zoneBtn.addEventListener('click',async()=>{if(typeof window.HappyHoloChooseActionZone!=='function'){alert('Outil de zone indisponible. Recharge la page.');return;}s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];if(s.actionZones.length>=4){alert('4 zones maximum.');return;}const z=await window.HappyHoloChooseActionZone({actionZone:null},`${s.action==='glint'?'Zone reflet':'Zone plein phare'} ${s.actionZones.length+1}`);if(z)s.actionZones.push(z);updateZone();notifyActionPlan();});removeZone.addEventListener('click',()=>{if(Array.isArray(s.actionZones)&&s.actionZones.length)s.actionZones.pop();updateZone();notifyActionPlan();});asel.addEventListener('change',()=>{s.action=asel.value;if(s.action==='explodeview'){s.explodeOrder=Number(s.explodeOrder)||i+1;s.explodeDirection=s.explodeDirection||'auto';explodeOrder.value=String(Math.min(12,s.explodeOrder));explodeDirection.value=s.explodeDirection;}if(s.action!=='headlight'&&s.action!=='glint')s.actionZones=[];updateZone();notifyActionPlan();});awrap.append(zoneBtn,removeZone);
       const intensityLine=document.createElement('div');Object.assign(intensityLine.style,{display:'flex',alignItems:'center',gap:'8px',marginTop:'7px'});const intensityLabel=document.createElement('span');intensityLabel.textContent='Intensité';Object.assign(intensityLabel.style,{fontSize:'10px',color:'#666',minWidth:'48px'});const intensity=document.createElement('input');intensity.type='range';intensity.min='10';intensity.max='100';intensity.step='5';intensity.value=Number(s.intensity||50);intensity.style.flex='1';const intensityOut=document.createElement('b');intensityOut.textContent=`${Number(s.intensity||50)}%`;Object.assign(intensityOut.style,{fontSize:'10px',minWidth:'34px',textAlign:'right'});intensity.addEventListener('input',()=>{s.intensity=Number(intensity.value);intensityOut.textContent=`${s.intensity}%`;notifyActionPlan();});intensityLine.append(intensityLabel,intensity,intensityOut);awrap.appendChild(intensityLine);
       const actionButtons=document.createElement('div');Object.assign(actionButtons.style,{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'7px',marginTop:'8px'});const oneBtn=document.createElement('button');oneBtn.type='button';oneBtn.textContent='▶ Voir cette action';const allBtn=document.createElement('button');allBtn.type='button';allBtn.textContent='▶ Voir toutes';for(const b of[oneBtn,allBtn])Object.assign(b.style,{minHeight:'38px',padding:'8px 10px',borderRadius:'10px',border:'1px solid #222',fontWeight:'800',fontSize:'11px',cursor:'pointer'});Object.assign(oneBtn.style,{background:'#111',color:'#fff'});Object.assign(allBtn.style,{background:'#f1f1f1',color:'#111'});oneBtn.addEventListener('click',()=>openMainActionPreview([i],`Aperçu — ${s.name||`Sélection ${i+1}`}`));allBtn.addEventListener('click',()=>openMainActionPreview(selections.map((_,j)=>j),'Aperçu — toutes les actions'));actionButtons.append(oneBtn,allBtn);awrap.appendChild(actionButtons);
       const sub=document.createElement('div');sub.textContent='Aperçu local immédiat avant génération des 9 vues.';Object.assign(sub.style,{fontSize:'10px',color:'#777',marginTop:'5px'});awrap.appendChild(sub);updateZone();row.appendChild(awrap);card.appendChild(row);
@@ -134,7 +141,7 @@
   window.addEventListener('happyholo:selection-plan',()=>{clearCaches();setTimeout(ensureControlPanel,0);});
   window.addEventListener('happyholo-relief-ready',()=>{clearCaches();ensureControlPanel();});
   window.addEventListener('happyholo-subject-placement-changed',()=>{clearCaches();try{window.renderAt?.(0,window.HappyHoloReliefState?.view);}catch(_){} });
+  window.HappyHoloSelectionRenderer={getExclusiveLayer,getMaskTarget,fitCoverLocal,sourceImage,bgImage,plan,placementSig,clearCaches};
   setTimeout(ensureControlPanel,300);
-  console.log('[HAPPYHOLO] V3.6.7 sélections + placement sujet indépendant actif');
+  console.log('[HAPPYHOLO] V3.8.0 sélections + ExplodeView machines actif');
 })();
-
