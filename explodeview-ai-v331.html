@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo — ExplodeView IA V3.31</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#05080b;overflow:hidden;font-family:system-ui,sans-serif}
+#bar{position:fixed;z-index:999999;left:0;right:0;top:0;height:44px;background:#0b1a25;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 12px;box-sizing:border-box;border-bottom:2px solid #28a8ee;font-size:13px;font-weight:800}
+#bar b{color:#62c7ff}.ok{color:#7ef29a}.bad{color:#ff8c8c}
+iframe{position:absolute;left:0;top:44px;width:100%;height:calc(100% - 44px);border:0;background:#fff}
+</style>
+</head>
+<body>
+<div id="bar"><span><b>HappyHolo V3.31</b> — ExplodeView IA forcé</span><span id="state">Chargement…</span></div>
+<iframe id="app" src="./relief3d-test-v31.html?fresh=3310902"></iframe>
+<script>
+(()=>{
+ const frame=document.getElementById('app'), state=document.getElementById('state');
+ const set=(t,ok=true)=>{state.textContent=t;state.className=ok?'ok':'bad'};
+ frame.addEventListener('load',()=>{
+   const w=frame.contentWindow,d=frame.contentDocument;
+   try{
+     if('serviceWorker' in w.navigator){w.navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});}
+     const old=d.getElementById('startPieceSelection');
+     const auto=d.getElementById('autoPieceSelectionEnabled');
+     if(auto?.closest('label')) auto.closest('label').style.display='none';
+     const steps=d.querySelector('.piece-start-steps');
+     if(steps) steps.innerHTML='<span><b>1.</b> Choisis la photo.</span><span><b>2.</b> Crée le relief global une seule fois.</span><span><b>3.</b> Touche directement chaque grosse pièce avec l’IA.</span>';
+     const intro=d.querySelector('#pieceSelectionStart p'); if(intro) intro.textContent='Nouvelle sélection : touche directement une roue, selle, phare, réservoir, moteur ou autre grosse pièce. Aucun découpage automatique par petites zones.';
+     if(old){
+       const fresh=old.cloneNode(true); old.replaceWith(fresh); fresh.textContent='🎯 IA — toucher les pièces';
+       fresh.addEventListener('click',async()=>{
+         const file=d.getElementById('file')?.files?.[0];
+         if(!file){d.getElementById('file')?.click();return;}
+         if(!Array.isArray(w.happyHoloSelectionPlan)||!w.happyHoloSelectionPlan?.[0]?.mask){
+           const build=d.getElementById('build');
+           if(build){d.getElementById('status').textContent='Création du détourage global avant sélection IA…'; build.click();}
+           return;
+         }
+         fresh.disabled=true; fresh.textContent='Chargement IA…';
+         try{
+           if(!w.HappyHoloSlimSAM?.open){
+             await new Promise((resolve,reject)=>{
+               const s=d.createElement('script'); s.src='./slimsam-piece-selector-v330.js?fresh=3310902'; s.onload=resolve; s.onerror=reject; d.head.appendChild(s);
+             });
+           }
+           if(!w.HappyHoloSlimSAM?.open) throw new Error('SlimSAM non chargé');
+           await w.HappyHoloSlimSAM.open();
+         }catch(e){alert('Sélection IA indisponible : '+(e?.message||e));}
+         finally{fresh.disabled=false;fresh.textContent='🎯 IA — toucher les pièces';}
+       });
+     }
+     const marker=d.getElementById('buildMarker'); if(marker){marker.textContent='V3.31 • SlimSAM forcé';marker.style.background='#62c7ff'}
+     const oldScript=[...d.scripts].find(s=>s.src.includes('explodeview-machines-v380.js'));
+     if(oldScript) oldScript.remove();
+     const s=d.createElement('script'); s.src='./explodeview-machines-v380.js?fresh=3310902'; d.head.appendChild(s);
+     set('SlimSAM forcé',true);
+   }catch(e){console.error(e);set('Erreur de forçage IA',false);}
+ });
+})();
+</script>
+</body>
+</html>
