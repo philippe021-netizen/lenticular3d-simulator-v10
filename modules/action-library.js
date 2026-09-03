@@ -44,7 +44,7 @@ async function loadBundledLibrary() {
 function ensureFamilyOptions(library) {
   const select = document.getElementById('family');
   if (!select) return;
-  const labels = { person: 'Personne', group: 'Duo / Groupe', animal: 'Animal', logo: 'Logo / Objet' };
+  const labels = { person: 'Individu', couple: 'Couple', group: 'Groupe', animal: 'Animal', logo: 'Logo / Objet' };
   const families = new Set();
   for (const action of (library?.actions || [])) {
     for (const variant of (action.variants || [])) if (variant?.family) families.add(variant.family);
@@ -101,9 +101,10 @@ export function getActionVariant(library, actionId, family = null, variantId = n
   const resolvedActionId = resolveActionIdFromVisibleSelect(library, actionId);
   const action = library?.actions?.find(a => a.id === resolvedActionId && a.active !== false);
   if (!action) throw new Error(`Action inconnue : ${resolvedActionId}`);
+  const variantFamily = family === 'couple' ? 'group' : family;
   let variant = null;
   if (variantId) variant = action.variants?.find(v => v.id === variantId);
-  if (!variant && family) variant = action.variants?.find(v => v.family === family);
+  if (!variant && variantFamily) variant = action.variants?.find(v => v.family === variantFamily);
   if (!variant) variant = action.variants?.find(v => v.id === action.defaultVariantId) || action.variants?.[0];
   if (!variant) throw new Error(`Aucune variante pour ${resolvedActionId}`);
   return { action, variant };

@@ -7,16 +7,30 @@
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:10;background:#111;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 50px)}iframe{width:100%;height:calc(100vh - 50px);border:0;background:#fff}.side{padding:16px;background:#fff;border-left:1px solid #ddd;overflow:auto}h2{margin:0 0 5px}p{font-size:13px;color:#555;line-height:1.4}label{display:block;font-size:13px;font-weight:750;margin:13px 0 6px}select,button{width:100%;font:inherit;padding:12px;border-radius:11px}select{border:1px solid #ccc;background:#fff}button{border:0;background:#111;color:#fff;font-weight:800;margin-top:12px}button:disabled{opacity:.45}.secondary{background:#e8e8e8;color:#111}.pixbtn{background:#17652c}.prompt,.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;line-height:1.4}.status{white-space:pre-wrap}.exports{margin-top:14px;padding:12px;border:1px solid #ddd;border-radius:12px;background:#fafafa}.exports b{font-size:14px}.exports .small{margin-top:5px}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.small{font-size:11px;color:#666;margin-top:8px}.frames-block{display:none;margin-top:14px;padding:12px;border:2px solid #19a45b;border-radius:12px;background:#f4fff7}.frames-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.frames-head b{font-size:14px;color:#126b3d}.frames-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.frame{position:relative;border-radius:9px;overflow:hidden;background:#111;aspect-ratio:3/4;cursor:pointer}.frame img{width:100%;height:100%;object-fit:cover;display:block}.frame span{position:absolute;left:5px;bottom:5px;background:#000b;color:#fff;font-size:10px;padding:3px 5px;border-radius:6px}.frames-note{font-size:11px;color:#456;line-height:1.35;margin-top:7px}.pixverse-label{font-size:11px;font-weight:800;color:#126b3d;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.diag{margin-top:8px;padding:8px 10px;border-radius:9px;background:#e7f7eb;color:#17652c;font-size:12px;font-weight:700}.diag.bad{background:#ffe9e7;color:#8b1f17}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #ddd}.layout iframe{height:58vh}.bar{position:relative}}
 </style>
+<style>
+.audience-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.audience-tab{min-height:46px;margin:0;padding:9px 7px;background:#eef1f3;color:#202830;border:2px solid transparent}
+.audience-tab.active{background:#111;color:#fff;border-color:#111;box-shadow:0 0 0 3px #38bdf833}
+.family-select{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
+@media(max-width:850px){.audience-tabs{grid-template-columns:repeat(2,1fr)}}
+</style>
 </head>
 <body>
-<div class="bar"><b>HappyHolo + PixVerse</b><span class="badge">TEST ISOLÉ</span></div>
+<div class="bar"><b>HappyHolo + PixVerse</b><span class="badge">PIXVERSE V6</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=pixverse-test-20260829e" title="HappyHolo"></iframe>
+  <iframe id="hhApp" src="./relief3d-test-v31.html?v=402" title="HappyHolo"></iframe>
   <aside class="side">
     <h2>Action PixVerse</h2>
     <p>Prépare l’image dans HappyHolo à gauche, puis lance une action. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
-    <label>Catégorie</label>
-    <select id="family"><option value="person">Personne</option><option value="group">Duo / Groupe</option><option value="animal">Animal</option><option value="logo">Logo / Objet</option></select>
+    <label>Type de photo</label>
+    <div id="audienceTabs" class="audience-tabs" role="group" aria-label="Type de photo">
+      <button type="button" class="audience-tab active" data-family="person" aria-pressed="true">Individu</button>
+      <button type="button" class="audience-tab" data-family="couple" aria-pressed="false">Couple</button>
+      <button type="button" class="audience-tab" data-family="group" aria-pressed="false">Groupe</button>
+      <button type="button" class="audience-tab" data-family="animal" aria-pressed="false">Animal</button>
+      <button type="button" class="audience-tab" data-family="logo" aria-pressed="false">Logo / objet</button>
+    </div>
+    <select id="family" class="family-select" aria-label="Type de photo"><option value="person">Individu</option><option value="couple">Couple</option><option value="group">Groupe</option><option value="animal">Animal</option><option value="logo">Logo / Objet</option></select>
     <label>Action</label><select id="action"></select>
     <div id="prompt" class="prompt">Chargement…</div>
     <button id="run" disabled>Lancer PixVerse</button>
@@ -42,12 +56,13 @@
   </aside>
 </div>
 <script type="module">
-import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=20260829e';
-import { runPixVerseAction } from './modules/pixverse-client.js?v=20260829e';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=20260829e';
+import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=402';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=402';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=402';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
+const audienceTabs=[...document.querySelectorAll('[data-family]')];
 const action=document.getElementById('action');
 const prompt=document.getElementById('prompt');
 const run=document.getElementById('run');
@@ -66,8 +81,15 @@ let lastVideoId=null;
 
 function setStatus(text,error=false,ok=false){status.textContent=text;status.style.background=error?'#ffe9e7':ok?'#e7f7eb':'#f2f2f2';status.style.color=error?'#8b1f17':ok?'#17652c':'#333'}
 function selection(){return action.value?getActionVariant(library,action.value,family.value):null}
+function actionsForAudience(){
+  const fixed={couple:['group_kiss','group_cheek_kiss','group_dance'],group:['group_hands_up']};
+  if(fixed[family.value])return (library?.actions||[]).filter(a=>a.active!==false&&fixed[family.value].includes(a.id));
+  return (library?.actions||[]).filter(a=>a.active!==false&&a.categories?.includes(family.value)&&a.variants?.some(v=>v.family===family.value));
+}
+function refreshAudienceTabs(){audienceTabs.forEach(b=>{const on=b.dataset.family===family.value;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));});}
 function refresh(){
-  const acts=(library?.actions||[]).filter(a=>a.active!==false&&a.categories?.includes(family.value)&&a.variants?.some(v=>v.family===family.value));
+  refreshAudienceTabs();
+  const acts=actionsForAudience();
   action.innerHTML=acts.map(a=>`<option value="${a.id}">${a.label}</option>`).join('');
   const s=selection();
   if(s){const v=s.variant;prompt.innerHTML=`<b>${s.action.label}</b><br>${v.prompt}<br><span style="color:#666">${v.duration||2} s · ${v.quality||'540p'} · audio ${v.audio?'ON':'OFF'}</span>`;run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}
@@ -168,7 +190,7 @@ function bindHappyHoloSceneChanges(){
   const w=iframe.contentWindow;if(!w||w.__happyHoloPixverseSceneBound)return;w.__happyHoloPixverseSceneBound=true;w.addEventListener('happyholo-background-changed',invalidatePixVerseAfterSceneEdit);w.addEventListener('happyholo-subject-placement-changed',invalidatePixVerseAfterSceneEdit)
 }
 
-family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
+audienceTabs.forEach(b=>b.onclick=()=>{family.value=b.dataset.family;refresh();});family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
 downloadStatic.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP statique ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadStaticSupportZip();setStatus(`ZIP statique prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP statique : ${e.message}`,true)}};
 downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
 iframe.addEventListener('load',()=>{stabilizeLocalSupport();bindHappyHoloSceneChanges();setStatus('HappyHolo chargé. Prépare une image puis lance l’action.')});

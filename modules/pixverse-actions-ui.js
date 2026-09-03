@@ -23,16 +23,18 @@ function buildPanel() {
   panel.style.cssText = 'margin:18px auto 0;max-width:1120px;background:#fff;border:2px solid #111;border-radius:18px;padding:18px;box-shadow:0 8px 30px #0001';
   panel.innerHTML = `
     <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
-      <div><h2 style="margin:0 0 4px">Actions PixVerse</h2><div style="font-size:13px;color:#555">Test intégré — image finale HappyHolo → 2 s / 540p → retour MP4.</div></div>
-      <span style="background:#fff3cd;color:#725c00;border:1px solid #eed47a;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:800">BRANCHE TEST</span>
+      <div><h2 style="margin:0 0 4px">Actions PixVerse</h2><div style="font-size:13px;color:#555">Image finale HappyHolo → 2 s / 540p → retour MP4.</div></div>
+      <span style="background:#fff3cd;color:#725c00;border:1px solid #eed47a;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:800">PIXVERSE V6</span>
     </div>
     <div style="display:grid;grid-template-columns:180px 1fr;gap:12px;margin-top:14px" class="hh-pv-grid">
       <div>
         <label style="font-size:13px;font-weight:700;display:block;margin:0 0 6px">Catégorie</label>
         <select id="hhPvFamily" style="width:100%;padding:11px;border:1px solid #ccc;border-radius:10px;background:#fff">
-          <option value="person">Personne</option>
-          <option value="group">Duo / Groupe</option>
+          <option value="person">Individu</option>
+          <option value="couple">Couple</option>
+          <option value="group">Groupe</option>
           <option value="animal">Animal</option>
+          <option value="logo">Logo / Objet</option>
         </select>
       </div>
       <div>
@@ -81,6 +83,8 @@ async function init() {
 
   function compatibleActions() {
     const family = familyEl.value;
+    const fixed = { couple: ['group_kiss', 'group_cheek_kiss', 'group_dance'], group: ['group_hands_up'] };
+    if (fixed[family]) return (library.actions || []).filter(a => a.active !== false && fixed[family].includes(a.id));
     return (library.actions || []).filter(a => a.active !== false && a.categories?.includes(family) && a.variants?.some(v => v.family === family || v.id === a.defaultVariantId));
   }
 
