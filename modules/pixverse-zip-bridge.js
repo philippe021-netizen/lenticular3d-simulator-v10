@@ -67,7 +67,7 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
         throw new Error('Les 9 vues PixVerse ne sont pas prêtes.');
       }
       if (!payload?.qualityGate?.passed) {
-        throw new Error('Export bloqué : doublon, retour en arrière ou mouvement utile insuffisant.');
+        throw new Error('Export bloqué : retour brutal à la pose initiale confirmé.');
       }
       const ZipCtor = iframe.contentWindow?.JSZip || window.JSZip;
       if (!ZipCtor) throw new Error('JSZip indisponible.');
