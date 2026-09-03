@@ -21,9 +21,9 @@
   <iframe id="hhApp" src="./relief3d-test-v31.html?v=405" title="HappyHolo"></iframe>
   <aside class="side">
     <h2>Action PixVerse</h2>
-    <p>Prépare l’image dans HappyHolo à gauche, puis lance une action. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
-    <label>Type de photo</label>
-    <div id="audienceTabs" class="audience-tabs" role="group" aria-label="Type de photo">
+    <p>Prépare l’image dans HappyHolo à gauche, puis choisis une action préparée ou écris une phrase libre. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
+    <label>Sujet ou mode</label>
+    <div id="audienceTabs" class="audience-tabs" role="group" aria-label="Sujet ou mode">
       <button type="button" class="audience-tab active" data-family="person" aria-pressed="true">Individu</button>
       <button type="button" class="audience-tab" data-family="couple" aria-pressed="false">Duo</button>
       <button type="button" class="audience-tab" data-family="group" aria-pressed="false">Groupe</button>
@@ -31,12 +31,12 @@
       <button type="button" class="audience-tab" data-family="logo" aria-pressed="false">Logo / objet</button>
       <button type="button" class="audience-tab" data-family="custom" aria-pressed="false">Action libre</button>
     </div>
-    <select id="family" class="family-select" aria-label="Type de photo"><option value="person">Individu</option><option value="couple">Duo</option><option value="group">Groupe</option><option value="animal">Animal</option><option value="logo">Logo / Objet</option><option value="custom">Action libre</option></select>
+    <select id="family" class="family-select" aria-label="Sujet ou mode"><option value="person">Individu</option><option value="couple">Duo</option><option value="group">Groupe</option><option value="animal">Animal</option><option value="logo">Logo / Objet</option><option value="custom">Action libre</option></select>
     <label id="actionLabel">Action</label><select id="action"></select>
     <div id="customActionBlock" hidden>
       <label for="customAction">Décris l’action en une phrase</label>
-      <textarea id="customAction" maxlength="800" placeholder="Ex. La voiture allume ses phares puis avance légèrement vers la droite."></textarea>
-      <div class="small">HappyHolo crée le prompt complet et conserve automatiquement tout le sujet dans le cadre.</div>
+      <textarea id="customAction" maxlength="800" placeholder="Ex. La voiture avance légèrement vers la droite."></textarea>
+      <div class="small">Décris une seule action simple. HappyHolo crée le prompt complet et conserve automatiquement tout le sujet dans le cadre.</div>
     </div>
     <div id="prompt" class="prompt">Chargement…</div>
     <button id="run" disabled>Lancer PixVerse</button>
@@ -92,7 +92,7 @@ let lastLaunchSelection=null;
 
 function setStatus(text,error=false,ok=false){status.textContent=text;status.style.background=error?'#ffe9e7':ok?'#e7f7eb':'#f2f2f2';status.style.color=error?'#8b1f17':ok?'#17652c':'#333'}
 function cleanCustomIdea(){return customAction.value.replace(/\s+/g,' ').trim().slice(0,800)}
-function localCustomPrompt(idea){return `Use the uploaded image as the exact visual reference. Perform exactly this requested action once: ${idea}. Interpret the request as one simple, continuous and physically plausible transition. Animate only the subject or parts explicitly involved in the request. Preserve the exact identity, anatomy, appearance, proportions, colors and geometry of every subject.`}
+function localCustomPrompt(idea){return `Use the uploaded image as the exact visual reference. Perform exactly this requested action once: "${idea}" — interpret it as one simple, continuous and physically plausible transition. Animate only the subject or parts explicitly involved in the request. Preserve the exact identity, anatomy, appearance, proportions, colors and geometry of every subject.`}
 function customSelection(idea=cleanCustomIdea(),prepared=null){if(!idea)return null;return{action:{id:'custom_action',label:'Action libre'},variant:{id:'custom_action_v1',family:'custom',prompt:prepared?.prompt||localCustomPrompt(idea),negativePrompt:prepared?.negativePrompt||'',duration:2,quality:'540p',motionMode:'normal',audio:false},customRequest:idea,promptProvider:prepared?.provider||'preview-template'}}
 function selection(){if(family.value==='custom')return customSelection();return action.value?getActionVariant(library,action.value,family.value):null}
 function actionsForAudience(){

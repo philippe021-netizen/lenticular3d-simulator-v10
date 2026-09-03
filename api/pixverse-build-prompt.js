@@ -10,7 +10,7 @@ function readOutputText(data) {
 }
 
 function localPrompt(idea) {
-  return `Use the uploaded image as the exact visual reference. Perform exactly this requested action once: ${idea}. Interpret the request as one simple, continuous and physically plausible transition. Animate only the subject or parts explicitly involved in the request. Preserve the exact identity, anatomy, appearance, proportions, colors and geometry of every subject.`;
+  return `Use the uploaded image as the exact visual reference. Perform exactly this requested action once: "${idea}" — interpret it as one simple, continuous and physically plausible transition. Animate only the subject or parts explicitly involved in the request. Preserve the exact identity, anatomy, appearance, proportions, colors and geometry of every subject.`;
 }
 
 const LOCAL_NEGATIVE = 'extra action, invented action, subject replacement, changed identity, face morphing, anatomy change, geometry change, duplicated subject, extra limbs, extra wheels, added object, text, letters, numbers, logo, watermark';
