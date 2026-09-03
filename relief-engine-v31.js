@@ -289,8 +289,8 @@ function startPreview(){
   anim=requestAnimationFrame(loop);
 }
 
-file.addEventListener('change',async()=>{
-  sourceFile=file.files?.[0]||null; exported=[]; exportBtn.disabled=true; downloadBtn.disabled=true; framesEl.innerHTML='';
+async function loadSourceFile(nextFile){
+  sourceFile=nextFile||null; exported=[]; exportBtn.disabled=true; downloadBtn.disabled=true; framesEl.innerHTML='';
   window.HappyHoloReliefState=null;
   if(!sourceFile) return;
   sourceImg=await fileToImage(sourceFile);
@@ -299,9 +299,11 @@ file.addEventListener('change',async()=>{
   const c=view.getContext('2d'); c.clearRect(0,0,view.width,view.height);
   const f=fitContain(sourceImg,view.width,view.height); c.drawImage(sourceImg,f.x,f.y,f.w,f.h);
   setStatus('Photo chargée. Clique sur « Créer le relief 3D local ».');
-});
+}
 
-buildBtn.addEventListener('click',async()=>{
+file.addEventListener('change',()=>loadSourceFile(file.files?.[0]||null));
+
+async function buildRelief(){
   if(!sourceFile){ setStatus('Choisis d’abord une photo.'); return; }
   buildBtn.disabled=true; exportBtn.disabled=true; downloadBtn.disabled=true;
   try{
@@ -321,7 +323,17 @@ buildBtn.addEventListener('click',async()=>{
     startPreview(); exportBtn.disabled=false; setStatus('V3.29 prête — Les sélections corrigées sont appliquées à l’ExplodeView et aux 9 vues.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
-});
+}
+
+buildBtn.addEventListener('click',buildRelief);
+
+window.HappyHoloLoadSourceBlob=async(blob,{autoBuild=true,name='happyholo-bord-repare.png'}={})=>{
+  if(!(blob instanceof Blob))throw new Error('Image réparée invalide.');
+  const nextFile=new File([blob],name,{type:blob.type||'image/png'});
+  await loadSourceFile(nextFile);
+  if(autoBuild)await buildRelief();
+  return window.HappyHoloReliefState;
+};
 
 exportBtn.addEventListener('click',async()=>{
   if(!subjectImg||!backgroundImg) return;
