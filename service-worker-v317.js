@@ -1,8 +1,9 @@
-const CACHE_VERSION = 'happyholo-offline-v1.61';
+const CACHE_VERSION = 'happyholo-offline-v1.62';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
 const APP_SHELL = ['./index.html','./happyholo-analysis.html','./happyholo-simulator.html','./happyholo-business-card-studio.html','./relief3d-test-v31.html','./relief-engine-v31.js','./action-preview-engine.js','./mask-editor-v315-panfix.js','./selection-controls-v336.js','./custom-background-v338.js','./composition-advanced-v350.js','./background-multiselect-engine.js','./background-object-editor-ipad-fix.js','./preview-sync-v355.js','./text-layer-v337.js','./v311-monotonic-patch.js','./support-preview-v316.js','./support-placement-sync-v374.js','./explodeview-machines-v380.js','./slimsam-piece-selector-v330.js','./offline-manager-v317.js','./manifest.webmanifest','./explodeview-rocket-demo/index.html','./explodeview-rocket-demo/vue-01.webp','./explodeview-rocket-demo/vue-02.webp','./explodeview-rocket-demo/vue-03.webp','./explodeview-rocket-demo/vue-04.webp','./explodeview-rocket-demo/vue-05.webp','./explodeview-rocket-demo/vue-06.webp','./explodeview-rocket-demo/vue-07.webp','./explodeview-rocket-demo/vue-08.webp','./explodeview-rocket-demo/vue-09.webp'];
+APP_SHELL.push('./happyholo-pixverse-actions-test.html','./data/actions-library.json','./modules/action-library.js','./modules/pixverse-client.js','./modules/video-frame-extractor.js');
 const CACHEABLE_HOSTS=['cdn.jsdelivr.net','esm.sh','staticimgly.com','huggingface.co','www.huggingface.co','cdn-lfs.huggingface.co','cdn-lfs-us-1.huggingface.co','cdn-lfs-eu-1.huggingface.co'];
 function cacheable(url){return url.origin===self.location.origin||CACHEABLE_HOSTS.some(h=>url.hostname===h||url.hostname.endsWith(`.${h}`));}
 self.addEventListener('install',e=>{e.waitUntil(caches.open(APP_CACHE).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting()));});
