@@ -47,17 +47,40 @@ function samples(progress) {
   assert.ok(selected.actionEndIndex >= 6);
 }
 
-// The export gate must reject a repeated source frame in the middle.
+// Similar neighboring frames are common in subtle lenticular motion. They
+// produce a warning but must not block export.
 {
-  const signatures = [0, 20, 35, 52, 66, 0, 85, 91, 97].map(value => new Float32Array([value]));
+  const signatures = [0, 10, 20, 30, 40, 50, 60, 70, 70].map(value => new Float32Array([value]));
   const frames = signatures.map((signature, index) => ({
     signature,
-    fingerprint: index === 5 ? 'source' : index === 0 ? 'source' : `frame-${index}`
+    fingerprint: index === 8 ? 'frame-7' : `frame-${index}`
+  }));
+  const quality = assessProgressiveFrames(frames);
+  assert.equal(quality.passed, true);
+  assert.equal(quality.warning, 'similar-frames');
+  assert.equal(quality.returnDetected, false);
+}
+
+// A true hard reset remains the only content-quality blocker.
+{
+  const signatures = [0, 20, 35, 52, 66, 4, 85, 91, 97].map(value => new Float32Array([value]));
+  const frames = signatures.map((signature, index) => ({
+    signature,
+    fingerprint: `frame-${index}`
   }));
   const quality = assessProgressiveFrames(frames);
   assert.equal(quality.passed, false);
-  assert.equal(quality.reason, 'duplicate-frames');
+  assert.equal(quality.reason, 'return-detected');
   assert.equal(quality.returnDetected, true);
+}
+
+// An extremely subtle action is left to visual judgment rather than refused.
+{
+  const signatures = [0, .05, .1, .15, .2, .25, .3, .35, .4].map(value => new Float32Array([value]));
+  const frames = signatures.map((signature, index) => ({ signature, fingerprint: `subtle-${index}` }));
+  const quality = assessProgressiveFrames(frames);
+  assert.equal(quality.passed, true);
+  assert.equal(quality.warning, 'subtle-motion');
 }
 
 console.log('video-frame-extractor progressive tests: ok');
