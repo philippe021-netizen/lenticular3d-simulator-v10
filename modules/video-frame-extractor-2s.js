@@ -3,7 +3,7 @@ import {
   downloadExtractedFrame,
   showPixVerseFramesInSimulator,
   stopPixVerseSimulatorPreview
-} from './video-frame-extractor.js?v=408';
+} from './video-frame-extractor.js?v=409';
 
 /**
  * HappyHolo PixVerse short-clip extractor.

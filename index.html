@@ -14,7 +14,7 @@
 </head>
 <body>
 <div class="app">
-  <aside class="rail" aria-label="Familles HappyHolo"><div class="brand"><div class="brand-row"><strong>HappyHolo</strong><span class="version">V4.3</span></div><div class="tagline">Un seul accès pour créer, animer, produire et contrôler.</div></div><nav class="families" id="families"></nav><div class="rail-foot"><div class="health"><span class="dot" id="healthDot"></span><span id="healthText">Contrôle des services…</span></div></div></aside>
+  <aside class="rail" aria-label="Familles HappyHolo"><div class="brand"><div class="brand-row"><strong>HappyHolo</strong><span class="version">V4.4</span></div><div class="tagline">Un seul accès pour créer, animer, produire et contrôler.</div></div><nav class="families" id="families"></nav><div class="rail-foot"><div class="health"><span class="dot" id="healthDot"></span><span id="healthText">Contrôle des services…</span></div></div></aside>
   <main class="workspace"><header class="toolbar"><div class="toolbar-top"><div class="title"><h1 id="routeTitle">Studio 3D</h1><p id="routeHelp">Photo, relief et 9 vues lenticulaires</p></div><div class="tool-actions"><button class="icon-btn reload" id="reload" title="Recharger ce module">↻</button><button class="icon-btn" id="open" title="Ouvrir ce module seul">↗</button><button class="icon-btn" id="focus" title="Plein écran">⛶</button></div></div><nav class="subnav" id="subnav"></nav></header><section class="stage"><div class="loading" id="loading"><div>Ouverture du module…</div></div><iframe class="service-frame" id="serviceFrame" title="Module HappyHolo" allow="clipboard-read; clipboard-write"></iframe></section></main>
 </div>
 <button class="focus-exit" id="focusExit">×</button>
@@ -27,11 +27,11 @@ const families=[
 {id:'analysis',label:'Analyser un visuel',title:'Analyse du visuel',help:'Résolution, netteté, contraste et cadrage support',src:'./happyholo-analysis.html?v=400'}]},
 {id:'animate',icon:'▶',label:'Animer',hint:'Local & PixVerse',routes:[
 {id:'local-actions',label:'Actions locales',title:'Actions locales',help:'Personne, animal, véhicule, objet et logo',src:'./relief3d-test-v31.html?embed=1&v=406',target:'#happyHoloSelectionControls'},
-{id:'pixverse',label:'Actions PixVerse',title:'Actions PixVerse V6',help:'Actions prédéfinies : individu, couple, groupe, animal et logo',src:'./happyholo-pixverse-actions-test.html?v=408'},
-{id:'pixverse-free',label:'Prompt libre PixVerse',title:'PixVerse — prompt libre universel',help:'Une phrase, une ou plusieurs zones, puis 9 vues avec réinjection protégée',src:'./happyholo-pixverse-free.html?v=408'}]},
+{id:'pixverse',label:'Actions PixVerse',title:'Actions PixVerse V6',help:'Actions prédéfinies : individu, couple, groupe, animal et logo',src:'./happyholo-pixverse-actions-test.html?v=409'},
+{id:'pixverse-free',label:'Prompt libre PixVerse',title:'PixVerse — prompt libre universel',help:'Une phrase, une ou plusieurs zones, puis 9 vues avec réinjection protégée',src:'./happyholo-pixverse-free.html?v=409'}]},
 {id:'products',icon:'▣',label:'Produits',hint:'Supports & cartes',routes:[
 {id:'supports',label:'Supports',title:'Supports et cadrage',help:'Porte-clé, médaillon, carte et verso',src:'./relief3d-test-v31.html?embed=1&v=406',target:'.support-card'},
-{id:'card',label:'Carte / souvenir',title:'Carte de visite et photo souvenir',help:'Analyse IA, texte protégé, 9 vues et ZIP impression',src:'./happyholo-business-card-studio.html?v=408'},
+{id:'card',label:'Carte / souvenir',title:'Carte de visite et photo souvenir',help:'Analyse IA, texte protégé, 9 vues et ZIP impression',src:'./happyholo-business-card-studio.html?v=409'},
 {id:'simulator',label:'Simulateur 9 vues',title:'Simulateur lenticulaire universel',help:'Lecture fluide, tactile et contrôle des écarts',src:'./happyholo-simulator.html?v=400'}]},
 {id:'machines',icon:'⚙',label:'Machines',hint:'ExplodeView',routes:[
 {id:'explode',label:'Créer ExplodeView',title:'ExplodeView — machines',help:'Démontage progressif des grosses pièces seulement',src:'./relief3d-test-v31.html?embed=1&v=406',target:'#pieceSelectionStart'},
