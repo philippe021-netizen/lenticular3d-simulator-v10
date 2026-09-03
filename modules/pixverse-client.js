@@ -1,0 +1,93 @@
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function readJson(r) {
+  const text = await r.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!r.ok) throw new Error(data?.error || data?.message || data?.ErrMsg || `Erreur HTTP ${r.status}`);
+  if (Number(data?.ErrCode) && Number(data.ErrCode) !== 0) {
+    throw new Error(data?.ErrMsg || `Erreur PixVerse ${data.ErrCode}`);
+  }
+  return data;
+}
+
+export async function uploadPixVerseImage(file) {
+  const form = new FormData();
+  // PixVerse attend impérativement le champ multipart nommé "image".
+  form.append('image', file, file.name || `happyholo-${Date.now()}.png`);
+  const r = await fetch('/api/pixverse-upload', { method: 'POST', body: form });
+  const data = await readJson(r);
+  const imgId = data?.Resp?.img_id ?? data?.img_id ?? data?.data?.img_id;
+  if (imgId === undefined || imgId === null || imgId === '') {
+    throw new Error(`PixVerse n’a pas renvoyé de img_id${data?.ErrMsg ? ` : ${data.ErrMsg}` : ''}.`);
+  }
+  return { imgId, raw: data };
+}
+
+export async function createPixVerseVideo({ imgId, prompt, negativePrompt = '', duration = 2, quality = '540p', motionMode = 'normal', seed = 0, audio = false }) {
+  const r = await fetch('/api/pixverse-create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      img_id: imgId,
+      prompt,
+      negative_prompt: negativePrompt,
+      duration,
+      quality,
+      motion_mode: motionMode,
+      seed,
+      generate_audio_switch: audio === true
+    })
+  });
+  const data = await readJson(r);
+  const videoId = data?.Resp?.video_id ?? data?.video_id ?? data?.data?.video_id;
+  if (videoId === undefined || videoId === null || videoId === '') throw new Error('PixVerse n’a pas renvoyé de video_id.');
+  return { videoId, raw: data };
+}
+
+export async function getPixVerseStatus(videoId) {
+  const r = await fetch(`/api/pixverse-status?id=${encodeURIComponent(videoId)}`, { cache: 'no-store' });
+  return readJson(r);
+}
+
+export async function waitForPixVerse(videoId, { intervalMs = 4000, timeoutMs = 180000, onStatus } = {}) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const data = await getPixVerseStatus(videoId);
+    onStatus?.(data);
+    const status = Number(data?.Resp?.status ?? data?.status ?? data?.data?.status);
+    const url = data?.Resp?.url ?? data?.url ?? data?.data?.url;
+    if (status === 1 && url) return { url, raw: data };
+    if (status === 7) throw new Error('PixVerse a refusé la génération (modération).');
+    if (status === 8) throw new Error('La génération PixVerse a échoué.');
+    await sleep(intervalMs);
+  }
+  throw new Error('Délai d’attente PixVerse dépassé.');
+}
+
+export function proxiedPixVerseVideoUrl(url) {
+  return `/api/pixverse-video?url=${encodeURIComponent(url)}`;
+}
+
+export async function runPixVerseAction(file, variant, { onStatus } = {}) {
+  if (!file) throw new Error('Image source manquante.');
+  if (!variant?.prompt) throw new Error('Prompt d’action manquant.');
+  onStatus?.({ step: 'upload' });
+  const { imgId } = await uploadPixVerseImage(file);
+  onStatus?.({ step: 'create', imgId });
+  const { videoId } = await createPixVerseVideo({
+    imgId,
+    prompt: variant.prompt,
+    negativePrompt: variant.negativePrompt || '',
+    duration: variant.duration ?? 2,
+    quality: variant.quality || '540p',
+    motionMode: variant.motionMode || 'normal',
+    seed: variant.seed ?? 0,
+    audio: variant.audio === true
+  });
+  onStatus?.({ step: 'processing', videoId });
+  const result = await waitForPixVerse(videoId, { onStatus: s => onStatus?.({ step: 'processing', videoId, response: s }) });
+  const videoUrl = proxiedPixVerseVideoUrl(result.url);
+  onStatus?.({ step: 'done', videoId, videoUrl });
+  return { imgId, videoId, sourceUrl: result.url, videoUrl, response: result.raw };
+}
