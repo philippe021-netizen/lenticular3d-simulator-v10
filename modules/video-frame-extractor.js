@@ -98,10 +98,9 @@ function ensurePixVerseOverlay() {
     img = doc.createElement('img');
     img.id = 'pixverseSimulatorImage';
     Object.assign(img.style, {
-      position: 'absolute', inset: '0', width: '100%', height: '100%',
-      objectFit: 'contain', objectPosition: 'center', display: 'none',
-      zIndex: '20', pointerEvents: 'none', borderRadius: 'inherit',
-      maxWidth: 'none', maxHeight: 'none', backfaceVisibility: 'hidden'
+      position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'contain',
+      objectPosition: 'center', display: 'none', zIndex: '20', pointerEvents: 'none',
+      borderRadius: 'inherit', maxWidth: 'none', maxHeight: 'none', backfaceVisibility: 'hidden'
     });
     imageWindow.appendChild(img);
   }
@@ -110,10 +109,9 @@ function ensurePixVerseOverlay() {
     badge = doc.createElement('div');
     badge.id = 'pixverseSimulatorBadge';
     Object.assign(badge.style, {
-      position: 'absolute', left: '8px', bottom: '8px', zIndex: '21',
-      padding: '4px 7px', borderRadius: '999px', background: 'rgba(0,0,0,.72)',
-      color: '#fff', fontSize: '10px', fontWeight: '800', display: 'none',
-      pointerEvents: 'none'
+      position: 'absolute', left: '8px', bottom: '8px', zIndex: '21', padding: '4px 7px',
+      borderRadius: '999px', background: 'rgba(0,0,0,.72)', color: '#fff', fontSize: '10px',
+      fontWeight: '800', display: 'none', pointerEvents: 'none'
     });
     imageWindow.appendChild(badge);
   }
@@ -134,8 +132,6 @@ function simulatorRotation(doc) {
 
 function stabilizeProductForPixVerse(product) {
   if (!product) return;
-  // La simulation d'origine anime déjà le même transform via CSS. La cumuler avec
-  // notre synchronisation PixVerse créait le tremblement visible sur iPad.
   product.classList.remove('support-playing');
   product.style.animation = 'none';
   product.style.willChange = 'transform';
@@ -152,21 +148,17 @@ function animatePixVersePreview(now) {
     pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
     return;
   }
-
   stabilizeProductForPixVerse(product);
   const period = simulatorSpeedMs(doc);
   const elapsed = Math.max(0, now - pixversePreviewStart);
   const phase = (elapsed % period) / period;
   const sweep = (1 - Math.cos(phase * Math.PI * 2)) / 2;
-
-  // Un seul mouvement pilote à la fois le porte-clé et les 9 vues : aucun conflit CSS/JS.
   if (product) {
     const rot = simulatorRotation(doc);
     const angle = -rot + sweep * rot * 2;
     const shift = -4 + sweep * 8;
     product.style.transform = `perspective(620px) rotateY(${angle.toFixed(3)}deg) translateX(${shift.toFixed(2)}px)`;
   }
-
   const idx = Math.max(0, Math.min(pixversePreviewFrames.length - 1, Math.round(sweep * (pixversePreviewFrames.length - 1))));
   if (idx !== pixverseLastFrameIndex) {
     pixverseLastFrameIndex = idx;
@@ -178,10 +170,8 @@ function animatePixVersePreview(now) {
 }
 
 export function stopPixVerseSimulatorPreview(clearFrames = false) {
-  if (pixversePreviewRAF) {
-    cancelAnimationFrame(pixversePreviewRAF);
-    pixversePreviewRAF = 0;
-  }
+  if (pixversePreviewRAF) cancelAnimationFrame(pixversePreviewRAF);
+  pixversePreviewRAF = 0;
   pixversePreviewEnabled = false;
   pixverseLastFrameIndex = -1;
   const { doc, product } = simulatorTarget();
@@ -238,26 +228,29 @@ async function waitForDecodedFrame(video, targetTime) {
   if (typeof video.requestVideoFrameCallback === 'function') {
     await new Promise(resolve => {
       const started = performance.now();
-      let stopped = false;
-      const finish = () => { if (!stopped) { stopped = true; resolve(); } };
-      const poll = () => {
-        if (stopped) return;
-        if (performance.now() - started > 1400) return finish();
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      const tick = () => {
+        if (done) return;
+        if (performance.now() - started > 900) return finish();
         video.requestVideoFrameCallback((_now, meta) => {
-          if (stopped) return;
           const mediaTime = Number(meta?.mediaTime);
-          if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.055) finish();
-          else requestAnimationFrame(poll);
+          if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.065) finish();
+          else requestAnimationFrame(tick);
         });
       };
-      poll();
+      tick();
     });
-  } else await delay(140);
+  } else await delay(90);
 }
 
 async function seek(video, time) {
   const duration = Number(video.duration) || 0;
   const target = Math.max(0, Math.min(Math.max(0, duration - 0.001), time));
+  if (Math.abs((Number(video.currentTime) || 0) - target) < 0.003) {
+    await waitForDecodedFrame(video, target);
+    return target;
+  }
   const seeked = once(video, 'seeked');
   video.currentTime = target;
   await seeked;
@@ -272,8 +265,7 @@ function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
 }
 
 function fingerprintCanvas(ctx, width, height) {
-  const stepsX = 12;
-  const stepsY = 8;
+  const stepsX = 12, stepsY = 8;
   let h = 2166136261 >>> 0;
   for (let y = 0; y < stepsY; y++) {
     for (let x = 0; x < stepsX; x++) {
@@ -289,13 +281,134 @@ function fingerprintCanvas(ctx, width, height) {
   return h.toString(16).padStart(8, '0');
 }
 
+function currentActionHint() {
+  const custom = document.getElementById('customAction');
+  const family = document.getElementById('family')?.value || '';
+  const actionSelect = document.getElementById('action');
+  const actionText = actionSelect?.selectedOptions?.[0]?.textContent || '';
+  const customText = custom?.value?.trim() || '';
+  const promptText = document.getElementById('prompt')?.textContent || '';
+  return [family, customText || actionText, promptText].filter(Boolean).join(' · ').toLowerCase().slice(0, 1400);
+}
+
+function actionSensitivity(hint) {
+  const subtle = /(clin d.?œil|wink|blink|sourire|smile|regard|look|yeux|eyes|oreille|ear|langue|tongue|bouche|mouth|kiss|bisou|cheek)/i.test(hint);
+  const large = /(danse|dance|bras|hands up|tourne|rotate|rotation|avance|move|walk|saute|jump|explod|explode|démont|teardown)/i.test(hint);
+  return subtle ? 0.72 : large ? 1.18 : 1;
+}
+
+function sampleSignature(ctx, width, height) {
+  const sx = 24, sy = 18;
+  const out = new Float32Array(sx * sy);
+  let n = 0;
+  for (let y = 0; y < sy; y++) {
+    for (let x = 0; x < sx; x++) {
+      const px = Math.min(width - 1, Math.round((x + 0.5) * width / sx));
+      const py = Math.min(height - 1, Math.round((y + 0.5) * height / sy));
+      const d = ctx.getImageData(px, py, 1, 1).data;
+      out[n++] = 0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2];
+    }
+  }
+  return out;
+}
+
+function signatureDistance(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+  return sum / (a.length * 255);
+}
+
+function median(values) {
+  if (!values.length) return 0;
+  const a = [...values].sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleCount = 26, onProgress) {
+  const count = Math.max(14, Math.min(42, Math.round(sampleCount)));
+  const samples = [];
+  let previousSig = null;
+  let baselineSig = null;
+  for (let i = 0; i < count; i++) {
+    const r = count === 1 ? 0 : i / (count - 1);
+    const time = start + (end - start) * r;
+    onProgress?.({ phase: 'analysis', index: i, count, time });
+    const actualTime = await seek(video, time);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const sig = sampleSignature(ctx, canvas.width, canvas.height);
+    if (!baselineSig) baselineSig = sig;
+    const stepMotion = previousSig ? signatureDistance(previousSig, sig) : 0;
+    const fromStart = signatureDistance(baselineSig, sig);
+    samples.push({ time: actualTime, sig, stepMotion, fromStart });
+    previousSig = sig;
+  }
+
+  const motions = samples.slice(1).map(s => s.stepMotion);
+  const med = median(motions);
+  const deviations = motions.map(v => Math.abs(v - med));
+  const mad = median(deviations) || 0.001;
+  const sensitivity = actionSensitivity(hint);
+  const threshold = med + mad * 0.85 * sensitivity;
+
+  let peakIndex = 1;
+  for (let i = 2; i < samples.length; i++) {
+    if (samples[i].fromStart > samples[peakIndex].fromStart) peakIndex = i;
+  }
+
+  const minChanged = Math.max(0.008, samples[peakIndex].fromStart * 0.18);
+  let actionStartIndex = 0;
+  for (let i = 1; i <= peakIndex; i++) {
+    if (samples[i].stepMotion >= threshold || samples[i].fromStart >= minChanged) {
+      actionStartIndex = Math.max(0, i - 1);
+      break;
+    }
+  }
+
+  let actionEndIndex = peakIndex;
+  const peakDistance = samples[peakIndex].fromStart;
+  for (let i = peakIndex + 1; i < samples.length; i++) {
+    const returning = peakDistance > 0.01 && samples[i].fromStart < peakDistance * 0.82;
+    const settled = samples[i].stepMotion < Math.max(med, threshold * 0.6);
+    if (returning || settled) break;
+    actionEndIndex = i;
+  }
+
+  const minSpan = Math.max(0.34, (end - start) * 0.22);
+  let selectedStart = samples[actionStartIndex]?.time ?? start;
+  let selectedEnd = samples[actionEndIndex]?.time ?? samples[peakIndex]?.time ?? end;
+  if (selectedEnd - selectedStart < minSpan) {
+    selectedStart = Math.max(start, (samples[peakIndex]?.time ?? end) - minSpan);
+    selectedEnd = Math.min(end, selectedStart + minSpan);
+  }
+  if (selectedEnd <= selectedStart) selectedEnd = Math.min(end, selectedStart + minSpan);
+
+  return {
+    start: selectedStart,
+    end: selectedEnd,
+    peak: samples[peakIndex]?.time ?? selectedEnd,
+    peakIndex,
+    actionStartIndex,
+    actionEndIndex,
+    threshold,
+    medianMotion: med,
+    sensitivity,
+    sampleCount: count,
+    hint: hint || null
+  };
+}
+
 export async function extractVideoFrames(video, {
   count = 9,
-  edgePaddingSeconds = 0.08,
+  edgePaddingSeconds = 0.05,
   progressiveOnly = true,
-  progressiveEndRatio = 0.72,
   type = 'image/jpeg',
   quality = 0.96,
+  actionAware = true,
+  actionHint = '',
+  analysisSamples = 26,
   onProgress
 } = {}) {
   if (!video) throw new Error('Vidéo PixVerse introuvable.');
@@ -305,12 +418,9 @@ export async function extractVideoFrames(video, {
   if (!video.videoWidth || !video.videoHeight) throw new Error('Dimensions vidéo PixVerse indisponibles.');
 
   const frameCount = Math.max(2, Math.round(count));
-  const pad = Math.min(Math.max(0, edgePaddingSeconds), duration * 0.15);
-  const start = pad;
-  const fullEnd = Math.max(start, duration - pad);
-  const safeProgressiveRatio = Math.max(0.5, Math.min(1, Number(progressiveEndRatio) || 0.72));
-  const end = progressiveOnly ? start + (fullEnd - start) * safeProgressiveRatio : fullEnd;
-  const span = Math.max(0, end - start);
+  const pad = Math.min(Math.max(0, edgePaddingSeconds), duration * 0.12);
+  const fullStart = pad;
+  const fullEnd = Math.max(fullStart, duration - pad);
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
@@ -320,31 +430,34 @@ export async function extractVideoFrames(video, {
   const wasPaused = video.paused;
   const originalTime = Number(video.currentTime) || 0;
   video.pause();
+  const hint = (actionHint || currentActionHint()).trim();
+  let analysis = null;
+  let start = fullStart;
+  let end = fullEnd;
   const frames = [];
   let previousFingerprint = null;
 
   try {
+    if (actionAware && fullEnd - fullStart > 0.45) {
+      analysis = await analyzeActionWindow(video, ctx, canvas, fullStart, fullEnd, hint, analysisSamples, onProgress);
+      start = analysis.start;
+      end = progressiveOnly ? Math.min(analysis.end, analysis.peak || analysis.end) : analysis.end;
+      if (end - start < 0.28) end = Math.min(fullEnd, start + 0.28);
+    }
+
+    const span = Math.max(0, end - start);
     for (let i = 0; i < frameCount; i++) {
       const ratio = frameCount === 1 ? 0.5 : i / (frameCount - 1);
       const requestedTime = start + span * ratio;
-      onProgress?.({ index: i, count: frameCount, time: requestedTime });
-      let actualTime = requestedTime;
-      let fingerprint = null;
-      let duplicateRetry = 0;
-      do {
-        actualTime = await seek(video, requestedTime);
-        await delay(duplicateRetry ? 120 : 35);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
-        if (fingerprint !== previousFingerprint || i === 0) break;
-        duplicateRetry++;
-        await delay(100 + duplicateRetry * 80);
-      } while (duplicateRetry < 3);
-
+      onProgress?.({ phase: 'extract', index: i, count: frameCount, time: requestedTime });
+      const actualTime = await seek(video, requestedTime);
+      await delay(20);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
       const blob = await canvasToBlob(canvas, type, quality);
       const url = URL.createObjectURL(blob);
-      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, duplicateRetry, blob, url, width: canvas.width, height: canvas.height });
+      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, duplicateRetry: fingerprint === previousFingerprint ? 1 : 0, blob, url, width: canvas.width, height: canvas.height });
       previousFingerprint = fingerprint;
     }
   } finally {
@@ -359,11 +472,19 @@ export async function extractVideoFrames(video, {
     frames,
     distinctFingerprints: new Set(frames.map(frame => frame.fingerprint)).size,
     extractionWindow: {
-      mode: progressiveOnly ? 'progressive-one-way' : 'full-duration',
+      mode: actionAware ? 'action-aware-progressive' : (progressiveOnly ? 'progressive-one-way' : 'full-duration'),
       start,
       end,
+      originalStart: fullStart,
       originalEnd: fullEnd,
-      ratio: progressiveOnly ? safeProgressiveRatio : 1
+      actionPeak: analysis?.peak ?? null,
+      actionHint: hint || null,
+      analysis: analysis ? {
+        sampleCount: analysis.sampleCount,
+        medianMotion: Number(analysis.medianMotion.toFixed(5)),
+        threshold: Number(analysis.threshold.toFixed(5)),
+        sensitivity: analysis.sensitivity
+      } : null
     },
     revoke() {
       stopPixVerseSimulatorPreview(true);
@@ -377,6 +498,7 @@ export async function extractVideoFrames(video, {
 export function downloadExtractedFrame(frame, prefix = 'happyholo-pixverse') {
   const a = document.createElement('a');
   a.href = frame.url;
-  a.download = `${prefix}-vue-${String(frame.index).padStart(2, '0')}.jpg`;
+  const subtype = frame?.blob?.type?.split('/')?.[1]?.replace('jpeg', 'jpg') || 'jpg';
+  a.download = `${prefix}-vue-${String(frame.index).padStart(2, '0')}.${subtype}`;
   a.click();
 }
