@@ -2,7 +2,7 @@
   "name": "HappyHolo Local",
   "short_name": "HappyHolo",
   "description": "Outil personnel HappyHolo de préparation lenticulaire sur iPad.",
-  "start_url": "./index.html?v=400",
+  "start_url": "./index.html?v=401",
   "scope": "./",
   "display": "standalone",
   "orientation": "landscape",
