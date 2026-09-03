@@ -372,10 +372,10 @@ export function selectFirstProgressivePass(samples, {
     if (previousPeak < armedFloor) continue;
 
     const drop = previousPeak - sample.fromStart;
-    const hardReturn = sample.fromStart <= Math.max(0.004, previousPeak * 0.48)
-      && sample.stepMotion >= Math.max(0.006, medianMotion * 0.9);
-    const meaningfulReversal = sample.fromStart <= previousPeak * 0.78
-      && drop >= Math.max(0.006, medianMotion * 1.1);
+    const hardReturn = sample.fromStart <= Math.max(0.003, previousPeak * 0.32)
+      && sample.stepMotion >= Math.max(0.008, medianMotion * 1.15);
+    const meaningfulReversal = sample.fromStart <= previousPeak * 0.58
+      && drop >= Math.max(0.008, medianMotion * 1.5);
     reversalRun = meaningfulReversal ? reversalRun + 1 : 0;
 
     if (hardReturn || reversalRun >= 2) {
@@ -466,18 +466,26 @@ export function assessProgressiveFrames(frames) {
   let returnDetected = false;
   for (let i = 1; i < progress.length; i++) {
     runningPeak = Math.max(runningPeak, progress[i - 1]);
-    if (runningPeak >= 0.008 && progress[i] <= runningPeak * 0.55 && runningPeak - progress[i] >= 0.006) {
+    // Only an unmistakable reset remains blocking. Small backward variations
+    // are normal with faces, fur, reflections and compressed PixVerse frames.
+    if (runningPeak >= 0.018 && progress[i] <= runningPeak * 0.25 && runningPeak - progress[i] >= 0.012) {
       returnDetected = true;
       break;
     }
   }
   const finalProgress = progress[progress.length - 1];
-  const enoughMotion = Math.max(...progress) >= 0.004;
-  const passed = distinctFrames === frames.length && !returnDetected && enoughMotion;
+  const enoughMotion = Math.max(...progress) >= 0.002;
+  const repeatedFrames = Math.max(0, frames.length - distinctFrames);
+  const warning = repeatedFrames > 0 ? 'similar-frames' : enoughMotion ? null : 'subtle-motion';
+  // Similar frames and subtle motion are advisory: the user can still export.
+  // A confirmed hard reset is the sole content-quality blocker.
+  const passed = !returnDetected;
   return {
     passed,
-    reason: distinctFrames !== frames.length ? 'duplicate-frames' : returnDetected ? 'return-detected' : enoughMotion ? null : 'motion-too-small',
+    reason: returnDetected ? 'return-detected' : null,
+    warning,
     distinctFrames,
+    repeatedFrames,
     returnDetected,
     finalProgress: Number(finalProgress.toFixed(5)),
     peakProgress: Number(Math.max(...progress).toFixed(5))
