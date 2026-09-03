@@ -1,382 +1,59 @@
-function once(target, event) {
-  return new Promise((resolve, reject) => {
-    const onEvent = () => { cleanup(); resolve(); };
-    const onError = () => { cleanup(); reject(new Error(`Erreur vidéo pendant ${event}.`)); };
-    const cleanup = () => {
-      target.removeEventListener(event, onEvent);
-      target.removeEventListener('error', onError);
-    };
-    target.addEventListener(event, onEvent, { once: true });
-    target.addEventListener('error', onError, { once: true });
-  });
+function once(target,event){return new Promise((resolve,reject)=>{const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error(`Erreur vidéo pendant ${event}.`))};const cleanup=()=>{target.removeEventListener(event,ok);target.removeEventListener('error',bad)};target.addEventListener(event,ok,{once:true});target.addEventListener('error',bad,{once:true})})}
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+
+let previewRAF=0,previewFrames=null,previewOn=false,previewStart=0,lastPreviewIndex=-1;
+
+function simulatorTarget(){const iframe=document.getElementById('hhApp');const doc=iframe?.contentDocument;const supportCanvas=doc?.getElementById('supportCanvas');return{doc,imageWindow:supportCanvas?.parentElement,product:doc?.getElementById('productObject')}}
+function placement(doc){return{fit:doc?.getElementById('supportFit')?.value||'contain',zoom:Number(doc?.getElementById('supportZoom')?.value||100),x:Number(doc?.getElementById('supportX')?.value||0),y:Number(doc?.getElementById('supportY')?.value||0),margin:Number(doc?.getElementById('supportMargin')?.value||0)}}
+function applyPlacement(){const{doc}=simulatorTarget();const img=doc?.getElementById('pixverseSimulatorImage');if(!doc||!img)return;const p=placement(doc);img.style.objectFit=p.fit==='cover'?'cover':'contain';let scale=Math.max(.1,p.zoom/100);if(p.fit==='preserve')scale*=Math.max(.55,1-p.margin/100);img.style.transform=`translate(${p.x*.5}%,${p.y*.5}%) scale(${scale})`;img.style.transformOrigin='50% 50%'}
+function ensureOverlay(){const{doc,imageWindow}=simulatorTarget();if(!doc||!imageWindow)return null;if(getComputedStyle(imageWindow).position==='static')imageWindow.style.position='relative';let img=doc.getElementById('pixverseSimulatorImage');if(!img){img=doc.createElement('img');img.id='pixverseSimulatorImage';Object.assign(img.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:'contain',objectPosition:'center',display:'none',zIndex:'20',pointerEvents:'none',borderRadius:'inherit',maxWidth:'none',maxHeight:'none',backfaceVisibility:'hidden'});imageWindow.appendChild(img)}let badge=doc.getElementById('pixverseSimulatorBadge');if(!badge){badge=doc.createElement('div');badge.id='pixverseSimulatorBadge';Object.assign(badge.style,{position:'absolute',left:'8px',bottom:'8px',zIndex:'21',padding:'4px 7px',borderRadius:'999px',background:'rgba(0,0,0,.72)',color:'#fff',fontSize:'10px',fontWeight:'800',display:'none',pointerEvents:'none'});imageWindow.appendChild(badge)}let btn=doc.getElementById('pixverseSimulatorToggle');if(!btn){const host=doc.querySelector('.support-controls');if(host){btn=doc.createElement('button');btn.id='pixverseSimulatorToggle';btn.type='button';btn.className='secondary';btn.style.width='100%';btn.style.marginTop='8px';host.appendChild(btn);btn.onclick=()=>previewOn?stopPixVerseSimulatorPreview(false):showPixVerseFramesInSimulator(previewFrames)}}if(btn){btn.disabled=!previewFrames?.length;btn.textContent=previewOn?'Aperçu PixVerse : ON':previewFrames?.length?'Aperçu PixVerse : OFF':'Aperçu PixVerse : indisponible'}['supportFit','supportMargin','supportZoom','supportX','supportY','supportType'].forEach(id=>{const el=doc.getElementById(id);if(el&&!el.dataset.pixSmartBound){el.dataset.pixSmartBound='1';el.addEventListener('input',applyPlacement);el.addEventListener('change',applyPlacement)}});applyPlacement();return{img,badge,btn}}
+function previewTick(now){if(!previewOn||!previewFrames?.length)return;const{doc,product}=simulatorTarget();const img=doc?.getElementById('pixverseSimulatorImage');const badge=doc?.getElementById('pixverseSimulatorBadge');if(!doc||!img||!badge){previewRAF=requestAnimationFrame(previewTick);return}const seconds=Math.max(2.5,Math.min(8,Number(doc?.getElementById('supportSpeed')?.value||5)));const phase=((now-previewStart)%(seconds*1000))/(seconds*1000);const sweep=(1-Math.cos(phase*Math.PI*2))/2;const idx=Math.max(0,Math.min(previewFrames.length-1,Math.round(sweep*(previewFrames.length-1))));if(product){product.classList.remove('support-playing');product.style.animation='none';const rot=Math.max(0,Math.min(8,Number(doc?.getElementById('supportRot')?.value||6)));product.style.transform=`perspective(620px) rotateY(${(-rot+sweep*rot*2).toFixed(3)}deg) translateX(${(-4+sweep*8).toFixed(2)}px)`}if(idx!==lastPreviewIndex){lastPreviewIndex=idx;img.src=previewFrames[idx].url;badge.textContent=`PIXVERSE ${idx+1}/${previewFrames.length}`}previewRAF=requestAnimationFrame(previewTick)}
+export function stopPixVerseSimulatorPreview(clearFrames=false){if(previewRAF)cancelAnimationFrame(previewRAF);previewRAF=0;previewOn=false;lastPreviewIndex=-1;const{doc,product}=simulatorTarget();const img=doc?.getElementById('pixverseSimulatorImage'),badge=doc?.getElementById('pixverseSimulatorBadge'),btn=doc?.getElementById('pixverseSimulatorToggle');if(img)img.style.display='none';if(badge)badge.style.display='none';if(product){product.style.transform='';product.style.animation='';product.style.willChange=''}if(clearFrames)previewFrames=null;if(btn){btn.disabled=!previewFrames?.length;btn.textContent=previewFrames?.length?'Aperçu PixVerse : OFF':'Aperçu PixVerse : indisponible'}}
+export function showPixVerseFramesInSimulator(frames){if(!Array.isArray(frames)||frames.length<2)return false;previewFrames=frames;const o=ensureOverlay();if(!o)return false;if(previewRAF)cancelAnimationFrame(previewRAF);previewOn=true;previewStart=performance.now();lastPreviewIndex=0;o.img.src=frames[0].url;o.img.style.display='block';o.badge.textContent=`PIXVERSE 1/${frames.length}`;o.badge.style.display='block';if(o.btn){o.btn.disabled=false;o.btn.textContent='Aperçu PixVerse : ON'}previewRAF=requestAnimationFrame(previewTick);return true}
+
+async function ensureMetadata(video){if(Number.isFinite(video.duration)&&video.duration>0&&video.videoWidth>0)return;await once(video,'loadedmetadata')}
+async function waitDecoded(video,target){if(typeof video.requestVideoFrameCallback==='function'){await new Promise(resolve=>{const started=performance.now();const loop=()=>{if(performance.now()-started>900)return resolve();video.requestVideoFrameCallback((_n,m)=>{const t=Number(m?.mediaTime);if(Number.isFinite(t)&&Math.abs(t-target)<=.06)resolve();else requestAnimationFrame(loop)})};loop()})}else await delay(90)}
+async function seek(video,time){const duration=Number(video.duration)||0;const target=Math.max(0,Math.min(Math.max(0,duration-.001),time));const done=once(video,'seeked');video.currentTime=target;await done;await waitDecoded(video,target);return target}
+function canvasToBlob(canvas,type='image/jpeg',quality=.96){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Impossible de créer une vue extraite.')),type,quality))}
+
+const SIG_X=16,SIG_Y=12;
+function signature(ctx,w,h){const out=new Float32Array(SIG_X*SIG_Y);let k=0;for(let y=0;y<SIG_Y;y++)for(let x=0;x<SIG_X;x++){const px=Math.min(w-1,Math.round((x+.5)*w/SIG_X)),py=Math.min(h-1,Math.round((y+.5)*h/SIG_Y)),d=ctx.getImageData(px,py,1,1).data;out[k++]=.2126*d[0]+.7152*d[1]+.0722*d[2]}return out}
+function distance(a,b,weights=null){let s=0,ws=0;for(let i=0;i<a.length;i++){const w=weights?.[i]??1;s+=Math.abs(a[i]-b[i])*w;ws+=w}return s/Math.max(.001,ws)}
+function fingerprint(sig){let h=2166136261>>>0;for(let i=0;i<sig.length;i++){h^=Math.round(sig[i]);h=Math.imul(h,16777619)>>>0}return h.toString(16).padStart(8,'0')}
+function pageActionHint(){const family=document.getElementById('family')?.value||'';const action=document.getElementById('action');const actionLabel=action?.selectedOptions?.[0]?.textContent||'';const custom=document.getElementById('customAction')?.value||'';const prompt=document.getElementById('prompt')?.textContent||'';return`${family} ${actionLabel} ${custom} ${prompt}`.replace(/\s+/g,' ').trim()}
+function actionProfile(text=''){const t=String(text).toLowerCase();let kind='global',roi=[0,0,1,1],focus=1.8,preRoll=2;
+ if(/miau|miaou|meow|aboie|aboi|bark|parle|speak|chant|bouche|mouth|langue|tongue|sourire|smile/.test(t)){kind='mouth';roi=[.22,.28,.78,.72];focus=4.2;preRoll=3}
+ else if(/clin|wink|cligne|blink|yeux|eyes|regard|look/.test(t)){kind='eyes';roi=[.18,.12,.82,.48];focus=4;preRoll=2}
+ else if(/tête|head|tourne la tête|incline/.test(t)){kind='head';roi=[.12,.08,.88,.68];focus=3;preRoll=2}
+ else if(/main|hand|bras|arm|salut|wave|pouce|thumb|embrass|kiss/.test(t)){kind='upper-body';roi=[.05,.05,.95,.72];focus=2.7;preRoll=2}
+ else if(/logo|texte|text|objet|object/.test(t)){kind='center-object';roi=[.15,.15,.85,.85];focus=2.8;preRoll=2}
+ else if(/danse|dance|marche|walk|court|run|voiture|car|moto|vehicle|avance|move/.test(t)){kind='global-motion';roi=[0,0,1,1];focus=1.5;preRoll=1}
+ return{kind,roi,focus,preRoll,text:t.slice(0,500)}}
+function regionWeights(profile){const out=new Float32Array(SIG_X*SIG_Y);const[x0,y0,x1,y1]=profile.roi;for(let y=0;y<SIG_Y;y++)for(let x=0;x<SIG_X;x++){const nx=(x+.5)/SIG_X,ny=(y+.5)/SIG_Y;const inside=nx>=x0&&nx<=x1&&ny>=y0&&ny<=y1;out[y*SIG_X+x]=inside?profile.focus:.35}return out}
+function median(values){if(!values.length)return 0;const a=[...values].sort((x,y)=>x-y),m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2}
+function chooseActionWindow(candidates,weights,profile){if(candidates.length<3)return{start:0,end:candidates.length-1,peak:candidates.length-1,stepScores:[]};const steps=[];for(let i=1;i<candidates.length;i++)steps.push(distance(candidates[i-1].sig,candidates[i].sig,weights));const med=median(steps),mean=steps.reduce((a,b)=>a+b,0)/steps.length,threshold=Math.max(med*1.35,mean*.55,.12);let peakStep=0;for(let i=1;i<steps.length;i++)if(steps[i]>steps[peakStep])peakStep=i;
+ // Cherche l'activité utile autour du pic de l'action, puis conserve un peu d'avant-action pour rendre la transformation lisible.
+ let activeStart=peakStep,activeEnd=peakStep;while(activeStart>0&&steps[activeStart-1]>=threshold*.72)activeStart--;while(activeEnd<steps.length-1&&steps[activeEnd+1]>=threshold*.72)activeEnd++;
+ // Si plusieurs impulsions proches composent la même action (ex. ouverture de bouche), agrandit la fenêtre sans réintégrer une longue attente initiale.
+ const maxGap=Math.max(2,Math.round(candidates.length*.08));let cursor=activeStart-1,gap=0;while(cursor>=0){if(steps[cursor]>=threshold*.7)gap=0;else gap++;if(gap>maxGap)break;activeStart=cursor;cursor--}cursor=activeEnd+1;gap=0;while(cursor<steps.length){if(steps[cursor]>=threshold*.7)gap=0;else gap++;if(gap>maxGap)break;activeEnd=cursor;cursor++}
+ let start=Math.max(0,activeStart-profile.preRoll);let end=Math.min(candidates.length-1,activeEnd+2);
+ // Pour un mouvement continu global, on garde le mouvement aller jusqu'au point le plus éloigné de l'état de départ.
+ if(profile.kind==='global'||profile.kind==='global-motion'){const fromStart=candidates.map(c=>distance(candidates[0].sig,c.sig,weights));let peak=0;for(let i=1;i<fromStart.length;i++)if(fromStart[i]>fromStart[peak])peak=i;if(peak<Math.floor(candidates.length*.35))peak=candidates.length-1;start=0;end=peak;return{start,end,peak,stepScores:steps,threshold}}
+ // Pour une action locale, la fenêtre doit contenir un vrai changement d'état, pas seulement le pic instantané.
+ if(end-start<Math.max(8,Math.floor(candidates.length*.22))){const extra=Math.ceil((Math.max(8,Math.floor(candidates.length*.22))-(end-start))/2);start=Math.max(0,start-extra);end=Math.min(candidates.length-1,end+extra)}return{start,end,peak:peakStep+1,stepScores:steps,threshold}}
+
+export async function extractVideoFrames(video,{count=9,edgePaddingSeconds=.06,type='image/jpeg',quality=.96,onProgress,candidateCount=37,actionHint=''}={}){
+ if(!video)throw new Error('Vidéo PixVerse introuvable.');await ensureMetadata(video);const duration=Number(video.duration);if(!Number.isFinite(duration)||duration<=0)throw new Error('Durée vidéo PixVerse invalide.');if(!video.videoWidth||!video.videoHeight)throw new Error('Dimensions vidéo PixVerse indisponibles.');
+ const n=Math.max(2,Math.round(count)),samples=Math.max(n*3,Math.round(candidateCount));const pad=Math.min(Math.max(0,edgePaddingSeconds),duration*.12),videoStart=pad,videoEnd=Math.max(videoStart,duration-pad),span=videoEnd-videoStart;
+ const canvas=document.createElement('canvas');canvas.width=video.videoWidth;canvas.height=video.videoHeight;const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true});if(!ctx)throw new Error('Canvas d’extraction indisponible.');
+ const wasPaused=video.paused,originalTime=Number(video.currentTime)||0;video.pause();const candidates=[];
+ try{for(let i=0;i<samples;i++){const t=videoStart+span*(i/(samples-1));onProgress?.({phase:'analyse',index:i,count:samples,time:t});const actual=await seek(video,t);ctx.drawImage(video,0,0,canvas.width,canvas.height);const sig=signature(ctx,canvas.width,canvas.height);candidates.push({time:actual,sig,fingerprint:fingerprint(sig)})}}
+ finally{try{await seek(video,Math.min(originalTime,Math.max(0,duration-.001)))}catch(_){}if(!wasPaused){try{await video.play()}catch(_){}}}
+ const hint=actionHint||pageActionHint(),profile=actionProfile(hint),weights=regionWeights(profile),window=chooseActionWindow(candidates,weights,profile),progressive=candidates.slice(window.start,window.end+1);
+ const cum=[0];for(let i=1;i<progressive.length;i++){const local=distance(progressive[i-1].sig,progressive[i].sig,weights),global=distance(progressive[i-1].sig,progressive[i].sig);const step=Math.max(.01,local*.82+global*.18);cum.push(cum[i-1]+step)}const total=cum[cum.length-1]||1;
+ const chosen=[];for(let i=0;i<n;i++){const target=total*(i/(n-1));let best=0,bestErr=Infinity;for(let j=0;j<cum.length;j++){const e=Math.abs(cum[j]-target);if(e<bestErr){best=j;bestErr=e}}if(chosen.length&&best<=chosen[chosen.length-1])best=Math.min(progressive.length-1,chosen[chosen.length-1]+1);chosen.push(best)}
+ const frames=[];const restorePaused=video.paused;video.pause();try{for(let i=0;i<chosen.length;i++){const c=progressive[chosen[i]];onProgress?.({phase:'export',index:i,count:n,time:c.time});const actual=await seek(video,c.time);ctx.drawImage(video,0,0,canvas.width,canvas.height);const sig=signature(ctx,canvas.width,canvas.height),blob=await canvasToBlob(canvas,type,quality),url=URL.createObjectURL(blob);frames.push({index:i+1,time:actual,requestedTime:c.time,fingerprint:fingerprint(sig),blob,url,width:canvas.width,height:canvas.height,motionTarget:i/(n-1)})}}finally{try{await seek(video,Math.min(originalTime,Math.max(0,duration-.001)))}catch(_){}if(!restorePaused&&!wasPaused){try{await video.play()}catch(_){}}}
+ const stepDistances=[];for(let i=1;i<frames.length;i++){const a=progressive[chosen[i-1]].sig,b=progressive[chosen[i]].sig;stepDistances.push(distance(a,b,weights))}const avg=stepDistances.reduce((a,b)=>a+b,0)/Math.max(1,stepDistances.length),max=stepDistances.length?Math.max(...stepDistances):0,min=stepDistances.length?Math.min(...stepDistances):0,regularity=avg?Math.max(0,1-(max-min)/(avg*2)):1;
+ const extractionStart=progressive[0]?.time??videoStart,extractionEnd=progressive[progressive.length-1]?.time??videoEnd;const result={duration,width:canvas.width,height:canvas.height,frames,distinctFingerprints:new Set(frames.map(f=>f.fingerprint)).size,extractionWindow:{mode:'action-aware-smart-motion',start:extractionStart,end:extractionEnd,originalStart:videoStart,originalEnd:videoEnd,ratio:span?(extractionEnd-extractionStart)/span:1},motionAnalysis:{candidateCount:samples,profile:profile.kind,actionHint:hint,windowStartCandidate:window.start,windowEndCandidate:window.end,peakCandidate:window.peak,activityThreshold:window.threshold,totalMotion:total,stepDistances,regularity},revoke(){stopPixVerseSimulatorPreview(true);frames.forEach(f=>URL.revokeObjectURL(f.url))}};try{showPixVerseFramesInSimulator(frames)}catch(_){}return result;
 }
-
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-let pixversePreviewRAF = 0;
-let pixversePreviewFrames = null;
-let pixversePreviewEnabled = false;
-let pixversePreviewStart = 0;
-let pixversePlacementBound = false;
-let pixverseLastFrameIndex = -1;
-
-function simulatorTarget() {
-  const iframe = document.getElementById('hhApp');
-  const doc = iframe?.contentDocument;
-  const supportCanvas = doc?.getElementById('supportCanvas');
-  const imageWindow = supportCanvas?.parentElement;
-  const product = doc?.getElementById('productObject');
-  return { doc, imageWindow, product };
-}
-
-function ensurePixVersePreviewControls() {
-  const { doc } = simulatorTarget();
-  if (!doc) return null;
-  let btn = doc.getElementById('pixverseSimulatorToggle');
-  if (btn) return btn;
-  const supportControls = doc.querySelector('.support-controls');
-  if (!supportControls) return null;
-  btn = doc.createElement('button');
-  btn.id = 'pixverseSimulatorToggle';
-  btn.type = 'button';
-  btn.className = 'secondary';
-  btn.style.width = '100%';
-  btn.style.marginTop = '8px';
-  btn.textContent = 'Aperçu PixVerse : indisponible';
-  btn.disabled = true;
-  supportControls.appendChild(btn);
-  btn.addEventListener('click', () => {
-    if (!pixversePreviewFrames?.length) return;
-    if (pixversePreviewEnabled) stopPixVerseSimulatorPreview(false);
-    else showPixVerseFramesInSimulator(pixversePreviewFrames);
-  });
-  return btn;
-}
-
-function currentFrontPlacement(doc) {
-  const fit = doc?.getElementById('supportFit')?.value || 'contain';
-  const zoom = Number(doc?.getElementById('supportZoom')?.value || 100);
-  const x = Number(doc?.getElementById('supportX')?.value || 0);
-  const y = Number(doc?.getElementById('supportY')?.value || 0);
-  const margin = Number(doc?.getElementById('supportMargin')?.value || 0);
-  return { fit, zoom, x, y, margin };
-}
-
-function applyPixVersePlacement() {
-  const { doc } = simulatorTarget();
-  const img = doc?.getElementById('pixverseSimulatorImage');
-  if (!doc || !img) return;
-  const p = currentFrontPlacement(doc);
-  img.style.objectFit = p.fit === 'cover' ? 'cover' : 'contain';
-  img.style.objectPosition = 'center';
-  let scale = Math.max(0.1, p.zoom / 100);
-  if (p.fit === 'preserve') scale *= Math.max(0.55, 1 - p.margin / 100);
-  img.style.transformOrigin = '50% 50%';
-  img.style.transform = `translate(${p.x * 0.5}%, ${p.y * 0.5}%) scale(${scale})`;
-}
-
-function bindPixVersePlacementControls() {
-  if (pixversePlacementBound) return;
-  const { doc } = simulatorTarget();
-  if (!doc) return;
-  ['supportFit','supportMargin','supportZoom','supportX','supportY','supportType'].forEach(id => {
-    const el = doc.getElementById(id);
-    if (!el || el.dataset.pixversePlacementBound === '1') return;
-    el.dataset.pixversePlacementBound = '1';
-    el.addEventListener('input', applyPixVersePlacement);
-    el.addEventListener('change', applyPixVersePlacement);
-  });
-  pixversePlacementBound = true;
-}
-
-function ensurePixVerseOverlay() {
-  const { doc, imageWindow } = simulatorTarget();
-  if (!doc || !imageWindow) return null;
-  if (getComputedStyle(imageWindow).position === 'static') imageWindow.style.position = 'relative';
-  let img = doc.getElementById('pixverseSimulatorImage');
-  if (!img) {
-    img = doc.createElement('img');
-    img.id = 'pixverseSimulatorImage';
-    Object.assign(img.style, {
-      position: 'absolute', inset: '0', width: '100%', height: '100%',
-      objectFit: 'contain', objectPosition: 'center', display: 'none',
-      zIndex: '20', pointerEvents: 'none', borderRadius: 'inherit',
-      maxWidth: 'none', maxHeight: 'none', backfaceVisibility: 'hidden'
-    });
-    imageWindow.appendChild(img);
-  }
-  let badge = doc.getElementById('pixverseSimulatorBadge');
-  if (!badge) {
-    badge = doc.createElement('div');
-    badge.id = 'pixverseSimulatorBadge';
-    Object.assign(badge.style, {
-      position: 'absolute', left: '8px', bottom: '8px', zIndex: '21',
-      padding: '4px 7px', borderRadius: '999px', background: 'rgba(0,0,0,.72)',
-      color: '#fff', fontSize: '10px', fontWeight: '800', display: 'none',
-      pointerEvents: 'none'
-    });
-    imageWindow.appendChild(badge);
-  }
-  bindPixVersePlacementControls();
-  applyPixVersePlacement();
-  return { img, badge };
-}
-
-function simulatorSpeedMs(doc) {
-  const seconds = Number(doc?.getElementById('supportSpeed')?.value || 5);
-  return Math.max(2500, Math.min(8000, seconds * 1000));
-}
-
-function simulatorRotation(doc) {
-  const deg = Number(doc?.getElementById('supportRot')?.value || 6);
-  return Math.max(0, Math.min(8, deg));
-}
-
-function stabilizeProductForPixVerse(product) {
-  if (!product) return;
-  // La simulation d'origine anime déjà le même transform via CSS. La cumuler avec
-  // notre synchronisation PixVerse créait le tremblement visible sur iPad.
-  product.classList.remove('support-playing');
-  product.style.animation = 'none';
-  product.style.willChange = 'transform';
-  const shell = product.querySelector('.shell');
-  if (shell) shell.style.animation = 'none';
-}
-
-function animatePixVersePreview(now) {
-  if (!pixversePreviewEnabled || !pixversePreviewFrames?.length) return;
-  const { doc, product } = simulatorTarget();
-  const img = doc?.getElementById('pixverseSimulatorImage');
-  const badge = doc?.getElementById('pixverseSimulatorBadge');
-  if (!doc || !img || !badge) {
-    pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
-    return;
-  }
-
-  stabilizeProductForPixVerse(product);
-  const period = simulatorSpeedMs(doc);
-  const elapsed = Math.max(0, now - pixversePreviewStart);
-  const phase = (elapsed % period) / period;
-  const sweep = (1 - Math.cos(phase * Math.PI * 2)) / 2;
-
-  // Un seul mouvement pilote à la fois le porte-clé et les 9 vues : aucun conflit CSS/JS.
-  if (product) {
-    const rot = simulatorRotation(doc);
-    const angle = -rot + sweep * rot * 2;
-    const shift = -4 + sweep * 8;
-    product.style.transform = `perspective(620px) rotateY(${angle.toFixed(3)}deg) translateX(${shift.toFixed(2)}px)`;
-  }
-
-  const idx = Math.max(0, Math.min(pixversePreviewFrames.length - 1, Math.round(sweep * (pixversePreviewFrames.length - 1))));
-  if (idx !== pixverseLastFrameIndex) {
-    pixverseLastFrameIndex = idx;
-    const frame = pixversePreviewFrames[idx];
-    img.src = frame.url;
-    badge.textContent = `PIXVERSE ${frame.index || idx + 1}/${pixversePreviewFrames.length}`;
-  }
-  pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
-}
-
-export function stopPixVerseSimulatorPreview(clearFrames = false) {
-  if (pixversePreviewRAF) {
-    cancelAnimationFrame(pixversePreviewRAF);
-    pixversePreviewRAF = 0;
-  }
-  pixversePreviewEnabled = false;
-  pixverseLastFrameIndex = -1;
-  const { doc, product } = simulatorTarget();
-  const img = doc?.getElementById('pixverseSimulatorImage');
-  const badge = doc?.getElementById('pixverseSimulatorBadge');
-  const btn = doc?.getElementById('pixverseSimulatorToggle');
-  if (img) img.style.display = 'none';
-  if (badge) badge.style.display = 'none';
-  if (product) {
-    product.style.transform = '';
-    product.style.animation = '';
-    product.style.willChange = '';
-    const shell = product.querySelector('.shell');
-    if (shell) shell.style.animation = '';
-  }
-  if (btn) {
-    btn.textContent = pixversePreviewFrames?.length ? 'Aperçu PixVerse : OFF' : 'Aperçu PixVerse : indisponible';
-    btn.disabled = !pixversePreviewFrames?.length;
-  }
-  if (clearFrames) pixversePreviewFrames = null;
-}
-
-export function showPixVerseFramesInSimulator(frames) {
-  if (!Array.isArray(frames) || frames.length < 2) return false;
-  pixversePreviewFrames = frames;
-  const controls = ensurePixVersePreviewControls();
-  const overlay = ensurePixVerseOverlay();
-  if (!overlay) return false;
-  if (pixversePreviewRAF) cancelAnimationFrame(pixversePreviewRAF);
-  const { product } = simulatorTarget();
-  stabilizeProductForPixVerse(product);
-  pixversePreviewEnabled = true;
-  pixversePreviewStart = performance.now();
-  pixverseLastFrameIndex = 0;
-  overlay.img.src = frames[0].url;
-  overlay.img.style.display = 'block';
-  overlay.badge.textContent = `PIXVERSE 1/${frames.length}`;
-  overlay.badge.style.display = 'block';
-  applyPixVersePlacement();
-  if (controls) {
-    controls.disabled = false;
-    controls.textContent = 'Aperçu PixVerse : ON';
-  }
-  pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
-  return true;
-}
-
-async function ensureMetadata(video) {
-  if (Number.isFinite(video.duration) && video.duration > 0 && video.videoWidth > 0) return;
-  await once(video, 'loadedmetadata');
-}
-
-async function waitForDecodedFrame(video, targetTime) {
-  if (typeof video.requestVideoFrameCallback === 'function') {
-    await new Promise(resolve => {
-      const started = performance.now();
-      let stopped = false;
-      const finish = () => { if (!stopped) { stopped = true; resolve(); } };
-      const poll = () => {
-        if (stopped) return;
-        if (performance.now() - started > 1400) return finish();
-        video.requestVideoFrameCallback((_now, meta) => {
-          if (stopped) return;
-          const mediaTime = Number(meta?.mediaTime);
-          if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.055) finish();
-          else requestAnimationFrame(poll);
-        });
-      };
-      poll();
-    });
-  } else await delay(140);
-}
-
-async function seek(video, time) {
-  const duration = Number(video.duration) || 0;
-  const target = Math.max(0, Math.min(Math.max(0, duration - 0.001), time));
-  const seeked = once(video, 'seeked');
-  video.currentTime = target;
-  await seeked;
-  await waitForDecodedFrame(video, target);
-  return target;
-}
-
-function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Impossible de créer une vue extraite.')), type, quality);
-  });
-}
-
-function fingerprintCanvas(ctx, width, height) {
-  const stepsX = 12;
-  const stepsY = 8;
-  let h = 2166136261 >>> 0;
-  for (let y = 0; y < stepsY; y++) {
-    for (let x = 0; x < stepsX; x++) {
-      const px = Math.min(width - 1, Math.round((x + 0.5) * width / stepsX));
-      const py = Math.min(height - 1, Math.round((y + 0.5) * height / stepsY));
-      const d = ctx.getImageData(px, py, 1, 1).data;
-      for (let i = 0; i < 3; i++) {
-        h ^= d[i];
-        h = Math.imul(h, 16777619) >>> 0;
-      }
-    }
-  }
-  return h.toString(16).padStart(8, '0');
-}
-
-export async function extractVideoFrames(video, {
-  count = 9,
-  edgePaddingSeconds = 0.08,
-  progressiveOnly = true,
-  progressiveEndRatio = 0.72,
-  type = 'image/jpeg',
-  quality = 0.96,
-  onProgress
-} = {}) {
-  if (!video) throw new Error('Vidéo PixVerse introuvable.');
-  await ensureMetadata(video);
-  const duration = Number(video.duration);
-  if (!Number.isFinite(duration) || duration <= 0) throw new Error('Durée vidéo PixVerse invalide.');
-  if (!video.videoWidth || !video.videoHeight) throw new Error('Dimensions vidéo PixVerse indisponibles.');
-
-  const frameCount = Math.max(2, Math.round(count));
-  const pad = Math.min(Math.max(0, edgePaddingSeconds), duration * 0.15);
-  const start = pad;
-  const fullEnd = Math.max(start, duration - pad);
-  const safeProgressiveRatio = Math.max(0.5, Math.min(1, Number(progressiveEndRatio) || 0.72));
-  const end = progressiveOnly ? start + (fullEnd - start) * safeProgressiveRatio : fullEnd;
-  const span = Math.max(0, end - start);
-  const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
-  if (!ctx) throw new Error('Canvas d’extraction indisponible.');
-
-  const wasPaused = video.paused;
-  const originalTime = Number(video.currentTime) || 0;
-  video.pause();
-  const frames = [];
-  let previousFingerprint = null;
-
-  try {
-    for (let i = 0; i < frameCount; i++) {
-      const ratio = frameCount === 1 ? 0.5 : i / (frameCount - 1);
-      const requestedTime = start + span * ratio;
-      onProgress?.({ index: i, count: frameCount, time: requestedTime });
-      let actualTime = requestedTime;
-      let fingerprint = null;
-      let duplicateRetry = 0;
-      do {
-        actualTime = await seek(video, requestedTime);
-        await delay(duplicateRetry ? 120 : 35);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
-        if (fingerprint !== previousFingerprint || i === 0) break;
-        duplicateRetry++;
-        await delay(100 + duplicateRetry * 80);
-      } while (duplicateRetry < 3);
-
-      const blob = await canvasToBlob(canvas, type, quality);
-      const url = URL.createObjectURL(blob);
-      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, duplicateRetry, blob, url, width: canvas.width, height: canvas.height });
-      previousFingerprint = fingerprint;
-    }
-  } finally {
-    try { await seek(video, Math.min(originalTime, Math.max(0, duration - 0.001))); } catch (_) {}
-    if (!wasPaused) { try { await video.play(); } catch (_) {} }
-  }
-
-  const result = {
-    duration,
-    width: canvas.width,
-    height: canvas.height,
-    frames,
-    distinctFingerprints: new Set(frames.map(frame => frame.fingerprint)).size,
-    extractionWindow: {
-      mode: progressiveOnly ? 'progressive-one-way' : 'full-duration',
-      start,
-      end,
-      originalEnd: fullEnd,
-      ratio: progressiveOnly ? safeProgressiveRatio : 1
-    },
-    revoke() {
-      stopPixVerseSimulatorPreview(true);
-      frames.forEach(frame => URL.revokeObjectURL(frame.url));
-    }
-  };
-  try { showPixVerseFramesInSimulator(frames); } catch (_) {}
-  return result;
-}
-
-export function downloadExtractedFrame(frame, prefix = 'happyholo-pixverse') {
-  const a = document.createElement('a');
-  a.href = frame.url;
-  a.download = `${prefix}-vue-${String(frame.index).padStart(2, '0')}.jpg`;
-  a.click();
-}
+export function downloadExtractedFrame(frame,prefix='happyholo-pixverse'){const a=document.createElement('a');a.href=frame.url;a.download=`${prefix}-vue-${String(frame.index).padStart(2,'0')}.png`;a.click()}
