@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>HappyHolo — Actions PixVerse test</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:10;background:#111;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 50px)}iframe{width:100%;height:calc(100vh - 50px);border:0;background:#fff}.side{padding:16px;background:#fff;border-left:1px solid #ddd;overflow:auto}h2{margin:0 0 5px}p{font-size:13px;color:#555;line-height:1.4}label{display:block;font-size:13px;font-weight:750;margin:13px 0 6px}select,button{width:100%;font:inherit;padding:12px;border-radius:11px}select{border:1px solid #ccc;background:#fff}button{border:0;background:#111;color:#fff;font-weight:800;margin-top:12px}button:disabled{opacity:.45}.secondary{background:#e8e8e8;color:#111}.pixbtn{background:#17652c}.prompt,.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;line-height:1.4}.status{white-space:pre-wrap}.exports{margin-top:14px;padding:12px;border:1px solid #ddd;border-radius:12px;background:#fafafa}.exports b{font-size:14px}.exports .small{margin-top:5px}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.small{font-size:11px;color:#666;margin-top:8px}.frames-block{display:none;margin-top:14px;padding:12px;border:2px solid #19a45b;border-radius:12px;background:#f4fff7}.frames-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.frames-head b{font-size:14px;color:#126b3d}.frames-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.frame{position:relative;border-radius:9px;overflow:hidden;background:#111;aspect-ratio:3/4;cursor:pointer}.frame img{width:100%;height:100%;object-fit:cover;display:block}.frame span{position:absolute;left:5px;bottom:5px;background:#000b;color:#fff;font-size:10px;padding:3px 5px;border-radius:6px}.frames-note{font-size:11px;color:#456;line-height:1.35;margin-top:7px}.pixverse-label{font-size:11px;font-weight:800;color:#126b3d;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.diag{margin-top:8px;padding:8px 10px;border-radius:9px;background:#e7f7eb;color:#17652c;font-size:12px;font-weight:700}.diag.bad{background:#ffe9e7;color:#8b1f17}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #ddd}.layout iframe{height:58vh}.bar{position:relative}}
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:10;background:#111;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 8px;border-radius:999px;font-size:12px;font-weight:800}.layout{display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:calc(100vh - 50px)}iframe{width:100%;height:calc(100vh - 50px);border:0;background:#fff}.side{padding:16px;background:#fff;border-left:1px solid #ddd;overflow:auto}h2{margin:0 0 5px}p{font-size:13px;color:#555;line-height:1.4}label{display:block;font-size:13px;font-weight:750;margin:13px 0 6px}select,textarea,button{width:100%;font:inherit;padding:12px;border-radius:11px}select,textarea{border:1px solid #ccc;background:#fff}textarea{min-height:92px;resize:vertical;line-height:1.4}button{border:0;background:#111;color:#fff;font-weight:800;margin-top:12px}button:disabled{opacity:.45}.secondary{background:#e8e8e8;color:#111}.pixbtn{background:#17652c}.prompt,.status{margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;line-height:1.4}.status{white-space:pre-wrap}.exports{margin-top:14px;padding:12px;border:1px solid #ddd;border-radius:12px;background:#fafafa}.exports b{font-size:14px}.exports .small{margin-top:5px}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.small{font-size:11px;color:#666;margin-top:8px}.frames-block{display:none;margin-top:14px;padding:12px;border:2px solid #19a45b;border-radius:12px;background:#f4fff7}.frames-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.frames-head b{font-size:14px;color:#126b3d}.frames-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:9px}.frame{position:relative;border-radius:9px;overflow:hidden;background:#111;aspect-ratio:3/4;cursor:pointer}.frame img{width:100%;height:100%;object-fit:cover;display:block}.frame span{position:absolute;left:5px;bottom:5px;background:#000b;color:#fff;font-size:10px;padding:3px 5px;border-radius:6px}.frames-note{font-size:11px;color:#456;line-height:1.35;margin-top:7px}.pixverse-label{font-size:11px;font-weight:800;color:#126b3d;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}.diag{margin-top:8px;padding:8px 10px;border-radius:9px;background:#e7f7eb;color:#17652c;font-size:12px;font-weight:700}.diag.bad{background:#ffe9e7;color:#8b1f17}#customActionBlock[hidden]{display:none}@media(max-width:850px){.layout{grid-template-columns:1fr}.side{border-left:0;border-top:1px solid #ddd}.layout iframe{height:58vh}.bar{position:relative}}
 </style>
 <style>
 .audience-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
@@ -18,20 +18,26 @@
 <body>
 <div class="bar"><b>HappyHolo + PixVerse</b><span class="badge">PIXVERSE V6</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=402" title="HappyHolo"></iframe>
+  <iframe id="hhApp" src="./relief3d-test-v31.html?v=405" title="HappyHolo"></iframe>
   <aside class="side">
     <h2>Action PixVerse</h2>
     <p>Prépare l’image dans HappyHolo à gauche, puis lance une action. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
     <label>Type de photo</label>
     <div id="audienceTabs" class="audience-tabs" role="group" aria-label="Type de photo">
       <button type="button" class="audience-tab active" data-family="person" aria-pressed="true">Individu</button>
-      <button type="button" class="audience-tab" data-family="couple" aria-pressed="false">Couple</button>
+      <button type="button" class="audience-tab" data-family="couple" aria-pressed="false">Duo</button>
       <button type="button" class="audience-tab" data-family="group" aria-pressed="false">Groupe</button>
       <button type="button" class="audience-tab" data-family="animal" aria-pressed="false">Animal</button>
       <button type="button" class="audience-tab" data-family="logo" aria-pressed="false">Logo / objet</button>
+      <button type="button" class="audience-tab" data-family="custom" aria-pressed="false">Action libre</button>
     </div>
-    <select id="family" class="family-select" aria-label="Type de photo"><option value="person">Individu</option><option value="couple">Couple</option><option value="group">Groupe</option><option value="animal">Animal</option><option value="logo">Logo / Objet</option></select>
-    <label>Action</label><select id="action"></select>
+    <select id="family" class="family-select" aria-label="Type de photo"><option value="person">Individu</option><option value="couple">Duo</option><option value="group">Groupe</option><option value="animal">Animal</option><option value="logo">Logo / Objet</option><option value="custom">Action libre</option></select>
+    <label id="actionLabel">Action</label><select id="action"></select>
+    <div id="customActionBlock" hidden>
+      <label for="customAction">Décris l’action en une phrase</label>
+      <textarea id="customAction" maxlength="800" placeholder="Ex. La voiture allume ses phares puis avance légèrement vers la droite."></textarea>
+      <div class="small">HappyHolo crée le prompt complet et conserve automatiquement tout le sujet dans le cadre.</div>
+    </div>
     <div id="prompt" class="prompt">Chargement…</div>
     <button id="run" disabled>Lancer PixVerse</button>
     <div id="status" class="status">Attends que HappyHolo soit chargé.</div>
@@ -56,14 +62,17 @@
   </aside>
 </div>
 <script type="module">
-import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=404';
-import { runPixVerseAction } from './modules/pixverse-client.js?v=404';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=404';
+import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=405';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=405';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=405';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
 const audienceTabs=[...document.querySelectorAll('[data-family]')];
 const action=document.getElementById('action');
+const actionLabel=document.getElementById('actionLabel');
+const customActionBlock=document.getElementById('customActionBlock');
+const customAction=document.getElementById('customAction');
 const prompt=document.getElementById('prompt');
 const run=document.getElementById('run');
 const status=document.getElementById('status');
@@ -79,9 +88,13 @@ let library=null;
 let extracted=null;
 let lastVideoId=null;
 let lastActionContext=null;
+let lastLaunchSelection=null;
 
 function setStatus(text,error=false,ok=false){status.textContent=text;status.style.background=error?'#ffe9e7':ok?'#e7f7eb':'#f2f2f2';status.style.color=error?'#8b1f17':ok?'#17652c':'#333'}
-function selection(){return action.value?getActionVariant(library,action.value,family.value):null}
+function cleanCustomIdea(){return customAction.value.replace(/\s+/g,' ').trim().slice(0,800)}
+function localCustomPrompt(idea){return `Use the uploaded image as the exact visual reference. Perform exactly this requested action once: ${idea}. Interpret the request as one simple, continuous and physically plausible transition. Animate only the subject or parts explicitly involved in the request. Preserve the exact identity, anatomy, appearance, proportions, colors and geometry of every subject.`}
+function customSelection(idea=cleanCustomIdea(),prepared=null){if(!idea)return null;return{action:{id:'custom_action',label:'Action libre'},variant:{id:'custom_action_v1',family:'custom',prompt:prepared?.prompt||localCustomPrompt(idea),negativePrompt:prepared?.negativePrompt||'',duration:2,quality:'540p',motionMode:'normal',audio:false},customRequest:idea,promptProvider:prepared?.provider||'preview-template'}}
+function selection(){if(family.value==='custom')return customSelection();return action.value?getActionVariant(library,action.value,family.value):null}
 function actionsForAudience(){
   const fixed={couple:['group_kiss','group_cheek_kiss','group_dance'],group:['group_hands_up']};
   if(fixed[family.value])return (library?.actions||[]).filter(a=>a.active!==false&&fixed[family.value].includes(a.id));
@@ -90,11 +103,15 @@ function actionsForAudience(){
 function refreshAudienceTabs(){audienceTabs.forEach(b=>{const on=b.dataset.family===family.value;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));});}
 function refresh(){
   refreshAudienceTabs();
+  const custom=family.value==='custom';actionLabel.hidden=custom;action.hidden=custom;customActionBlock.hidden=!custom;
+  if(custom){const s=selection();if(s){renderPrompt(s);run.disabled=false}else{prompt.textContent='Écris une phrase : HappyHolo préparera le prompt complet avec toutes les contraintes.';run.disabled=true}run.textContent='Créer le prompt et lancer PixVerse';return}
   const acts=actionsForAudience();
   action.innerHTML=acts.map(a=>`<option value="${a.id}">${a.label}</option>`).join('');
   const s=selection();
-  if(s){const v=s.variant;prompt.innerHTML=`<b>${s.action.label}</b><br>${v.prompt}<br><span style="color:#666">${v.duration||2} s · ${v.quality||'540p'} · audio ${v.audio?'ON':'OFF'}</span>`;run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}
+  run.textContent='Lancer PixVerse';if(s){renderPrompt(s);run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}
 }
+function renderPrompt(s){const v=s.variant;prompt.replaceChildren();const title=document.createElement('b');title.textContent=s.customRequest?'Prompt préparé — action libre':s.action.label;const text=document.createElement('div');text.textContent=v.prompt;text.style.marginTop='4px';const meta=document.createElement('span');meta.style.color='#666';meta.textContent=`${v.duration||2} s · ${v.quality||'540p'} · audio ${v.audio?'ON':'OFF'} · sujet intégralement cadré`;prompt.append(title,text,meta)}
+async function prepareCustomSelection(s){const response=await fetch('/api/pixverse-build-prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea:s.customRequest})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||`Préparation du prompt impossible (HTTP ${response.status}).`);return customSelection(s.customRequest,data)}
 function canvasToFile(canvas){return new Promise((resolve,reject)=>{if(!canvas)return reject(new Error('Canvas final HappyHolo introuvable.'));canvas.toBlob(blob=>blob?resolve(new File([blob],`happyholo-${Date.now()}.png`,{type:'image/png'})):reject(new Error('Impossible de préparer l’image finale.')),'image/png',.95)})}
 function clearFrames(){extracted?.revoke?.();extracted=null;lastVideoId=null;lastActionContext=null;downloadPixVerse.disabled=true;framesGrid.innerHTML='';framesMeta.textContent='';framesDiag.textContent='';framesDiag.className='diag';framesBlock.style.display='none'}
 function renderFrames(result){
@@ -116,7 +133,8 @@ function currentSupportSpec(){
   const map={
     'keychain-vertical':{id,label:'porte-cle-vertical',width:1024,height:1536},
     'keychain-horizontal':{id,label:'porte-cle-horizontal',width:1536,height:1024},
-    'medallion-round':{id,label:'medaillon-rond',width:1024,height:1024},
+    'medallion-round-25':{id,label:'medaillon-rond-25mm',width:1024,height:1024,diameterMm:25},
+    'medallion-round':{id,label:'medaillon-rond-30mm',width:1024,height:1024,diameterMm:30},
     'business-card':{id,label:'carte-85x54',width:1536,height:969},
     'business-card-88':{id,label:'carte-88x56',width:1536,height:978}
   };
@@ -158,7 +176,7 @@ async function downloadStaticSupportZip(){
     const raw=await urlToBlob(imgs[i].src);const fitted=await fitFrameToSupport(raw,spec,placement);
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo static support print',source:'happyholo-static-9-views',views:9,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,placement},null,2));
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo static support print',source:'happyholo-static-9-views',views:9,support:spec.id,diameterMm:spec.diameterMm||null,outputWidth:spec.width,outputHeight:spec.height,placement},null,2));
   const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`9-vues-statique-${spec.label}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);
 }
 async function downloadPixVerseZip(){
@@ -171,13 +189,16 @@ async function downloadPixVerseZip(){
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
   const distinct=extracted.distinctFingerprints ?? new Set(extracted.frames.map(f=>f.fingerprint)).size;
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:9,distinctFrames:distinct,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,customRequest:lastActionContext?.customRequest||null,promptProvider:lastActionContext?.promptProvider||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:9,distinctFrames:distinct,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,diameterMm:spec.diameterMm||null,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
   const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
 }
-async function launch(){
+async function launch(selectionOverride=null){
   if(!navigator.onLine){setStatus('PixVerse nécessite Internet.',true);return}
-  const s=selection();if(!s)return;run.disabled=true;video.style.display='none';rerun.style.display='none';clearFrames();
-  try{setStatus('Préparation de l’image finale HappyHolo…');const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(distinct<9)setStatus(`Vidéo récupérée, mais extraction iPad incomplète : ${distinct}/9 images distinctes.`,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues progressives sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}}catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
+  let s=selectionOverride||selection();if(!s)return;run.disabled=true;video.style.display='none';rerun.style.display='none';clearFrames();
+  try{
+    if(s.customRequest&&!selectionOverride){setStatus('Création du prompt PixVerse avec les contraintes HappyHolo…');s=await prepareCustomSelection(s);renderPrompt(s)}
+    lastLaunchSelection=s;setStatus('Préparation de l’image finale HappyHolo…');const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,customRequest:s.customRequest||null,promptProvider:s.promptProvider||null,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(distinct<9)setStatus(`Vidéo récupérée, mais extraction iPad incomplète : ${distinct}/9 images distinctes.`,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues progressives sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}
+  }catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
 }
 
 function stabilizeLocalSupport(){
@@ -192,7 +213,7 @@ function bindHappyHoloSceneChanges(){
   const w=iframe.contentWindow;if(!w||w.__happyHoloPixverseSceneBound)return;w.__happyHoloPixverseSceneBound=true;w.addEventListener('happyholo-background-changed',invalidatePixVerseAfterSceneEdit);w.addEventListener('happyholo-subject-placement-changed',invalidatePixVerseAfterSceneEdit)
 }
 
-audienceTabs.forEach(b=>b.onclick=()=>{family.value=b.dataset.family;refresh();});family.onchange=refresh;action.onchange=refresh;run.onclick=launch;rerun.onclick=launch;
+audienceTabs.forEach(b=>b.onclick=()=>{family.value=b.dataset.family;refresh();});family.onchange=refresh;action.onchange=refresh;customAction.addEventListener('input',refresh);run.onclick=()=>launch();rerun.onclick=()=>launch(lastLaunchSelection||selection());
 downloadStatic.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP statique ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadStaticSupportZip();setStatus(`ZIP statique prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP statique : ${e.message}`,true)}};
 downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
 iframe.addEventListener('load',()=>{stabilizeLocalSupport();bindHappyHoloSceneChanges();setStatus('HappyHolo chargé. Prépare une image puis lance l’action.')});

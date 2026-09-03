@@ -3,7 +3,8 @@ function supportSpec(doc) {
   const map = {
     'keychain-vertical': { id:'keychain-vertical', label:'porte-cle-vertical', width:1024, height:1536 },
     'keychain-horizontal': { id:'keychain-horizontal', label:'porte-cle-horizontal', width:1536, height:1024 },
-    'medallion-round': { id:'medallion-round', label:'medaillon-rond', width:1024, height:1024 },
+    'medallion-round-25': { id:'medallion-round-25', label:'medaillon-rond-25mm', width:1024, height:1024, diameterMm:25 },
+    'medallion-round': { id:'medallion-round', label:'medaillon-rond-30mm', width:1024, height:1024, diameterMm:30 },
     'business-card': { id:'business-card', label:'carte-85x54', width:1536, height:969 },
     'business-card-88': { id:'business-card-88', label:'carte-88x56', width:1536, height:978 }
   };
@@ -85,6 +86,8 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
         actionId: payload.actionId || null,
         actionLabel: payload.actionLabel || null,
         variantId: payload.variantId || null,
+        customRequest: payload.customRequest || null,
+        promptProvider: payload.promptProvider || null,
         promptPolicy: payload.promptPolicy || 'lenticular-one-way-v1',
         prompt: payload.promptUsed || payload.prompt || null,
         negativePrompt: payload.negativePromptUsed || payload.negativePrompt || null,
@@ -93,6 +96,7 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
         sourceWidth: payload.width,
         sourceHeight: payload.height,
         support: spec.id,
+        diameterMm: spec.diameterMm || null,
         outputWidth: spec.width,
         outputHeight: spec.height,
         fit: 'cover-center',

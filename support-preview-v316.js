@@ -16,7 +16,7 @@
     <div class="support-head"><div><h2>Rendu support</h2><p>Simulation lenticulaire — couches de profondeur + actions locales.</p></div><span class="support-badge">Aperçu 3D</span></div>
     <div class="support-grid">
       <div class="support-controls">
-        <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round">Médaillon rond Ø30 mm</option><option value="business-card">Carte de visite 85,60 × 53,98 mm</option><option value="business-card-88">Carte 88 × 56 mm</option></select>
+        <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round-25">Médaillon rond Ø25 mm</option><option value="medallion-round">Médaillon rond Ø30 mm</option><option value="business-card">Carte de visite 85,60 × 53,98 mm</option><option value="business-card-88">Carte 88 × 56 mm</option></select>
         <label>Cadrage</label><select id="supportFit"><option value="preserve">Préserver le sujet</option><option value="contain" selected>Placement maître — recommandé</option><option value="cover">Remplir — plein cadre</option></select>
         <label><span>Marge autour du sujet</span><b id="marginOut">0%</b></label><input id="supportMargin" type="range" min="0" max="30" value="0">
         <label><span>Zoom</span><b id="zoomOut">100%</b></label><input id="supportZoom" type="range" min="60" max="180" value="100">
@@ -80,7 +80,14 @@
     if(ring)ring.style.display='';
     if(link)link.style.display='';
 
-    if(state.support==='business-card'){
+    if(state.support==='medallion-round-25'){
+      shell.style.width='205px';
+      shell.style.height='205px';
+      shell.style.borderRadius='50%';
+      $('#supportRecommendation').textContent='Médaillon rond Ø25 mm — découpe finale exacte à 25 mm.';
+    }else if(state.support==='medallion-round'){
+      $('#supportRecommendation').textContent='Médaillon rond Ø30 mm — découpe finale exacte à 30 mm.';
+    }else if(state.support==='business-card'){
       // Ratio ISO 85,60 / 53,98 = 1,5858
       shell.style.width='300px';
       shell.style.height='189px';

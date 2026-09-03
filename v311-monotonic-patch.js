@@ -39,9 +39,22 @@
       cropShape: 'rect',
       filename: '9-vues-porte-cle-horizontal-75lpi-v320.zip'
     },
+    'medallion-round-25': {
+      support: 'medallion-round-25',
+      label: 'Médaillon rond Ø25 mm',
+      widthPx: 1024,
+      heightPx: 1024,
+      widthMm: 25,
+      heightMm: 25,
+      diameterMm: 25,
+      lpi: DEFAULT_LPI,
+      resizeMode: 'center-cover-no-distortion',
+      cropShape: 'circle',
+      filename: '9-vues-medallion-rond-25mm-75lpi-v320.zip'
+    },
     'medallion-round': {
       support: 'medallion-round',
-      label: 'Médaillon rond',
+      label: 'Médaillon rond Ø30 mm',
       widthPx: 1024,
       heightPx: 1024,
       widthMm: 30,
@@ -50,7 +63,7 @@
       lpi: DEFAULT_LPI,
       resizeMode: 'center-cover-no-distortion',
       cropShape: 'circle',
-      filename: '9-vues-medallion-rond-75lpi-v320.zip'
+      filename: '9-vues-medallion-rond-30mm-75lpi-v320.zip'
     }
   };
 
