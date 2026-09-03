@@ -7,9 +7,10 @@ import {
 
 /**
  * HappyHolo PixVerse short-clip extractor.
- * PixVerse actions are generated at 2 s. For these clips we deliberately
- * ignore the unstable first/last ~150 ms and spread the 9 lenticular views
- * across the whole useful motion (about 0.15 s -> 1.85 s on a 2.00 s clip).
+ * PixVerse actions are generated at about 2 s, but the useful action can occupy
+ * only a fraction of the clip. We therefore analyze the clip first, locate the
+ * progressive action window, stop before any return/repetition, and only then
+ * calculate the 9 lenticular views inside that useful window.
  */
 export async function extractVideoFrames(video, options = {}) {
   const duration = Number(video?.duration);
@@ -17,15 +18,12 @@ export async function extractVideoFrames(video, options = {}) {
 
   const tuned = shortPixVerseClip
     ? {
-        edgePaddingSeconds: 0.15,
-        progressiveOnly: false,
-        progressiveEndRatio: 1,
         ...options,
-        // Keep the 2 s profile authoritative even when older callers still
-        // carry the previous progressive-only defaults.
-        edgePaddingSeconds: 0.15,
-        progressiveOnly: false,
-        progressiveEndRatio: 1
+        count: options.count ?? 9,
+        edgePaddingSeconds: 0.04,
+        actionAware: true,
+        progressiveOnly: true,
+        analysisSamples: Math.max(36, Number(options.analysisSamples) || 0)
       }
     : options;
 
@@ -33,10 +31,11 @@ export async function extractVideoFrames(video, options = {}) {
   if (shortPixVerseClip) {
     result.extractionWindow = {
       ...result.extractionWindow,
-      mode: 'pixverse-2s-full-motion',
+      mode: 'pixverse-2s-action-targeted-progressive',
       targetDuration: 2,
-      expectedStart: 0.15,
-      expectedEnd: Math.max(0.15, duration - 0.15)
+      calculatedBeforeExtraction: true,
+      progressiveOnly: true,
+      actionAware: true
     };
   }
   return result;
