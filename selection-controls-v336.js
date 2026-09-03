@@ -138,10 +138,54 @@
     if(window.innerWidth<850){for(const row of card.children){if(row.style?.display==='grid')row.style.gridTemplateColumns='1fr';}}
   }
 
+  function inspectSubjectEdges(){
+    const img=window.HappyHoloReliefState?.subjectImg||sourceImage();
+    if(!img?.naturalWidth)return{sides:[],ready:false,message:'Crée d’abord le relief 3D local.'};
+    const maxSide=520,iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
+    const scale=Math.min(1,maxSide/Math.max(iw,ih)),W=Math.max(32,Math.round(iw*scale)),H=Math.max(32,Math.round(ih*scale));
+    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,W,H);
+    const data=ctx.getImageData(0,0,W,H).data,strip=Math.max(2,Math.round(Math.min(W,H)*.018));
+    const count=(x0,y0,x1,y1)=>{let opaque=0,total=0;for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){total++;if(data[(y*W+x)*4+3]>38)opaque++;}return total?opaque/total:0;};
+    const scores={left:count(0,0,strip,H),right:count(W-strip,0,W,H),top:count(0,0,W,strip),bottom:count(0,H-strip,W,H)};
+    const sides=Object.entries(scores).filter(([,score])=>score>.012).map(([side])=>side);
+    return{sides,ready:true,scores,message:sides.length?`Sujet coupé ou trop proche : ${sides.join(', ')}.`:'Marge du sujet correcte.'};
+  }
+
+  const externalActionMap={
+    head_turn:'yaw3d',
+    person_half_spin:'yaw3d',
+    person_hip_dance:'pivot',
+    person_full_dance:'pivot',
+    group_dance:'pivot'
+  };
+
+  function previewExternalAction({actionId,label='',target='auto',family='person'}={}){
+    const selections=plan();
+    if(!selections.length)throw new Error('Crée le relief et valide au moins une sélection avant l’aperçu local.');
+    const localAction=externalActionMap[actionId];
+    if(!localAction)throw new Error('Cette action demande une déformation IA. Choisis une action locale compatible ou lance PixVerse.');
+    let indices=[];
+    if(target==='all'||family==='group'||family==='couple')indices=selections.map((_,index)=>index);
+    else if(/^\d+$/.test(String(target))&&selections[Number(target)])indices=[Number(target)];
+    else indices=[0];
+    for(const index of indices){
+      const selection=selections[index];
+      selection.action=localAction;
+      selection.intensity=Math.max(35,Number(selection.intensity)||55);
+      selection.actionSpeed=Number(selection.actionSpeed)||2000;
+    }
+    clearCaches();ensureControlPanel();notifyActionPlan();
+    openMainActionPreview(indices,`Aperçu local — ${label||'action choisie'}`);
+    return{ok:true,localAction,indices,message:`${label||'Action'} activée localement, sans PixVerse.`};
+  }
+
   window.addEventListener('happyholo:selection-plan',()=>{clearCaches();setTimeout(ensureControlPanel,0);});
   window.addEventListener('happyholo-relief-ready',()=>{clearCaches();ensureControlPanel();});
   window.addEventListener('happyholo-subject-placement-changed',()=>{clearCaches();try{window.renderAt?.(0,window.HappyHoloReliefState?.view);}catch(_){} });
   window.HappyHoloSelectionRenderer={getExclusiveLayer,getMaskTarget,fitCoverLocal,sourceImage,bgImage,plan,placementSig,clearCaches};
+  window.HappyHoloEdgeSafety={inspect:inspectSubjectEdges};
+  window.HappyHoloLocalActions={preview:previewExternalAction,supportedActionIds:Object.keys(externalActionMap)};
   setTimeout(ensureControlPanel,300);
   console.log('[HAPPYHOLO] V3.8.0 sélections + ExplodeView machines actif');
 })();
