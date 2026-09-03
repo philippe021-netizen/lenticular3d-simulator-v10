@@ -1,20 +1,20 @@
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const PROMPT_POLICY_MARKER = 'LENTICULAR ONE-WAY MOTION POLICY';
-const ONE_WAY_PROMPT_POLICY = `${PROMPT_POLICY_MARKER}: Perform exactly one continuous transition from the source state to one clearly different final state. Move progressively in one direction only. Reach the final state by 65% of the clip, then hold it completely motionless until the end. Never reverse, repeat, bounce, oscillate, loop, or return toward the starting pose. CAMERA AND BACKGROUND ARE A FROZEN PHOTOGRAPHIC PLATE: no camera shift and no environmental motion; water, waves, foliage, clouds, lights, shadows and every unmentioned person, animal or object remain pixel-stable. Only the specifically named subject, body parts or effect may move. Preserve identity, anatomy, clothing, scale, framing and geometry.`;
-const ONE_WAY_NEGATIVE_POLICY = 'reverse motion, return to starting pose, return to initial pose, repeated action, second action, bounce, oscillation, boomerang motion, loop, cyclic motion, ping pong motion, moving water, moving waves, moving foam, moving foliage, moving trees, moving clouds, changing shadows, changing background, background regeneration, environmental motion';
+const ONE_WAY_PROMPT_POLICY = `${PROMPT_POLICY_MARKER}: Perform exactly one continuous transition from the source state to one clearly different final state. Move progressively in one direction only. Reach the final state by 65% of the clip, then hold it completely motionless until the end. Never reverse, repeat, bounce, oscillate, loop, or return toward the starting pose. KEEP EVERY ANIMATED SUBJECT COMPLETELY INSIDE THE ORIGINAL FRAME AT ALL TIMES WITH A CLEAR SAFETY MARGIN. The entire visible silhouette of every person, couple, group member, child, animal, vehicle, machine, object and logo must remain visible from first frame to last frame. Hands, fingers, arms, head, hair, feet, paws, ears, tails, wheels, bodywork, machine parts and logo contours never touch or cross an image edge. Never enlarge a subject, move it toward the camera or push it outside its original framing. Use compact lateral movement and bend limbs when available space is limited. CAMERA AND BACKGROUND ARE A FROZEN PHOTOGRAPHIC PLATE: no camera shift and no environmental motion; water, waves, foam, foliage, clouds, birds, lights, shadows and every unmentioned person, animal or object remain pixel-stable. Only the specifically named subjects, body parts or effect may move. Preserve every identity, anatomy, clothing, scale, framing and geometry.`;
+const ONE_WAY_NEGATIVE_POLICY = 'reverse motion, return to starting pose, return to initial pose, repeated action, second action, bounce, oscillation, boomerang motion, loop, cyclic motion, ping pong motion, cropped subject, partial body, cut off subject, out of frame, subject touching image edge, cropped hands, hands outside frame, cropped arms, arms outside frame, cropped head, cropped hair, cropped feet, feet outside frame, cropped paws, cropped tail, cropped wheels, cropped vehicle, cropped machine, cropped object, cropped logo, limbs crossing image edge, subject enlargement, subject drift, body moving toward camera, moving water, moving waves, moving foam, moving foliage, moving trees, moving clouds, moving birds, bird motion, changing shadows, changing background, background regeneration, environmental motion';
 
-function appendPolicy(value, policy, marker = '') {
+function appendPolicy(value, policy, marker = '', separator = ' ') {
   const source = String(value || '').trim();
   if (marker && source.includes(marker)) return source.slice(0, 5000);
-  const separator = source ? ' ' : '';
-  const room = Math.max(0, 5000 - separator.length - policy.length);
-  return `${source.slice(0, room)}${separator}${policy}`;
+  const joiner = source ? separator : '';
+  const room = Math.max(0, 5000 - joiner.length - policy.length);
+  return `${source.slice(0, room)}${joiner}${policy}`;
 }
 
 export function hardenPixVersePrompts(prompt, negativePrompt = '') {
   return {
     prompt: appendPolicy(prompt, ONE_WAY_PROMPT_POLICY, PROMPT_POLICY_MARKER),
-    negativePrompt: appendPolicy(negativePrompt, ONE_WAY_NEGATIVE_POLICY, 'reverse motion, return to starting pose'),
+    negativePrompt: appendPolicy(negativePrompt, ONE_WAY_NEGATIVE_POLICY, 'reverse motion, return to starting pose', ', '),
     policy: 'lenticular-one-way-v1'
   };
 }
