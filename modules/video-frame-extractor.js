@@ -265,18 +265,21 @@ function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
 }
 
 function fingerprintCanvas(ctx, width, height) {
-  const stepsX = 12, stepsY = 8;
+  const sample = document.createElement('canvas');
+  sample.width = 128;
+  sample.height = 96;
+  const sampleCtx = sample.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!sampleCtx) return '';
+  sampleCtx.drawImage(ctx.canvas, 0, 0, width, height, 0, 0, sample.width, sample.height);
+  const pixels = sampleCtx.getImageData(0, 0, sample.width, sample.height).data;
   let h = 2166136261 >>> 0;
-  for (let y = 0; y < stepsY; y++) {
-    for (let x = 0; x < stepsX; x++) {
-      const px = Math.min(width - 1, Math.round((x + 0.5) * width / stepsX));
-      const py = Math.min(height - 1, Math.round((y + 0.5) * height / stepsY));
-      const d = ctx.getImageData(px, py, 1, 1).data;
-      for (let i = 0; i < 3; i++) {
-        h ^= d[i];
-        h = Math.imul(h, 16777619) >>> 0;
-      }
-    }
+  for (let i = 0; i < pixels.length; i += 4) {
+    h ^= pixels[i];
+    h = Math.imul(h, 16777619) >>> 0;
+    h ^= pixels[i + 1];
+    h = Math.imul(h, 16777619) >>> 0;
+    h ^= pixels[i + 2];
+    h = Math.imul(h, 16777619) >>> 0;
   }
   return h.toString(16).padStart(8, '0');
 }
@@ -298,7 +301,7 @@ function actionSensitivity(hint) {
 }
 
 function sampleSignature(ctx, width, height) {
-  const sx = 24, sy = 18;
+  const sx = 32, sy = 24;
   const out = new Float32Array(sx * sy);
   let n = 0;
   for (let y = 0; y < sy; y++) {
@@ -324,6 +327,161 @@ function median(values) {
   const a = [...values].sort((x, y) => x - y);
   const m = Math.floor(a.length / 2);
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+/**
+ * Keep the first complete one-way action. PixVerse can ignore the prompt's
+ * final hold and restart the animation inside the same two-second clip. A
+ * global maximum is therefore unsafe: it can select the second pass.
+ */
+export function selectFirstProgressivePass(samples, {
+  start = samples?.[0]?.time ?? 0,
+  end = samples?.[samples.length - 1]?.time ?? start,
+  medianMotion = 0,
+  threshold = 0
+} = {}) {
+  if (!Array.isArray(samples) || samples.length < 2) {
+    return { actionStartIndex: 0, actionEndIndex: 0, peakIndex: 0, returnIndex: -1, returnDetected: false };
+  }
+
+  const overallMax = Math.max(...samples.map(sample => Number(sample.fromStart) || 0));
+  const activityFloor = Math.max(0.004, medianMotion * 1.15, overallMax * 0.08);
+  let actionStartIndex = 0;
+  for (let i = 1; i < samples.length; i++) {
+    if (samples[i].fromStart >= activityFloor || samples[i].stepMotion >= threshold) {
+      // Keep one quiet sample before the first detected motion so view 1 is
+      // the real source pose, including when the analysis grid is sparse.
+      actionStartIndex = Math.max(0, i - 2);
+      break;
+    }
+  }
+
+  const armedFloor = Math.max(0.008, medianMotion * 1.4, overallMax * 0.16);
+  let peakIndex = actionStartIndex;
+  let peakDistance = samples[peakIndex].fromStart || 0;
+  let returnIndex = -1;
+  let reversalRun = 0;
+
+  for (let i = actionStartIndex + 1; i < samples.length; i++) {
+    const sample = samples[i];
+    const previousPeak = peakDistance;
+    if (sample.fromStart > peakDistance) {
+      peakDistance = sample.fromStart;
+      peakIndex = i;
+    }
+    if (previousPeak < armedFloor) continue;
+
+    const drop = previousPeak - sample.fromStart;
+    const hardReturn = sample.fromStart <= Math.max(0.004, previousPeak * 0.48)
+      && sample.stepMotion >= Math.max(0.006, medianMotion * 0.9);
+    const meaningfulReversal = sample.fromStart <= previousPeak * 0.78
+      && drop >= Math.max(0.006, medianMotion * 1.1);
+    reversalRun = meaningfulReversal ? reversalRun + 1 : 0;
+
+    if (hardReturn || reversalRun >= 2) {
+      returnIndex = i;
+      break;
+    }
+  }
+
+  const cycleLimit = returnIndex >= 0 ? returnIndex : samples.length;
+  peakIndex = actionStartIndex;
+  peakDistance = samples[peakIndex].fromStart || 0;
+  for (let i = actionStartIndex + 1; i < cycleLimit; i++) {
+    if (samples[i].fromStart > peakDistance) {
+      peakDistance = samples[i].fromStart;
+      peakIndex = i;
+    }
+  }
+
+  // Stop when the first pass has essentially reached its final state. This
+  // removes a long final hold without drifting into a later restart.
+  let actionEndIndex = peakIndex;
+  const completionFloor = peakDistance * 0.94;
+  for (let i = actionStartIndex + 1; i <= peakIndex; i++) {
+    if (samples[i].fromStart >= completionFloor) {
+      actionEndIndex = i;
+      break;
+    }
+  }
+
+  const minSpan = Math.max(0.28, (end - start) * 0.14);
+  while (actionEndIndex < peakIndex && samples[actionEndIndex].time - samples[actionStartIndex].time < minSpan) {
+    actionEndIndex++;
+  }
+
+  return {
+    actionStartIndex,
+    actionEndIndex,
+    peakIndex,
+    returnIndex,
+    returnDetected: returnIndex >= 0,
+    peakDistance
+  };
+}
+
+export function planProgressiveFrameTimes(samples, startIndex, endIndex, count = 9) {
+  const frameCount = Math.max(2, Math.round(count));
+  const segment = samples.slice(startIndex, endIndex + 1);
+  if (segment.length < 2) return Array.from({ length: frameCount }, () => segment[0]?.time ?? 0);
+
+  const monotoneProgress = [];
+  let runningMax = Number(segment[0].fromStart) || 0;
+  for (const sample of segment) {
+    runningMax = Math.max(runningMax, Number(sample.fromStart) || 0);
+    monotoneProgress.push(runningMax);
+  }
+  const firstProgress = monotoneProgress[0];
+  const lastProgress = monotoneProgress[monotoneProgress.length - 1];
+  const usableProgress = lastProgress - firstProgress;
+  const firstTime = segment[0].time;
+  const lastTime = segment[segment.length - 1].time;
+
+  if (usableProgress < 0.004) {
+    return Array.from({ length: frameCount }, (_, i) => firstTime + (lastTime - firstTime) * i / (frameCount - 1));
+  }
+
+  return Array.from({ length: frameCount }, (_, i) => {
+    if (i === 0) return firstTime;
+    if (i === frameCount - 1) return lastTime;
+    const target = firstProgress + usableProgress * i / (frameCount - 1);
+    let upper = 1;
+    while (upper < monotoneProgress.length - 1 && monotoneProgress[upper] < target) upper++;
+    const lower = Math.max(0, upper - 1);
+    const lowProgress = monotoneProgress[lower];
+    const highProgress = monotoneProgress[upper];
+    const ratio = highProgress > lowProgress ? (target - lowProgress) / (highProgress - lowProgress) : 1;
+    return segment[lower].time + (segment[upper].time - segment[lower].time) * Math.max(0, Math.min(1, ratio));
+  });
+}
+
+export function assessProgressiveFrames(frames) {
+  if (!Array.isArray(frames) || frames.length < 2) {
+    return { passed: false, reason: 'not-enough-frames', distinctFrames: frames?.length || 0, returnDetected: false };
+  }
+  const distinctFrames = new Set(frames.map(frame => frame.fingerprint)).size;
+  const baseline = frames[0].signature;
+  const progress = frames.map(frame => signatureDistance(baseline, frame.signature));
+  let runningPeak = 0;
+  let returnDetected = false;
+  for (let i = 1; i < progress.length; i++) {
+    runningPeak = Math.max(runningPeak, progress[i - 1]);
+    if (runningPeak >= 0.008 && progress[i] <= runningPeak * 0.55 && runningPeak - progress[i] >= 0.006) {
+      returnDetected = true;
+      break;
+    }
+  }
+  const finalProgress = progress[progress.length - 1];
+  const enoughMotion = Math.max(...progress) >= 0.004;
+  const passed = distinctFrames === frames.length && !returnDetected && enoughMotion;
+  return {
+    passed,
+    reason: distinctFrames !== frames.length ? 'duplicate-frames' : returnDetected ? 'return-detected' : enoughMotion ? null : 'motion-too-small',
+    distinctFrames,
+    returnDetected,
+    finalProgress: Number(finalProgress.toFixed(5)),
+    peakProgress: Number(Math.max(...progress).toFixed(5))
+  };
 }
 
 async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleCount = 26, onProgress) {
@@ -353,28 +511,8 @@ async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleC
   const sensitivity = actionSensitivity(hint);
   const threshold = med + mad * 0.85 * sensitivity;
 
-  let peakIndex = 1;
-  for (let i = 2; i < samples.length; i++) {
-    if (samples[i].fromStart > samples[peakIndex].fromStart) peakIndex = i;
-  }
-
-  const minChanged = Math.max(0.008, samples[peakIndex].fromStart * 0.18);
-  let actionStartIndex = 0;
-  for (let i = 1; i <= peakIndex; i++) {
-    if (samples[i].stepMotion >= threshold || samples[i].fromStart >= minChanged) {
-      actionStartIndex = Math.max(0, i - 1);
-      break;
-    }
-  }
-
-  let actionEndIndex = peakIndex;
-  const peakDistance = samples[peakIndex].fromStart;
-  for (let i = peakIndex + 1; i < samples.length; i++) {
-    const returning = peakDistance > 0.01 && samples[i].fromStart < peakDistance * 0.82;
-    const settled = samples[i].stepMotion < Math.max(med, threshold * 0.6);
-    if (returning || settled) break;
-    actionEndIndex = i;
-  }
+  const selected = selectFirstProgressivePass(samples, { start, end, medianMotion: med, threshold });
+  const { peakIndex, actionStartIndex, actionEndIndex } = selected;
 
   const minSpan = Math.max(0.34, (end - start) * 0.22);
   let selectedStart = samples[actionStartIndex]?.time ?? start;
@@ -392,11 +530,14 @@ async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleC
     peakIndex,
     actionStartIndex,
     actionEndIndex,
+    returnIndex: selected.returnIndex,
+    returnDetected: selected.returnDetected,
     threshold,
     medianMotion: med,
     sensitivity,
     sampleCount: count,
-    hint: hint || null
+    hint: hint || null,
+    samples
   };
 }
 
@@ -435,7 +576,7 @@ export async function extractVideoFrames(video, {
   let start = fullStart;
   let end = fullEnd;
   const frames = [];
-  let previousFingerprint = null;
+  let plannedTimes = null;
 
   try {
     if (actionAware && fullEnd - fullStart > 0.45) {
@@ -443,34 +584,39 @@ export async function extractVideoFrames(video, {
       start = analysis.start;
       end = progressiveOnly ? Math.min(analysis.end, analysis.peak || analysis.end) : analysis.end;
       if (end - start < 0.28) end = Math.min(fullEnd, start + 0.28);
+      plannedTimes = planProgressiveFrameTimes(analysis.samples, analysis.actionStartIndex, analysis.actionEndIndex, frameCount);
+      start = plannedTimes[0];
+      end = plannedTimes[plannedTimes.length - 1];
     }
 
     const span = Math.max(0, end - start);
     for (let i = 0; i < frameCount; i++) {
       const ratio = frameCount === 1 ? 0.5 : i / (frameCount - 1);
-      const requestedTime = start + span * ratio;
+      const requestedTime = plannedTimes?.[i] ?? (start + span * ratio);
       onProgress?.({ phase: 'extract', index: i, count: frameCount, time: requestedTime });
       const actualTime = await seek(video, requestedTime);
       await delay(20);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
+      const signature = sampleSignature(ctx, canvas.width, canvas.height);
       const blob = await canvasToBlob(canvas, type, quality);
       const url = URL.createObjectURL(blob);
-      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, duplicateRetry: fingerprint === previousFingerprint ? 1 : 0, blob, url, width: canvas.width, height: canvas.height });
-      previousFingerprint = fingerprint;
+      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, signature, blob, url, width: canvas.width, height: canvas.height });
     }
   } finally {
     try { await seek(video, Math.min(originalTime, Math.max(0, duration - 0.001))); } catch (_) {}
     if (!wasPaused) { try { await video.play(); } catch (_) {} }
   }
 
+  const qualityGate = assessProgressiveFrames(frames);
   const result = {
     duration,
     width: canvas.width,
     height: canvas.height,
     frames,
-    distinctFingerprints: new Set(frames.map(frame => frame.fingerprint)).size,
+    distinctFingerprints: qualityGate.distinctFrames,
+    qualityGate,
     extractionWindow: {
       mode: actionAware ? 'action-aware-progressive' : (progressiveOnly ? 'progressive-one-way' : 'full-duration'),
       start,
@@ -478,6 +624,10 @@ export async function extractVideoFrames(video, {
       originalStart: fullStart,
       originalEnd: fullEnd,
       actionPeak: analysis?.peak ?? null,
+      returnDetected: analysis?.returnDetected ?? false,
+      returnTime: analysis?.returnIndex >= 0 ? analysis.samples[analysis.returnIndex]?.time ?? null : null,
+      plannedBeforeExtraction: Boolean(plannedTimes),
+      plannedTimes: plannedTimes?.map(time => Number(time.toFixed(3))) || null,
       actionHint: hint || null,
       analysis: analysis ? {
         sampleCount: analysis.sampleCount,
