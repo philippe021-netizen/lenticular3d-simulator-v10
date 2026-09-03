@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo PixVerse — Diagnostic</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0;padding:24px}.card{max-width:760px;margin:6vh auto;background:#fff;border:1px solid #ddd;border-radius:18px;padding:22px;box-shadow:0 10px 30px #0001}h1{margin:0 0 8px;font-size:26px}.line{padding:12px 14px;border-radius:12px;background:#f2f2f2;margin-top:10px;font-size:15px;word-break:break-word}.ok{background:#e7f7eb;color:#17652c}.bad{background:#ffe9e7;color:#8b1f17}button,a.btn{display:block;width:100%;text-align:center;margin-top:14px;padding:14px;border:0;border-radius:12px;background:#111;color:#fff;font:inherit;font-weight:800;text-decoration:none}.small{font-size:12px;color:#666;margin-top:12px;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Diagnostic PixVerse</h1>
+<div id="key" class="line">Vérification de PIXVERSE_API_KEY…</div>
+<div id="env" class="line">Environnement : …</div>
+<div id="commit" class="line">Commit : …</div>
+<div id="deploy" class="line">Déploiement : …</div>
+<a id="continue" class="btn" href="../happyholo-pixverse-actions-test.html" style="display:none">Ouvrir HappyHolo + PixVerse</a>
+<button id="retry" type="button">Revérifier</button>
+<div class="small">Cette page ne révèle jamais la clé. Elle vérifie seulement si Vercel l’a injectée dans ce déploiement.</div>
+</div>
+<script>
+async function check(){
+ const key=document.getElementById('key'),env=document.getElementById('env'),commit=document.getElementById('commit'),deploy=document.getElementById('deploy'),cont=document.getElementById('continue');
+ key.className='line';key.textContent='Vérification de PIXVERSE_API_KEY…';cont.style.display='none';
+ try{
+  const r=await fetch('../api/pixverse-diag?ts='+Date.now(),{cache:'no-store'});
+  const d=await r.json();
+  const ok=!!d.pixverseKeyPresent;
+  key.className='line '+(ok?'ok':'bad');
+  key.textContent=ok?'✅ Clé PixVerse détectée : OUI':'❌ Clé PixVerse détectée : NON';
+  env.textContent='Environnement : '+(d.environment||'inconnu');
+  commit.textContent='Commit : '+(d.gitCommitSha||'inconnu')+(d.gitCommitRef?' — '+d.gitCommitRef:'');
+  deploy.textContent='Déploiement : '+(d.deploymentUrl||location.host);
+  if(ok) cont.style.display='block';
+ }catch(e){key.className='line bad';key.textContent='❌ Diagnostic impossible : '+e.message;}
+}
+document.getElementById('retry').onclick=check;check();
+</script>
+</body>
+</html>

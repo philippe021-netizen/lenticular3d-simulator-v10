@@ -243,7 +243,13 @@ async function estimateDepth(img,label){
 
 /* 5 — RENDU MULTICOUCHE V3.24 — fond + placement sujet synchronisés */
 function renderAt(norm,target=view){
+  if(!target) return;
   const x=target.getContext('2d'); const W=target.width,H=target.height; x.clearRect(0,0,W,H);
+  if(!backgroundImg || !subjectImg){
+    x.fillStyle='#111827';
+    x.fillRect(0,0,W,H);
+    return;
+  }
   const amplitude=Number(angle.value)/4;
   const bgK=Number(bgDepth.value)/0.10;
   const subK=Number(subjectDepth.value)/0.30;

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo — Test PixVerse 2 s</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f5f7}*{box-sizing:border-box}body{margin:0;padding:20px;max-width:900px;margin:auto}.card{background:#fff;border-radius:18px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px #0001}h1{font-size:24px;margin:0 0 8px}p{line-height:1.35}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.grid{grid-template-columns:1fr}}label{display:block;font-weight:600;margin:10px 0 6px}input,textarea,select,button{font:inherit}input[type=file],textarea,select{width:100%;padding:12px;border:1px solid #ccc;border-radius:12px;background:#fff}textarea{min-height:90px;resize:vertical}button{width:100%;padding:15px;border:0;border-radius:14px;font-weight:700;font-size:17px;background:#111;color:#fff}button:disabled{opacity:.45}.status{padding:12px;border-radius:12px;background:#eee;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;min-height:48px}.ok{background:#e8f7ec}.err{background:#fdecec}video,img{width:100%;max-height:520px;object-fit:contain;border-radius:14px;background:#111}.small{font-size:13px;color:#666}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#e8e8ed;font-size:12px;font-weight:700;margin-right:6px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Test PixVerse HappyHolo</h1>
+  <p>Test isolé du flux complet : image → PixVerse V6 → vidéo <strong>2 s / 540p / sans audio</strong> → retour MP4.</p>
+  <span class="badge">Branche test</span><span class="badge">Ne touche pas à main</span>
+</div>
+
+<div class="card">
+  <label for="image">1. Image finale</label>
+  <input id="image" type="file" accept="image/png,image/jpeg,image/webp">
+  <img id="preview" alt="Aperçu" hidden>
+
+  <label for="prompt">2. Action</label>
+  <textarea id="prompt">Turn head slightly left and back. Fixed camera. Preserve identity.</textarea>
+
+  <label for="negative">Negative prompt</label>
+  <textarea id="negative">distorted face, camera movement, flicker</textarea>
+
+  <div class="grid">
+    <div><label>Durée</label><select id="duration"><option value="2" selected>2 secondes</option><option value="1">1 seconde</option><option value="3">3 secondes</option></select></div>
+    <div><label>Qualité</label><select id="quality"><option value="540p" selected>540p</option><option value="360p">360p</option><option value="720p">720p</option></select></div>
+  </div>
+
+  <p class="small">Pour ce test, le modèle est verrouillé côté serveur sur PixVerse V6 et l’audio reste désactivé.</p>
+  <button id="run" disabled>Lancer le test PixVerse</button>
+</div>
+
+<div class="card">
+  <label>État</label>
+  <div id="status" class="status">Choisir une image.</div>
+</div>
+
+<div class="card" id="resultCard" hidden>
+  <label>Résultat récupéré dans HappyHolo</label>
+  <video id="video" controls playsinline loop></video>
+  <p><a id="download" download="happyholo-pixverse-test.mp4">Télécharger le MP4 de test</a></p>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const image=$('image'), preview=$('preview'), run=$('run'), status=$('status');
+const resultCard=$('resultCard'), video=$('video'), download=$('download');
+let objectUrl=null;
+
+function setStatus(msg,type=''){
+  status.textContent=msg;
+  status.className='status'+(type?' '+type:'');
+}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+async function jsonOrThrow(r,label){
+  const text=await r.text();
+  let data; try{data=JSON.parse(text);}catch{throw new Error(`${label}: réponse non JSON (${r.status})`)}
+  if(!r.ok) throw new Error(data?.error||data?.ErrMsg||`${label}: HTTP ${r.status}`);
+  if(data?.ErrCode!==undefined && data.ErrCode!==0) throw new Error(data.ErrMsg||`${label}: ErrCode ${data.ErrCode}`);
+  return data;
+}
+function pick(obj,...paths){
+  for(const path of paths){let v=obj; for(const k of path.split('.')) v=v?.[k]; if(v!==undefined&&v!==null&&v!=='') return v;}
+}
+
+image.addEventListener('change',()=>{
+  if(objectUrl) URL.revokeObjectURL(objectUrl);
+  const f=image.files?.[0];
+  if(!f){run.disabled=true;preview.hidden=true;setStatus('Choisir une image.');return;}
+  objectUrl=URL.createObjectURL(f); preview.src=objectUrl; preview.hidden=false; run.disabled=false;
+  setStatus(`Prêt : ${f.name} — ${(f.size/1024/1024).toFixed(2)} Mo`);
+});
+
+run.addEventListener('click',async()=>{
+  const file=image.files?.[0]; if(!file) return;
+  run.disabled=true; resultCard.hidden=true; video.removeAttribute('src'); video.load();
+  const prompt=$('prompt').value.trim();
+  const negative_prompt=$('negative').value.trim();
+  if(!prompt){setStatus('Prompt manquant.','err');run.disabled=false;return;}
+  try{
+    setStatus('1/4 — Upload de l’image vers PixVerse…');
+    const fd=new FormData(); fd.append('image',file,file.name);
+    const upload=await jsonOrThrow(await fetch('/api/pixverse-upload',{method:'POST',body:fd}),'Upload');
+    const imgId=pick(upload,'Resp.img_id','img_id');
+    if(!imgId) throw new Error('PixVerse n’a pas renvoyé de img_id.');
+
+    setStatus(`2/4 — Image reçue (img_id ${imgId}). Génération 2 s en cours…`);
+    const create=await jsonOrThrow(await fetch('/api/pixverse-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      img_id:Number(imgId), prompt, negative_prompt,
+      duration:Number($('duration').value), quality:$('quality').value,
+      motion_mode:'normal', generate_audio_switch:false
+    })}),'Création');
+    const videoId=pick(create,'Resp.video_id','video_id','Resp.id','id');
+    if(!videoId) throw new Error('PixVerse n’a pas renvoyé de video_id.');
+
+    let finalUrl='';
+    for(let i=1;i<=60;i++){
+      setStatus(`3/4 — PixVerse travaille… vérification ${i} (video_id ${videoId})`);
+      await sleep(i===1?2500:5000);
+      const s=await jsonOrThrow(await fetch('/api/pixverse-status?id='+encodeURIComponent(videoId)),'Statut');
+      const st=Number(pick(s,'Resp.status','status'));
+      if(st===1){finalUrl=pick(s,'Resp.url','url');break;}
+      if(st===7) throw new Error('PixVerse a refusé le contenu (modération).');
+      if(st===8) throw new Error('PixVerse a échoué à générer la vidéo.');
+    }
+    if(!finalUrl) throw new Error('Délai dépassé : aucune vidéo terminée après 5 minutes.');
+
+    setStatus('4/4 — Vidéo terminée. Récupération du MP4 dans HappyHolo…');
+    const localUrl='/api/pixverse-video?url='+encodeURIComponent(finalUrl);
+    const vr=await fetch(localUrl);
+    if(!vr.ok) throw new Error(`Récupération vidéo : HTTP ${vr.status}`);
+    const blob=await vr.blob();
+    if(!blob.type.includes('video') && blob.size<1000) throw new Error('Le fichier récupéré ne semble pas être une vidéo.');
+    const blobUrl=URL.createObjectURL(blob);
+    video.src=blobUrl; download.href=blobUrl; resultCard.hidden=false;
+    setStatus(`SUCCÈS — MP4 récupéré dans le programme (${(blob.size/1024/1024).toFixed(2)} Mo).`,'ok');
+    video.play().catch(()=>{});
+  }catch(e){
+    console.error(e); setStatus('ERREUR — '+(e?.message||String(e)),'err');
+  }finally{run.disabled=false;}
+});
+</script>
+</body>
+</html>
