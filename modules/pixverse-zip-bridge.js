@@ -82,6 +82,12 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
         generator: 'HappyHolo + PixVerse V6',
         source: 'pixverse-video',
         videoId: payload.videoId || null,
+        actionId: payload.actionId || null,
+        actionLabel: payload.actionLabel || null,
+        variantId: payload.variantId || null,
+        promptPolicy: payload.promptPolicy || 'lenticular-one-way-v1',
+        prompt: payload.promptUsed || payload.prompt || null,
+        negativePrompt: payload.negativePromptUsed || payload.negativePrompt || null,
         views: 9,
         distinctFrames: distinct,
         sourceWidth: payload.width,
@@ -90,6 +96,7 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
         outputWidth: spec.width,
         outputHeight: spec.height,
         fit: 'cover-center',
+        extractionWindow: payload.extractionWindow || null,
         times: frames.map(f => Number(f.time.toFixed(3)))
       }, null, 2));
 

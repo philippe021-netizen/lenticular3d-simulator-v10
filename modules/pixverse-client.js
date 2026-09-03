@@ -1,4 +1,23 @@
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const PROMPT_POLICY_MARKER = 'LENTICULAR ONE-WAY MOTION POLICY';
+const ONE_WAY_PROMPT_POLICY = `${PROMPT_POLICY_MARKER}: Perform exactly one continuous transition from the source state to one clearly different final state. Move progressively in one direction only. Reach the final state by 65% of the clip, then hold it completely motionless until the end. Never reverse, repeat, bounce, oscillate, loop, or return toward the starting pose. CAMERA AND BACKGROUND ARE A FROZEN PHOTOGRAPHIC PLATE: no camera shift and no environmental motion; water, waves, foliage, clouds, lights, shadows and every unmentioned person, animal or object remain pixel-stable. Only the specifically named subject, body parts or effect may move. Preserve identity, anatomy, clothing, scale, framing and geometry.`;
+const ONE_WAY_NEGATIVE_POLICY = 'reverse motion, return to starting pose, return to initial pose, repeated action, second action, bounce, oscillation, boomerang motion, loop, cyclic motion, ping pong motion, moving water, moving waves, moving foam, moving foliage, moving trees, moving clouds, changing shadows, changing background, background regeneration, environmental motion';
+
+function appendPolicy(value, policy, marker = '') {
+  const source = String(value || '').trim();
+  if (marker && source.includes(marker)) return source.slice(0, 5000);
+  const separator = source ? ' ' : '';
+  const room = Math.max(0, 5000 - separator.length - policy.length);
+  return `${source.slice(0, room)}${separator}${policy}`;
+}
+
+export function hardenPixVersePrompts(prompt, negativePrompt = '') {
+  return {
+    prompt: appendPolicy(prompt, ONE_WAY_PROMPT_POLICY, PROMPT_POLICY_MARKER),
+    negativePrompt: appendPolicy(negativePrompt, ONE_WAY_NEGATIVE_POLICY, 'reverse motion, return to starting pose'),
+    policy: 'lenticular-one-way-v1'
+  };
+}
 
 async function readJson(r) {
   const text = await r.text();
@@ -72,13 +91,14 @@ export function proxiedPixVerseVideoUrl(url) {
 export async function runPixVerseAction(file, variant, { onStatus } = {}) {
   if (!file) throw new Error('Image source manquante.');
   if (!variant?.prompt) throw new Error('Prompt d’action manquant.');
+  const hardened = hardenPixVersePrompts(variant.prompt, variant.negativePrompt || '');
   onStatus?.({ step: 'upload' });
   const { imgId } = await uploadPixVerseImage(file);
   onStatus?.({ step: 'create', imgId });
   const { videoId } = await createPixVerseVideo({
     imgId,
-    prompt: variant.prompt,
-    negativePrompt: variant.negativePrompt || '',
+    prompt: hardened.prompt,
+    negativePrompt: hardened.negativePrompt,
     duration: variant.duration ?? 2,
     quality: variant.quality || '540p',
     motionMode: variant.motionMode || 'normal',
@@ -89,5 +109,14 @@ export async function runPixVerseAction(file, variant, { onStatus } = {}) {
   const result = await waitForPixVerse(videoId, { onStatus: s => onStatus?.({ step: 'processing', videoId, response: s }) });
   const videoUrl = proxiedPixVerseVideoUrl(result.url);
   onStatus?.({ step: 'done', videoId, videoUrl });
-  return { imgId, videoId, sourceUrl: result.url, videoUrl, response: result.raw };
+  return {
+    imgId,
+    videoId,
+    sourceUrl: result.url,
+    videoUrl,
+    response: result.raw,
+    promptUsed: hardened.prompt,
+    negativePromptUsed: hardened.negativePrompt,
+    promptPolicy: hardened.policy
+  };
 }

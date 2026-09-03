@@ -25,7 +25,7 @@
 <section id="exportCard" class="card export-card hidden"><div class="badge">Impression</div><h2>8. Contrôle final & ZIP</h2><label>Format final</label><select id="cardFormat"><option value="1536x969">Carte 85 × 54 mm</option><option value="1536x978">Carte 88 × 56 mm</option><option value="1800x1200">Photo souvenir 10 × 15 paysage</option><option value="1200x1800">Photo souvenir 10 × 15 portrait</option><option value="1536x1536">Carré / magnet</option><option value="1024x1024">Médaillon rond</option></select><div id="finalStatus" class="status">Préparation...</div><div id="finalGrid" class="final-grid"></div><button id="downloadZip" class="pix" disabled>Télécharger ZIP 9 vues impression</button></section>
 </div></div></div>
 <script type="module">
-import { extractVideoFrames } from './modules/video-frame-extractor.js?v=20260830-fidelity';
+import { extractVideoFrames } from './modules/video-frame-extractor.js?v=403';
 import { createBusinessCardTextState, drawBusinessCardText, serializeBusinessCardText, bindBusinessCardTextDrag, BUSINESS_CARD_TEXT_PRESET } from './modules/business-card-text-layer.js?v=20260830-text-v345';
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
 let imageData='',analysisData=null,chosen=null,generated=[],selectedImage='',extracted=null,finalBlobs=[];

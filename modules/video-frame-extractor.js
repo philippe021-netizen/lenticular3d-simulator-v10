@@ -292,6 +292,8 @@ function fingerprintCanvas(ctx, width, height) {
 export async function extractVideoFrames(video, {
   count = 9,
   edgePaddingSeconds = 0.08,
+  progressiveOnly = true,
+  progressiveEndRatio = 0.72,
   type = 'image/jpeg',
   quality = 0.96,
   onProgress
@@ -305,7 +307,9 @@ export async function extractVideoFrames(video, {
   const frameCount = Math.max(2, Math.round(count));
   const pad = Math.min(Math.max(0, edgePaddingSeconds), duration * 0.15);
   const start = pad;
-  const end = Math.max(start, duration - pad);
+  const fullEnd = Math.max(start, duration - pad);
+  const safeProgressiveRatio = Math.max(0.5, Math.min(1, Number(progressiveEndRatio) || 0.72));
+  const end = progressiveOnly ? start + (fullEnd - start) * safeProgressiveRatio : fullEnd;
   const span = Math.max(0, end - start);
   const canvas = document.createElement('canvas');
   canvas.width = video.videoWidth;
@@ -354,6 +358,13 @@ export async function extractVideoFrames(video, {
     height: canvas.height,
     frames,
     distinctFingerprints: new Set(frames.map(frame => frame.fingerprint)).size,
+    extractionWindow: {
+      mode: progressiveOnly ? 'progressive-one-way' : 'full-duration',
+      start,
+      end,
+      originalEnd: fullEnd,
+      ratio: progressiveOnly ? safeProgressiveRatio : 1
+    },
     revoke() {
       stopPixVerseSimulatorPreview(true);
       frames.forEach(frame => URL.revokeObjectURL(frame.url));

@@ -56,9 +56,9 @@
   </aside>
 </div>
 <script type="module">
-import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=402';
-import { runPixVerseAction } from './modules/pixverse-client.js?v=402';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=402';
+import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=403';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=403';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js?v=403';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -78,6 +78,7 @@ const downloadPixVerse=document.getElementById('downloadPixVerse');
 let library=null;
 let extracted=null;
 let lastVideoId=null;
+let lastActionContext=null;
 
 function setStatus(text,error=false,ok=false){status.textContent=text;status.style.background=error?'#ffe9e7':ok?'#e7f7eb':'#f2f2f2';status.style.color=error?'#8b1f17':ok?'#17652c':'#333'}
 function selection(){return action.value?getActionVariant(library,action.value,family.value):null}
@@ -95,13 +96,14 @@ function refresh(){
   if(s){const v=s.variant;prompt.innerHTML=`<b>${s.action.label}</b><br>${v.prompt}<br><span style="color:#666">${v.duration||2} s · ${v.quality||'540p'} · audio ${v.audio?'ON':'OFF'}</span>`;run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}
 }
 function canvasToFile(canvas){return new Promise((resolve,reject)=>{if(!canvas)return reject(new Error('Canvas final HappyHolo introuvable.'));canvas.toBlob(blob=>blob?resolve(new File([blob],`happyholo-${Date.now()}.png`,{type:'image/png'})):reject(new Error('Impossible de préparer l’image finale.')),'image/png',.95)})}
-function clearFrames(){extracted?.revoke?.();extracted=null;lastVideoId=null;downloadPixVerse.disabled=true;framesGrid.innerHTML='';framesMeta.textContent='';framesDiag.textContent='';framesDiag.className='diag';framesBlock.style.display='none'}
+function clearFrames(){extracted?.revoke?.();extracted=null;lastVideoId=null;lastActionContext=null;downloadPixVerse.disabled=true;framesGrid.innerHTML='';framesMeta.textContent='';framesDiag.textContent='';framesDiag.className='diag';framesBlock.style.display='none'}
 function renderFrames(result){
   extracted=result;framesGrid.innerHTML='';
   result.frames.forEach(frame=>{const card=document.createElement('button');card.type='button';card.className='frame';card.style.padding='0';card.style.margin='0';card.title=`Vue ${frame.index} — ${frame.time.toFixed(2)} s`;const img=document.createElement('img');img.src=frame.url;img.alt=`Vue ${frame.index}`;const label=document.createElement('span');label.textContent=`${frame.index} · ${frame.time.toFixed(2)}s`;card.append(img,label);card.onclick=()=>downloadExtractedFrame(frame,'happyholo-pixverse');framesGrid.appendChild(card)});
-  framesMeta.textContent=`${result.width}×${result.height}`;
+  const windowInfo=result.extractionWindow;
+  framesMeta.textContent=windowInfo?`${result.width}×${result.height} · ${windowInfo.start.toFixed(2)}–${windowInfo.end.toFixed(2)} s`:`${result.width}×${result.height}`;
   const distinct=result.distinctFingerprints ?? new Set(result.frames.map(f=>f.fingerprint)).size;
-  framesDiag.textContent=`Contrôle extraction : ${distinct}/9 images réellement distinctes`;
+  framesDiag.textContent=`Contrôle extraction : ${distinct}/9 images distinctes · fenêtre progressive sans retour`;
   framesDiag.className=`diag${distinct<9?' bad':''}`;
   framesBlock.style.display='block';downloadPixVerse.disabled=result.frames.length!==9;
   requestAnimationFrame(()=>framesBlock.scrollIntoView({behavior:'smooth',block:'start'}));
@@ -169,13 +171,13 @@ async function downloadPixVerseZip(){
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
   const distinct=extracted.distinctFingerprints ?? new Set(extracted.frames.map(f=>f.fingerprint)).size;
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,views:9,distinctFrames:distinct,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,placement,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:9,distinctFrames:distinct,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
   const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
 }
 async function launch(){
   if(!navigator.onLine){setStatus('PixVerse nécessite Internet.',true);return}
   const s=selection();if(!s)return;run.disabled=true;video.style.display='none';rerun.style.display='none';clearFrames();
-  try{setStatus('Préparation de l’image finale HappyHolo…');const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(distinct<9)setStatus(`Vidéo récupérée, mais extraction iPad incomplète : ${distinct}/9 images distinctes.`,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues PixVerse distinctes.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,actionId:s.action.id,variantId:s.variant.id,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}}catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
+  try{setStatus('Préparation de l’image finale HappyHolo…');const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(distinct<9)setStatus(`Vidéo récupérée, mais extraction iPad incomplète : ${distinct}/9 images distinctes.`,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues progressives sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}}catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
 }
 
 function stabilizeLocalSupport(){
