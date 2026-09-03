@@ -12,16 +12,17 @@
 .audience-tab{min-height:46px;margin:0;padding:9px 7px;background:#eef1f3;color:#202830;border:2px solid transparent}
 .audience-tab.active{background:#111;color:#fff;border-color:#111;box-shadow:0 0 0 3px #38bdf833}
 .family-select{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
+.local-tools{margin-top:12px;padding:12px;border:2px solid #1683c7;border-radius:12px;background:#f1f9ff}.local-tools>label{margin-top:0}.localbtn{background:#0877b8}.repairbtn{background:#fff3cd;color:#5f4900;border:1px solid #ddb931}.local-note{font-size:11px;color:#456;line-height:1.35;margin-top:7px}
 @media(max-width:850px){.audience-tabs{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
-<div class="bar"><b>HappyHolo + PixVerse</b><span class="badge">PIXVERSE V6</span></div>
+<div class="bar"><b>HappyHolo — Animer</b><span class="badge">LOCAL + PIXVERSE V6</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=405" title="HappyHolo"></iframe>
+  <iframe id="hhApp" src="./relief3d-test-v31.html?v=411" title="HappyHolo"></iframe>
   <aside class="side">
-    <h2>Action PixVerse</h2>
-    <p>Prépare l’image dans HappyHolo à gauche, puis choisis une action préparée ou écris une phrase libre. L’image du canvas final est envoyée en V6, 2 s, 540p, sans audio.</p>
+    <h2>Choisir une action</h2>
+    <p>Prépare l’image à gauche, choisis l’action et la personne ciblée, puis teste-la localement sans PixVerse. PixVerse reste disponible pour les mouvements qui demandent une génération IA.</p>
     <label>Sujet ou mode</label>
     <div id="audienceTabs" class="audience-tabs" role="group" aria-label="Sujet ou mode">
       <button type="button" class="audience-tab active" data-family="person" aria-pressed="true">Individu</button>
@@ -39,6 +40,13 @@
       <div class="small">Décris une seule action simple. HappyHolo crée le prompt complet et conserve automatiquement tout le sujet dans le cadre.</div>
     </div>
     <div id="prompt" class="prompt">Chargement…</div>
+    <section class="local-tools">
+      <label for="localTarget">Cible de l’action locale</label>
+      <select id="localTarget"><option value="auto">Première sélection</option></select>
+      <button id="previewLocal" class="localbtn" disabled>▶ Aperçu local — sans PixVerse</button>
+      <button id="repairEdge" class="repairbtn" disabled>Réparer automatiquement un bord coupé</button>
+      <div class="local-note">L’aperçu local utilise la sélection et l’action choisies. La réparation recrée d’abord les parties manquantes au bord, puis recharge l’image dans HappyHolo.</div>
+    </section>
     <button id="run" disabled>Lancer PixVerse</button>
     <div id="status" class="status">Attends que HappyHolo soit chargé.</div>
 
@@ -84,6 +92,9 @@ const framesMeta=document.getElementById('framesMeta');
 const framesDiag=document.getElementById('framesDiag');
 const downloadStatic=document.getElementById('downloadStatic');
 const downloadPixVerse=document.getElementById('downloadPixVerse');
+const localTarget=document.getElementById('localTarget');
+const previewLocal=document.getElementById('previewLocal');
+const repairEdge=document.getElementById('repairEdge');
 let library=null;
 let extracted=null;
 let lastVideoId=null;
@@ -101,18 +112,46 @@ function actionsForAudience(){
   return (library?.actions||[]).filter(a=>a.active!==false&&a.categories?.includes(family.value)&&a.variants?.some(v=>v.family===family.value));
 }
 function refreshAudienceTabs(){audienceTabs.forEach(b=>{const on=b.dataset.family===family.value;b.classList.toggle('active',on);b.setAttribute('aria-pressed',String(on));});}
+function localApi(){return iframe.contentWindow?.HappyHoloLocalActions}
+function refreshLocalTargets(){
+  const selections=iframe.contentWindow?.happyHoloSelectionPlan||[],previous=localTarget.value;
+  localTarget.innerHTML='';
+  if(family.value==='group'||family.value==='couple')localTarget.appendChild(new Option('Toutes les sélections','all'));
+  selections.forEach((item,index)=>localTarget.appendChild(new Option(item.name||`Sélection ${index+1}`,String(index))));
+  if(!localTarget.options.length)localTarget.appendChild(new Option('Crée d’abord le relief','auto'));
+  localTarget.value=[...localTarget.options].some(option=>option.value===previous)?previous:localTarget.options[0].value;
+  const selected=selection();previewLocal.disabled=!selected||!localApi()?.supportedActionIds?.includes(selected.action.id)||!selections.length;
+  repairEdge.disabled=!iframe.contentWindow?.HappyHoloEdgeSafety?.inspect?.().ready;
+}
 function refresh(){
   refreshAudienceTabs();
   const custom=family.value==='custom';actionLabel.hidden=custom;action.hidden=custom;customActionBlock.hidden=!custom;
-  if(custom){const s=selection();if(s){renderPrompt(s);run.disabled=false}else{prompt.textContent='Écris une phrase : HappyHolo préparera le prompt complet avec toutes les contraintes.';run.disabled=true}run.textContent='Créer le prompt et lancer PixVerse';return}
+  if(custom){const s=selection();if(s){renderPrompt(s);run.disabled=false}else{prompt.textContent='Écris une phrase : HappyHolo préparera le prompt complet avec toutes les contraintes.';run.disabled=true}run.textContent='Créer le prompt et lancer PixVerse';previewLocal.disabled=true;refreshLocalTargets();return}
   const acts=actionsForAudience();
   action.innerHTML=acts.map(a=>`<option value="${a.id}">${a.label}</option>`).join('');
   const s=selection();
-  run.textContent='Lancer PixVerse';if(s){renderPrompt(s);run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}
+  run.textContent='Lancer PixVerse';if(s){renderPrompt(s);run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}refreshLocalTargets()
 }
 function renderPrompt(s){const v=s.variant;prompt.replaceChildren();const title=document.createElement('b');title.textContent=s.customRequest?'Prompt préparé — action libre':s.action.label;const text=document.createElement('div');text.textContent=v.prompt;text.style.marginTop='4px';const meta=document.createElement('span');meta.style.color='#666';meta.textContent=`${v.duration||2} s · ${v.quality||'540p'} · audio ${v.audio?'ON':'OFF'} · sujet intégralement cadré`;prompt.append(title,text,meta)}
 async function prepareCustomSelection(s){const response=await fetch('/api/pixverse-build-prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea:s.customRequest})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||`Préparation du prompt impossible (HTTP ${response.status}).`);return customSelection(s.customRequest,data)}
 function canvasToFile(canvas){return new Promise((resolve,reject)=>{if(!canvas)return reject(new Error('Canvas final HappyHolo introuvable.'));canvas.toBlob(blob=>blob?resolve(new File([blob],`happyholo-${Date.now()}.png`,{type:'image/png'})):reject(new Error('Impossible de préparer l’image finale.')),'image/png',.95)})}
+function dataUrlToBlob(dataUrl){const [head,body]=String(dataUrl).split(',');const mime=/data:([^;]+)/.exec(head)?.[1]||'image/png',bytes=atob(body),out=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)out[i]=bytes.charCodeAt(i);return new Blob([out],{type:mime})}
+function prepareEdgeRepair(){
+  const w=iframe.contentWindow,report=w?.HappyHoloEdgeSafety?.inspect?.();
+  if(!report?.ready)throw new Error(report?.message||'Crée d’abord le relief 3D local.');
+  if(!report.sides.length)throw new Error('Aucun sujet coupé au bord n’a été détecté.');
+  const source=iframe.contentDocument?.getElementById('view');if(!source)throw new Error('Aperçu HappyHolo introuvable.');
+  const padX=Math.round(source.width*.14),padY=Math.round(source.height*.14),left=report.sides.includes('left')?padX:0,right=report.sides.includes('right')?padX:0,top=report.sides.includes('top')?padY:0,bottom=report.sides.includes('bottom')?padY:0;
+  const image=document.createElement('canvas');image.width=source.width+left+right;image.height=source.height+top+bottom;image.getContext('2d').drawImage(source,left,top);
+  const mask=document.createElement('canvas');mask.width=image.width;mask.height=image.height;const mx=mask.getContext('2d');mx.fillStyle='#fff';mx.fillRect(0,0,mask.width,mask.height);const overlapX=Math.round(source.width*.045),overlapY=Math.round(source.height*.045);
+  if(left)mx.clearRect(0,0,left+overlapX,mask.height);if(right)mx.clearRect(left+source.width-overlapX,0,right+overlapX,mask.height);if(top)mx.clearRect(0,0,mask.width,top+overlapY);if(bottom)mx.clearRect(0,top+source.height-overlapY,mask.width,bottom+overlapY);
+  return{imageDataUrl:image.toDataURL('image/png'),maskDataUrl:mask.toDataURL('image/png'),sides:report.sides,imageSize:image.width>=image.height?'1536x1024':'1024x1536'};
+}
+async function repairDetectedEdge(){
+  const payload=prepareEdgeRepair();repairEdge.disabled=true;previewLocal.disabled=true;run.disabled=true;setStatus(`Réparation du bord ${payload.sides.join(', ')} — reconstruction de la partie manquante…`);
+  try{const response=await fetch('/api/repair-subject-edge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||`Réparation impossible (HTTP ${response.status}).`);const blob=dataUrlToBlob(data.imageDataUrl);setStatus('Bord réparé. HappyHolo recalcule le détourage et le relief…');await iframe.contentWindow.HappyHoloLoadSourceBlob(blob,{autoBuild:true,name:'happyholo-bord-repare.png'});refreshLocalTargets();setStatus('Bord réparé et sujet recadré. Tu peux lancer l’aperçu local ou PixVerse.',false,true)}finally{run.disabled=false;refreshLocalTargets()}
+}
+function previewChosenAction(){const s=selection();if(!s)throw new Error('Choisis une action.');const api=localApi();if(!api)throw new Error('Moteur d’actions locales indisponible.');return api.preview({actionId:s.action.id,label:s.action.label,target:localTarget.value,family:family.value})}
 function clearFrames(){extracted?.revoke?.();extracted=null;lastVideoId=null;lastActionContext=null;downloadPixVerse.disabled=true;framesGrid.innerHTML='';framesMeta.textContent='';framesDiag.textContent='';framesDiag.className='diag';framesBlock.style.display='none'}
 function renderFrames(result){
   extracted=result;framesGrid.innerHTML='';
@@ -216,9 +255,11 @@ function bindHappyHoloSceneChanges(){
 }
 
 audienceTabs.forEach(b=>b.onclick=()=>{family.value=b.dataset.family;refresh();});family.onchange=refresh;action.onchange=refresh;customAction.addEventListener('input',refresh);run.onclick=()=>launch();rerun.onclick=()=>launch(lastLaunchSelection||selection());
+previewLocal.onclick=()=>{try{const result=previewChosenAction();setStatus(result.message,false,true)}catch(error){setStatus(error.message,true)}};
+repairEdge.onclick=async()=>{try{await repairDetectedEdge()}catch(error){setStatus(`Réparation impossible : ${error.message}`,true);refreshLocalTargets()}};
 downloadStatic.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP statique ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadStaticSupportZip();setStatus(`ZIP statique prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP statique : ${e.message}`,true)}};
 downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
-iframe.addEventListener('load',()=>{stabilizeLocalSupport();bindHappyHoloSceneChanges();setStatus('HappyHolo chargé. Prépare une image puis lance l’action.')});
+iframe.addEventListener('load',()=>{stabilizeLocalSupport();bindHappyHoloSceneChanges();const w=iframe.contentWindow;w.addEventListener('happyholo:selection-plan',refreshLocalTargets);w.addEventListener('happyholo-relief-ready',refreshLocalTargets);refreshLocalTargets();setStatus('HappyHolo chargé. Prépare une image, puis utilise l’aperçu local ou PixVerse.')});
 try{library=await loadActionLibrary();refresh()}catch(e){setStatus(`Bibliothèque indisponible : ${e.message}`,true)}
 </script>
 </body>
