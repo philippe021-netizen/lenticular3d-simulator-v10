@@ -1,4 +1,4 @@
-/* HappyHolo V3.7.8 — cadrage commun sujet/fond + extension douce du décor */
+/* HappyHolo V3.7.9 — fond plein cadre proportionnel + sujet indépendant */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -137,15 +137,6 @@
     ctx.restore();
   }
 
-  function makeSafetyBackdrop(img,W,H){
-    const c=document.createElement('canvas');c.width=W;c.height=H;
-    const x=c.getContext('2d'),r=coverRect(img.naturalWidth,img.naturalHeight,W,H),pad=Math.max(8,Math.round(Math.min(W,H)*.06));
-    x.save();x.filter=`blur(${Math.max(10,Math.round(Math.min(W,H)*.045))}px)`;
-    x.drawImage(img,r.x-pad,r.y-pad,r.w+pad*2,r.h+pad*2);x.restore();
-    x.fillStyle='rgba(0,0,0,.035)';x.fillRect(0,0,W,H);
-    return c;
-  }
-
   function makeDepthLayers(img,depth,SW,SH,count,_soft,placementRect=null){
     const base=document.createElement('canvas');base.width=SW;base.height=SH;const bx=base.getContext('2d');
     const fr=placementRect||coverRect(img.naturalWidth,img.naturalHeight,SW,SH);
@@ -189,17 +180,16 @@
     // ratio. A single background layer keeps the reconstructed decor monobloc:
     // splitting it into depth bands produces visible curved slices when animated.
     const size=currentSupportRenderSize(),SW=size.width,SH=size.height;
-    // The reconstructed background and the cut-out subject originate from the
-    // same photo. Keep their base camera transform identical so the subject
-    // continues to cover its inpainted hole after a format change. Only the
-    // unused side area is extended with a soft, proportional backdrop.
-    const compositionRect=containRect(rs.backgroundImg.naturalWidth,rs.backgroundImg.naturalHeight,SW,SH);
-    const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,1,.42,compositionRect);
-    const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||compositionRect;
+    // A portrait source cannot fill a landscape support without either crop,
+    // distortion or invented side panels. Use a proportional full-bleed crop
+    // for the reconstructed decor, while the cut-out subject keeps its own
+    // contained placement so it remains entirely visible.
+    const backgroundRect=coverRect(rs.backgroundImg.naturalWidth,rs.backgroundImg.naturalHeight,SW,SH);
+    const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,1,.42,backgroundRect);
+    const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||containRect(rs.subjectImg.naturalWidth,rs.subjectImg.naturalHeight,SW,SH);
     const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,1,.30,masterRect);
     if(token!==buildToken)return;
-    const safetyBackground=makeSafetyBackdrop(rs.backgroundImg,SW,SH);
-    reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
+    reliefLayers={w:SW,h:SH,bg,sub};
     headlightCache=null;glintCache=null;transformCache=null;
     $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
     play();
@@ -349,7 +339,6 @@
     const customBg=window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,full);
     if(!customBg){
       const br=coverRect(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
-      if(reliefLayers.safetyBackground)ctx.drawImage(reliefLayers.safetyBackground,br.x-1,br.y-1,br.w+2,br.h+2);
       for(const l of reliefLayers.bg){const z=(l.depth-.5)*2,shift=norm*(4+5*z)*(canvas.width/320);ctx.drawImage(l.canvas,br.x+shift,br.y,br.w,br.h);}
     }
     const textDepth=Number(window.happyHoloTextLayer?.depth)||0;if(textDepth<0)drawTextLayer(norm,r);
@@ -424,5 +413,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.8 · cadrage commun + décor étendu');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.9 · fond plein cadre proportionnel');
 })();
