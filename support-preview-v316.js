@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.3 — pivot support synchronisé avec la photo */
+/* HappyHolo V3.8.4 — fond choisi repris sans fond reconstruit */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -200,9 +200,9 @@
     // Keep the source itself so zoom/X/Y sliders redraw it immediately at the
     // selected keychain, medallion or card ratio without an intermediate crop.
     if(token!==buildToken)return;
-    reliefLayers={source};
+    reliefLayers={source,subject:rs?.subjectImg||null};
     headlightCache=null;glintCache=null;transformCache=null;
-    $('#supportHint').textContent='Photo originale plein cadre — aucune reconstruction autour du sujet.';
+    $('#supportHint').textContent='Photo originale ou fond choisi — aucune reconstruction floue autour du sujet.';
     play();
   }
 
@@ -335,19 +335,25 @@
     if(face==='back'){ drawBackFace(); return; }
     draw(norm, actionPulse);
   }
+  function drawOriginalOrChosenBackground(source,subject,norm=0,actionPulse=0){
+    if(!source)return;
+    const full={x:0,y:0,w:canvas.width,h:canvas.height};
+    const customBg=subject&&window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,full);
+    const visual=customBg?subject:source;
+    const r=frontRect(visual.naturalWidth,visual.naturalHeight,canvas.width,canvas.height);
+    ctx.drawImage(visual,r.x,r.y,r.w,r.h);
+    applyHeadlightsFlat(r,actionPulse);drawTextLayer(norm,r);drawCardGuides();
+  }
+
   function drawFallback(actionPulse=0,norm=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;
-    const r=frontRect(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
-    ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);
-    applyHeadlightsFlat(r,actionPulse);drawTextLayer(norm,r);drawCardGuides();
+    drawOriginalOrChosenBackground(uploadedImage,window.HappyHoloReliefState?.subjectImg||null,norm,actionPulse);
   }
 
   function draw(norm,actionPulse=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!reliefLayers){drawFallback(actionPulse,norm);return;}
     if(reliefLayers.source){
-      const source=reliefLayers.source,br=frontRect(source.naturalWidth,source.naturalHeight,canvas.width,canvas.height);
-      ctx.drawImage(source,br.x,br.y,br.w,br.h);
-      applyHeadlightsFlat(br,actionPulse);drawTextLayer(norm,br);drawCardGuides();
+      drawOriginalOrChosenBackground(reliefLayers.source,reliefLayers.subject,norm,actionPulse);
       return;
     }
     const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
@@ -430,5 +436,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.3 · pivot support/photo synchronisé');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.4 · fond choisi synchronisé');
 })();

@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.1 — photo originale + cadrage recto manuel
+/* HappyHolo V3.8.4 — photo originale ou fond choisi + cadrage recto manuel
    Neutralise les anciens modes de remplissage sans toucher au verso, aux cartes,
    à la zone de sécurité ni à la démo 360.
 */
@@ -61,7 +61,7 @@
       note.id='happyHoloMasterPlacementNote';
       note.className='support-note';
       note.style.marginTop='12px';
-      note.innerHTML='<b>Cadrage du recto</b><br>La photo originale remplit le support sans déformation. Ajuste le zoom et sa position horizontale ou verticale pour chaque porte-clé, médaillon ou carte.';
+      note.innerHTML='<b>Cadrage du recto</b><br>Le support reprend la photo originale ou le nouveau fond choisi, sans reconstruction floue. Ajuste le zoom et la position du sujet pour chaque format.';
       const supportType=$('#supportType');
       const controls=supportType?.closest('.support-controls');
       if(controls && supportType)controls.insertBefore(note,supportType.nextSibling);
@@ -95,5 +95,5 @@
     setValue('#supportMargin',0);
   });
 
-  console.log('[HAPPYHOLO] support placement sync V3.8.1 · cadrage recto manuel');
+  console.log('[HAPPYHOLO] support placement sync V3.8.4 · fond choisi + cadrage recto');
 })();
