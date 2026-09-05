@@ -1,6 +1,6 @@
-/* HappyHolo V3.7.6 — placement support synchronisé + reconstruction au ratio du support
+/* HappyHolo V3.8.0 — photo originale plein cadre au ratio du support
    Neutralise le second cadrage du recto sans toucher au verso, aux cartes,
-   aux actions locales, à la zone de sécurité ni à la démo 360.
+   à la zone de sécurité ni à la démo 360.
 */
 (() => {
   'use strict';
@@ -49,7 +49,7 @@
       note.id='happyHoloMasterPlacementNote';
       note.className='support-note';
       note.style.marginTop='12px';
-      note.innerHTML='<b>Placement du recto synchronisé</b><br>Le sujet et le fond reprennent automatiquement la composition principale. Les réglages de déplacement se font uniquement dans « Sujet et arrière-plan ».';
+      note.innerHTML='<b>Photo originale plein cadre</b><br>Le support conserve la photo intacte et l’agrandit proportionnellement pour remplir le format. Aucun fond n’est reconstruit autour du sujet.';
       const supportType=$('#supportType');
       const controls=supportType?.closest('.support-controls');
       if(controls && supportType)controls.insertBefore(note,supportType.nextSibling);
@@ -86,5 +86,5 @@
     setValue('#supportY',0);
   });
 
-  console.log('[HAPPYHOLO] support placement sync V3.7.6 · ratio support reconstruit');
+  console.log('[HAPPYHOLO] support placement sync V3.8.0 · original plein cadre');
 })();
