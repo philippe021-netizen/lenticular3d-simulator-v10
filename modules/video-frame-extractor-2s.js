@@ -10,7 +10,6 @@ function makeVideo(src) {
   v.preload = 'auto';
   v.muted = true;
   v.playsInline = true;
-  v.crossOrigin = 'anonymous';
   v.style.display = 'none';
   v.src = src;
   document.body.appendChild(v);
@@ -55,11 +54,22 @@ async function extractFromVideo(video, options = {}) {
   return result;
 }
 
+async function fetchAsObjectUrl(src) {
+  const r = await fetch(src, { cache: 'no-store' });
+  if (!r.ok) {
+    const msg = await r.text().catch(()=>'');
+    throw new Error(`Chargement vidéo HTTP ${r.status}${msg ? ` — ${msg.slice(0,120)}` : ''}`);
+  }
+  const blob = await r.blob();
+  if (!blob.size) throw new Error('Vidéo vide reçue depuis HappyHolo.');
+  return URL.createObjectURL(blob);
+}
+
 /**
  * HappyHolo PixVerse short-clip extractor.
- * Accepte soit un HTMLVideoElement, soit une URL PixVerse.
- * Pour une URL, on tente d'abord le CDN PixVerse directement (CORS anonyme).
- * Si Safari/iPad refuse cette lecture, on retente automatiquement via le proxy HappyHolo.
+ * Pour une URL same-origin, on télécharge d'abord le MP4 complet puis on crée
+ * un objectURL local. Safari lit alors loadedmetadata sur un fichier déjà présent,
+ * et non sur un CDN PixVerse encore instable.
  */
 export async function extractVideoFrames(videoOrUrl, options = {}) {
   if (typeof videoOrUrl !== 'string') return extractFromVideo(videoOrUrl, options);
@@ -70,18 +80,26 @@ export async function extractVideoFrames(videoOrUrl, options = {}) {
   const sameOrigin = source.startsWith(location.origin) || source.startsWith('/');
   const candidates = sameOrigin
     ? [source]
-    : [source, `/api/pixverse-video?url=${encodeURIComponent(source)}`];
+    : [`/api/pixverse-video?url=${encodeURIComponent(source)}`, source];
 
   let lastError = null;
   for (const src of candidates) {
     let video = null;
+    let objectUrl = '';
     try {
-      video = makeVideo(src);
+      if (src.startsWith('/') || src.startsWith(location.origin)) {
+        objectUrl = await fetchAsObjectUrl(src);
+        video = makeVideo(objectUrl);
+      } else {
+        video = makeVideo(src);
+        video.crossOrigin = 'anonymous';
+      }
       return await extractFromVideo(video, options);
     } catch (e) {
       lastError = e;
     } finally {
       destroyVideo(video);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     }
   }
 
