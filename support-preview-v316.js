@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.1 — photo originale plein cadre + cadrage recto manuel */
+/* HappyHolo V3.8.2 — cadrage recto sur toute l'amplitude utile */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -20,8 +20,8 @@
         <label>Cadrage</label><select id="supportFit"><option value="preserve">Préserver le sujet</option><option value="contain" selected>Placement maître — recommandé</option><option value="cover">Remplir — plein cadre</option></select>
         <label><span>Marge autour du sujet</span><b id="marginOut">0%</b></label><input id="supportMargin" type="range" min="0" max="30" value="0">
         <label><span>Zoom</span><b id="zoomOut">100%</b></label><input id="supportZoom" type="range" min="60" max="180" value="100">
-        <label><span>Position horizontale</span><b id="xOut">0%</b></label><input id="supportX" type="range" min="-50" max="50" value="0">
-        <label><span>Position verticale</span><b id="yOut">0%</b></label><input id="supportY" type="range" min="-50" max="50" value="0">
+        <label><span>Position horizontale</span><b id="xOut">0%</b></label><input id="supportX" type="range" min="-100" max="100" value="0">
+        <label><span>Position verticale</span><b id="yOut">0%</b></label><input id="supportY" type="range" min="-100" max="100" value="0">
         <label><span>Rotation lenticulaire</span><b id="rotOut">±6°</b></label><input id="supportRot" type="range" min="0" max="8" value="6" step="1">
         <label><span>Vitesse</span><b id="speedOut">5.0 s</b></label><input id="supportSpeed" type="range" min="2" max="8" value="5" step="0.5">
         <label style="display:flex;align-items:center;gap:8px"><input id="supportShowSafe" type="checkbox" checked> Afficher la zone de sécurité carte</label>
@@ -113,7 +113,10 @@
   function frontRect(sw,sh,dw,dh){
     const k=Math.max(dw/sw,dh/sh)*(Math.max(60,Math.min(180,Number(state.zoom)||100))/100);
     const w=sw*k,h=sh*k;
-    return{x:(dw-w)/2+(Number(state.x)||0)/100*dw*.5,y:(dh-h)/2+(Number(state.y)||0)/100*dh*.5,w,h};
+    // Map -100..100 to the complete available crop travel while always keeping
+    // the support filled: no blank edge can enter the frame at either extreme.
+    const travelX=Math.max(0,(w-dw)/2),travelY=Math.max(0,(h-dh)/2);
+    return{x:(dw-w)/2+(Number(state.x)||0)/100*travelX,y:(dh-h)/2+(Number(state.y)||0)/100*travelY,w,h};
   }
 
   function isCardSupport(){
@@ -417,5 +420,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.1 · cadrage recto manuel');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.2 · amplitude complète du cadrage');
 })();
