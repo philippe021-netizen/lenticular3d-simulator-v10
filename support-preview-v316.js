@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.2 — cadrage recto sur toute l'amplitude utile */
+/* HappyHolo V3.8.3 — pivot support synchronisé avec la photo */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -71,6 +71,16 @@
   const shell=product.querySelector('.shell');
   const ring=product.querySelector('.ring');
   const link=product.querySelector('.link');
+
+  function setSupportPivot(norm=0){
+    const phase=Math.max(-1,Math.min(1,Number(norm)||0));
+    const base=state.face==='back'?180:0;
+    setProductTilt(base+phase*state.rot);
+    if(shell){
+      const shadowX=Math.round(-phase*10);
+      shell.style.boxShadow=`${shadowX}px 12px 24px rgba(0,0,0,.25)`;
+    }
+  }
 
   function applySupportShape(){
     if(!shell)return;
@@ -354,9 +364,9 @@
   }
 
   function headlightPulse(ts){const s=activeHeadlightSelection();if(!s)return 0;const ms=Math.max(800,Number(s.actionSpeed||2000)),t=((ts-start)%ms)/ms;return(1-Math.cos(t*Math.PI*2))/2;}
-  function tick(ts){if(!running)return;if(!start)start=ts;if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}lastFrame=ts;const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);renderFaceByState(phase,headlightPulse(ts));raf=requestAnimationFrame(tick);}
-  function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);product.classList.add('support-playing');cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
-  function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');flipAngle=state.face==='back'?180:0;setProductTilt(flipAngle);renderFaceByState(0,0);}
+  function tick(ts){if(!running)return;if(!start)start=ts;if(ts-lastFrame<38){raf=requestAnimationFrame(tick);return;}lastFrame=ts;const phase=Math.sin((ts-start)/(state.speed*1000)*Math.PI*2);setSupportPivot(phase);renderFaceByState(phase,headlightPulse(ts));raf=requestAnimationFrame(tick);}
+  function play(){if(!uploadedImage&&!reliefLayers)return;running=true;start=0;lastFrame=0;product.style.setProperty('--support-speed',`${state.speed}s`);product.classList.add('support-playing');setSupportPivot(0);cancelAnimationFrame(raf);raf=requestAnimationFrame(tick);}
+  function stop(){running=false;cancelAnimationFrame(raf);product.classList.remove('support-playing');flipAngle=state.face==='back'?180:0;setProductTilt(flipAngle);if(shell)shell.style.boxShadow='';renderFaceByState(0,0);}
   function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;applySupportShape();product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();updateFaceButtons();if(!flipping)setProductTilt(flipAngle);renderFaceByState(0,0);if(running)start=0;}
 
   function animateToAngle(target,duration=900){
@@ -420,5 +430,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.2 · amplitude complète du cadrage');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.3 · pivot support/photo synchronisé');
 })();
