@@ -175,7 +175,7 @@
     const SW=420, SH=Math.max(280,Math.round(SW*(rs.view.height/rs.view.width)));
     const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,4,.42);
     const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||null;
-    const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30,masterRect);
+    const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,1,.30,masterRect);
     if(token!==buildToken)return;
     const safetyBackground=makeFlatLayer(rs.backgroundImg,SW,SH);
     reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
