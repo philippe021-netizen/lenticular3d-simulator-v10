@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.4 — fond choisi repris sans fond reconstruit */
+/* HappyHolo V3.8.5 — placement libre du sujet sur fond choisi */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -127,6 +127,13 @@
     // the support filled: no blank edge can enter the frame at either extreme.
     const travelX=Math.max(0,(w-dw)/2),travelY=Math.max(0,(h-dh)/2);
     return{x:(dw-w)/2+(Number(state.x)||0)/100*travelX,y:(dh-h)/2+(Number(state.y)||0)/100*travelY,w,h};
+  }
+  function subjectOnBackgroundRect(sw,sh,dw,dh){
+    const k=Math.min(dw/sw,dh/sh)*(Math.max(60,Math.min(180,Number(state.zoom)||100))/100);
+    const w=sw*k,h=sh*k;
+    // A selected background already fills the support, so the transparent
+    // cut-out may travel freely instead of being constrained by crop margins.
+    return{x:(dw-w)/2+(Number(state.x)||0)/100*dw*.5,y:(dh-h)/2+(Number(state.y)||0)/100*dh*.5,w,h};
   }
 
   function isCardSupport(){
@@ -340,7 +347,9 @@
     const full={x:0,y:0,w:canvas.width,h:canvas.height};
     const customBg=subject&&window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,full);
     const visual=customBg?subject:source;
-    const r=frontRect(visual.naturalWidth,visual.naturalHeight,canvas.width,canvas.height);
+    const r=customBg
+      ? subjectOnBackgroundRect(visual.naturalWidth,visual.naturalHeight,canvas.width,canvas.height)
+      : frontRect(visual.naturalWidth,visual.naturalHeight,canvas.width,canvas.height);
     ctx.drawImage(visual,r.x,r.y,r.w,r.h);
     applyHeadlightsFlat(r,actionPulse);drawTextLayer(norm,r);drawCardGuides();
   }
@@ -436,5 +445,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.4 · fond choisi synchronisé');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.5 · sujet libre sur fond choisi');
 })();
