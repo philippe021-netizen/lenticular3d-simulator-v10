@@ -62,8 +62,6 @@ async function safeSeek(video, time) {
     video.currentTime = target;
     await p;
   }
-  // Sur Safari iPad, requestVideoFrameCallback peut ne jamais rappeler sur une vidéo en pause.
-  // Deux frames d'affichage + un court délai suffisent après seeked pour que le canvas lise l'image.
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   await delay(35);
 }
@@ -142,8 +140,22 @@ async function fetchAsObjectUrl(src) {
   }
 }
 
+function triggerBusinessCardSimulation() {
+  const prepare = document.getElementById('prepare');
+  const result = document.getElementById('resultCard');
+  if (!prepare || !result) return;
+  setTimeout(() => {
+    if (prepare.disabled) return;
+    prepare.click();
+  }, 120);
+}
+
 export async function extractVideoFrames(videoOrUrl, options = {}) {
-  if (typeof videoOrUrl !== 'string') return extractFromVideo(videoOrUrl, options);
+  if (typeof videoOrUrl !== 'string') {
+    const result = await extractFromVideo(videoOrUrl, options);
+    triggerBusinessCardSimulation();
+    return result;
+  }
 
   const source = String(videoOrUrl || '').trim();
   if (!source) throw new Error('URL vidéo PixVerse manquante.');
@@ -163,7 +175,9 @@ export async function extractVideoFrames(videoOrUrl, options = {}) {
         video = makeVideo(src);
         video.crossOrigin = 'anonymous';
       }
-      return await extractFromVideo(video, options);
+      const result = await extractFromVideo(video, options);
+      triggerBusinessCardSimulation();
+      return result;
     } catch (e) {
       lastError = e;
     } finally {
