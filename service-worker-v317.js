@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.71';
+const CACHE_VERSION = 'happyholo-offline-v1.72';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -6,7 +6,7 @@ const APP_SHELL = ['./index.html','./happyholo-analysis.html','./happyholo-simul
 APP_SHELL.push('./happyholo-pixverse-actions-test.html','./happyholo-pixverse-free.html','./data/actions-library.json','./modules/action-library.js','./modules/pixverse-client.js','./modules/video-frame-extractor.js','./modules/video-frame-extractor-2s.js');
 const CACHEABLE_HOSTS=['cdn.jsdelivr.net','esm.sh','staticimgly.com','huggingface.co','www.huggingface.co','cdn-lfs.huggingface.co','cdn-lfs-us-1.huggingface.co','cdn-lfs-eu-1.huggingface.co'];
 function cacheable(url){return url.origin===self.location.origin||CACHEABLE_HOSTS.some(h=>url.hostname===h||url.hostname.endsWith(`.${h}`));}
-async function patchSupportPreview(req,response){const url=new URL(req.url);if(!response||!response.ok||response.type==='opaque'||!url.pathname.endsWith('/support-preview-v316.js'))return response;const source=await response.text();const patched=source.replace("const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,4,.42);","const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,1,.42);");const headers=new Headers(response.headers);headers.delete('content-length');headers.delete('content-encoding');return new Response(patched,{status:response.status,statusText:response.statusText,headers});}
+async function patchSupportPreview(req,response){const url=new URL(req.url);if(!response||!response.ok||response.type==='opaque'||!url.pathname.endsWith('/support-preview-v316.js'))return response;const source=await response.text();const patched=source.replace("const SW=420, SH=Math.max(280,Math.round(SW*(rs.view.height/rs.view.width)));","const box=canvas.getBoundingClientRect(),SW=420,SH=Math.max(2,Math.round(SW*((box.height||280)/(box.width||420))));").replace("const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,4,.42);","const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,1,.42);");const headers=new Headers(response.headers);headers.delete('content-length');headers.delete('content-encoding');return new Response(patched,{status:response.status,statusText:response.statusText,headers});}
 self.addEventListener('install',e=>{e.waitUntil(caches.open(APP_CACHE).then(c=>c.addAll(APP_SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('happyholo-offline-')&&k!==APP_CACHE&&k!==RUNTIME_CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 async function cacheOnly(req){const c=await caches.match(req,{ignoreSearch:true});return c?patchSupportPreview(req,c):new Response('Ressource absente du pack local HappyHolo.',{status:503});}
