@@ -134,36 +134,60 @@ async function reconstructBackground(original, alphaCanvas){
     for(let yy=Math.max(0,y-r);yy<=Math.min(h-1,y+r);yy++)
       for(let x2=Math.max(0,xx-r);x2<=Math.min(w-1,xx+r);x2++) dilated[yy*w+x2]=255;
   }
-  const data=img.data; const filled=new Uint8Array(w*h);
-  for(let i=0;i<w*h;i++) filled[i]=dilated[i]<30 ? 1 : 0;
-  const passes=42;
-  for(let pass=0;pass<passes;pass++){
-    let changed=0; const next=[];
-    for(let y=1;y<h-1;y++) for(let xx=1;xx<w-1;xx++){
-      const idx=y*w+xx; if(filled[idx]) continue;
-      let sr=0,sg=0,sb=0,n=0;
-      const ns=[idx-1,idx+1,idx-w,idx+w,idx-w-1,idx-w+1,idx+w-1,idx+w+1];
-      for(const ni of ns){ if(!filled[ni]) continue; sr+=data[ni*4]; sg+=data[ni*4+1]; sb+=data[ni*4+2]; n++; }
-      if(n>=2) next.push([idx,sr/n,sg/n,sb/n]);
-    }
-    for(const [idx,r0,g0,b0] of next){
-      data[idx*4]=r0; data[idx*4+1]=g0; data[idx*4+2]=b0; data[idx*4+3]=255; filled[idx]=1; changed++;
-    }
-    if(pass%8===0){ setStatus(`2/5 Reconstruction locale du fond… passe ${pass+1}/${passes}`); await sleep(0); }
-    if(!changed) break;
+  const data=img.data,total=w*h,filled=new Uint8Array(total),queued=new Uint8Array(total),queue=[];
+  let remaining=0;
+  for(let i=0;i<total;i++){
+    if(dilated[i]<30)filled[i]=1;
+    else remaining++;
   }
-  for(let i=0;i<w*h;i++) if(!filled[i]){
-    const j=Math.max(0,i-1); data[i*4]=data[j*4]; data[i*4+1]=data[j*4+1]; data[i*4+2]=data[j*4+2]; data[i*4+3]=255;
+
+  // Seed every pixel on the inside edge of the mask. Unlike the previous
+  // fixed 42-pass fill, this frontier reaches the centre of any subject-sized
+  // hole and never falls back to copying an entire scan line.
+  const hasKnownNeighbour=idx=>{
+    const px=idx%w,py=(idx/w)|0;
+    return(px>0&&filled[idx-1])||(px<w-1&&filled[idx+1])||(py>0&&filled[idx-w])||(py<h-1&&filled[idx+w]);
+  };
+  for(let i=0;i<total;i++)if(!filled[i]&&hasKnownNeighbour(i)){queued[i]=1;queue.push(i);}
+
+  let head=0,lastYield=0;
+  while(head<queue.length){
+    const idx=queue[head++];
+    if(filled[idx])continue;
+    const px=idx%w,py=(idx/w)|0;
+    let sr=0,sg=0,sb=0,weight=0;
+    for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
+      if(!ox&&!oy)continue;
+      const nx=px+ox,ny=py+oy;if(nx<0||nx>=w||ny<0||ny>=h)continue;
+      const ni=ny*w+nx;if(!filled[ni])continue;
+      const k=(ox&&oy)?.7071:1,o=ni*4;sr+=data[o]*k;sg+=data[o+1]*k;sb+=data[o+2]*k;weight+=k;
+    }
+    if(!weight)continue;
+    const o=idx*4;data[o]=sr/weight;data[o+1]=sg/weight;data[o+2]=sb/weight;data[o+3]=255;filled[idx]=1;remaining--;
+    const neighbours=[];if(px>0)neighbours.push(idx-1);if(px<w-1)neighbours.push(idx+1);if(py>0)neighbours.push(idx-w);if(py<h-1)neighbours.push(idx+w);
+    for(const ni of neighbours)if(!filled[ni]&&!queued[ni]){queued[ni]=1;queue.push(ni);}
+    if(head-lastYield>24000){lastYield=head;setStatus(`2/5 Reconstruction locale du fond… ${Math.max(1,Math.round((1-remaining/Math.max(1,queue.length+remaining))*100))}%`);await sleep(0);}
+  }
+
+  // A fully masked image has no usable boundary. This should not occur after
+  // background removal, but keep a neutral deterministic fallback.
+  if(remaining){
+    let sr=0,sg=0,sb=0,n=0;for(let i=0;i<total;i++)if(filled[i]){const o=i*4;sr+=data[o];sg+=data[o+1];sb+=data[o+2];n++;}
+    const rr=n?sr/n:32,gg=n?sg/n:32,bb=n?sb/n:32;
+    for(let i=0;i<total;i++)if(!filled[i]){const o=i*4;data[o]=rr;data[o+1]=gg;data[o+2]=bb;data[o+3]=255;filled[i]=1;}
   }
   x.putImageData(img,0,0);
   const blurred=document.createElement('canvas'); blurred.width=w;blurred.height=h;
-  const bx=blurred.getContext('2d'); bx.filter='blur(5px)'; bx.drawImage(c,0,0); bx.filter='none';
+  const blurRadius=Math.max(8,Math.min(28,Math.round(Math.min(w,h)*.035)));
+  const bx=blurred.getContext('2d'); bx.filter=`blur(${blurRadius}px)`; bx.drawImage(c,0,0); bx.filter='none';
   const out=document.createElement('canvas'); out.width=w;out.height=h;
   const ox=out.getContext('2d'); ox.drawImage(c,0,0); ox.save(); ox.globalCompositeOperation='source-over';
-  const maskCanvas=document.createElement('canvas'); maskCanvas.width=w;maskCanvas.height=h;
-  const mx=maskCanvas.getContext('2d'); const mid=mx.createImageData(w,h);
+  const rawMask=document.createElement('canvas');rawMask.width=w;rawMask.height=h;
+  const rx=rawMask.getContext('2d');const mid=rx.createImageData(w,h);
   for(let i=0;i<w*h;i++){ const v=dilated[i]; mid.data[i*4]=255;mid.data[i*4+1]=255;mid.data[i*4+2]=255;mid.data[i*4+3]=v; }
-  mx.putImageData(mid,0,0);
+  rx.putImageData(mid,0,0);
+  const maskCanvas=document.createElement('canvas');maskCanvas.width=w;maskCanvas.height=h;
+  const mx=maskCanvas.getContext('2d');mx.filter='blur(2px)';mx.drawImage(rawMask,0,0);mx.filter='none';
   const patch=document.createElement('canvas'); patch.width=w;patch.height=h;
   const px=patch.getContext('2d'); px.drawImage(blurred,0,0); px.globalCompositeOperation='destination-in'; px.drawImage(maskCanvas,0,0);
   ox.drawImage(patch,0,0); ox.restore();

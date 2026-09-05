@@ -1,4 +1,4 @@
-/* HappyHolo V3.7.7 — fond proportionnel et monobloc sur tous les supports */
+/* HappyHolo V3.7.8 — cadrage commun sujet/fond + extension douce du décor */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -110,6 +110,7 @@
   function fitBox(sw,sh,dw,dh){ let k=(state.fit==='cover')?Math.max(dw/sw,dh/sh):Math.min(dw/sw,dh/sh); k*=state.zoom/100; if(state.fit==='preserve')k*=Math.max(.55,1-state.margin/100); const w=sw*k,h=sh*k; return {x:(dw-w)/2+(state.x/100)*dw*.5,y:(dh-h)/2+(state.y/100)*dh*.5,w,h}; }
   function ensureCanvas(){ const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2); const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} }
   function coverRect(sw,sh,dw,dh){const k=Math.max(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
+  function containRect(sw,sh,dw,dh){const k=Math.min(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
 
   function isCardSupport(){
     return state.support==='business-card' || state.support==='business-card-88';
@@ -136,10 +137,12 @@
     ctx.restore();
   }
 
-  function makeFlatLayer(img,W,H){
+  function makeSafetyBackdrop(img,W,H){
     const c=document.createElement('canvas');c.width=W;c.height=H;
-    const x=c.getContext('2d'),r=coverRect(img.naturalWidth,img.naturalHeight,W,H);
-    x.drawImage(img,r.x,r.y,r.w,r.h);
+    const x=c.getContext('2d'),r=coverRect(img.naturalWidth,img.naturalHeight,W,H),pad=Math.max(8,Math.round(Math.min(W,H)*.06));
+    x.save();x.filter=`blur(${Math.max(10,Math.round(Math.min(W,H)*.045))}px)`;
+    x.drawImage(img,r.x-pad,r.y-pad,r.w+pad*2,r.h+pad*2);x.restore();
+    x.fillStyle='rgba(0,0,0,.035)';x.fillRect(0,0,W,H);
     return c;
   }
 
@@ -186,11 +189,16 @@
     // ratio. A single background layer keeps the reconstructed decor monobloc:
     // splitting it into depth bands produces visible curved slices when animated.
     const size=currentSupportRenderSize(),SW=size.width,SH=size.height;
-    const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,1,.42);
-    const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||null;
+    // The reconstructed background and the cut-out subject originate from the
+    // same photo. Keep their base camera transform identical so the subject
+    // continues to cover its inpainted hole after a format change. Only the
+    // unused side area is extended with a soft, proportional backdrop.
+    const compositionRect=containRect(rs.backgroundImg.naturalWidth,rs.backgroundImg.naturalHeight,SW,SH);
+    const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,1,.42,compositionRect);
+    const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||compositionRect;
     const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,1,.30,masterRect);
     if(token!==buildToken)return;
-    const safetyBackground=makeFlatLayer(rs.backgroundImg,SW,SH);
+    const safetyBackground=makeSafetyBackdrop(rs.backgroundImg,SW,SH);
     reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
     headlightCache=null;glintCache=null;transformCache=null;
     $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
@@ -416,5 +424,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.7 · fond proportionnel monobloc');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.8 · cadrage commun + décor étendu');
 })();
