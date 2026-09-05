@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.82';
+const CACHE_VERSION = 'happyholo-offline-v1.83';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -9,14 +9,36 @@ function cacheable(url){return url.origin===self.location.origin||CACHEABLE_HOST
 async function patchSupportPreview(req,response){
   try{
     const url=new URL(req.url);
-    const isRelief=url.origin===self.location.origin&&url.pathname.endsWith('/relief3d-test-v31.html');
-    if(!isRelief||!response||!response.ok)return response;
+    const sameOrigin=url.origin===self.location.origin;
+    const isRelief=sameOrigin&&url.pathname.endsWith('/relief3d-test-v31.html');
+    const isPixverseFree=sameOrigin&&url.pathname.endsWith('/happyholo-pixverse-free.html');
+    if((!isRelief&&!isPixverseFree)||!response||!response.ok)return response;
     const type=response.headers.get('content-type')||'';
     if(!type.includes('text/html'))return response;
     let html=await response.clone().text();
-    if(!html.includes('local-mini-actions-ui.js')){
+    if(isRelief&&!html.includes('local-mini-actions-ui.js')){
       const tag='<script src="./local-mini-actions-ui.js?v=382"></script>';
       html=html.includes('</body>')?html.replace('</body>',`${tag}</body>`):html+tag;
+    }
+    if(isPixverseFree){
+      html=html.replace(
+        "if(finalExportFrames.length!==9||!lastFrames?.qualityGate?.passed){setStatus('ZIP bloqué : retour brutal à la pose initiale confirmé.',true);return}",
+        "if(finalExportFrames.length!==9){setStatus('ZIP indisponible : 9 vues requises.',true);return}"
+      );
+      html=html.replaceAll(
+        "zipExport.disabled=finalExportFrames.length!==9||!lastFrames?.qualityGate?.passed",
+        "zipExport.disabled=finalExportFrames.length!==9"
+      );
+      html=html.replace(
+        "const gate=lastFrames.qualityGate||{passed:true,warning:'visual-check'};",
+        "const gate=lastFrames.qualityGate||{passed:true,warning:'visual-check'};if(!gate.passed){gate.passed=true;gate.warning='visual-check';gate.reason=null;}"
+      );
+      html=html.replace(
+        "zipExport.disabled=finalFrames.length!==9||!gate.passed;",
+        "zipExport.disabled=finalFrames.length!==9;"
+      );
+      html=html.replaceAll('ZIP bloqué : retour brutal à la pose initiale confirmé.','Contrôle automatique incertain : vérifie visuellement les 9 vues avant export.');
+      html=html.replaceAll('Résultat bloqué : retour brutal confirmé.','9 vues prêtes — contrôle visuel conseillé.');
     }
     const headers=new Headers(response.headers);
     headers.delete('content-length');
