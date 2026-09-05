@@ -7,38 +7,66 @@ import {
 
 /**
  * HappyHolo PixVerse short-clip extractor.
- * PixVerse actions are generated at about 2 s, but the useful action can occupy
- * only a fraction of the clip. We therefore analyze the clip first, locate the
- * progressive action window, stop before any return/repetition, and only then
- * calculate the 9 lenticular views inside that useful window.
+ * Accepte soit un HTMLVideoElement, soit une URL vidéo PixVerse.
+ * Dans le second cas on crée un élément vidéo local et on passe par le proxy
+ * HappyHolo pour éviter les problèmes CORS/Safari avant l'extraction des 9 vues.
  */
-export async function extractVideoFrames(video, options = {}) {
-  const duration = Number(video?.duration);
-  const shortPixVerseClip = Number.isFinite(duration) && duration > 0 && duration <= 2.35;
+export async function extractVideoFrames(videoOrUrl, options = {}) {
+  let video = videoOrUrl;
+  let ownedVideo = null;
 
-  const tuned = shortPixVerseClip
-    ? {
-        ...options,
-        count: options.count ?? 9,
-        edgePaddingSeconds: 0.04,
-        actionAware: true,
-        progressiveOnly: true,
-        analysisSamples: Math.max(36, Number(options.analysisSamples) || 0)
-      }
-    : options;
-
-  const result = await baseExtractVideoFrames(video, tuned);
-  if (shortPixVerseClip) {
-    result.extractionWindow = {
-      ...result.extractionWindow,
-      mode: 'pixverse-2s-action-targeted-progressive',
-      targetDuration: 2,
-      calculatedBeforeExtraction: true,
-      progressiveOnly: true,
-      actionAware: true
-    };
+  if (typeof videoOrUrl === 'string') {
+    const source = String(videoOrUrl || '').trim();
+    if (!source) throw new Error('URL vidéo PixVerse manquante.');
+    ownedVideo = document.createElement('video');
+    ownedVideo.preload = 'auto';
+    ownedVideo.muted = true;
+    ownedVideo.playsInline = true;
+    ownedVideo.crossOrigin = 'anonymous';
+    ownedVideo.style.display = 'none';
+    const sameOrigin = source.startsWith(location.origin) || source.startsWith('/');
+    ownedVideo.src = sameOrigin ? source : `/api/pixverse-video?url=${encodeURIComponent(source)}`;
+    document.body.appendChild(ownedVideo);
+    video = ownedVideo;
   }
-  return result;
+
+  try {
+    const duration = Number(video?.duration);
+    const shortPixVerseClip = Number.isFinite(duration) && duration > 0 && duration <= 2.35;
+
+    const tuned = shortPixVerseClip
+      ? {
+          ...options,
+          count: options.count ?? 9,
+          edgePaddingSeconds: 0.04,
+          actionAware: true,
+          progressiveOnly: true,
+          analysisSamples: Math.max(36, Number(options.analysisSamples) || 0)
+        }
+      : options;
+
+    const result = await baseExtractVideoFrames(video, tuned);
+    const finalDuration = Number(video?.duration);
+    const finalShort = Number.isFinite(finalDuration) && finalDuration > 0 && finalDuration <= 2.35;
+    if (finalShort) {
+      result.extractionWindow = {
+        ...result.extractionWindow,
+        mode: 'pixverse-2s-action-targeted-progressive',
+        targetDuration: 2,
+        calculatedBeforeExtraction: true,
+        progressiveOnly: true,
+        actionAware: true
+      };
+    }
+    return result;
+  } finally {
+    if (ownedVideo) {
+      try { ownedVideo.pause(); } catch (_) {}
+      ownedVideo.removeAttribute('src');
+      try { ownedVideo.load(); } catch (_) {}
+      ownedVideo.remove();
+    }
+  }
 }
 
 export {
