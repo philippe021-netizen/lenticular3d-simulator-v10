@@ -1,4 +1,4 @@
-/* HappyHolo V3.7.3 — verso non inversé + réglages dédiés */
+/* HappyHolo V3.7.7 — fond proportionnel et monobloc sur tous les supports */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -166,14 +166,27 @@
     return out;
   }
 
+  function currentSupportRenderSize(){
+    const box=canvas.getBoundingClientRect();
+    const ratio=(box.width>1&&box.height>1)
+      ? box.height/box.width
+      : (canvas.clientWidth>1&&canvas.clientHeight>1 ? canvas.clientHeight/canvas.clientWidth : 1);
+    const width=420;
+    return{width,height:Math.max(2,Math.round(width*ratio))};
+  }
+
   async function rebuildReliefLayers(){
     const token=++buildToken, rs=window.HappyHoloReliefState;
     if(!rs?.subjectImg||!rs?.backgroundImg||!rs?.subjectDepthCanvas||!rs?.backgroundDepthCanvas){reliefLayers=null;draw(0,0);return;}
     $('#supportHint').textContent='Préparation des couches de profondeur…';
     await new Promise(r=>setTimeout(r,30));
     if(token!==buildToken)return;
-    const SW=420, SH=Math.max(280,Math.round(SW*(rs.view.height/rs.view.width)));
-    const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,4,.42);
+    // The support can switch between portrait, landscape, card and round formats.
+    // Rebuild against the *current support window* instead of the master preview
+    // ratio. A single background layer keeps the reconstructed decor monobloc:
+    // splitting it into depth bands produces visible curved slices when animated.
+    const size=currentSupportRenderSize(),SW=size.width,SH=size.height;
+    const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,1,.42);
     const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||null;
     const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,1,.30,masterRect);
     if(token!==buildToken)return;
@@ -403,5 +416,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.3 · verso lisible + réglages dédiés');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.7 · fond proportionnel monobloc');
 })();
