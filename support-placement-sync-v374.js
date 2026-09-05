@@ -1,4 +1,4 @@
-/* HappyHolo V3.7.4 — placement support synchronisé avec la composition principale
+/* HappyHolo V3.7.6 — placement support synchronisé + reconstruction au ratio du support
    Neutralise le second cadrage du recto sans toucher au verso, aux cartes,
    aux actions locales, à la zone de sécurité ni à la démo 360.
 */
@@ -21,11 +21,16 @@
     el.value=String(value);
   }
 
+  function scheduleSupportRebuild(){
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      window.dispatchEvent(new CustomEvent('happyholo-subject-placement-changed'));
+    }));
+  }
+
   function neutralizeSupportPlacement(){
     const fit=$('#supportFit');
     if(!fit)return false;
 
-    // Le recto reprend désormais le cadrage maître : aucune seconde translation/échelle.
     setValue('#supportFit','contain');
     setValue('#supportMargin',0);
     setValue('#supportZoom',100);
@@ -50,8 +55,14 @@
       if(controls && supportType)controls.insertBefore(note,supportType.nextSibling);
     }
 
-    // Un seul événement suffit pour faire relire les valeurs par la V3.7.3.
     fit.dispatchEvent(new Event('input',{bubbles:true}));
+
+    const supportType=$('#supportType');
+    if(supportType && !supportType.dataset.hhRatioSync){
+      supportType.dataset.hhRatioSync='1';
+      supportType.addEventListener('input',scheduleSupportRebuild);
+      supportType.addEventListener('change',scheduleSupportRebuild);
+    }
     return true;
   }
 
@@ -67,8 +78,6 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
   else boot();
 
-  // Si le placement maître change, le support reste neutre et se reconstruit via
-  // l'événement déjà écouté par support-preview-v316.js.
   window.addEventListener('happyholo-subject-placement-changed',()=>{
     setValue('#supportFit','contain');
     setValue('#supportMargin',0);
@@ -77,5 +86,5 @@
     setValue('#supportY',0);
   });
 
-  console.log('[HAPPYHOLO] support placement sync V3.7.4 actif');
+  console.log('[HAPPYHOLO] support placement sync V3.7.6 · ratio support reconstruit');
 })();
