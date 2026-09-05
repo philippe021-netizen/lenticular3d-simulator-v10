@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   const key = process.env.PIXVERSE_API_KEY;
   if (!key) return res.status(500).json({ error: 'PIXVERSE_API_KEY manquante dans Vercel.' });
 
-  const rawId = String(req.query.id || '').trim();
+  const rawId = String(req.query.id || req.query.video_id || '').trim();
   if (!/^\d+$/.test(rawId)) return res.status(400).json({ error: 'video id PixVerse invalide' });
 
   const controller = new AbortController();
