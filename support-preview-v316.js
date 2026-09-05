@@ -1,4 +1,4 @@
-/* HappyHolo V3.7.3 — verso non inversé + réglages dédiés */
+/* HappyHolo V3.7.4 — anti-coupes sujet monobloc + verso non inversé */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -42,7 +42,7 @@
           <button id="supportDemo360Btn" class="secondary" type="button">Démo 360</button>
         </div>
       </div>
-      <div class="support-stage-wrap"><div class="support-stage"><div id="productObject" class="product-object keychain-vertical"><div class="ring"></div><div class="link"></div><div class="shell"><div class="image-window"><canvas id="supportCanvas"></canvas></div></div></div><div id="supportEmpty" class="support-empty">Charge une photo pour afficher le support.</div></div><div id="supportRecommendation" class="support-note">Portrait → porte-clé vertical recommandé.</div><div id="supportHint" class="support-note">Après « Créer le relief 3D local », l’aperçu utilise plusieurs plans de profondeur. Les actions validées sont jouées dans ce même aperçu.</div></div>
+      <div class="support-stage-wrap"><div class="support-stage"><div id="productObject" class="product-object keychain-vertical"><div class="ring"></div><div class="link"></div><div class="shell"><div class="image-window"><canvas id="supportCanvas"></canvas></div></div></div><div id="supportEmpty" class="support-empty">Charge une photo pour afficher le support.</div></div><div id="supportRecommendation" class="support-note">Portrait → porte-clé vertical recommandé.</div><div id="supportHint" class="support-note">Après « Créer le relief 3D local », le fond conserve sa profondeur et le sujet reste monobloc pour éviter les coupes.</div></div>
     </div>`;
   document.querySelector('.card.grid')?.insertAdjacentElement('afterend',host);
 
@@ -88,7 +88,6 @@
     }else if(state.support==='medallion-round'){
       $('#supportRecommendation').textContent='Médaillon rond Ø30 mm — découpe finale exacte à 30 mm.';
     }else if(state.support==='business-card'){
-      // Ratio ISO 85,60 / 53,98 = 1,5858
       shell.style.width='300px';
       shell.style.height='189px';
       shell.style.borderRadius='14px';
@@ -96,7 +95,6 @@
       if(link)link.style.display='none';
       $('#supportRecommendation').textContent='Carte de visite — 85,60 × 53,98 mm. Garde les infos importantes dans la zone de sécurité.';
     }else if(state.support==='business-card-88'){
-      // Ratio 88 / 56 = 1,5714
       shell.style.width='300px';
       shell.style.height='191px';
       shell.style.borderRadius='14px';
@@ -111,9 +109,7 @@
   function ensureCanvas(){ const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2); const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} }
   function coverRect(sw,sh,dw,dh){const k=Math.max(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
 
-  function isCardSupport(){
-    return state.support==='business-card' || state.support==='business-card-88';
-  }
+  function isCardSupport(){return state.support==='business-card' || state.support==='business-card-88';}
 
   function drawCardGuides(){
     if(!isCardSupport() || !state.showSafe) return;
@@ -175,12 +171,12 @@
     const SW=420, SH=Math.max(280,Math.round(SW*(rs.view.height/rs.view.width)));
     const bg=makeDepthLayers(rs.backgroundImg,rs.backgroundDepthCanvas,SW,SH,4,.42);
     const masterRect=window.HappyHoloSubjectPlacement?.rect?.(rs.subjectImg,SW,SH,{x:0,y:0,w:SW,h:SH})||null;
-    const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,6,.30,masterRect);
+    const sub=makeDepthLayers(rs.subjectImg,rs.subjectDepthCanvas,SW,SH,1,.30,masterRect);
     if(token!==buildToken)return;
     const safetyBackground=makeFlatLayer(rs.backgroundImg,SW,SH);
     reliefLayers={w:SW,h:SH,bg,sub,safetyBackground};
     headlightCache=null;glintCache=null;transformCache=null;
-    $('#supportHint').textContent='Aperçu 3D prêt — profondeur + actions validées.';
+    $('#supportHint').textContent='Aperçu 3D prêt — fond en profondeur, sujet monobloc anti-coupes.';
     play();
   }
 
@@ -252,33 +248,22 @@
     const iw=img.naturalWidth||img.width||1,ih=img.naturalHeight||img.height||1;
     const sc=Math.max(W/iw,H/ih)*(Math.max(60,Math.min(180,Number(state.backZoom)||100))/100);
     const w=iw*sc,h=ih*sc;
-    return{
-      x:(W-w)/2+(Number(state.backX)||0)/100*W*.5,
-      y:(H-h)/2+(Number(state.backY)||0)/100*H*.5,
-      w,h
-    };
+    return{x:(W-w)/2+(Number(state.backX)||0)/100*W*.5,y:(H-h)/2+(Number(state.backY)||0)/100*H*.5,w,h};
   }
 
   function drawBackFace(){
     ensureCanvas();
     ctx.clearRect(0,0,canvas.width,canvas.height);
-
-    // Le support DOM est déjà tourné de 180° : on retourne donc le dessin
-    // du verso horizontalement pour qu'il soit lisible normalement à l'écran.
     ctx.save();
     ctx.translate(canvas.width,0);
     ctx.scale(-1,1);
-
     if(backImage){
       const r=backRect(backImage,canvas.width,canvas.height);
       ctx.drawImage(backImage,r.x,r.y,r.w,r.h);
     }else{
       const g=ctx.createLinearGradient(0,0,canvas.width,canvas.height);
-      if(isCardSupport()){
-        g.addColorStop(0,'#ffffff'); g.addColorStop(1,'#e9e9ee');
-      }else{
-        g.addColorStop(0,'#f2f2f3'); g.addColorStop(1,'#c9ccd3');
-      }
+      if(isCardSupport()){g.addColorStop(0,'#ffffff'); g.addColorStop(1,'#e9e9ee');}
+      else{g.addColorStop(0,'#f2f2f3'); g.addColorStop(1,'#c9ccd3');}
       ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
       ctx.strokeStyle='rgba(0,0,0,.12)';
       ctx.lineWidth=Math.max(2,Math.round(Math.min(canvas.width,canvas.height)*0.014));
@@ -290,8 +275,6 @@
       ctx.font=`500 ${Math.max(10,Math.round(Math.min(canvas.width,canvas.height)*0.038))}px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif`;
       ctx.fillText('Charge une image dans le bloc « Verso du support »', canvas.width/2, canvas.height/2 + 22);
     }
-
-    // Les guides doivent suivre le verso lui aussi.
     if(isCardSupport() && state.showSafe){
       const W=canvas.width,H=canvas.height;
       const trimPad=Math.round(Math.min(W,H)*0.012);
@@ -308,11 +291,7 @@
     ctx.restore();
   }
 
-  function renderFaceByState(norm=0, actionPulse=0){
-    const face=currentRenderedFace();
-    if(face==='back'){ drawBackFace(); return; }
-    draw(norm, actionPulse);
-  }
+  function renderFaceByState(norm=0, actionPulse=0){const face=currentRenderedFace();if(face==='back'){ drawBackFace(); return; }draw(norm, actionPulse);}
   function drawFallback(actionPulse=0,norm=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;
     const r=fitBox(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
@@ -343,49 +322,16 @@
   function apply(){const wasRunning=running;product.className=`product-object ${state.support}${wasRunning?' support-playing':''}`;applySupportShape();product.style.setProperty('--support-neg',`${-state.rot}deg`);product.style.setProperty('--support-pos',`${state.rot}deg`);product.style.setProperty('--support-speed',`${state.speed}s`);updateText();updateFaceButtons();if(!flipping)setProductTilt(flipAngle);renderFaceByState(0,0);if(running)start=0;}
 
   function animateToAngle(target,duration=900){
-    cancelAnimationFrame(flipRAF);
-    cancelAnimationFrame(raf);
-    running=false;
-    product.classList.remove('support-playing');
-    flipping=true;
-    const startAngle=flipAngle;
-    const delta=target-startAngle;
-    const t0=performance.now();
-    const ease=t=>1-Math.pow(1-t,3);
-    const step=now=>{
-      const p=Math.min(1,(now-t0)/duration);
-      flipAngle=startAngle+delta*ease(p);
-      setProductTilt(flipAngle);
-      renderFaceByState(0,0);
-      if(p<1){ flipRAF=requestAnimationFrame(step); return; }
-      flipping=false;
-      flipAngle=target;
-      const norm=((flipAngle%360)+360)%360;
-      state.face = (norm>=90 && norm<270) ? 'back' : 'front';
-      updateFaceButtons();
-      setProductTilt(flipAngle);
-      renderFaceByState(0,0);
-    };
+    cancelAnimationFrame(flipRAF);cancelAnimationFrame(raf);running=false;product.classList.remove('support-playing');flipping=true;
+    const startAngle=flipAngle,delta=target-startAngle,t0=performance.now(),ease=t=>1-Math.pow(1-t,3);
+    const step=now=>{const p=Math.min(1,(now-t0)/duration);flipAngle=startAngle+delta*ease(p);setProductTilt(flipAngle);renderFaceByState(0,0);if(p<1){ flipRAF=requestAnimationFrame(step); return; }flipping=false;flipAngle=target;const norm=((flipAngle%360)+360)%360;state.face=(norm>=90&&norm<270)?'back':'front';updateFaceButtons();setProductTilt(flipAngle);renderFaceByState(0,0);};
     flipRAF=requestAnimationFrame(step);
   }
 
   function showFront(){ animateToAngle(flipAngle<=180?360:720); state.face='front'; }
-  function showBack(){
-    const a=((flipAngle%360)+360)%360;
-    let target = a<180 ? 180 : 540;
-    animateToAngle(target);
-    state.face='back';
-  }
-  function showRecto(){
-    const a=((flipAngle%360)+360)%360;
-    let target = a<180 ? 360 : 720;
-    animateToAngle(target);
-    state.face='front';
-  }
-  function demo360(){
-    const a=flipAngle;
-    animateToAngle(a+360,2800);
-  }
+  function showBack(){const a=((flipAngle%360)+360)%360;animateToAngle(a<180?180:540);state.face='back';}
+  function showRecto(){const a=((flipAngle%360)+360)%360;animateToAngle(a<180?360:720);state.face='front';}
+  function demo360(){animateToAngle(flipAngle+360,2800);}
 
   [type,fit,margin,zoom,xp,yp,rot,speed,safe].forEach(el=>el.addEventListener('input',()=>{state.support=type.value;state.fit=fit.value;state.margin=+margin.value;state.zoom=+zoom.value;state.x=+xp.value;state.y=+yp.value;state.rot=+rot.value;state.speed=+speed.value;state.safe=+safe.value;apply();}));
   showSafe.addEventListener('input',()=>{state.showSafe=showSafe.checked?1:0;apply();});
@@ -403,5 +349,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.3 · verso lisible + réglages dédiés');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.7.4 · sujet monobloc anti-coupes');
 })();
