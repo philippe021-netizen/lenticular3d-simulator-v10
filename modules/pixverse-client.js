@@ -84,8 +84,11 @@ export async function waitForPixVerse(videoId, { intervalMs = 4000, timeoutMs = 
   throw new Error('Délai d’attente PixVerse dépassé.');
 }
 
-export function proxiedPixVerseVideoUrl(url) {
-  return `/api/pixverse-video?url=${encodeURIComponent(url)}`;
+export function proxiedPixVerseVideoUrl(url, videoId = '') {
+  const p = new URLSearchParams();
+  if (videoId !== undefined && videoId !== null && String(videoId).trim()) p.set('id', String(videoId).trim());
+  if (url) p.set('url', url);
+  return `/api/pixverse-video?${p.toString()}`;
 }
 
 export async function runPixVerseAction(file, variant, { onStatus } = {}) {
@@ -107,7 +110,10 @@ export async function runPixVerseAction(file, variant, { onStatus } = {}) {
   });
   onStatus?.({ step: 'processing', videoId });
   const result = await waitForPixVerse(videoId, { onStatus: s => onStatus?.({ step: 'processing', videoId, response: s }) });
-  const videoUrl = proxiedPixVerseVideoUrl(result.url);
+  // Important sur Safari/iPad : le proxy reçoit le video_id et redemande une URL CDN fraîche
+  // à PixVerse au moment exact où le navigateur ouvre le MP4. L'URL de statut reste seulement
+  // un secours. Cela évite les MP4 "reçus" mais déjà expirés/illisibles lors de loadedmetadata.
+  const videoUrl = proxiedPixVerseVideoUrl(result.url, videoId);
   onStatus?.({ step: 'done', videoId, videoUrl });
   return {
     imgId,
