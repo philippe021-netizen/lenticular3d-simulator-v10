@@ -1,4 +1,4 @@
-/* HappyHolo V3.8.0 — photo originale plein cadre, sans reconstruction */
+/* HappyHolo V3.8.1 — photo originale plein cadre + cadrage recto manuel */
 (() => {
   'use strict';
   const $ = s => document.querySelector(s);
@@ -110,6 +110,11 @@
   function fitBox(sw,sh,dw,dh){ let k=(state.fit==='cover')?Math.max(dw/sw,dh/sh):Math.min(dw/sw,dh/sh); k*=state.zoom/100; if(state.fit==='preserve')k*=Math.max(.55,1-state.margin/100); const w=sw*k,h=sh*k; return {x:(dw-w)/2+(state.x/100)*dw*.5,y:(dh-h)/2+(state.y/100)*dh*.5,w,h}; }
   function ensureCanvas(){ const r=canvas.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2); const w=Math.max(2,Math.round(r.width*d)),h=Math.max(2,Math.round(r.height*d)); if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;} }
   function coverRect(sw,sh,dw,dh){const k=Math.max(dw/sw,dh/sh);const w=sw*k,h=sh*k;return{x:(dw-w)/2,y:(dh-h)/2,w,h};}
+  function frontRect(sw,sh,dw,dh){
+    const k=Math.max(dw/sw,dh/sh)*(Math.max(60,Math.min(180,Number(state.zoom)||100))/100);
+    const w=sw*k,h=sh*k;
+    return{x:(dw-w)/2+(Number(state.x)||0)/100*dw*.5,y:(dh-h)/2+(Number(state.y)||0)/100*dh*.5,w,h};
+  }
 
   function isCardSupport(){
     return state.support==='business-card' || state.support==='business-card-88';
@@ -179,12 +184,10 @@
     // Filling another aspect ratio is done solely by a proportional cover crop.
     // No inpainted background and no detached subject are composited here, which
     // prevents halos, duplicated silhouettes and blurred replacement pixels.
-    const size=currentSupportRenderSize(),SW=size.width,SH=size.height;
-    const original=document.createElement('canvas');original.width=SW;original.height=SH;
-    const ox=original.getContext('2d'),or=coverRect(source.naturalWidth,source.naturalHeight,SW,SH);
-    ox.drawImage(source,or.x,or.y,or.w,or.h);
+    // Keep the source itself so zoom/X/Y sliders redraw it immediately at the
+    // selected keychain, medallion or card ratio without an intermediate crop.
     if(token!==buildToken)return;
-    reliefLayers={w:SW,h:SH,original};
+    reliefLayers={source};
     headlightCache=null;glintCache=null;transformCache=null;
     $('#supportHint').textContent='Photo originale plein cadre — aucune reconstruction autour du sujet.';
     play();
@@ -321,19 +324,20 @@
   }
   function drawFallback(actionPulse=0,norm=0){
     ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!uploadedImage)return;
-    const r=coverRect(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
+    const r=frontRect(uploadedImage.naturalWidth,uploadedImage.naturalHeight,canvas.width,canvas.height);
     ctx.drawImage(uploadedImage,r.x,r.y,r.w,r.h);
     applyHeadlightsFlat(r,actionPulse);drawTextLayer(norm,r);drawCardGuides();
   }
 
   function draw(norm,actionPulse=0){
-    ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!reliefLayers){drawFallback(actionPulse,norm);return;}const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
-    if(reliefLayers.original){
-      const br=coverRect(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
-      ctx.drawImage(reliefLayers.original,br.x,br.y,br.w,br.h);
+    ensureCanvas();ctx.clearRect(0,0,canvas.width,canvas.height);if(!reliefLayers){drawFallback(actionPulse,norm);return;}
+    if(reliefLayers.source){
+      const source=reliefLayers.source,br=frontRect(source.naturalWidth,source.naturalHeight,canvas.width,canvas.height);
+      ctx.drawImage(source,br.x,br.y,br.w,br.h);
       applyHeadlightsFlat(br,actionPulse);drawTextLayer(norm,br);drawCardGuides();
       return;
     }
+    const r=fitBox(reliefLayers.w,reliefLayers.h,canvas.width,canvas.height);
     ctx.save();ctx.beginPath();ctx.rect(0,0,canvas.width,canvas.height);ctx.clip();
     const full={x:0,y:0,w:canvas.width,h:canvas.height};
     const customBg=window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,full);
@@ -413,5 +417,5 @@
   window.addEventListener('happyholo-subject-placement-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;rebuildReliefLayers();});
   window.addEventListener('happyholo-text-layer-changed',()=>renderFaceByState(0,0));
   window.addEventListener('resize',()=>renderFaceByState(0,0));
-  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.0 · photo originale plein cadre');
+  showSafe.checked=!!state.showSafe;safe.value=state.safe;backZoom.value=state.backZoom;backX.value=state.backX;backY.value=state.backY;updateText();updateFaceButtons();apply();console.log('[HAPPYHOLO] support-preview V3.8.1 · cadrage recto manuel');
 })();
