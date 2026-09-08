@@ -63,7 +63,7 @@
 
     html=html.slice(0,start)+lockedSubject+html.slice(end);
     html=html.replaceAll('HappyHolo — Tiefling double traitement V5','HappyHolo — Tiefling double traitement V8');
-    html=html.replace('Nouveau rendu sujet : petit déplacement global + pivot pseudo‑3D piloté par la profondeur. Le fond conserve le comportement V3/V4.','V8 : silhouette extérieure verrouillée + tirettes optimisées iPad. Les valeurs suivent le doigt immédiatement ; les 9 vues sont recalculées au relâchement.');
+    html=html.replace('Nouveau rendu sujet : petit déplacement global + pivot pseudo‑3D piloté par la profondeur. Le fond conserve le comportement V3/V4.','V8 : silhouette extérieure verrouillée + tirettes optimisées iPad. Aperçu léger pendant le glissement ; calcul complet des 9 vues au relâchement.');
     html=html.replace('id="subjectMove" type="range" min="0" max="120" value="45"','id="subjectMove" type="range" min="0" max="130" value="74"');
     html=html.replace('id="subjectMoveVal" class="val">45%','id="subjectMoveVal" class="val">74%');
     html=html.replace('id="subjectPivot" type="range" min="0" max="180" value="100"','id="subjectPivot" type="range" min="0" max="90" value="58"');
@@ -74,7 +74,7 @@
     html=html.replace('id="parallaxVal" class="val">32 px','id="parallaxVal" class="val">28 px');
 
     const oldBind="function bind(id,fmt){const e=$(id),o=$(id+'Val');const f=()=>o.textContent=fmt(e.value);e.oninput=()=>{f();if(frames.length)build(false)};f()}";
-    const newBind="function bind(id,fmt){const e=$(id),o=$(id+'Val');const f=()=>o.textContent=fmt(e.value);e.oninput=()=>{f()};e.onchange=()=>{f();if(frames.length){stat('Mise à jour des 9 vues…');requestAnimationFrame(()=>build(false))}};f()}";
+    const newBind="let previewTimer=0;function previewCurrent(){if(!frames.length||!bg||!subject||!sDepth||!bDepth)return;const n=Math.max(1,Math.min(9,+$('slider').value||5)),i=n-1,outW=Math.min(360,bg.naturalWidth),outH=Math.round(outW*bg.naturalHeight/bg.naturalWidth),c=document.createElement('canvas');c.width=outW;c.height=outH;const x=c.getContext('2d'),t=(i-4)/4,amp=+$('parallax').value;x.putImageData(warpBg(outW,outH,t,amp),0,0);const s=subjectLayer(outW,outH,t,amp),sc=document.createElement('canvas');sc.width=outW;sc.height=outH;sc.getContext('2d').putImageData(s,0,0);x.drawImage(sc,0,0);stage.innerHTML='';stage.appendChild(c)}function queuePreview(){clearTimeout(previewTimer);previewTimer=setTimeout(previewCurrent,55)}function bind(id,fmt){const e=$(id),o=$(id+'Val');const f=()=>o.textContent=fmt(e.value);e.oninput=()=>{f();if(frames.length)queuePreview()};e.onchange=()=>{f();clearTimeout(previewTimer);if(frames.length){stat('Mise à jour des 9 vues…');requestAnimationFrame(()=>build(false))}};f()}";
     if(!html.includes(oldBind)) throw new Error('Gestion des tirettes V5 introuvable');
     html=html.replace(oldBind,newBind);
     html=html.replace('input[type=file],input[type=range]{width:100%}','input[type=file],input[type=range]{width:100%}input[type=range]{touch-action:pan-x;accent-color:var(--accent)}');
