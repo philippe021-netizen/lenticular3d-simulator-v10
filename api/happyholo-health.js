@@ -50,7 +50,7 @@ export default async function handler(req,res){
       const body=typeof req.body==='string'?JSON.parse(req.body):(req.body||{});
       const imageToken=String(body.image_token||'').trim();
       if(!imageToken)return res.status(400).json({error:'image_token manquant.'});
-      const payload={input:imageToken,model:'tripo-v3.1',texture:true,pbr:true,texture_quality:tq.has(body.texture_quality)?body.texture_quality:'extreme',geometry_quality:gq.has(body.geometry_quality)?body.geometry_quality:'detailed',export_uv:true};
+      const payload={input:imageToken,model:'tripo-v3.1',texture:true,pbr:true,texture_quality:tq.has(body.texture_quality)?body.texture_quality:'extreme',geometry_quality:gq.has(body.geometry_quality)?body.geometry_quality:'detailed'};
       const json=await tripoFetch('/generation/image-to-model',key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const taskId=json?.data?.task_id;
       if(!taskId)return res.status(502).json({error:'task_id absent dans la réponse Tripo.',details:json});
@@ -69,8 +69,7 @@ export default async function handler(req,res){
     return res.status(404).json({error:'Action inconnue.'});
   }catch(e){
     const message=e?.name==='AbortError'?'Délai Tripo dépassé.':(e?.message||'Erreur Tripo');
+    console.error('Tripo API error',e?.details||e);
     return res.status(e?.status||500).json({error:message,details:e?.details||null});
   }
 }
-
-// Redeploy trigger after TRIPO_API_KEY was added to Vercel Preview.
