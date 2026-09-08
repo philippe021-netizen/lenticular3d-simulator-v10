@@ -7,63 +7,49 @@
 <style>
 :root{color-scheme:dark;--bg:#0d1117;--card:#151b23;--line:#2b3442;--txt:#f3f6fb;--muted:#9aa7b6;--accent:#ffb300}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.wrap{max-width:1180px;margin:auto;padding:20px}.head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:16px}.head h1{font-size:24px;margin:0 0 5px}.head p{margin:0;color:var(--muted)}
-.grid{display:grid;grid-template-columns:360px 1fr;gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}.card h2{font-size:17px;margin:0 0 12px}.row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin:12px 0}.row label{color:#dfe7f0}.row .val{min-width:58px;text-align:right;color:var(--accent);font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:auto;padding:20px}.head{margin-bottom:16px}.head h1{font-size:24px;margin:0 0 5px}.head p{margin:0;color:var(--muted)}
+.grid{display:grid;grid-template-columns:360px 1fr;gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}.card h2{font-size:17px;margin:0 0 12px}.row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;margin:12px 0}.row label{color:#dfe7f0}.row .val{min-width:64px;text-align:right;color:var(--accent);font-variant-numeric:tabular-nums}
 input[type=file]{width:100%;margin:6px 0 10px}input[type=range]{width:100%}.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}button{border:1px solid var(--line);background:#222b37;color:white;border-radius:10px;padding:10px 13px;font-weight:700;cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);color:#151515}button:disabled{opacity:.4;cursor:not-allowed}.status{margin-top:12px;padding:10px;border-radius:10px;background:#0d131b;color:var(--muted);min-height:42px}
 .stage{position:relative;min-height:520px;display:grid;place-items:center;overflow:hidden;background:#06090d;border-radius:12px;border:1px solid var(--line)}canvas{max-width:100%;max-height:72vh;display:block}.stage .empty{color:var(--muted);text-align:center;padding:28px}.toolbar{display:flex;align-items:center;gap:12px;margin-top:12px}.toolbar input{flex:1}.thumbs{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;margin-top:12px}.thumbs canvas{width:100%;border-radius:5px;border:1px solid var(--line);background:#000}.depths{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.depthBox{background:#0b1017;border:1px solid var(--line);border-radius:10px;padding:8px}.depthBox small{display:block;color:var(--muted);margin-bottom:6px}.depthBox canvas{width:100%;height:auto}
-.sep{height:1px;background:var(--line);margin:15px 0}.hint{font-size:13px;color:var(--muted)}.ok{color:#8be28b}.warn{color:#ffcf6e}
-@media(max-width:850px){.grid{grid-template-columns:1fr}.stage{min-height:360px}.head{display:block}.wrap{padding:12px}.depths{grid-template-columns:1fr}.thumbs{grid-template-columns:repeat(3,1fr)}}
+.sep{height:1px;background:var(--line);margin:15px 0}.hint{font-size:13px;color:var(--muted)}.ok{color:#8be28b}.warn{color:#ffcf6e}.mini{font-size:12px;color:var(--muted);margin-top:8px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.stage{min-height:360px}.wrap{padding:12px}.depths{grid-template-columns:1fr}.thumbs{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="head">
-    <div><h1>HappyHolo — Tiefling double traitement</h1><p>Prototype séparé : profondeur du sujet et profondeur du fond calculées indépendamment, puis recomposées en 9 vues.</p></div>
-  </div>
+  <div class="head"><h1>HappyHolo — Tiefling double traitement</h1><p>Prototype séparé : profondeur du sujet et profondeur du fond calculées indépendamment, puis recomposées en 9 vues.</p></div>
   <div class="grid">
     <section class="card">
       <h2>1. Images</h2>
-      <label>Sujet détouré — PNG transparent</label>
-      <input id="subjectFile" type="file" accept="image/*" />
-      <label>Fond seul — sans le sujet</label>
-      <input id="bgFile" type="file" accept="image/*" />
-      <p class="hint">Le sujet et le fond sont envoyés séparément au moteur de profondeur local. Rien n'est envoyé vers un serveur HappyHolo.</p>
+      <label>Sujet détouré — PNG transparent</label><input id="subjectFile" type="file" accept="image/*" />
+      <label>Fond seul — sans le sujet</label><input id="bgFile" type="file" accept="image/*" />
+      <p class="hint">Le sujet et le fond sont analysés séparément par le moteur de profondeur local.</p>
       <div class="sep"></div>
       <h2>2. Tiefling / DepthAnything V2</h2>
-      <div class="row"><label for="depthSize">Définition profondeur</label><span id="depthSizeVal" class="val">518</span></div>
-      <input id="depthSize" type="range" min="322" max="798" step="28" value="518" />
-      <div class="row"><label for="edgeProtect">Protection contours sujet</label><span id="edgeProtectVal" class="val">3 px</span></div>
-      <input id="edgeProtect" type="range" min="0" max="10" step="1" value="3" />
+      <div class="row"><label for="depthSize">Définition profondeur</label><span id="depthSizeVal" class="val">518</span></div><input id="depthSize" type="range" min="322" max="798" step="28" value="518" />
+      <div class="row"><label for="edgeProtect">Protection contours sujet</label><span id="edgeProtectVal" class="val">3 px</span></div><input id="edgeProtect" type="range" min="0" max="10" step="1" value="3" />
+      <div class="row"><label for="bgDepthContrast">Contraste profondeur fond</label><span id="bgDepthContrastVal" class="val">150%</span></div><input id="bgDepthContrast" type="range" min="80" max="260" value="150" />
       <div class="sep"></div>
-      <h2>3. Relief final</h2>
-      <div class="row"><label for="subjectStrength">Relief sujet</label><span id="subjectStrengthVal" class="val">100%</span></div>
-      <input id="subjectStrength" type="range" min="0" max="180" value="100" />
-      <div class="row"><label for="bgStrength">Relief fond</label><span id="bgStrengthVal" class="val">32%</span></div>
-      <input id="bgStrength" type="range" min="0" max="100" value="32" />
-      <div class="row"><label for="parallax">Amplitude 9 vues</label><span id="parallaxVal" class="val">24 px</span></div>
-      <input id="parallax" type="range" min="4" max="70" value="24" />
-      <div class="row"><label for="bgZoom">Zoom sécurité fond</label><span id="bgZoomVal" class="val">1.06×</span></div>
-      <input id="bgZoom" type="range" min="100" max="118" value="106" />
-      <div class="btns">
-        <button id="analyzeBtn" class="primary">Tiefling : analyser les 2</button>
-        <button id="viewsBtn" disabled>Créer les 9 vues</button>
-        <button id="zipBtn" disabled>Télécharger ZIP 9 vues</button>
-      </div>
+      <h2>3. Placement du sujet</h2>
+      <div class="row"><label for="subjectZoom">Zoom sujet</label><span id="subjectZoomVal" class="val">100%</span></div><input id="subjectZoom" type="range" min="35" max="180" value="100" />
+      <div class="row"><label for="subjectX">Sujet horizontal</label><span id="subjectXVal" class="val">0%</span></div><input id="subjectX" type="range" min="-60" max="60" value="0" />
+      <div class="row"><label for="subjectY">Sujet vertical</label><span id="subjectYVal" class="val">0%</span></div><input id="subjectY" type="range" min="-60" max="60" value="0" />
+      <p class="mini">À 100%, le sujet conserve sa taille relative. Si le PNG et le fond ont exactement les mêmes dimensions, leur placement reste pixel pour pixel.</p>
+      <div class="sep"></div>
+      <h2>4. Relief final</h2>
+      <div class="row"><label for="subjectStrength">Relief sujet</label><span id="subjectStrengthVal" class="val">100%</span></div><input id="subjectStrength" type="range" min="0" max="180" value="100" />
+      <div class="row"><label for="bgStrength">Relief fond</label><span id="bgStrengthVal" class="val">32%</span></div><input id="bgStrength" type="range" min="0" max="100" value="32" />
+      <div class="row"><label for="parallax">Amplitude 9 vues</label><span id="parallaxVal" class="val">24 px</span></div><input id="parallax" type="range" min="4" max="70" value="24" />
+      <div class="row"><label for="bgZoom">Zoom sécurité fond</label><span id="bgZoomVal" class="val">1.06×</span></div><input id="bgZoom" type="range" min="100" max="118" value="106" />
+      <div class="btns"><button id="analyzeBtn" class="primary">Tiefling : analyser les 2</button><button id="viewsBtn" disabled>Créer les 9 vues</button><button id="zipBtn" disabled>Télécharger ZIP 9 vues</button></div>
       <div id="status" class="status">Charge un sujet détouré et un fond.</div>
     </section>
-
     <section class="card">
       <h2>Aperçu recomposé</h2>
-      <div id="stage" class="stage"><div class="empty">Les deux images seront recomposées ici.<br>Le sujet et le décor auront chacun leur propre profondeur.</div></div>
-      <div class="toolbar">
-        <span>Vue</span><input id="viewSlider" type="range" min="1" max="9" value="5" disabled /><strong id="viewLabel">5 / 9</strong>
-        <button id="playBtn" disabled>▶</button>
-      </div>
+      <div id="stage" class="stage"><div class="empty">Les deux images seront recomposées ici.<br>Le sujet conservera maintenant sa taille et sa position.</div></div>
+      <div class="toolbar"><span>Vue</span><input id="viewSlider" type="range" min="1" max="9" value="5" disabled /><strong id="viewLabel">5 / 9</strong><button id="playBtn" disabled>▶</button></div>
       <div id="thumbs" class="thumbs"></div>
-      <div class="depths">
-        <div class="depthBox"><small>Carte de profondeur — sujet</small><canvas id="subjectDepth"></canvas></div>
-        <div class="depthBox"><small>Carte de profondeur — fond</small><canvas id="bgDepth"></canvas></div>
-      </div>
+      <div class="depths"><div class="depthBox"><small>Carte de profondeur — sujet</small><canvas id="subjectDepth"></canvas></div><div class="depthBox"><small>Carte de profondeur — fond (contraste renforcé)</small><canvas id="bgDepth"></canvas></div></div>
     </section>
   </div>
 </div>
@@ -71,115 +57,28 @@ input[type=file]{width:100%;margin:6px 0 10px}input[type=range]{width:100%}.btns
 <script>
 (() => {
 'use strict';
-const $=id=>document.getElementById(id);
-const MODEL='https://raw.githubusercontent.com/combatwombat/tiefling/main/site/public/models/depthanythingv2-vits-dynamic-quant.onnx';
-const worker=new Worker('./tiefling-dual-worker.js',{type:'module'});
-let subject=null,bg=null,subjectDepth=null,bgDepth=null,views=[],playing=false,playTimer=null,pendingResolve=null,pendingReject=null;
-const stage=$('stage');
-
-function setStatus(t,cls=''){ $('status').innerHTML=`<span class="${cls}">${t}</span>`; }
-function bindRange(id,fmt){ const el=$(id),out=$(id+'Val'); const f=()=>out.textContent=fmt(el.value); el.addEventListener('input',f); f(); }
-bindRange('depthSize',v=>v); bindRange('edgeProtect',v=>v+' px'); bindRange('subjectStrength',v=>v+'%'); bindRange('bgStrength',v=>v+'%'); bindRange('parallax',v=>v+' px'); bindRange('bgZoom',v=>(v/100).toFixed(2)+'×');
-
-async function loadImage(file){
-  if(!file) return null;
-  const url=URL.createObjectURL(file);
-  try{ const img=new Image(); img.decoding='async'; img.src=url; await img.decode(); return img; }
-  finally{ setTimeout(()=>URL.revokeObjectURL(url),1000); }
-}
-
-function fitSize(w,h,maxDim){ const s=Math.min(1,maxDim/Math.max(w,h)); return {w:Math.max(1,Math.round(w*s)),h:Math.max(1,Math.round(h*s))}; }
-function canvasFromImage(img,w=img.naturalWidth,h=img.naturalHeight,flattenAlpha=false){
-  const c=document.createElement('canvas'); c.width=w;c.height=h; const x=c.getContext('2d',{willReadFrequently:true});
-  if(flattenAlpha){x.fillStyle='#808080';x.fillRect(0,0,w,h);} x.drawImage(img,0,0,w,h); return c;
-}
-function squareInference(img,size,isSubject){
-  const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d',{willReadFrequently:true});
-  x.fillStyle=isSubject?'#808080':'#000';x.fillRect(0,0,size,size);
-  const s=Math.min(size/img.naturalWidth,size/img.naturalHeight),w=img.naturalWidth*s,h=img.naturalHeight*s,dx=(size-w)/2,dy=(size-h)/2;
-  x.drawImage(img,dx,dy,w,h); return {imageData:x.getImageData(0,0,size,size),rect:{dx,dy,w,h,size}};
-}
-function runDepth(img,size,isSubject){
-  return new Promise((resolve,reject)=>{
-    if(pendingResolve){reject(new Error('Le moteur est déjà occupé.'));return;}
-    const pack=squareInference(img,size,isSubject); pendingResolve=r=>resolve({...r,rect:pack.rect}); pendingReject=reject;
-    worker.postMessage({imageData:pack.imageData,size,modelUrl:MODEL});
-  });
-}
-worker.onmessage=e=>{ const d=e.data||{}; if(!pendingResolve)return; const ok=pendingResolve,ko=pendingReject; pendingResolve=pendingReject=null; d.ok?ok(d):ko(new Error(d.error||'Erreur Tiefling')); };
-worker.onerror=e=>{ if(pendingReject) pendingReject(new Error(e.message||'Erreur worker')); pendingResolve=pendingReject=null; };
-
-function depthToCanvas(res,img,target){
-  const src=new ImageData(new Uint8ClampedArray(res.data),res.width,res.height); const tmp=document.createElement('canvas');tmp.width=res.width;tmp.height=res.height;tmp.getContext('2d').putImageData(src,0,0);
-  const r=res.rect; const sx=r.dx,sy=r.dy,sw=r.w,sh=r.h;
-  target.width=img.naturalWidth;target.height=img.naturalHeight; const tx=target.getContext('2d',{willReadFrequently:true});tx.imageSmoothingEnabled=true;tx.drawImage(tmp,sx,sy,sw,sh,0,0,target.width,target.height);
-  return tx.getImageData(0,0,target.width,target.height);
-}
-function erodeAlphaDepth(depth,img,radius){
-  if(radius<=0)return depth; const mask=canvasFromImage(img,img.naturalWidth,img.naturalHeight).getContext('2d',{willReadFrequently:true}).getImageData(0,0,img.naturalWidth,img.naturalHeight).data;
-  const out=new Uint8ClampedArray(depth.data); const w=depth.width,h=depth.height;
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
-    const i=(y*w+x)*4;if(mask[i+3]<8){out[i]=out[i+1]=out[i+2]=0;continue;}
-    let nearEdge=false;
-    for(let yy=Math.max(0,y-radius);yy<=Math.min(h-1,y+radius)&&!nearEdge;yy+=Math.max(1,radius))
-      for(let xx=Math.max(0,x-radius);xx<=Math.min(w-1,x+radius);xx+=Math.max(1,radius)) if(mask[(yy*w+xx)*4+3]<8){nearEdge=true;break;}
-    if(nearEdge){
-      let sum=0,n=0;for(let yy=Math.max(0,y-radius);yy<=Math.min(h-1,y+radius);yy++)for(let xx=Math.max(0,x-radius);xx<=Math.min(w-1,x+radius);xx++){const j=(yy*w+xx)*4;if(mask[j+3]>128){sum+=depth.data[j];n++;}}
-      if(n){const v=Math.round(sum/n);out[i]=out[i+1]=out[i+2]=v;}
-    }
-    out[i+3]=255;
-  }
-  return new ImageData(out,w,h);
-}
-
-function sampleBilinear(data,w,h,x,y,c){
-  x=Math.max(0,Math.min(w-1,x));y=Math.max(0,Math.min(h-1,y));const x0=Math.floor(x),y0=Math.floor(y),x1=Math.min(w-1,x0+1),y1=Math.min(h-1,y0+1),fx=x-x0,fy=y-y0;
-  const a=data[(y0*w+x0)*4+c],b=data[(y0*w+x1)*4+c],d=data[(y1*w+x0)*4+c],e=data[(y1*w+x1)*4+c];return (a*(1-fx)+b*fx)*(1-fy)+(d*(1-fx)+e*fx)*fy;
-}
-function warpLayer(img,depth,outW,outH,offset,strength,zoom=1){
-  const src=canvasFromImage(img,img.naturalWidth,img.naturalHeight).getContext('2d',{willReadFrequently:true}).getImageData(0,0,img.naturalWidth,img.naturalHeight); const sw=src.width,sh=src.height,dw=depth.width,dh=depth.height;
-  const out=new ImageData(outW,outH),od=out.data; const z=zoom; const baseScale=Math.max(outW/sw,outH/sh)*z; const shownW=sw*baseScale,shownH=sh*baseScale,ox=(outW-shownW)/2,oy=(outH-shownH)/2;
-  for(let y=0;y<outH;y++){
-    let sy=(y-oy)/baseScale; if(sy<0||sy>=sh)continue;
-    for(let x=0;x<outW;x++){
-      let sx0=(x-ox)/baseScale; if(sx0<0||sx0>=sw)continue;
-      const dx=sx0/(sw-1)*(dw-1),dy=sy/(sh-1)*(dh-1); const dep=sampleBilinear(depth.data,dw,dh,dx,dy,0)/255; const shift=offset*strength*(dep-.5); const sx=sx0-shift/baseScale;
-      const p=(y*outW+x)*4; for(let c=0;c<4;c++)od[p+c]=Math.round(sampleBilinear(src.data,sw,sh,sx,sy,c));
-    }
-  }
-  return out;
-}
-function composeView(index){
-  const maxW=960; const ar=bg.naturalWidth/bg.naturalHeight; const outW=Math.min(maxW,bg.naturalWidth); const outH=Math.round(outW/ar); const c=document.createElement('canvas');c.width=outW;c.height=outH;const x=c.getContext('2d');
-  const t=(index-4)/4,amp=+$('parallax').value; const bgWarp=warpLayer(bg,bgDepth,outW,outH,t*amp,+$('bgStrength').value/100,+$('bgZoom').value/100);x.putImageData(bgWarp,0,0);
-  const subWarp=warpLayer(subject,subjectDepth,outW,outH,t*amp,+$('subjectStrength').value/100,1); const tmp=document.createElement('canvas');tmp.width=outW;tmp.height=outH;tmp.getContext('2d').putImageData(subWarp,0,0);x.drawImage(tmp,0,0); return c;
-}
-function showView(n){ const c=views[n-1];if(!c)return;stage.innerHTML='';stage.appendChild(c.cloneNode());const dst=stage.firstChild;dst.getContext('2d').drawImage(c,0,0);$('viewLabel').textContent=`${n} / 9`; $('viewSlider').value=n; }
-function renderThumbs(){ const box=$('thumbs');box.innerHTML='';views.forEach((c,i)=>{const t=document.createElement('canvas');t.width=c.width;t.height=c.height;t.getContext('2d').drawImage(c,0,0);t.onclick=()=>showView(i+1);box.appendChild(t);}); }
-
-$('subjectFile').addEventListener('change',async e=>{subject=await loadImage(e.target.files[0]);setStatus(subject&&bg?'Prêt pour l’analyse Tiefling.':'Sujet chargé. Ajoute le fond.');});
-$('bgFile').addEventListener('change',async e=>{bg=await loadImage(e.target.files[0]);setStatus(subject&&bg?'Prêt pour l’analyse Tiefling.':'Fond chargé. Ajoute le sujet.');});
-
-$('analyzeBtn').onclick=async()=>{
-  if(!subject||!bg){setStatus('Il faut le sujet détouré ET le fond seul.','warn');return;}
-  const b=$('analyzeBtn');b.disabled=true;$('viewsBtn').disabled=true;$('zipBtn').disabled=true;views=[];$('thumbs').innerHTML='';
-  try{
-    const size=+$('depthSize').value; setStatus('Tiefling 1/2 : calcul de la profondeur du sujet…'); const sr=await runDepth(subject,size,true); let sd=depthToCanvas(sr,subject,$('subjectDepth')); sd=erodeAlphaDepth(sd,subject,+$('edgeProtect').value); $('subjectDepth').getContext('2d').putImageData(sd,0,0);subjectDepth=sd;
-    setStatus('Tiefling 2/2 : calcul de la profondeur du fond…'); const br=await runDepth(bg,size,false);bgDepth=depthToCanvas(br,bg,$('bgDepth'));
-    setStatus(`Deux profondeurs indépendantes terminées (${br.backend||sr.backend||'moteur local'}). Tu peux créer les 9 vues.`,'ok');$('viewsBtn').disabled=false;
-  }catch(err){console.error(err);setStatus('Erreur Tiefling : '+err.message,'warn');}
-  finally{b.disabled=false;}
-};
-
-$('viewsBtn').onclick=async()=>{
-  if(!subjectDepth||!bgDepth)return; const b=$('viewsBtn');b.disabled=true;setStatus('Recomposition des 9 vues : fond Tiefling + sujet Tiefling…');await new Promise(r=>setTimeout(r,30));
-  views=[];for(let i=0;i<9;i++){views.push(composeView(i));await new Promise(r=>requestAnimationFrame(r));}
-  renderThumbs();showView(5);$('viewSlider').disabled=false;$('playBtn').disabled=false;$('zipBtn').disabled=false;b.disabled=false;setStatus('Terminé : 2 cartes de profondeur séparées, 9 vues synchronisées.','ok');
-};
-$('viewSlider').oninput=e=>showView(+e.target.value);
-$('playBtn').onclick=()=>{playing=!playing;$('playBtn').textContent=playing?'❚❚':'▶';clearInterval(playTimer);if(playing){let i=+$('viewSlider').value-1,dir=1;playTimer=setInterval(()=>{i+=dir;if(i>=8){i=8;dir=-1}else if(i<=0){i=0;dir=1}showView(i+1)},180);}};
-$('zipBtn').onclick=async()=>{if(!views.length)return;setStatus('Création du ZIP…');const zip=new JSZip();for(let i=0;i<views.length;i++){const blob=await new Promise(r=>views[i].toBlob(r,'image/png'));zip.file(`happyholo-tiefling-dual-vue-${String(i+1).padStart(2,'0')}.png`,blob);}const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HappyHolo_Tiefling_Double_9_vues.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);setStatus('ZIP 9 vues créé.','ok');};
+const $=id=>document.getElementById(id);const MODEL='https://raw.githubusercontent.com/combatwombat/tiefling/main/site/public/models/depthanythingv2-vits-dynamic-quant.onnx';const worker=new Worker('./tiefling-dual-worker.js',{type:'module'});
+let subject=null,bg=null,subjectDepth=null,bgDepth=null,views=[],playing=false,playTimer=null,pendingResolve=null,pendingReject=null;const stage=$('stage');
+function setStatus(t,cls=''){$('status').innerHTML=`<span class="${cls}">${t}</span>`}function bindRange(id,fmt){const el=$(id),out=$(id+'Val');const f=()=>out.textContent=fmt(el.value);el.addEventListener('input',()=>{f();if(views.length)rebuildViews(false)});f()}
+bindRange('depthSize',v=>v);bindRange('edgeProtect',v=>v+' px');bindRange('bgDepthContrast',v=>v+'%');bindRange('subjectZoom',v=>v+'%');bindRange('subjectX',v=>(+v>0?'+':'')+v+'%');bindRange('subjectY',v=>(+v>0?'+':'')+v+'%');bindRange('subjectStrength',v=>v+'%');bindRange('bgStrength',v=>v+'%');bindRange('parallax',v=>v+' px');bindRange('bgZoom',v=>(v/100).toFixed(2)+'×');
+async function loadImage(file){if(!file)return null;const url=URL.createObjectURL(file);try{const img=new Image();img.decoding='async';img.src=url;await img.decode();return img}finally{setTimeout(()=>URL.revokeObjectURL(url),1000)}}
+function canvasFromImage(img,w=img.naturalWidth,h=img.naturalHeight){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(img,0,0,w,h);return c}
+function squareInference(img,size,isSubject){const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle=isSubject?'#808080':'#000';x.fillRect(0,0,size,size);const s=Math.min(size/img.naturalWidth,size/img.naturalHeight),w=img.naturalWidth*s,h=img.naturalHeight*s,dx=(size-w)/2,dy=(size-h)/2;x.drawImage(img,dx,dy,w,h);return{imageData:x.getImageData(0,0,size,size),rect:{dx,dy,w,h,size}}}
+function runDepth(img,size,isSubject){return new Promise((resolve,reject)=>{if(pendingResolve){reject(new Error('Le moteur est déjà occupé.'));return}const pack=squareInference(img,size,isSubject);pendingResolve=r=>resolve({...r,rect:pack.rect});pendingReject=reject;worker.postMessage({imageData:pack.imageData,size,modelUrl:MODEL})})}
+worker.onmessage=e=>{const d=e.data||{};if(!pendingResolve)return;const ok=pendingResolve,ko=pendingReject;pendingResolve=pendingReject=null;d.ok?ok(d):ko(new Error(d.error||'Erreur Tiefling'))};worker.onerror=e=>{if(pendingReject)pendingReject(new Error(e.message||'Erreur worker'));pendingResolve=pendingReject=null};
+function depthToCanvas(res,img,target){const src=new ImageData(new Uint8ClampedArray(res.data),res.width,res.height),tmp=document.createElement('canvas');tmp.width=res.width;tmp.height=res.height;tmp.getContext('2d').putImageData(src,0,0);const r=res.rect;target.width=img.naturalWidth;target.height=img.naturalHeight;const tx=target.getContext('2d',{willReadFrequently:true});tx.imageSmoothingEnabled=true;tx.drawImage(tmp,r.dx,r.dy,r.w,r.h,0,0,target.width,target.height);return tx.getImageData(0,0,target.width,target.height)}
+function erodeAlphaDepth(depth,img,radius){if(radius<=0)return depth;const mask=canvasFromImage(img).getContext('2d',{willReadFrequently:true}).getImageData(0,0,img.naturalWidth,img.naturalHeight).data,out=new Uint8ClampedArray(depth.data),w=depth.width,h=depth.height;for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(mask[i+3]<8){out[i]=out[i+1]=out[i+2]=0;continue}let nearEdge=false;for(let yy=Math.max(0,y-radius);yy<=Math.min(h-1,y+radius)&&!nearEdge;yy+=Math.max(1,radius))for(let xx=Math.max(0,x-radius);xx<=Math.min(w-1,x+radius);xx+=Math.max(1,radius))if(mask[(yy*w+xx)*4+3]<8){nearEdge=true;break}if(nearEdge){let sum=0,n=0;for(let yy=Math.max(0,y-radius);yy<=Math.min(h-1,y+radius);yy++)for(let xx=Math.max(0,x-radius);xx<=Math.min(w-1,x+radius);xx++){const j=(yy*w+xx)*4;if(mask[j+3]>128){sum+=depth.data[j];n++}}if(n){const v=Math.round(sum/n);out[i]=out[i+1]=out[i+2]=v}}out[i+3]=255}return new ImageData(out,w,h)}
+function contrastDepth(depth,pct){const k=pct/100,out=new Uint8ClampedArray(depth.data);for(let i=0;i<out.length;i+=4){const v=Math.max(0,Math.min(255,128+(depth.data[i]-128)*k));out[i]=out[i+1]=out[i+2]=Math.round(v);out[i+3]=255}return new ImageData(out,depth.width,depth.height)}
+function sample(data,w,h,x,y,c){x=Math.max(0,Math.min(w-1,x));y=Math.max(0,Math.min(h-1,y));const x0=Math.floor(x),y0=Math.floor(y),x1=Math.min(w-1,x0+1),y1=Math.min(h-1,y0+1),fx=x-x0,fy=y-y0,a=data[(y0*w+x0)*4+c],b=data[(y0*w+x1)*4+c],d=data[(y1*w+x0)*4+c],e=data[(y1*w+x1)*4+c];return(a*(1-fx)+b*fx)*(1-fy)+(d*(1-fx)+e*fx)*fy}
+function warpPlaced(img,depth,outW,outH,offset,strength,opt={}){const src=canvasFromImage(img).getContext('2d',{willReadFrequently:true}).getImageData(0,0,img.naturalWidth,img.naturalHeight),sw=src.width,sh=src.height,dw=depth.width,dh=depth.height,out=new ImageData(outW,outH),od=out.data;let baseScale;if(opt.mode==='subject'&&bg&&sw===bg.naturalWidth&&sh===bg.naturalHeight){baseScale=outW/bg.naturalWidth}else if(opt.mode==='subject'){baseScale=Math.min(outW/sw,outH/sh)}else{baseScale=Math.max(outW/sw,outH/sh)}baseScale*=opt.zoom||1;const shownW=sw*baseScale,shownH=sh*baseScale,ox=(outW-shownW)/2+(opt.x||0)*outW,oy=(outH-shownH)/2+(opt.y||0)*outH;for(let y=0;y<outH;y++){const sy=(y-oy)/baseScale;if(sy<0||sy>=sh)continue;for(let x=0;x<outW;x++){const sx0=(x-ox)/baseScale;if(sx0<0||sx0>=sw)continue;const dx=sx0/(sw-1)*(dw-1),dy=sy/(sh-1)*(dh-1),dep=sample(depth.data,dw,dh,dx,dy,0)/255,shift=offset*strength*(dep-.5),sx=sx0-shift/baseScale,p=(y*outW+x)*4;for(let c=0;c<4;c++)od[p+c]=Math.round(sample(src.data,sw,sh,sx,sy,c))}}return out}
+function composeView(index){const maxW=960,ar=bg.naturalWidth/bg.naturalHeight,outW=Math.min(maxW,bg.naturalWidth),outH=Math.round(outW/ar),c=document.createElement('canvas');c.width=outW;c.height=outH;const x=c.getContext('2d'),t=(index-4)/4,amp=+$('parallax').value,bgWarp=warpPlaced(bg,bgDepth,outW,outH,t*amp,+$('bgStrength').value/100,{zoom:+$('bgZoom').value/100});x.putImageData(bgWarp,0,0);const subWarp=warpPlaced(subject,subjectDepth,outW,outH,t*amp,+$('subjectStrength').value/100,{mode:'subject',zoom:+$('subjectZoom').value/100,x:+$('subjectX').value/100,y:+$('subjectY').value/100}),tmp=document.createElement('canvas');tmp.width=outW;tmp.height=outH;tmp.getContext('2d').putImageData(subWarp,0,0);x.drawImage(tmp,0,0);return c}
+function showView(n){const c=views[n-1];if(!c)return;stage.innerHTML='';const dst=document.createElement('canvas');dst.width=c.width;dst.height=c.height;dst.getContext('2d').drawImage(c,0,0);stage.appendChild(dst);$('viewLabel').textContent=`${n} / 9`;$('viewSlider').value=n}
+function renderThumbs(){const box=$('thumbs');box.innerHTML='';views.forEach((c,i)=>{const t=document.createElement('canvas');t.width=c.width;t.height=c.height;t.getContext('2d').drawImage(c,0,0);t.onclick=()=>showView(i+1);box.appendChild(t)})}
+async function rebuildViews(withStatus=true){if(!subjectDepth||!bgDepth||!subject||!bg)return;if(withStatus)setStatus('Recomposition des 9 vues…');views=[];for(let i=0;i<9;i++){views.push(composeView(i));await new Promise(r=>requestAnimationFrame(r))}renderThumbs();showView(+$('viewSlider').value||5);$('viewSlider').disabled=false;$('playBtn').disabled=false;$('zipBtn').disabled=false;if(withStatus)setStatus('Terminé : sujet conservé à sa taille/position + fond Tiefling contrasté.','ok')}
+$('subjectFile').addEventListener('change',async e=>{subject=await loadImage(e.target.files[0]);subjectDepth=null;views=[];setStatus(subject&&bg?'Prêt pour l’analyse Tiefling.':'Sujet chargé. Ajoute le fond.')});$('bgFile').addEventListener('change',async e=>{bg=await loadImage(e.target.files[0]);bgDepth=null;views=[];setStatus(subject&&bg?'Prêt pour l’analyse Tiefling.':'Fond chargé. Ajoute le sujet.')});
+$('analyzeBtn').onclick=async()=>{if(!subject||!bg){setStatus('Il faut le sujet détouré ET le fond seul.','warn');return}const b=$('analyzeBtn');b.disabled=true;$('viewsBtn').disabled=true;$('zipBtn').disabled=true;views=[];$('thumbs').innerHTML='';try{const size=+$('depthSize').value;setStatus('Tiefling 1/2 : profondeur du sujet…');const sr=await runDepth(subject,size,true);let sd=depthToCanvas(sr,subject,$('subjectDepth'));sd=erodeAlphaDepth(sd,subject,+$('edgeProtect').value);$('subjectDepth').getContext('2d').putImageData(sd,0,0);subjectDepth=sd;setStatus('Tiefling 2/2 : profondeur du fond…');const br=await runDepth(bg,size,false);let bd=depthToCanvas(br,bg,$('bgDepth'));bd=contrastDepth(bd,+$('bgDepthContrast').value);$('bgDepth').getContext('2d').putImageData(bd,0,0);bgDepth=bd;setStatus('Deux profondeurs indépendantes terminées. Crée les 9 vues.','ok');$('viewsBtn').disabled=false}catch(err){console.error(err);setStatus('Erreur Tiefling : '+err.message,'warn')}finally{b.disabled=false}};
+$('viewsBtn').onclick=()=>rebuildViews(true);$('viewSlider').oninput=e=>showView(+e.target.value);$('playBtn').onclick=()=>{playing=!playing;$('playBtn').textContent=playing?'❚❚':'▶';clearInterval(playTimer);if(playing){let i=+$('viewSlider').value-1,dir=1;playTimer=setInterval(()=>{i+=dir;if(i>=8){i=8;dir=-1}else if(i<=0){i=0;dir=1}showView(i+1)},180)}};
+$('zipBtn').onclick=async()=>{if(!views.length)return;setStatus('Création du ZIP…');const zip=new JSZip();for(let i=0;i<views.length;i++){const blob=await new Promise(r=>views[i].toBlob(r,'image/png'));zip.file(`happyholo-tiefling-dual-vue-${String(i+1).padStart(2,'0')}.png`,blob)}const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='HappyHolo_Tiefling_Double_9_vues.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);setStatus('ZIP 9 vues créé.','ok')};
 })();
 </script>
-</body>
-</html>
+</body></html>
