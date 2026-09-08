@@ -14,7 +14,7 @@
 </head>
 <body>
 <div class="app">
-  <aside class="rail" aria-label="Familles HappyHolo"><div class="brand"><div class="brand-row"><strong>HappyHolo</strong><span class="version">V4.7</span></div><div class="tagline">Un seul accès pour créer, animer, produire et contrôler.</div></div><nav class="families" id="families"></nav><div class="rail-foot"><div class="health"><span class="dot" id="healthDot"></span><span id="healthText">Contrôle des services…</span></div></div></aside>
+  <aside class="rail" aria-label="Familles HappyHolo"><div class="brand"><div class="brand-row"><strong>HappyHolo</strong><span class="version">V4.8</span></div><div class="tagline">Un seul accès pour créer, animer, produire et contrôler.</div></div><nav class="families" id="families"></nav><div class="rail-foot"><div class="health"><span class="dot" id="healthDot"></span><span id="healthText">Contrôle des services…</span></div></div></aside>
   <main class="workspace"><header class="toolbar"><div class="toolbar-top"><div class="title"><h1 id="routeTitle">Studio 3D</h1><p id="routeHelp">Photo, relief et 9 vues lenticulaires</p></div><div class="tool-actions"><button class="icon-btn reload" id="reload" title="Recharger ce module">↻</button><button class="icon-btn" id="open" title="Ouvrir ce module seul">↗</button><button class="icon-btn" id="focus" title="Plein écran">⛶</button></div></div><nav class="subnav" id="subnav"></nav></header><section class="stage"><div class="loading" id="loading"><div>Ouverture du module…</div></div><iframe class="service-frame" id="serviceFrame" title="Module HappyHolo" allow="clipboard-read; clipboard-write"></iframe></section></main>
 </div>
 <button class="focus-exit" id="focusExit">×</button>
@@ -23,6 +23,7 @@
 const families=[
 {id:'create',icon:'✦',label:'Créer',hint:'Photo, GLB & détourage',routes:[
 {id:'photo',label:'Photo & relief',title:'Photo & relief 3D',help:'Détourage local, profondeur et export de 9 vues',src:'./relief3d-test-v31.html?embed=1&v=406',target:'.card.grid'},
+{id:'tiefling15',label:'3D avancé + détourage',title:'Tiefling V15 — photo vers 9 vues',help:'Une photo : détourage du sujet, reconstruction du fond, profondeur Tiefling et sol protégé',src:'./happyholo-tiefling-v15.html?v=480'},
 {id:'glb',label:'GLB → 9 vues',title:'GLB 3D → 9 vues lenticulaires',help:'Import GLB Tripo 4K, rotation 3D réelle et export vue-01 à vue-09',src:'./glb-3d-studio.html?v=470'},
 {id:'cutout',label:'Détourage & fonds',title:'Détourage, fonds et composition',help:'Plusieurs zones au doigt ou Apple Pencil, fond reconstruit et placement libre',src:'./relief3d-test-v31.html?embed=1&v=406',target:'#happyHoloCustomBackgrounds'},
 {id:'analysis',label:'Analyser un visuel',title:'Analyse du visuel',help:'Résolution, netteté, contraste et cadrage support',src:'./happyholo-analysis.html?v=400'}]},
