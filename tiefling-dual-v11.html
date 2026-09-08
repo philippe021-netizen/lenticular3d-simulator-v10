@@ -1,1 +1,72 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>HappyHolo Tiefling V11</title></head><body>V11</body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo — Tiefling V11 ancrage sol</title>
+<style>html,body{margin:0;width:100%;height:100%;background:#0d1117;overflow:hidden}iframe{border:0;width:100%;height:100%;display:block}</style>
+</head>
+<body>
+<iframe id="app"></iframe>
+<script>
+(async()=>{
+  const frame=document.getElementById('app');
+  try{
+    let html=await (await fetch('./tiefling-dual-v10.html',{cache:'no-store'})).text();
+    const declStart=html.indexOf('    const lockedSubject=`function subjectLayer(');
+    const declEnd=html.indexOf('`;\n\n    html=html.slice(0,start)+lockedSubject',declStart);
+    if(declStart<0||declEnd<0) throw new Error('Moteur sujet V10 introuvable');
+
+    const anchoredSubject=`function subjectLayer(outW,outH,t,amp){
+      const src=cv(subject).getContext('2d',{willReadFrequently:true}).getImageData(0,0,subject.naturalWidth,subject.naturalHeight),sw=src.width,sh=src.height,out=new ImageData(outW,outH),od=out.data;
+      let scale=(bg&&sw===bg.naturalWidth&&sh===bg.naturalHeight)?outW/bg.naturalWidth:Math.min(outW/sw,outH/sh);
+      scale*=+$('subjectZoom').value/100;
+      const ox=(outW-sw*scale)/2+(+$('subjectX').value/100)*outW,oy=(outH-sh*scale)/2+(+$('subjectY').value/100)*outH,
+      move=+$('subjectMove').value/100,pivot=+$('subjectPivot').value/100,vol=+$('subjectVolume').value/100,cx=sw/2,edgeRadius=5;
+      function alphaAt(x,y){return sample(src.data,sw,sh,x,y,3)/255}
+      function smoothstep(a,b,v){v=Math.max(0,Math.min(1,(v-a)/(b-a)));return v*v*(3-2*v)}
+      function interiorWeight(x,y){const a=alphaAt(x,y);if(a<.04)return 0;let mn=a;const r=edgeRadius;mn=Math.min(mn,alphaAt(x-r,y),alphaAt(x+r,y),alphaAt(x,y-r),alphaAt(x,y+r),alphaAt(x-r*.7,y-r*.7),alphaAt(x+r*.7,y-r*.7),alphaAt(x-r*.7,y+r*.7),alphaAt(x+r*.7,y+r*.7));return Math.max(0,Math.min(1,(mn-.10)/.70))}
+
+      let minY=sh,maxY=0,minX=sw,maxX=0,count=0,contactXSum=0,contactCount=0;
+      for(let yy=0;yy<sh;yy+=2)for(let xx=0;xx<sw;xx+=2){if(alphaAt(xx,yy)>.18){minY=Math.min(minY,yy);maxY=Math.max(maxY,yy);minX=Math.min(minX,xx);maxX=Math.max(maxX,xx);count++}}
+      if(!count){minY=0;maxY=sh-1;minX=0;maxX=sw-1}
+      const subjectH=Math.max(8,maxY-minY),contactBand=Math.max(3,subjectH*.045);
+      for(let yy=Math.max(minY,maxY-contactBand);yy<=maxY;yy+=2)for(let xx=minX;xx<=maxX;xx+=2){if(alphaAt(xx,yy)>.18){contactXSum+=xx;contactCount++}}
+      const contactX=contactCount?contactXSum/contactCount:(minX+maxX)/2,contactY=maxY;
+
+      let supportShift=0;
+      if(bg&&bDepth){
+        const bw=bg.naturalWidth,bh=bg.naturalHeight,bgScale=Math.max(outW/bw,outH/bh)*(+$('bgZoom').value/100),bgOx=(outW-bw*bgScale)/2,bgOy=(outH-bh*bgScale)/2;
+        const contactOutX=ox+contactX*scale,contactOutY=oy+contactY*scale,bx=(contactOutX-bgOx)/bgScale,by=(contactOutY-bgOy)/bgScale;
+        if(bx>=0&&bx<bw&&by>=0&&by<bh){
+          const zbg=sample(bDepth.data,bDepth.width,bDepth.height,bx/(bw-1)*(bDepth.width-1),by/(bh-1)*(bDepth.height-1),0)/255;
+          const near=smoothstep(.66,.84,zbg),mid=smoothstep(.34,.60,zbg)*(1-near),far=1-Math.min(1,near+mid),pz=far*(-.50)+mid*(.015)+near*(.64),str=+$('bgStrength').value/100,drift=+$('bgDrift').value/100;
+          supportShift=-t*amp*drift*.36+t*amp*str*pz*1.72;
+        }
+      }
+
+      const oldRigid=t*amp*move;
+      for(let y=0;y<outH;y++){
+        const sy0=(y-oy)/scale;if(sy0<0||sy0>=sh)continue;
+        for(let x=0;x<outW;x++){
+          const sx0=(x-ox)/scale;if(sx0<0||sx0>=sw)continue;
+          const heightFromContact=Math.max(0,(contactY-sy0)/subjectH),anchor=smoothstep(.02,.58,heightFromContact),rigid=supportShift+(oldRigid-supportShift)*anchor,sxRigid=sx0-rigid/scale;
+          if(sxRigid<0||sxRigid>=sw)continue;
+          const rigidAlpha=alphaAt(sxRigid,sy0);if(rigidAlpha<.01)continue;
+          const nx=(sxRigid-cx)/(sw*.5),z=sample(sDepth.data,sDepth.width,sDepth.height,sxRigid/(sw-1)*(sDepth.width-1),sy0/(sh-1)*(sDepth.height-1),0)/255,protect=interiorWeight(sxRigid,sy0),yaw=t*amp*pivot*(z-.5)*1.35,perspective=t*amp*pivot*nx*(z-.5)*0.45,internal=t*amp*vol*(z-.5),extra=(yaw+perspective+internal)*protect*anchor,sx=sxRigid-extra/scale,p=(y*outW+x)*4;
+          od[p]=Math.round(sample(src.data,sw,sh,sx,sy0,0));od[p+1]=Math.round(sample(src.data,sw,sh,sx,sy0,1));od[p+2]=Math.round(sample(src.data,sw,sh,sx,sy0,2));od[p+3]=Math.round(rigidAlpha*255);
+        }
+      }
+      return out
+    }`;
+
+    const replacement='    const lockedSubject=`'+anchoredSubject+'`';
+    html=html.slice(0,declStart)+replacement+html.slice(declEnd+1);
+    html=html.replaceAll('V10','V11').replaceAll('v10','v11');
+    html=html.replace('V11 : sujet V9 strictement conservé. Fond automatique 3 plans renforcé : proche plus présent, lointain légèrement opposé, plan moyen stabilisé pour augmenter le relief sans étirer le sujet.','V11 : sujet, support et fond restent traités séparément. Ancrage sol automatique : pieds, pattes, pneus ou base suivent localement le support pour supprimer le glissement, tandis que le haut du sujet conserve son relief 3D.');
+    frame.srcdoc=html;
+  }catch(e){document.body.innerHTML='<div style="color:white;font:16px sans-serif;padding:24px">Erreur V11 : '+String(e.message||e)+'</div>'}
+})();
+</script>
+</body>
+</html>
