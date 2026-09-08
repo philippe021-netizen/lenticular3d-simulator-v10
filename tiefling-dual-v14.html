@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo — Tiefling V14 pivot + sol protégé</title>
+<style>html,body{margin:0;width:100%;height:100%;background:#0d1117;overflow:hidden}iframe{border:0;width:100%;height:100%;display:block}</style>
+</head>
+<body>
+<iframe id="app"></iframe>
+<script>
+(async()=>{
+  const frame=document.getElementById('app');
+  try{
+    let html=await (await fetch('./tiefling-dual-v5.html',{cache:'no-store'})).text();
+
+    const bgStart=html.indexOf('function warpBg(');
+    const bgEnd=html.indexOf('function subjectLayer(',bgStart);
+    if(bgStart<0||bgEnd<0) throw new Error('Moteur fond V5 introuvable');
+
+    const v14Bg=`let groundCacheKey='',groundCache=null;
+function smooth01(a,b,v){v=Math.max(0,Math.min(1,(v-a)/(b-a)));return v*v*(3-2*v)}
+function mix(a,b,t){return a+(b-a)*t}
+function subjectGroundInfo(outW,outH){
+  if(!subject)return null;
+  const key=[outW,outH,subject.naturalWidth,subject.naturalHeight,$('subjectZoom').value,$('subjectX').value,$('subjectY').value].join('|');
+  if(key===groundCacheKey&&groundCache)return groundCache;
+  const c=cv(subject),ctx=c.getContext('2d',{willReadFrequently:true}),id=ctx.getImageData(0,0,c.width,c.height),d=id.data,sw=c.width,sh=c.height;
+  let minX=sw,maxX=0,minY=sh,maxY=0,found=false;
+  const step=Math.max(1,Math.floor(Math.min(sw,sh)/650));
+  for(let y=0;y<sh;y+=step)for(let x=0;x<sw;x+=step){if(d[(y*sw+x)*4+3]>28){found=true;if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}
+  if(!found)return null;
+  let scale=(bg&&sw===bg.naturalWidth&&sh===bg.naturalHeight)?outW/bg.naturalWidth:Math.min(outW/sw,outH/sh);
+  scale*=+$('subjectZoom').value/100;
+  const ox=(outW-sw*scale)/2+(+$('subjectX').value/100)*outW,oy=(outH-sh*scale)/2+(+$('subjectY').value/100)*outH;
+  groundCacheKey=key;
+  groundCache={cx:ox+((minX+maxX)/2)*scale,groundY:oy+maxY*scale,halfW:Math.max(18,(maxX-minX)*scale*.58),band:Math.max(12,outH*.075),srcBottom:maxY,srcTop:minY};
+  return groundCache
+}
+function warpBg(outW,outH,t,amp){
+  const src=cv(bg).getContext('2d',{willReadFrequently:true}).getImageData(0,0,bg.naturalWidth,bg.naturalHeight),sw=src.width,sh=src.height,out=new ImageData(outW,outH),od=out.data,
+  scale=Math.max(outW/sw,outH/sh)*(+$('bgZoom').value/100),ox=(outW-sw*scale)/2,oy=(outH-sh*scale)/2,
+  str=+$('bgStrength').value/100,drift=+$('bgDrift').value/100,g=subjectGroundInfo(outW,outH),subjectShift=t*amp*(+$('subjectMove').value/100);
+
+  function planeDepth(z){
+    const near=smooth01(.66,.84,z),mid=smooth01(.34,.60,z)*(1-near),far=1-Math.min(1,near+mid);
+    return far*(-.42)+mid*(.01)+near*(.52)
+  }
+
+  const horizonY=Math.max(outH*.42,g?Math.min(outH*.64,g.groundY-outH*.18):outH*.55);
+  const horizonShift=-t*amp*drift*.34;
+
+  for(let y=0;y<outH;y++){
+    const sy=(y-oy)/scale;if(sy<0||sy>=sh)continue;
+    const groundBlend=smooth01(horizonY,outH*.93,y);
+    const groundShift=mix(horizonShift,subjectShift*.94,groundBlend);
+    for(let x=0;x<outW;x++){
+      const sx0=(x-ox)/scale;if(sx0<0||sx0>=sw)continue;
+      const z=sample(bDepth.data,bDepth.width,bDepth.height,sx0/(sw-1)*(bDepth.width-1),sy/(sh-1)*(bDepth.height-1),0)/255;
+      const pz=planeDepth(z);
+      let depthShift=-t*amp*drift*.34+t*amp*str*pz*1.45;
+      let shift=mix(depthShift,groundShift,groundBlend*.94);
+      if(g){
+        const gy=1-smooth01(g.band*.20,g.band*1.30,Math.abs(y-g.groundY));
+        const gx=1-smooth01(g.halfW*.65,g.halfW*1.22,Math.abs(x-g.cx));
+        const contact=Math.max(0,Math.min(1,gy*gx));
+        shift=mix(shift,subjectShift,contact*.96);
+      }
+      const sx=sx0-shift/scale,p=(y*outW+x)*4;
+      for(let c=0;c<4;c++)od[p+c]=sample(src.data,sw,sh,sx,sy,c)
+    }
+  }
+  return out
+}`;
+    html=html.slice(0,bgStart)+v14Bg+html.slice(bgEnd);
+
+    const start=html.indexOf('function subjectLayer(');
+    const end=html.indexOf('function compose(',start);
+    if(start<0||end<0) throw new Error('Moteur sujet V5 introuvable');
+
+    const v14Subject=`function subjectLayer(outW,outH,t,amp){
+      const src=cv(subject).getContext('2d',{willReadFrequently:true}).getImageData(0,0,subject.naturalWidth,subject.naturalHeight),sw=src.width,sh=src.height,out=new ImageData(outW,outH),od=out.data;
+      let scale=(bg&&sw===bg.naturalWidth&&sh===bg.naturalHeight)?outW/bg.naturalWidth:Math.min(outW/sw,outH/sh);
+      scale*=+$('subjectZoom').value/100;
+      const ox=(outW-sw*scale)/2+(+$('subjectX').value/100)*outW,oy=(outH-sh*scale)/2+(+$('subjectY').value/100)*outH,
+      move=+$('subjectMove').value/100,pivot=+$('subjectPivot').value/100,vol=+$('subjectVolume').value/100,g=subjectGroundInfo(outW,outH),srcBottom=g?g.srcBottom:sh-1,
+      cx=(g?((g.cx-ox)/scale):sw*.5),theta=t*pivot*.30,cosT=Math.max(.90,Math.cos(theta)),sinT=Math.sin(theta),rigid=t*amp*move;
+
+      function alphaAt(x,y){return sample(src.data,sw,sh,x,y,3)/255}
+
+      for(let y=0;y<outH;y++){
+        const sy=(y-oy)/scale;if(sy<0||sy>=sh)continue;
+        const footLock=smooth01(srcBottom-sh*.18,srcBottom,sy);
+        for(let x=0;x<outW;x++){
+          const sxScreen=(x-ox-rigid)/scale;
+          if(sxScreen<0||sxScreen>=sw)continue;
+          const nx=(sxScreen-cx)/(sw*.5);
+          const rotatedX=cx+(sxScreen-cx)/cosT;
+          if(rotatedX<0||rotatedX>=sw)continue;
+          const z=sample(sDepth.data,sDepth.width,sDepth.height,rotatedX/(sw-1)*(sDepth.width-1),sy/(sh-1)*(sDepth.height-1),0)/255;
+          const depthRel=(z-.5);
+          const turn=sinT*depthRel*sw*(.095+.06*vol)*(1-footLock*.72);
+          const contour=sinT*nx*sw*.018*(1-footLock*.60);
+          const sx=rotatedX-turn-contour;
+          const a=alphaAt(sx,sy);if(a<.01)continue;
+          const p=(y*outW+x)*4;
+          od[p]=Math.round(sample(src.data,sw,sh,sx,sy,0));
+          od[p+1]=Math.round(sample(src.data,sw,sh,sx,sy,1));
+          od[p+2]=Math.round(sample(src.data,sw,sh,sx,sy,2));
+          od[p+3]=Math.round(a*255)
+        }
+      }
+      return out
+    }`;
+
+    html=html.slice(0,start)+v14Subject+html.slice(end);
+    html=html.replaceAll('HappyHolo — Tiefling double traitement V5','HappyHolo — Tiefling double traitement V14');
+    html=html.replace('Nouveau rendu sujet : petit déplacement global + pivot pseudo‑3D piloté par la profondeur. Le fond conserve le comportement V3/V4.','V14 : pivot du sujet plus rigide autour de son axe vertical. La partie basse de l’image est traitée comme un plan de sol continu afin de préserver routes, podiums et lignes de fuite.');
+    html=html.replace('id="subjectMove" type="range" min="0" max="120" value="45"','id="subjectMove" type="range" min="0" max="130" value="62"');
+    html=html.replace('id="subjectMoveVal" class="val">45%','id="subjectMoveVal" class="val">62%');
+    html=html.replace('id="subjectPivot" type="range" min="0" max="180" value="100"','id="subjectPivot" type="range" min="0" max="120" value="78"');
+    html=html.replace('id="subjectPivotVal" class="val">100%','id="subjectPivotVal" class="val">78%');
+    html=html.replace('id="subjectVolume" type="range" min="0" max="50" value="18"','id="subjectVolume" type="range" min="0" max="40" value="18"');
+    html=html.replace('id="subjectVolumeVal" class="val">18%','id="subjectVolumeVal" class="val">18%');
+    html=html.replace('id="parallax" type="range" min="4" max="70" value="32"','id="parallax" type="range" min="4" max="70" value="22"');
+    html=html.replace('id="parallaxVal" class="val">32 px','id="parallaxVal" class="val">22 px');
+    html=html.replace('id="bgStrength" type="range" min="0" max="120" value="68"','id="bgStrength" type="range" min="0" max="120" value="70"');
+    html=html.replace('id="bgStrengthVal" class="val">68%','id="bgStrengthVal" class="val">70%');
+    html=html.replace('id="bgDrift" type="range" min="0" max="100" value="55"','id="bgDrift" type="range" min="0" max="100" value="24"');
+    html=html.replace('id="bgDriftVal" class="val">55%','id="bgDriftVal" class="val">24%');
+
+    const oldBind="function bind(id,fmt){const e=$(id),o=$(id+'Val');const f=()=>o.textContent=fmt(e.value);e.oninput=()=>{f();if(frames.length)build(false)};f()}";
+    const newBind="let previewTimer=0;function previewCurrent(){if(!frames.length||!bg||!subject||!sDepth||!bDepth)return;groundCacheKey='';groundCache=null;const n=Math.max(1,Math.min(9,+$('slider').value||5)),i=n-1,outW=Math.min(360,bg.naturalWidth),outH=Math.round(outW*bg.naturalHeight/bg.naturalWidth),c=document.createElement('canvas');c.width=outW;c.height=outH;const x=c.getContext('2d'),t=(i-4)/4,amp=+$('parallax').value;x.putImageData(warpBg(outW,outH,t,amp),0,0);const s=subjectLayer(outW,outH,t,amp),sc=document.createElement('canvas');sc.width=outW;sc.height=outH;sc.getContext('2d').putImageData(s,0,0);x.drawImage(sc,0,0);stage.innerHTML='';stage.appendChild(c)}function queuePreview(){clearTimeout(previewTimer);previewTimer=setTimeout(previewCurrent,55)}function bind(id,fmt){const e=$(id),o=$(id+'Val');const f=()=>o.textContent=fmt(e.value);e.oninput=()=>{f();groundCacheKey='';groundCache=null;if(frames.length)queuePreview()};e.onchange=()=>{f();groundCacheKey='';groundCache=null;clearTimeout(previewTimer);if(frames.length){stat('Mise à jour des 9 vues…');requestAnimationFrame(()=>build(false))}};f()}";
+    if(!html.includes(oldBind)) throw new Error('Gestion des tirettes V5 introuvable');
+    html=html.replace(oldBind,newBind);
+    html=html.replace('input[type=file],input[type=range]{width:100%}','input[type=file],input[type=range]{width:100%}input[type=range]{touch-action:pan-x;accent-color:var(--accent)}');
+    html=html.replaceAll('happyholo-v5-','happyholo-v14-').replaceAll('HappyHolo_Tiefling_V5_9_vues.zip','HappyHolo_Tiefling_V14_9_vues.zip');
+    frame.srcdoc=html;
+  }catch(e){
+    document.body.innerHTML='<div style="color:white;font:16px sans-serif;padding:24px">Erreur V14 : '+String(e.message||e)+'</div>';
+  }
+})();
+</script>
+</body>
+</html>
