@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo — Tiefling V10 fond 3 plans renforcé</title>
+<style>html,body{margin:0;width:100%;height:100%;background:#0d1117;overflow:hidden}iframe{border:0;width:100%;height:100%;display:block}</style>
+</head>
+<body>
+<iframe id="app"></iframe>
+<script>
+(async()=>{
+  const frame=document.getElementById('app');
+  try{
+    let html=await (await fetch('./tiefling-dual-v5.html',{cache:'no-store'})).text();
+
+    const bgStart=html.indexOf('function warpBg(');
+    const bgEnd=html.indexOf('function subjectLayer(',bgStart);
+    if(bgStart<0||bgEnd<0) throw new Error('Moteur fond V5 introuvable');
+
+    const threePlaneBg=`function warpBg(outW,outH,t,amp){
+      const src=cv(bg).getContext('2d',{willReadFrequently:true}).getImageData(0,0,bg.naturalWidth,bg.naturalHeight),sw=src.width,sh=src.height,out=new ImageData(outW,outH),od=out.data,
+      scale=Math.max(outW/sw,outH/sh)*(+$('bgZoom').value/100),ox=(outW-sw*scale)/2,oy=(outH-sh*scale)/2,
+      str=+$('bgStrength').value/100,drift=+$('bgDrift').value/100;
+
+      function smoothstep(a,b,v){v=Math.max(0,Math.min(1,(v-a)/(b-a)));return v*v*(3-2*v)}
+      function planeDepth(z){
+        const near=smoothstep(.66,.84,z),mid=smoothstep(.34,.60,z)*(1-near),far=1-Math.min(1,near+mid);
+        return far*(-.50)+mid*(.015)+near*(.64);
+      }
+
+      for(let y=0;y<outH;y++){
+        const sy=(y-oy)/scale;if(sy<0||sy>=sh)continue;
+        for(let x=0;x<outW;x++){
+          const sx0=(x-ox)/scale;if(sx0<0||sx0>=sw)continue;
+          const z=sample(bDepth.data,bDepth.width,bDepth.height,sx0/(sw-1)*(bDepth.width-1),sy/(sh-1)*(bDepth.height-1),0)/255;
+          const pz=planeDepth(z);
+          const shift=-t*amp*drift*.36+t*amp*str*pz*1.72;
+          const sx=sx0-shift/scale,p=(y*outW+x)*4;
+          for(let c=0;c<4;c++)od[p+c]=sample(src.data,sw,sh,sx,sy,c)
+        }
+      }
+      return out
+    }`;
+    html=html.slice(0,bgStart)+threePlaneBg+html.slice(bgEnd);
+
+    const start=html.indexOf('function subjectLayer(');
+    const end=html.indexOf('function compose(',start);
+    if(start<0||end<0) throw new Error('Moteur sujet V5 introuvable');
+
+    const lockedSubject=`function subjectLayer(outW,outH,t,amp){
+      const src=cv(subject).getContext('2d',{willReadFrequently:true}).getImageData(0,0,subject.naturalWidth,subject.naturalHeight),sw=src.width,sh=src.height,out=new ImageData(outW,outH),od=out.data;
+      let scale=(bg&&sw===bg.naturalWidth&&sh===bg.naturalHeight)?outW/bg.naturalWidth:Math.min(outW/sw,outH/sh);
+      scale*=+$('subjectZoom').value/100;
+      const ox=(outW-sw*scale)/2+(+$('subjectX').value/100)*outW,oy=(outH-sh*scale)/2+(+$('subjectY').value/100)*outH,
+      move=+$('subjectMove').value/100,pivot=+$('subjectPivot').value/100,vol=+$('subjectVolume').value/100,cx=sw/2,edgeRadius=5;
+
+      function alphaAt(x,y){return sample(src.data,sw,sh,x,y,3)/255}
+      function interiorWeight(x,y){
+        const a=alphaAt(x,y);if(a<.04)return 0;
+        let mn=a;const r=edgeRadius;
+        mn=Math.min(mn,alphaAt(x-r,y),alphaAt(x+r,y),alphaAt(x,y-r),alphaAt(x,y+r),alphaAt(x-r*.7,y-r*.7),alphaAt(x+r*.7,y-r*.7),alphaAt(x-r*.7,y+r*.7),alphaAt(x+r*.7,y+r*.7));
+        return Math.max(0,Math.min(1,(mn-.10)/.70));
+      }
+
+      for(let y=0;y<outH;y++){
+        const sy0=(y-oy)/scale;if(sy0<0||sy0>=sh)continue;
+        for(let x=0;x<outW;x++){
+          const sx0=(x-ox)/scale;if(sx0<0||sx0>=sw)continue;
+          const rigid=t*amp*move;
+          const sxRigid=sx0-rigid/scale;
+          if(sxRigid<0||sxRigid>=sw)continue;
+          const rigidAlpha=alphaAt(sxRigid,sy0);
+          if(rigidAlpha<.01)continue;
+          const nx=(sxRigid-cx)/(sw*.5);
+          const z=sample(sDepth.data,sDepth.width,sDepth.height,sxRigid/(sw-1)*(sDepth.width-1),sy0/(sh-1)*(sDepth.height-1),0)/255;
+          const protect=interiorWeight(sxRigid,sy0);
+          const yaw=t*amp*pivot*(z-.5)*1.35;
+          const perspective=t*amp*pivot*nx*(z-.5)*0.45;
+          const internal=t*amp*vol*(z-.5);
+          const extra=(yaw+perspective+internal)*protect;
+          const sx=sxRigid-extra/scale,p=(y*outW+x)*4;
+          od[p]=Math.round(sample(src.data,sw,sh,sx,sy0,0));
+          od[p+1]=Math.round(sample(src.data,sw,sh,sx,sy0,1));
+          od[p+2]=Math.round(sample(src.data,sw,sh,sx,sy0,2));
+          od[p+3]=Math.round(rigidAlpha*255);
+        }
+      }
+      return out
+    }`;
+
+    html=html.slice(0,start)+lockedSubject+html.slice(end);
+    html=html.replaceAll('HappyHolo — Tiefling double traitement V5','HappyHolo — Tiefling double traitement V10');
+    html=html.replace('Nouveau rendu sujet : petit déplacement global + pivot pseudo‑3D piloté par la profondeur. Le fond conserve le comportement V3/V4.','V10 : sujet V9 strictement conservé. Fond automatique 3 plans renforcé : proche plus présent, lointain légèrement opposé, plan moyen stabilisé pour augmenter le relief sans étirer le sujet.');
+    html=html.replace('id="subjectMove" type="range" min="0" max="120" value="45"','id="subjectMove" type="range" min="0" max="130" value="74"');
+    html=html.replace('id="subjectMoveVal" class="val">45%','id="subjectMoveVal" class="val">74%');
+    html=html.replace('id="subjectPivot" type="range" min="0" max="180" value="100"','id="subjectPivot" type="range" min="0" max="90" value="58"');
+    html=html.replace('id="subjectPivotVal" class="val">100%','id="subjectPivotVal" class="val">58%');
+    html=html.replace('id="subjectVolume" type="range" min="0" max="50" value="18"','id="subjectVolume" type="range" min="0" max="18" value="7"');
+    html=html.replace('id="subjectVolumeVal" class="val">18%','id="subjectVolumeVal" class="val">7%');
+    html=html.replace('id="parallax" type="range" min="4" max="70" value="32"','id="parallax" type="range" min="4" max="70" value="24"');
+    html=html.replace('id="parallaxVal" class="val">32 px','id="parallaxVal" class="val">24 px');
+    html=html.replace('id="bgStrength" type="range" min="0" max="120" value="68"','id="bgStrength" type="range" min="0" max="120" value="86"');
+    html=html.replace('id="bgStrengthVal" class="val">68%','id="bgStrengthVal" class="val">86%');
+    html=html.replace('id="bgDrift" type="range" min="0" max="100" value="55"','id="bgDrift" type="range" min="0" max="100" value="30"');
+    html=html.replace('id="bgDriftVal" class="val">55%','id="bgDriftVal" class="val">30%');
+
+    const oldBind="function bind(id,fmt){const e=$(id),o=$(id+'Val');const f=()=>o.textContent=fmt(e.value);e.oninput=()=>{f();if(frames.length)build(false)};f()}";
+    const newBind="let previewTimer=0;function previewCurrent(){if(!frames.length||!bg||!subject||!sDepth||!bDepth)return;const n=Math.max(1,Math.min(9,+$('slider').value||5)),i=n-1,outW=Math.min(360,bg.naturalWidth),outH=Math.round(outW*bg.naturalHeight/bg.naturalWidth),c=document.createElement('canvas');c.width=outW;c.height=outH;const x=c.getContext('2d'),t=(i-4)/4,amp=+$('parallax').value;x.putImageData(warpBg(outW,outH,t,amp),0,0);const s=subjectLayer(outW,outH,t,amp),sc=document.createElement('canvas');sc.width=outW;sc.height=outH;sc.getContext('2d').putImageData(s,0,0);x.drawImage(sc,0,0);stage.innerHTML='';stage.appendChild(c)}function queuePreview(){clearTimeout(previewTimer);previewTimer=setTimeout(previewCurrent,55)}function bind(id,fmt){const e=$(id),o=$(id+'Val');const f=()=>o.textContent=fmt(e.value);e.oninput=()=>{f();if(frames.length)queuePreview()};e.onchange=()=>{f();clearTimeout(previewTimer);if(frames.length){stat('Mise à jour des 9 vues…');requestAnimationFrame(()=>build(false))}};f()}";
+    if(!html.includes(oldBind)) throw new Error('Gestion des tirettes V5 introuvable');
+    html=html.replace(oldBind,newBind);
+    html=html.replace('input[type=file],input[type=range]{width:100%}','input[type=file],input[type=range]{width:100%}input[type=range]{touch-action:pan-x;accent-color:var(--accent)}');
+    html=html.replaceAll('happyholo-v5-','happyholo-v10-').replaceAll('HappyHolo_Tiefling_V5_9_vues.zip','HappyHolo_Tiefling_V10_9_vues.zip');
+    frame.srcdoc=html;
+  }catch(e){
+    document.body.innerHTML='<div style="color:white;font:16px sans-serif;padding:24px">Erreur V10 : '+String(e.message||e)+'</div>';
+  }
+})();
+</script>
+</body>
+</html>
