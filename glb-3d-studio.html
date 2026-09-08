@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>HappyHolo — GLB vers 9 vues</title>
+<style>
+:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;color:#111;background:#edf1f3;--ink:#071019;--line:#cbd4db;--yellow:#ffd60a;--muted:#647480}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;background:#edf1f3}.wrap{max-width:1400px;margin:auto;padding:14px}.top{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}.top h1{font-size:22px;margin:0}.top p{margin:3px 0 0;color:var(--muted);font-size:13px}.badge{background:var(--ink);color:#fff;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:850}.layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.75fr);gap:12px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;box-shadow:0 8px 30px #0001}.viewer{position:relative;min-height:580px;overflow:hidden;background:linear-gradient(180deg,#f9fbfc,#e8edf0)}#viewport{width:100%;height:100%;min-height:580px;display:block;touch-action:none}.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:28px;color:#51616d;pointer-events:none}.empty strong{font-size:22px;color:#19242c}.empty span{display:block;margin-top:8px;line-height:1.45}.controls{padding:14px;display:grid;gap:12px}.drop{border:2px dashed #aab7c0;border-radius:15px;padding:15px;text-align:center;background:#f8fafb}.drop input{width:100%;font-size:16px}.row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.row label{font-weight:800;font-size:13px}.value{font-variant-numeric:tabular-nums;font-size:13px;color:#44545f}.range{width:100%;accent-color:#111}.preset{display:grid;grid-template-columns:1fr 1fr;gap:7px}.btn{min-height:46px;border:1px solid #bcc7cf;border-radius:13px;background:#f5f7f8;color:#18232b;font-weight:850;font-size:14px;padding:9px 12px}.btn.primary{background:var(--yellow);border-color:#dfbd00;color:#17191b}.btn.dark{background:var(--ink);border-color:var(--ink);color:#fff}.btn:disabled{opacity:.45}.status{min-height:42px;border-radius:12px;background:#f3f6f7;padding:10px 12px;font-size:12px;color:#485965;line-height:1.35}.thumbs{padding:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.thumb{aspect-ratio:1/1;border:1px solid #cbd4db;border-radius:10px;background:#eef2f4;overflow:hidden;position:relative}.thumb img{width:100%;height:100%;object-fit:contain;display:block}.thumb b{position:absolute;left:5px;bottom:5px;background:#071019cc;color:#fff;border-radius:6px;padding:3px 5px;font-size:10px}.footnote{font-size:11px;color:#71818c;line-height:1.4;margin:0}.hidden{display:none!important}@media(max-width:900px){.wrap{padding:8px}.layout{grid-template-columns:1fr}.viewer,#viewport{min-height:52dvh}.controls{padding:10px}.top h1{font-size:18px}.top p{display:none}.thumbs{grid-template-columns:repeat(9,86px);overflow-x:auto}.thumb{width:86px}.preset{grid-template-columns:1fr 1fr}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.177.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.177.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div><h1>GLB → 9 vues lenticulaires</h1><p>Charge un GLB Tripo 4K, règle l'amplitude puis génère les 9 PNG localement sur l'iPad.</p></div><span class="badge">GLB local</span></div>
+  <div class="layout">
+    <section class="card viewer"><canvas id="viewport"></canvas><div class="empty" id="empty"><div><strong>Charge un modèle GLB</strong><span>Le fichier reste dans le navigateur. Les textures et matériaux du GLB sont conservés.</span></div></div></section>
+    <aside class="card controls">
+      <div class="drop"><input id="file" type="file" accept=".glb,model/gltf-binary,application/octet-stream"></div>
+      <div class="preset"><button class="btn" id="depth50">3D profondeur · 50 LPI</button><button class="btn" id="motion60">Rotation · 60 LPI</button></div>
+      <div><div class="row"><label for="amp">Amplitude totale</label><span class="value" id="ampVal">32°</span></div><input class="range" id="amp" type="range" min="8" max="80" step="2" value="32"></div>
+      <div><div class="row"><label for="zoom">Zoom</label><span class="value" id="zoomVal">100%</span></div><input class="range" id="zoom" type="range" min="70" max="150" step="2" value="100"></div>
+      <div><div class="row"><label for="elev">Hauteur caméra</label><span class="value" id="elevVal">8°</span></div><input class="range" id="elev" type="range" min="-15" max="30" step="1" value="8"></div>
+      <div class="preset"><button class="btn" id="resetView">Recentrer</button><button class="btn" id="turntable">Aperçu rotation</button></div>
+      <button class="btn primary" id="generate" disabled>Générer les 9 vues</button>
+      <button class="btn dark" id="zip" disabled>Exporter ZIP · vue-01 à vue-09</button>
+      <div class="status" id="status">En attente d'un GLB.</div>
+      <p class="footnote">Les angles ne sont pas figés : 50 LPI et 60 LPI sont des préréglages de départ à valider par les essais physiques.</p>
+    </aside>
+  </div>
+  <section class="card thumbs hidden" id="thumbs"></section>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const $=id=>document.getElementById(id);
+const canvas=$('viewport');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,preserveDrawingBuffer:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.08;
+renderer.setClearColor(0xf5f7f8,1);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(34,1,.01,1000);
+const controls=new OrbitControls(camera,canvas);controls.enableDamping=true;controls.dampingFactor=.07;controls.target.set(0,0,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x69747d,2.25));
+const key=new THREE.DirectionalLight(0xffffff,3.2);key.position.set(-4,6,5);key.castShadow=true;scene.add(key);
+const fill=new THREE.DirectionalLight(0xd9eaff,1.65);fill.position.set(5,2,3);scene.add(fill);
+const rim=new THREE.DirectionalLight(0xffffff,1.8);rim.position.set(0,4,-5);scene.add(rim);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(50,50),new THREE.MeshStandardMaterial({color:0xe6eaed,roughness:1,metalness:0}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+let model=null,modelRadius=1,modelCenter=new THREE.Vector3(),baseDistance=4,turning=false,generated=[];
+function status(t){$('status').textContent=t}
+function resize(){const r=canvas.getBoundingClientRect(),w=Math.max(1,Math.round(r.width)),h=Math.max(1,Math.round(r.height));if(canvas.width!==Math.round(w*renderer.getPixelRatio())||canvas.height!==Math.round(h*renderer.getPixelRatio()))renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+function setCamera(angleDeg=0){const elev=THREE.MathUtils.degToRad(+$('elev').value);const a=THREE.MathUtils.degToRad(angleDeg);const zoom=100/(+$('zoom').value);const d=baseDistance*zoom;camera.position.set(Math.sin(a)*Math.cos(elev)*d,Math.sin(elev)*d,Math.cos(a)*Math.cos(elev)*d);camera.lookAt(controls.target);camera.updateMatrixWorld()}
+function fitModel(){if(!model)return;const box=new THREE.Box3().setFromObject(model);box.getCenter(modelCenter);model.position.sub(modelCenter);const centered=new THREE.Box3().setFromObject(model);const s=centered.getSize(new THREE.Vector3());modelRadius=Math.max(s.x,s.y,s.z)*.5||1;baseDistance=modelRadius/Math.tan(THREE.MathUtils.degToRad(camera.fov*.5))*1.18;const b2=new THREE.Box3().setFromObject(model);ground.position.y=b2.min.y-.02*modelRadius;controls.target.set(0,(b2.min.y+b2.max.y)*.5,0);controls.minDistance=modelRadius*.8;controls.maxDistance=baseDistance*4;setCamera(0);controls.update()}
+function disposeCurrent(){if(!model)return;scene.remove(model);model.traverse(o=>{if(o.geometry)o.geometry.dispose?.();if(o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach(m=>{for(const k in m){const v=m[k];if(v&&v.isTexture)v.dispose?.()}m.dispose?.()})}});model=null}
+async function loadFile(file){if(!file)return;if(!/\.glb$/i.test(file.name)){status('Format refusé : choisis un fichier .glb.');return}status(`Chargement de ${file.name}…`);$('generate').disabled=true;$('zip').disabled=true;generated=[];$('thumbs').classList.add('hidden');const url=URL.createObjectURL(file);try{const gltf=await new GLTFLoader().loadAsync(url);disposeCurrent();model=gltf.scene;model.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;if(o.material){const arr=Array.isArray(o.material)?o.material:[o.material];arr.forEach(m=>{m.needsUpdate=true})}}});scene.add(model);fitModel();$('empty').classList.add('hidden');$('generate').disabled=false;status(`GLB chargé : ${file.name}. Matériaux et textures prêts.`)}catch(e){console.error(e);status('Impossible de lire ce GLB. Vérifie que l’export Tripo contient bien le modèle et ses textures.')}finally{URL.revokeObjectURL(url)}}
+
+function canvasBlob(){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG impossible')),'image/png',1))}
+async function generateNine(){if(!model)return;turning=false;$('generate').disabled=true;$('zip').disabled=true;generated=[];$('thumbs').innerHTML='';$('thumbs').classList.remove('hidden');const total=+$('amp').value,start=-total/2,step=total/8;const capture=1024;renderer.setPixelRatio(1);renderer.setSize(capture,capture,false);camera.aspect=1;camera.updateProjectionMatrix();for(let i=0;i<9;i++){const angle=start+step*i;status(`Rendu ${i+1}/9 · ${angle.toFixed(1)}°`);setCamera(angle);renderer.render(scene,camera);await new Promise(r=>requestAnimationFrame(r));renderer.render(scene,camera);const blob=await canvasBlob();generated.push({name:`vue-${String(i+1).padStart(2,'0')}.png`,blob,angle});const url=URL.createObjectURL(blob);const d=document.createElement('div');d.className='thumb';d.innerHTML=`<img alt="Vue ${i+1}"><b>${i+1}/9</b>`;d.querySelector('img').src=url;$('thumbs').appendChild(d)}renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));resize();setCamera(0);$('zip').disabled=false;$('generate').disabled=false;status('9 vues générées. Vérifie les angles puis exporte le ZIP.');try{window.parent?.postMessage({type:'happyholo:glb-9views-ready',count:9,amplitude:total},location.origin)}catch(_){}}
+async function exportZip(){if(generated.length!==9)return;if(!window.JSZip){status('Module ZIP indisponible. Recharge la page avec Internet.');return}const zip=new JSZip();generated.forEach(x=>zip.file(x.name,x.blob));zip.file('manifest.json',JSON.stringify({source:'HappyHolo GLB 3D',views:generated.map((x,i)=>({file:x.name,index:i+1,angle_deg:+x.angle.toFixed(3)})),amplitude_deg:+$('amp').value,preset:+$('amp').value<=40?'3d-depth':'rotation',created_at:new Date().toISOString()},null,2));status('Création du ZIP…');const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='happyholo-glb-9-vues.zip';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);status('ZIP prêt : vue-01.png à vue-09.png + manifest.json.')}
+
+$('file').addEventListener('change',e=>loadFile(e.target.files?.[0]));
+$('depth50').onclick=()=>{$('amp').value=32;$('amp').dispatchEvent(new Event('input'));status('Préréglage 50 LPI : amplitude totale 32°. À valider sur impression réelle.')};
+$('motion60').onclick=()=>{$('amp').value=64;$('amp').dispatchEvent(new Event('input'));status('Préréglage 60 LPI : amplitude totale 64°. À valider sur impression réelle.')};
+$('resetView').onclick=()=>{if(model){fitModel();status('Vue recentrée.')}};
+$('turntable').onclick=()=>{turning=!turning;$('turntable').textContent=turning?'Arrêter aperçu':'Aperçu rotation'};
+$('generate').onclick=generateNine;$('zip').onclick=exportZip;
+[['amp','ampVal',v=>`${v}°`],['zoom','zoomVal',v=>`${v}%`],['elev','elevVal',v=>`${v}°`]].forEach(([id,out,fmt])=>$(id).addEventListener('input',()=>{$(out).textContent=fmt($(id).value);if(model&&!turning)setCamera(0)}));
+let t0=performance.now();function loop(t){resize();controls.update();if(turning&&model){const total=+$('amp').value;const phase=Math.sin((t-t0)/1800)*total/2;setCamera(phase)}renderer.render(scene,camera);requestAnimationFrame(loop)}requestAnimationFrame(loop);
+</script>
+</body>
+</html>
