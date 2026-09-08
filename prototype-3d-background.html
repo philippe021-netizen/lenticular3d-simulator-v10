@@ -1,21 +1,98 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>HappyHolo – Prototype Fond 3D</title><style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#09111a;color:#eef5fb;font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1100px;margin:auto;padding:18px}.card{background:#111c27;border:1px solid #2b3b49;border-radius:18px;padding:16px;margin:12px 0}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:block;font-weight:700;margin:8px 0}input[type=file]{width:100%;padding:12px;background:#0b1520;border-radius:12px}input[type=range]{width:100%}button{border:0;border-radius:14px;padding:13px 16px;font-weight:800;background:#eaf4fb;color:#07111a}.primary{background:#ffd84a}canvas{width:100%;height:auto;background:#000;border-radius:16px;display:block}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.views canvas{border-radius:10px}.muted{color:#9fb0bf;font-size:.92rem}.pill{display:inline-block;background:#183047;padding:6px 10px;border-radius:999px;font-size:.85rem}.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.row,.controls{grid-template-columns:1fr}.views{grid-template-columns:repeat(3,1fr)}}
-</style></head><body><div class="wrap"><h1>HappyHolo — test Fond 3D</h1><p class="muted">Prototype séparé du programme principal. Sujet déjà détouré + fond indépendant + profondeur appliquée uniquement au fond.</p>
-<div class="card row"><div><label>1. Sujet détouré (PNG transparent)</label><input id="subjectFile" type="file" accept="image/png,image/webp,image/jpeg"></div><div><label>2. Fond</label><input id="bgFile" type="file" accept="image/*"><label>Carte de profondeur du fond (optionnelle)</label><input id="depthFile" type="file" accept="image/*"><div class="muted">Sans depth map, le prototype utilise une profondeur perspective automatique : bas = proche, haut = loin.</div></div></div>
-<div class="card controls"><div><label>Relief du fond <span id="reliefV" class="pill">24</span></label><input id="relief" type="range" min="0" max="70" value="24"><label>Déplacement du sujet <span id="subjectV" class="pill">12</span></label><input id="subjectShift" type="range" min="0" max="35" value="12"></div><div><label>Zoom fond <span id="zoomV" class="pill">1.06</span></label><input id="zoom" type="range" min="100" max="125" value="106"><label>Taille sujet <span id="sizeV" class="pill">72%</span></label><input id="subjectSize" type="range" min="30" max="110" value="72"></div></div>
-<div class="card"><label>Position de vue <span id="posV" class="pill">5 / 9</span></label><input id="position" type="range" min="1" max="9" value="5" step="1"><canvas id="main" width="900" height="600"></canvas></div>
-<div class="card"><h2>9 vues</h2><div id="views" class="views"></div></div>
-</div><script>
-const $=id=>document.getElementById(id), main=$('main'), ctx=main.getContext('2d',{willReadFrequently:true});let bg=null,sub=null,depth=null;
-function load(file,cb){if(!file)return;const u=URL.createObjectURL(file),im=new Image;im.onload=()=>{URL.revokeObjectURL(u);cb(im);renderAll()};im.src=u}
-$('bgFile').onchange=e=>load(e.target.files[0],im=>bg=im);$('subjectFile').onchange=e=>load(e.target.files[0],im=>sub=im);$('depthFile').onchange=e=>load(e.target.files[0],im=>depth=im);
-['relief','subjectShift','zoom','subjectSize','position'].forEach(id=>$(id).oninput=()=>{updateLabels();renderAll()});
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo – Labo Fond 3D</title>
+<style>
+:root{color-scheme:dark;--bg:#09111a;--card:#111c27;--line:#2b3b49;--text:#eef5fb;--muted:#9fb0bf;--yellow:#ffd84a;--blue:#183047}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto;padding:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.full{grid-column:1/-1}label{display:block;font-weight:750;margin:8px 0}input[type=file],select{width:100%;padding:12px;background:#0b1520;color:var(--text);border:1px solid #263746;border-radius:12px}input[type=range]{width:100%}.muted{color:var(--muted);font-size:.92rem;line-height:1.35}.pill{display:inline-block;background:var(--blue);padding:6px 10px;border-radius:999px;font-size:.85rem}.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}.actions{display:flex;flex-wrap:wrap;gap:10px}.btn{border:0;border-radius:14px;padding:13px 16px;font-weight:850;background:#eaf4fb;color:#07111a}.btn.primary{background:var(--yellow)}.btn.secondary{background:#1e3447;color:#fff}.btn:disabled{opacity:.45}.status{margin-top:10px;padding:10px 12px;border-radius:12px;background:#0b1520;color:#c9d5df;font-size:.92rem}.preview{display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:start}canvas{width:100%;height:auto;background:#000;border-radius:16px;display:block}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.views canvas{border-radius:10px;cursor:pointer}.advanced{border-top:1px solid #263746;margin-top:14px;padding-top:12px}.advanced summary{cursor:pointer;font-weight:750;color:#c9d5df}.step{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--yellow);color:#111;font-weight:900;margin-right:8px}
+@media(max-width:820px){.grid,.controls,.preview{grid-template-columns:1fr}.views{grid-template-columns:repeat(3,1fr)}.wrap{padding:12px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>HappyHolo — Labo Fond 3D</h1>
+<p class="muted">Prototype séparé. Flux de test : sujet détouré → fond choisi → réglage du relief → génération des 9 vues.</p>
+
+<div class="card grid">
+  <div>
+    <label><span class="step">1</span>Sujet détouré</label>
+    <input id="subjectFile" type="file" accept="image/png,image/webp,image/jpeg">
+    <div class="muted">Idéal : PNG transparent. Le détourage automatique n'est pas encore branché dans ce prototype.</div>
+  </div>
+  <div>
+    <label><span class="step">2</span>Fond</label>
+    <input id="bgFile" type="file" accept="image/*">
+    <div class="muted">Choisis une photo de fond différente, ou laisse vide pour un fond noir de test.</div>
+  </div>
+  <div class="full advanced">
+    <details>
+      <summary>Réglage avancé — carte de profondeur du fond</summary>
+      <label>Carte de profondeur (facultative)</label>
+      <input id="depthFile" type="file" accept="image/*">
+      <div class="muted">Si elle n'est pas fournie, le programme crée une profondeur perspective simple automatiquement.</div>
+    </details>
+  </div>
+</div>
+
+<div class="card controls">
+  <div>
+    <label>Relief du fond <span id="reliefV" class="pill">24</span></label>
+    <input id="relief" type="range" min="0" max="70" value="24">
+    <label>Déplacement du sujet <span id="subjectV" class="pill">12</span></label>
+    <input id="subjectShift" type="range" min="0" max="35" value="12">
+  </div>
+  <div>
+    <label>Zoom fond <span id="zoomV" class="pill">1.06</span></label>
+    <input id="zoom" type="range" min="100" max="125" value="106">
+    <label>Taille sujet <span id="sizeV" class="pill">72%</span></label>
+    <input id="subjectSize" type="range" min="30" max="110" value="72">
+  </div>
+</div>
+
+<div class="card">
+  <label><span class="step">3</span>Créer l'effet</label>
+  <div class="actions">
+    <button id="generate" class="btn primary">Créer l'effet 3D + 9 vues</button>
+    <button id="downloadCurrent" class="btn secondary" disabled>Télécharger la vue affichée</button>
+    <button id="downloadAll" class="btn secondary" disabled>Télécharger les 9 vues</button>
+  </div>
+  <div id="status" class="status">Charge au minimum le sujet, puis appuie sur « Créer l'effet 3D + 9 vues ».</div>
+</div>
+
+<div class="card preview">
+  <div>
+    <label>Position de vue <span id="posV" class="pill">5 / 9</span></label>
+    <input id="position" type="range" min="1" max="9" value="5" step="1">
+    <canvas id="main" width="900" height="600"></canvas>
+  </div>
+  <div>
+    <h3 style="margin-top:0">9 vues</h3>
+    <div id="views" class="views"></div>
+  </div>
+</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),main=$('main');let bg=null,sub=null,depth=null,generated=false;
+function load(file,cb){if(!file)return;const u=URL.createObjectURL(file),im=new Image;im.onload=()=>{URL.revokeObjectURL(u);cb(im);generated=false;renderPreviewOnly()};im.src=u}
+$('bgFile').onchange=e=>load(e.target.files[0],im=>bg=im);
+$('subjectFile').onchange=e=>load(e.target.files[0],im=>sub=im);
+$('depthFile').onchange=e=>load(e.target.files[0],im=>depth=im);
+['relief','subjectShift','zoom','subjectSize','position'].forEach(id=>$(id).oninput=()=>{updateLabels();if(generated)renderAll();else renderPreviewOnly()});
 function updateLabels(){$('reliefV').textContent=$('relief').value;$('subjectV').textContent=$('subjectShift').value;$('zoomV').textContent=(+$('zoom').value/100).toFixed(2);$('sizeV').textContent=$('subjectSize').value+'%';$('posV').textContent=$('position').value+' / 9'}
 function fitRect(im,w,h,scale=1){const s=Math.max(w/im.width,h/im.height)*scale,nw=im.width*s,nh=im.height*s;return{x:(w-nw)/2,y:(h-nh)/2,w:nw,h:nh}}
 function makeDepth(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');if(depth){x.drawImage(depth,0,0,w,h);return x.getImageData(0,0,w,h)}const id=x.createImageData(w,h);for(let y=0;y<h;y++){const v=Math.round(255*(0.18+0.82*y/(h-1)));for(let xx=0;xx<w;xx++){const i=(y*w+xx)*4;id.data[i]=id.data[i+1]=id.data[i+2]=v;id.data[i+3]=255}}return id}
-function render(c,view){const w=c.width,h=c.height,x=c.getContext('2d',{willReadFrequently:true});x.clearRect(0,0,w,h);x.fillStyle='#000';x.fillRect(0,0,w,h);if(bg){const z=+$('zoom').value/100,fr=fitRect(bg,w,h,z),tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;const tx=tmp.getContext('2d',{willReadFrequently:true});tx.drawImage(bg,fr.x,fr.y,fr.w,fr.h);const src=tx.getImageData(0,0,w,h),dm=makeDepth(w,h),out=tx.createImageData(w,h);const amp=+$('relief').value*((view-5)/4);for(let y=0;y<h;y++){for(let xx=0;xx<w;xx++){const i=(y*w+xx)*4,d=dm.data[i]/255,off=Math.round((d-.5)*amp),sx=Math.max(0,Math.min(w-1,xx+off)),si=(y*w+sx)*4;out.data[i]=src.data[si];out.data[i+1]=src.data[si+1];out.data[i+2]=src.data[si+2];out.data[i+3]=255}}x.putImageData(out,0,0)}
+function render(c,view){const w=c.width,h=c.height,x=c.getContext('2d',{willReadFrequently:true});x.clearRect(0,0,w,h);x.fillStyle='#000';x.fillRect(0,0,w,h);
+if(bg){const z=+$('zoom').value/100,fr=fitRect(bg,w,h,z),tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;const tx=tmp.getContext('2d',{willReadFrequently:true});tx.drawImage(bg,fr.x,fr.y,fr.w,fr.h);const src=tx.getImageData(0,0,w,h),dm=makeDepth(w,h),out=tx.createImageData(w,h);const amp=+$('relief').value*((view-5)/4);for(let y=0;y<h;y++){for(let xx=0;xx<w;xx++){const i=(y*w+xx)*4,d=dm.data[i]/255,off=Math.round((d-.5)*amp),sx=Math.max(0,Math.min(w-1,xx+off)),si=(y*w+sx)*4;out.data[i]=src.data[si];out.data[i+1]=src.data[si+1];out.data[i+2]=src.data[si+2];out.data[i+3]=255}}x.putImageData(out,0,0)}
 if(sub){const pct=+$('subjectSize').value/100,s=Math.min(w/sub.width,h/sub.height)*pct,nw=sub.width*s,nh=sub.height*s,shift=+$('subjectShift').value*((view-5)/4);x.drawImage(sub,(w-nw)/2+shift,h-nh-8,nw,nh)}}
+function renderPreviewOnly(){render(main,+$('position').value)}
 function renderAll(){render(main,+$('position').value);document.querySelectorAll('.views canvas').forEach((c,i)=>render(c,i+1))}
-const v=$('views');for(let i=1;i<=9;i++){const c=document.createElement('canvas');c.width=450;c.height=300;c.title='Vue '+i;c.onclick=()=>{$('position').value=i;updateLabels();renderAll()};v.appendChild(c)}updateLabels();renderAll();
-</script></body></html>
+function canvasDownload(c,name){c.toBlob(blob=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1200)},'image/png')}
+$('generate').onclick=()=>{if(!sub){$('status').textContent='Il manque le sujet détouré. Charge un PNG transparent puis recommence.';return}generated=true;renderAll();$('downloadCurrent').disabled=false;$('downloadAll').disabled=false;$('status').textContent='Effet créé. Vérifie les vues 1 à 9 et le fond. Si le relief est trop fort, baisse « Relief du fond ».'}
+$('downloadCurrent').onclick=()=>canvasDownload(main,`happyholo-vue-${String($('position').value).padStart(2,'0')}.png`);
+$('downloadAll').onclick=()=>{if(!generated)return;const canv=[...document.querySelectorAll('.views canvas')];let i=0;function next(){if(i>=canv.length){$('status').textContent='Les 9 vues ont été lancées en téléchargement.';return}canvasDownload(canv[i],`happyholo-vue-${String(i+1).padStart(2,'0')}.png`);i++;setTimeout(next,300)}next()};
+const v=$('views');for(let i=1;i<=9;i++){const c=document.createElement('canvas');c.width=450;c.height=300;c.title='Vue '+i;c.onclick=()=>{$('position').value=i;updateLabels();renderPreviewOnly()};v.appendChild(c)}updateLabels();renderPreviewOnly();
+</script>
+</body></html>
