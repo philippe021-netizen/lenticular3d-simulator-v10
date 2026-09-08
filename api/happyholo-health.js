@@ -1,4 +1,4 @@
-const TRIPO='https://api.tripo3d.ai/v2/openapi';
+const TRIPO='https://openapi.tripo3d.ai/v3';
 const tq=new Set(['standard','detailed','extreme']);
 const gq=new Set(['standard','detailed']);
 
@@ -22,7 +22,7 @@ export default async function handler(req,res){
     if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
     const openAI=process.env.OPENAI_API_KEY||process.env.CLE_API_OPENAI||process.env['CLÉ_API_OPENAI'];
     const gateway=process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN;
-    return res.status(200).json({ok:true,version:'happyholo-v4',services:{local:true,pixverse:Boolean(process.env.PIXVERSE_API_KEY),tripo:Boolean(process.env.TRIPO_API_KEY),analysis:Boolean(gateway||openAI),imageGeneration:Boolean(openAI),explodeview:Boolean(openAI)},environment:process.env.VERCEL_ENV||'local',commit:process.env.VERCEL_GIT_COMMIT_SHA||null});
+    return res.status(200).json({ok:true,version:'happyholo-v4-tripo-v3',services:{local:true,pixverse:Boolean(process.env.PIXVERSE_API_KEY),tripo:Boolean(process.env.TRIPO_API_KEY),analysis:Boolean(gateway||openAI),imageGeneration:Boolean(openAI),explodeview:Boolean(openAI)},environment:process.env.VERCEL_ENV||'local',commit:process.env.VERCEL_GIT_COMMIT_SHA||null});
   }
 
   const key=process.env.TRIPO_API_KEY;
@@ -39,9 +39,9 @@ export default async function handler(req,res){
       if(bytes.length>8*1024*1024)return res.status(413).json({error:'Image trop volumineuse après compression.'});
       const form=new FormData();
       form.append('file',new Blob([bytes],{type:m[1]}),'microplayer.jpg');
-      const json=await tripoFetch('/upload/sts',key,{method:'POST',body:form});
-      const token=json?.data?.image_token||json?.data?.file_token||json?.data?.token;
-      if(!token)return res.status(502).json({error:'Jeton image absent dans la réponse Tripo.',details:json});
+      const json=await tripoFetch('/files',key,{method:'POST',body:form});
+      const token=json?.data?.file_token||json?.data?.token;
+      if(!token)return res.status(502).json({error:'Jeton fichier absent dans la réponse Tripo.',details:json});
       return res.status(200).json({image_token:token,bytes:bytes.length});
     }
 
@@ -50,8 +50,8 @@ export default async function handler(req,res){
       const body=typeof req.body==='string'?JSON.parse(req.body):(req.body||{});
       const imageToken=String(body.image_token||'').trim();
       if(!imageToken)return res.status(400).json({error:'image_token manquant.'});
-      const payload={type:'image_to_model',model_version:'v3.1-20260211',file:{type:'jpeg',file_token:imageToken},texture:true,pbr:true,texture_quality:tq.has(body.texture_quality)?body.texture_quality:'extreme',geometry_quality:gq.has(body.geometry_quality)?body.geometry_quality:'detailed',export_uv:true};
-      const json=await tripoFetch('/task',key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const payload={input:imageToken,model:'tripo-v3.1',texture:true,pbr:true,texture_quality:tq.has(body.texture_quality)?body.texture_quality:'extreme',geometry_quality:gq.has(body.geometry_quality)?body.geometry_quality:'detailed',export_uv:true};
+      const json=await tripoFetch('/generation/image-to-model',key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const taskId=json?.data?.task_id;
       if(!taskId)return res.status(502).json({error:'task_id absent dans la réponse Tripo.',details:json});
       return res.status(200).json({task_id:taskId,profile:payload});
@@ -61,9 +61,9 @@ export default async function handler(req,res){
       if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
       const taskId=String(req.query?.task_id||'').trim();
       if(!taskId)return res.status(400).json({error:'task_id manquant.'});
-      const json=await tripoFetch(`/task/${encodeURIComponent(taskId)}`,key);
+      const json=await tripoFetch(`/tasks/${encodeURIComponent(taskId)}`,key);
       const d=json?.data||{};
-      return res.status(200).json({task_id:d.task_id||taskId,type:d.type,status:d.status,progress:Number(d.progress||0),output:{pbr_model:d.output?.pbr_model||null,model:d.output?.model||null,base_model:d.output?.base_model||null,rendered_image:d.output?.rendered_image||null},error:d.error||null});
+      return res.status(200).json({task_id:d.task_id||taskId,type:d.type,status:d.status,progress:Number(d.progress||0),credits_consumed:Number(d.credits_consumed||0),output:{pbr_model:d.output?.model_url||d.output?.pbr_model||d.output?.model||null,model:d.output?.model_url||d.output?.model||null,base_model:d.output?.base_model||null,rendered_image:d.output?.rendered_image_url||d.output?.rendered_image||null},error:d.error||null});
     }
 
     return res.status(404).json({error:'Action inconnue.'});
