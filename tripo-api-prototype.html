@@ -14,12 +14,14 @@
   input,select{font:inherit;width:100%;box-sizing:border-box;margin:7px 0 14px;padding:10px;border-radius:10px;border:1px solid #555;background:#121212;color:#fff}
   progress{width:100%;height:18px}
   img{max-width:100%;border-radius:12px;background:#fff}
-  .muted{color:#aaa;font-size:14px}.ok{color:#8fdc9d}.err{color:#ff9b9b}
+  .muted{color:#aaa;font-size:14px}.ok{color:#8fdc9d}.err{color:#ff9b9b}.warn{color:#ffd27a}
+  pre{white-space:pre-wrap;word-break:break-word;background:#101010;border:1px solid #333;border-radius:10px;padding:10px;font-size:12px}
 </style>
 </head>
 <body><main>
   <h1>Prototype MicroPlayer → Tripo</h1>
   <p class="muted">Test isolé. Il ne modifie pas le programme principal.</p>
+  <p id="backend" class="muted">Vérification du backend…</p>
 
   <div class="card">
     <label>Photo source</label>
@@ -35,6 +37,7 @@
     <div id="state">En attente.</div>
     <progress id="progress" max="100" value="0"></progress>
     <div id="task" class="muted"></div>
+    <pre id="details" hidden></pre>
   </div>
 
   <div id="result" class="card" hidden>
@@ -62,17 +65,31 @@ async function compressImage(file){
   }finally{URL.revokeObjectURL(url)}
 }
 
-async function api(url,opts){
-  const r=await fetch(url,opts); let j={};
+async function api(url,opts={}){
+  const r=await fetch(url,{cache:'no-store',...opts}); let j={};
   try{j=await r.json()}catch{}
-  if(!r.ok || j.error) throw new Error(j.error || `Erreur HTTP ${r.status}`);
+  if(!r.ok || j.error){
+    const detail=j?.details?.message || j?.details?.suggestion || j?.details?.raw || '';
+    const err=new Error([j.error || `Erreur HTTP ${r.status}`,detail].filter(Boolean).join(' — '));
+    err.payload=j;
+    throw err;
+  }
   return j;
 }
+
+(async()=>{
+  try{
+    const h=await api('/api/happyholo-health');
+    const short=(h.commit||'').slice(0,8);
+    $('backend').innerHTML=`Backend : <span class="ok">${h.version}</span> · Tripo ${h.services?.tripo?'OK':'ABSENT'} · commit ${short||'?'}`;
+    if(h.version!=='happyholo-v4-tripo-v3') $('backend').className='warn';
+  }catch(e){$('backend').innerHTML='<span class="err">Backend inaccessible : '+e.message+'</span>'}
+})();
 
 $('go').onclick=async()=>{
   const file=$('file').files[0];
   if(!file){$('state').innerHTML='<span class="err">Choisis une photo.</span>';return}
-  $('go').disabled=true;$('result').hidden=true;$('progress').value=0;$('task').textContent='';
+  $('go').disabled=true;$('result').hidden=true;$('progress').value=0;$('task').textContent='';$('details').hidden=true;$('details').textContent='';
   try{
     $('state').textContent='Compression de la photo…';
     const dataUrl=await compressImage(file);
@@ -82,9 +99,9 @@ $('go').onclick=async()=>{
 
     $('state').textContent='Création du modèle PBR…';
     const created=await api('/api/happyholo-health?action=tripo-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_token:up.image_token,texture_quality:$('texture').value,geometry_quality:$('geometry').value})});
-    $('task').textContent='Task ID : '+created.task_id;
+    $('task').textContent='Task ID : '+created.task_id+' · modèle '+(created.profile?.model||'?');
 
-    const deadline=Date.now()+8*60*1000;
+    const deadline=Date.now()+12*60*1000;
     while(Date.now()<deadline){
       const st=await api('/api/happyholo-health?action=tripo-status&task_id='+encodeURIComponent(created.task_id));
       $('progress').value=st.progress||0;
@@ -98,12 +115,13 @@ $('go').onclick=async()=>{
         $('state').innerHTML='<span class="ok">Modèle PBR terminé.</span>';
         return;
       }
-      if(['failed','cancelled','banned','expired','unknown'].includes(st.status)) throw new Error('Tâche Tripo terminée avec le statut : '+st.status);
+      if(['failed','cancelled','banned','expired','unknown'].includes(st.status)) throw new Error('Tâche Tripo terminée avec le statut : '+st.status+(st.error?' — '+JSON.stringify(st.error):''));
       await sleep(2500);
     }
-    throw new Error('Temps d’attente dépassé (8 min).');
+    throw new Error('Temps d’attente dépassé (12 min).');
   }catch(e){
     $('state').innerHTML='<span class="err">'+String(e.message||e)+'</span>';
+    if(e.payload){$('details').textContent=JSON.stringify(e.payload,null,2);$('details').hidden=false}
   }finally{$('go').disabled=false}
 };
 </script>
