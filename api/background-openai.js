@@ -1,0 +1,21 @@
+export const config={api:{bodyParser:{sizeLimit:'12mb'}},maxDuration:60};
+function getKey(){return process.env.OPENAI_API_KEY||process.env['CLÉ_API_OPENAI']||process.env.CLE_API_OPENAI;}
+function parseDataUrl(v){const m=/^data:(image\/(?:png|jpeg|webp));base64,(.+)$/s.exec(v||'');if(!m)throw new Error('Image de référence invalide');return{type:m[1],buffer:Buffer.from(m[2],'base64')}}
+function ext(t){return t.includes('png')?'png':t.includes('webp')?'webp':'jpg'}
+function allow(res){res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Methods','POST,OPTIONS');res.setHeader('Access-Control-Allow-Headers','Content-Type');}
+function buildPrompt(extra=''){return `Create ONLY a photorealistic EMPTY BACKGROUND for compositing the exact original cut-out subject back on top. Use the uploaded reference photo only to infer camera height, horizon, perspective, vanishing lines, lighting direction, light softness, color temperature, scene scale and the subject contact level with the ground/support.
+
+STRICT COMPOSITION RULES:
+- Keep the exact same aspect ratio and framing logic as the reference.
+- Preserve a compatible horizon height and camera viewpoint.
+- Build a credible ground/support plane exactly where the original subject's feet, paws or wheels meet the scene.
+- Keep straight architectural/road lines straight; no warped road, bent podium, melting geometry or stretched textures.
+- Match lighting direction and overall color temperature so the untouched original subject can be composited naturally.
+- Leave the area behind the subject visually plausible and clean.
+- Background should have enough depth layers for subtle lenticular parallax, while keeping the support plane stable.
+
+ABSOLUTELY DO NOT GENERATE: any person, animal, vehicle, motorcycle, bicycle, object replacing the subject, text, logo, watermark or duplicate of the subject. The returned image must be BACKGROUND ONLY.
+${extra?`USER REQUEST FOR THE DECOR: ${extra}`:'Choose a plausible decor coherent with the reference scene.'}`}
+}
+async function callOpenAI(key,imageDataUrl,extra){const src=parseDataUrl(imageDataUrl);const form=new FormData();form.append('model','gpt-image-2');form.append('image[]',new Blob([src.buffer],{type:src.type}),`reference.${ext(src.type)}`);form.append('prompt',buildPrompt(extra));form.append('size','1024x1024');form.append('quality','low');form.append('output_format','jpeg');form.append('output_compression','90');const c=new AbortController(),tm=setTimeout(()=>c.abort(),55000);try{const r=await fetch('https://api.openai.com/v1/images/edits',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:c.signal});const text=await r.text();let j;try{j=JSON.parse(text)}catch{j=null}if(!r.ok)throw new Error(`OpenAI ${r.status}: ${j?.error?.message||text.slice(0,500)}`);const b64=j?.data?.[0]?.b64_json;if(!b64)throw new Error('Aucune image de fond retournée par OpenAI');return'data:image/jpeg;base64,'+b64}catch(e){if(e?.name==='AbortError')throw new Error('La génération du fond a dépassé 55 secondes.');throw e}finally{clearTimeout(tm)}}
+export default async function handler(req,res){allow(res);if(req.method==='OPTIONS')return res.status(204).end();if(req.method!=='POST')return res.status(405).json({error:'POST only'});const key=getKey();if(!key)return res.status(500).json({error:'OPENAI_API_KEY absente sur le serveur'});try{const{imageDataUrl,extraPrompt=''}=req.body||{};const backgroundDataUrl=await callOpenAI(key,imageDataUrl,String(extraPrompt||'').slice(0,1200));res.setHeader('Cache-Control','no-store');return res.status(200).json({backgroundDataUrl,model:'gpt-image-2'})}catch(e){console.error('[background-openai]',e);return res.status(500).json({error:e?.message||'Erreur génération fond IA'})}}
