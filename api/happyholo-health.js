@@ -72,3 +72,5 @@ export default async function handler(req,res){
     return res.status(e?.status||500).json({error:message,details:e?.details||null});
   }
 }
+
+// Redeploy trigger after TRIPO_API_KEY was added to Vercel Preview.
