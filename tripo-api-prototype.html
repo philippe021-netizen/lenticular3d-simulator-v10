@@ -15,7 +15,6 @@
   progress{width:100%;height:18px}
   img{max-width:100%;border-radius:12px;background:#fff}
   .muted{color:#aaa;font-size:14px}.ok{color:#8fdc9d}.err{color:#ff9b9b}
-  code{white-space:pre-wrap;word-break:break-word}
 </style>
 </head>
 <body><main>
@@ -79,15 +78,15 @@ $('go').onclick=async()=>{
     const dataUrl=await compressImage(file);
 
     $('state').textContent='Envoi à Tripo…';
-    const up=await api('/api/tripo-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data_url:dataUrl,filename:'microplayer.jpg'})});
+    const up=await api('/api/happyholo-health?action=tripo-upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data_url:dataUrl})});
 
     $('state').textContent='Création du modèle PBR…';
-    const created=await api('/api/tripo-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_token:up.image_token,texture_quality:$('texture').value,geometry_quality:$('geometry').value})});
+    const created=await api('/api/happyholo-health?action=tripo-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image_token:up.image_token,texture_quality:$('texture').value,geometry_quality:$('geometry').value})});
     $('task').textContent='Task ID : '+created.task_id;
 
     const deadline=Date.now()+8*60*1000;
     while(Date.now()<deadline){
-      const st=await api('/api/tripo-status?task_id='+encodeURIComponent(created.task_id));
+      const st=await api('/api/happyholo-health?action=tripo-status&task_id='+encodeURIComponent(created.task_id));
       $('progress').value=st.progress||0;
       $('state').textContent=`Tripo : ${st.status||'en cours'} — ${st.progress||0}%`;
       if(st.status==='success'){
