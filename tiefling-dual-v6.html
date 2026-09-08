@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>HappyHolo — Tiefling V6 contour verrouillé</title>
+<style>html,body{margin:0;width:100%;height:100%;background:#0d1117;overflow:hidden}iframe{border:0;width:100%;height:100%;display:block}</style>
+</head>
+<body>
+<iframe id="app" src="./tiefling-dual-v5.html"></iframe>
+<script>
+const frame=document.getElementById('app');
+frame.addEventListener('load',()=>{
+  try{
+    const d=frame.contentDocument;
+    const set=(id,val)=>{const e=d.getElementById(id);if(e){e.value=String(val);e.dispatchEvent(new Event('input',{bubbles:true}));}return e};
+    set('subjectMove',78);
+    set('subjectPivot',48);
+    set('subjectVolume',5);
+    set('parallax',28);
+    set('bgStrength',68);
+    set('bgDrift',55);
+    const h1=d.querySelector('h1'); if(h1) h1.textContent='HappyHolo — Tiefling double traitement V6';
+    const intro=d.querySelector('.wrap > .hint'); if(intro) intro.textContent='V6 anti-dédoublement : silhouette du sujet privilégiée, déplacement global visible, pivot Tiefling limité aux micro-parallaxes internes.';
+    const pivot=d.getElementById('subjectPivot'); if(pivot){pivot.max='90'; const row=pivot.previousElementSibling; if(row){const lab=row.querySelector('label'); if(lab)lab.textContent='Micro-pivot 3D';}}
+    const vol=d.getElementById('subjectVolume'); if(vol){vol.max='18'; const row=vol.previousElementSibling; if(row){const lab=row.querySelector('label'); if(lab)lab.textContent='Volume interne fin';}}
+    const move=d.getElementById('subjectMove'); if(move){move.max='130'; const row=move.previousElementSibling; if(row){const lab=row.querySelector('label'); if(lab)lab.textContent='Déplacement silhouette';}}
+  }catch(e){console.error(e)}
+});
+</script>
+</body>
+</html>
