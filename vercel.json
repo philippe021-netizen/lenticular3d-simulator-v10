@@ -3,6 +3,12 @@
   "functions": {
     "api/*.js": { "maxDuration": 60 }
   },
+  "rewrites": [
+    {
+      "source": "/api/background-openai",
+      "destination": "/api/happyholo-health"
+    }
+  ],
   "headers": [
     {
       "source": "/modules/video-frame-extractor-2s.js",
