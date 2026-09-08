@@ -22,7 +22,7 @@ export default async function handler(req,res){
     if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
     const openAI=process.env.OPENAI_API_KEY||process.env.CLE_API_OPENAI||process.env['CLÉ_API_OPENAI'];
     const gateway=process.env.AI_GATEWAY_API_KEY||process.env.VERCEL_OIDC_TOKEN;
-    return res.status(200).json({ok:true,version:'happyholo-v4-tripo-v3',services:{local:true,pixverse:Boolean(process.env.PIXVERSE_API_KEY),tripo:Boolean(process.env.TRIPO_API_KEY),analysis:Boolean(gateway||openAI),imageGeneration:Boolean(openAI),explodeview:Boolean(openAI)},environment:process.env.VERCEL_ENV||'local',commit:process.env.VERCEL_GIT_COMMIT_SHA||null});
+    return res.status(200).json({ok:true,version:'happyholo-v5-tripo-photo-fidelity',services:{local:true,pixverse:Boolean(process.env.PIXVERSE_API_KEY),tripo:Boolean(process.env.TRIPO_API_KEY),analysis:Boolean(gateway||openAI),imageGeneration:Boolean(openAI),explodeview:Boolean(openAI)},environment:process.env.VERCEL_ENV||'local',commit:process.env.VERCEL_GIT_COMMIT_SHA||null});
   }
 
   const key=process.env.TRIPO_API_KEY;
@@ -50,7 +50,17 @@ export default async function handler(req,res){
       const body=typeof req.body==='string'?JSON.parse(req.body):(req.body||{});
       const imageToken=String(body.image_token||'').trim();
       if(!imageToken)return res.status(400).json({error:'image_token manquant.'});
-      const payload={input:imageToken,model:'v3.1-20260211',texture:true,pbr:true,texture_quality:tq.has(body.texture_quality)?body.texture_quality:'extreme',geometry_quality:gq.has(body.geometry_quality)?body.geometry_quality:'detailed'};
+      const payload={
+        input:imageToken,
+        model:'v3.1-20260211',
+        texture:true,
+        pbr:true,
+        texture_quality:tq.has(body.texture_quality)?body.texture_quality:'extreme',
+        geometry_quality:gq.has(body.geometry_quality)?body.geometry_quality:'detailed',
+        texture_alignment:'original_image',
+        orientation:'align_image',
+        export_uv:true
+      };
       const json=await tripoFetch('/generation/image-to-model',key,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const taskId=json?.data?.task_id;
       if(!taskId)return res.status(502).json({error:'task_id absent dans la réponse Tripo.',details:json});
