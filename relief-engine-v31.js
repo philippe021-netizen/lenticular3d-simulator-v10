@@ -305,7 +305,7 @@ function renderAt(norm,target=view){
   x.globalAlpha=0.24+protect*0.28; x.drawImage(tmp,subShift,0); x.globalAlpha=1;
   if(textDepth>=0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
 }
-window.renderAt=renderAt;
+window.HappyHoloRenderPipeline?.register('relief-base',renderAt,{priority:0});
 
 function startPreview(){
   cancelAnimationFrame(anim); const t0=performance.now();
