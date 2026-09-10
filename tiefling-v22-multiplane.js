@@ -29,7 +29,7 @@ function patch(html){
   if(!html.includes(oldDepth))return html;
   html=html.replace(oldDepth,newDepth);
 
-  const ui=`<script>(()=>{'use strict';const bindV22=()=>{const p=document.getElementById('bgPlanes'),s=document.getElementById('bgPlaneSnap'),pv=document.getElementById('bgPlanesVal'),sv=document.getElementById('bgPlaneSnapVal'),views=document.getElementById('views');if(!p||p.dataset.v22)return;p.dataset.v22='1';const rebuild=()=>{pv.textContent=p.value+' plans';sv.textContent=s.value+'%';if(views&&!views.disabled)views.click()};p.addEventListener('input',rebuild);s.addEventListener('input',rebuild);rebuild()};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindV22,{once:true});else bindV22()})();<\/script><script src="./tiefling-v21-bg-zones.js?v=548"><\/script>`;
+  const ui=`<script>(()=>{'use strict';const bindV22=()=>{const p=document.getElementById('bgPlanes'),s=document.getElementById('bgPlaneSnap'),pv=document.getElementById('bgPlanesVal'),sv=document.getElementById('bgPlaneSnapVal'),views=document.getElementById('views');if(!p||p.dataset.v22)return;p.dataset.v22='1';const rebuild=()=>{pv.textContent=p.value+' plans';sv.textContent=s.value+'%';if(views&&!views.disabled)views.click()};p.addEventListener('input',rebuild);s.addEventListener('input',rebuild);rebuild()};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindV22,{once:true});else bindV22()})();<\/script><script src="./tiefling-v21-bg-zones.js?v=548"><\/script><script src="./tiefling-v22-cutout-pro.js?v=550"><\/script>`;
   html=html.replace('</body>',ui+'</body>');
   return html;
 }
