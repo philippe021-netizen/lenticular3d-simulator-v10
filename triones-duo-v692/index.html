@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Triones Duo V6.9.2</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#0b0d12;color:#f4f7fb}
+    body{margin:0;padding:24px;max-width:820px;margin:auto}
+    .box{background:#151923;border:1px solid #2b3342;border-radius:16px;padding:18px}
+    .ok{color:#67e8a5}.bad{color:#ff7b88}
+  </style>
+</head>
+<body>
+  <div class="box" id="boot">Chargement de Triones Duo V6.9.2…</div>
+<script>
+(async()=>{
+  const boot=document.getElementById('boot');
+  try{
+    const r=await fetch('/triones-duo-v691/index.html',{cache:'no-store'});
+    if(!r.ok) throw new Error('Base V6.9.1 introuvable ('+r.status+')');
+    let h=await r.text();
+
+    const replacements=[
+      ['Triones Duo V6.9.1','Triones Duo V6.9.2'],
+      ['Bluefy — scan Bluetooth élargi + FFD5 → FFD9','Bluefy — scan filtré Triones FFD5 → FFD9'],
+      ['Le scan est volontairement élargi pour retrouver les deux contrôleurs même si leur nom ou leurs métadonnées Bluetooth varient. Choisis manuellement le phare gauche puis le droit.','Le scan principal ne montre que les appareils annonçant le service Triones FFD5. Tu dois normalement voir seulement les contrôleurs compatibles. Si aucun phare n’apparaît, utilise SCAN ÉLARGI (secours).'],
+      ['<button id="reconnect" class="green">Reconnecter</button><button id="forget" class="alt">Oublier</button>','<button id="reconnect" class="green">Reconnecter</button><button id="scanWide" class="alt">SCAN ÉLARGI (secours)</button><button id="forget" class="alt">Oublier</button>'],
+      ["function support(){const ok=!!navigator.bluetooth;$('support').innerHTML=ok?'<span class=\"ok\">Bluetooth Web disponible — scan élargi prêt dans Bluefy.</span>':'<span class=\"bad\">Ouvre cette page dans Bluefy.</span>'}","function support(){const ok=!!navigator.bluetooth;$('support').innerHTML=ok?'<span class=\"ok\">Bluetooth Web disponible — scan filtré FFD5 prêt dans Bluefy.</span>':'<span class=\"bad\">Ouvre cette page dans Bluefy.</span>'}"],
+      ["async function choose(side){if(!navigator.bluetooth){alert('Ouvre Triones dans Bluefy.');return}try{log(`${side}: scan Bluetooth élargi…`);const d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[SERVICE]});if((side==='left'&&S.right.device?.id===d.id)||(side==='right'&&S.left.device?.id===d.id)){alert('Ce contrôleur est déjà affecté à l’autre phare.');return}await attach(side,d)}catch(e){log(`${side}: ${e.name||'Erreur'}: ${e.message}`);$(`${side}State`).textContent='non connecté'}}","async function choose(side){if(!navigator.bluetooth){alert('Ouvre Triones dans Bluefy.');return}try{log(`${side}: scan filtré FFD5…`);const d=await navigator.bluetooth.requestDevice({filters:[{services:[SERVICE]}],optionalServices:[SERVICE]});if((side==='left'&&S.right.device?.id===d.id)||(side==='right'&&S.left.device?.id===d.id)){alert('Ce contrôleur est déjà affecté à l’autre phare.');return}await attach(side,d)}catch(e){log(`${side}: ${e.name||'Erreur'}: ${e.message}`);$(`${side}State`).textContent='non connecté'}}\nasync function chooseWide(){if(!navigator.bluetooth){alert('Ouvre Triones dans Bluefy.');return}const side=!S.left.char?'left':(!S.right.char?'right':null);if(!side){alert('Les deux phares sont déjà connectés.');return}try{log(`${side}: scan élargi de secours…`);const d=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:[SERVICE]});if((side==='left'&&S.right.device?.id===d.id)||(side==='right'&&S.left.device?.id===d.id)){alert('Ce contrôleur est déjà affecté à l’autre phare.');return}await attach(side,d)}catch(e){log(`${side}: ${e.name||'Erreur'}: ${e.message}`);$(`${side}State`).textContent='non connecté'}}"],
+      ["$('scanLeft').onclick=()=>choose('left');$('scanRight').onclick=()=>choose('right');$('reconnect').onclick=reconnect;","$('scanLeft').onclick=()=>choose('left');$('scanRight').onclick=()=>choose('right');$('reconnect').onclick=reconnect;$('scanWide').onclick=chooseWide;"]
+    ];
+
+    for(const [from,to] of replacements){
+      if(!h.includes(from)) throw new Error('Patch V6.9.2 impossible : motif absent');
+      h=h.replace(from,to);
+    }
+
+    document.open();
+    document.write(h);
+    document.close();
+  }catch(e){
+    boot.innerHTML='<strong class="bad">Erreur de chargement V6.9.2</strong><br><br>'+String(e.message||e);
+  }
+})();
+</script>
+</body>
+</html>
