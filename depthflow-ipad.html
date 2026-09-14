@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V14</title>
+<title>MicroPlayer — Depth iPad V15</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,8 +39,8 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V14</h1>
-<div class="sub">Quatre plans rigides avec carte colorée contrôlable au doigt ou à l’Apple Pencil. L’automatique propose les zones ; vous pouvez les corriger avant les 9 vues. Vue 05 = photo originale stricte.</div>
+<h1>MicroPlayer — profondeur locale iPad V15</h1>
+<div class="sub">Quatre plans rigides avec retouche Apple Pencil accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
   <div class="row">
@@ -156,6 +156,7 @@ let maskTimer = null;
 let editMode = "auto";
 let drawingMask = false;
 let lastPaintPoint = null;
+let selectionDrawFrame = null;
 let showLayers = false;
 
 for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
@@ -306,6 +307,11 @@ for (const eventName of ["pointerup", "pointercancel"]) {
     if (!drawingMask) return;
     drawingMask = false;
     lastPaintPoint = null;
+    if (selectionDrawFrame) {
+      cancelAnimationFrame(selectionDrawFrame);
+      selectionDrawFrame = null;
+    }
+    drawSelection();
     if (editMode.startsWith("layer-")) {
       status.textContent = "Plan manuel mis à jour ✓.";
     } else {
@@ -328,14 +334,20 @@ function generateViews({ scroll = true } = {}) {
   const subjectRelief = Number(byId("subjectRelief").value);
   const edgeProtect = Number(byId("edgeProtect").value);
 
+  const renderCanvas = document.createElement("canvas");
+  renderCanvas.width = imageCanvas.width;
+  renderCanvas.height = imageCanvas.height;
+
   for (let i = 0; i < 9; i++) {
     const canvas = document.createElement("canvas");
     canvas.width = imageCanvas.width;
     canvas.height = imageCanvas.height;
+    const frameCtx = canvas.getContext("2d");
     if (i === 4) {
-      canvas.getContext("2d").drawImage(imageCanvas, 0, 0);
+      frameCtx.drawImage(imageCanvas, 0, 0);
     } else {
-      renderLockedSubject(canvas, imageCanvas, backgroundCanvas, depthCanvas, subjectMask, layerMapCanvas, ((i - 4) / 4) * amplitude, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, seed.depth);
+      renderLockedSubject(renderCanvas, imageCanvas, backgroundCanvas, depthCanvas, subjectMask, layerMapCanvas, ((i - 4) / 4) * amplitude, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, seed.depth);
+      frameCtx.drawImage(renderCanvas, 0, 0);
     }
     frames.push(canvas);
     const box = document.createElement("div");
@@ -362,8 +374,8 @@ function generateViews({ scroll = true } = {}) {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans validée • pinceau haute précision • simulateur synchronisé";
-  status.textContent = "Simulateur actualisé ✓ — les 9 vues utilisent maintenant toutes les corrections validées.";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans validée • Pencil accéléré • moteur WebGL partagé • simulateur synchronisé";
+  status.textContent = "Simulateur actualisé ✓ — corrections appliquées avec le moteur accéléré.";
   if (scroll) animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -590,10 +602,19 @@ function paintLayerMap(x, y, from) {
     "layer-mid": "#268cff",
     "layer-far": "#a438ea"
   };
+  const color = colors[editMode] || colors["layer-near"];
   const ctx = layerMapCanvas.getContext("2d");
-  ctx.strokeStyle = colors[editMode] || colors["layer-near"];
+  ctx.strokeStyle = color;
   strokeBrush(ctx, x, y, from, radius);
-  drawSelection();
+
+  // Paint the visible overlay directly instead of rebuilding the full
+  // high-resolution preview at every Pencil event.
+  const previewCtx = selectCanvas.getContext("2d");
+  previewCtx.save();
+  previewCtx.globalAlpha = 0.42;
+  previewCtx.strokeStyle = color;
+  strokeBrush(previewCtx, x, y, from, radius);
+  previewCtx.restore();
 }
 
 function paintSubjectMask(x, y, from) {
@@ -606,7 +627,15 @@ function paintSubjectMask(x, y, from) {
   strokeBrush(ctx, x, y, from, radius);
   ctx.restore();
   backgroundCanvas = null;
-  drawSelection();
+  scheduleSelectionDraw();
+}
+
+function scheduleSelectionDraw() {
+  if (selectionDrawFrame) return;
+  selectionDrawFrame = requestAnimationFrame(() => {
+    selectionDrawFrame = null;
+    drawSelection();
+  });
 }
 
 function drawSelection() {
@@ -910,24 +939,30 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, layerMap,
     "}"
   ].join("\n");
 
-  const programObject = createProgram(gl, vertex, fragment);
-  gl.useProgram(programObject);
-  const buffer = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
-  const location = gl.getAttribLocation(programObject, "p");
-  gl.enableVertexAttribArray(location);
-  gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
-  bindTexture(gl, image, 0);
-  bindTexture(gl, backgroundImage, 1, true);
-  bindTexture(gl, depth, 2);
-  bindTexture(gl, mask, 3);
-  bindTexture(gl, layerMap, 4);
-  gl.uniform1i(gl.getUniformLocation(programObject, "im"), 0);
-  gl.uniform1i(gl.getUniformLocation(programObject, "bg"), 1);
-  gl.uniform1i(gl.getUniformLocation(programObject, "dm"), 2);
-  gl.uniform1i(gl.getUniformLocation(programObject, "mm"), 3);
-  gl.uniform1i(gl.getUniformLocation(programObject, "lm"), 4);
+  let programObject = out.__microPlayerProgram;
+  if (!programObject) {
+    programObject = createProgram(gl, vertex, fragment);
+    out.__microPlayerProgram = programObject;
+    gl.useProgram(programObject);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+    const location = gl.getAttribLocation(programObject, "p");
+    gl.enableVertexAttribArray(location);
+    gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+    bindTexture(gl, image, 0);
+    bindTexture(gl, backgroundImage, 1, true);
+    bindTexture(gl, depth, 2);
+    bindTexture(gl, mask, 3);
+    bindTexture(gl, layerMap, 4);
+    gl.uniform1i(gl.getUniformLocation(programObject, "im"), 0);
+    gl.uniform1i(gl.getUniformLocation(programObject, "bg"), 1);
+    gl.uniform1i(gl.getUniformLocation(programObject, "dm"), 2);
+    gl.uniform1i(gl.getUniformLocation(programObject, "mm"), 3);
+    gl.uniform1i(gl.getUniformLocation(programObject, "lm"), 4);
+  } else {
+    gl.useProgram(programObject);
+  }
   gl.uniform1f(gl.getUniformLocation(programObject, "shift"), position * strength);
   gl.uniform1f(gl.getUniformLocation(programObject, "subjectDepth"), subjectDepth);
   gl.uniform1f(gl.getUniformLocation(programObject, "subjectPlane"), subjectPlane);
