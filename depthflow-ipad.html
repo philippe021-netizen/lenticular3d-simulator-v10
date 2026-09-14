@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V19</title>
+<title>MicroPlayer — Depth iPad V20</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,8 +39,8 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V19</h1>
-<div class="sub">Quatre plans rigides avec retouche Apple Pencil accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
+<h1>MicroPlayer — profondeur locale iPad V20</h1>
+<div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
   <div class="row">
@@ -625,7 +625,7 @@ function resetLayerLocks() {
     mid: makeMaskCanvas(),
     far: makeMaskCanvas()
   };
-  layerStrokeCanvas = makeMaskCanvas();
+  layerStrokeCanvas = document.createElement("canvas");
 }
 
 function paintLayerMap(x, y, from) {
@@ -645,26 +645,39 @@ function paintLayerMap(x, y, from) {
   };
   const key = keys[editMode] || "near";
   const protectedKeys = ["near", "mid", "far"].filter(layerKey => layerKey !== key);
+  const start = from || { x, y };
 
-  // Build only the effective part of the Pencil stroke. Every manually
-  // painted layer is frozen when another color is used, so the Pencil may
-  // overlap its footprint without replacing any protected pixel.
+  // Work only inside the small rectangle touched by this Pencil segment.
+  // This avoids compositing several full-resolution canvases on every event.
+  const margin = radius + 3;
+  const x0 = Math.max(0, Math.floor(Math.min(start.x, x) - margin));
+  const y0 = Math.max(0, Math.floor(Math.min(start.y, y) - margin));
+  const x1 = Math.min(selectCanvas.width, Math.ceil(Math.max(start.x, x) + margin));
+  const y1 = Math.min(selectCanvas.height, Math.ceil(Math.max(start.y, y) + margin));
+  const patchWidth = Math.max(1, x1 - x0);
+  const patchHeight = Math.max(1, y1 - y0);
+
+  layerStrokeCanvas.width = patchWidth;
+  layerStrokeCanvas.height = patchHeight;
   const strokeCtx = layerStrokeCanvas.getContext("2d");
-  strokeCtx.clearRect(0, 0, layerStrokeCanvas.width, layerStrokeCanvas.height);
   strokeCtx.save();
   strokeCtx.strokeStyle = "#ffffff";
-  strokeBrush(strokeCtx, x, y, from, radius);
+  strokeBrush(strokeCtx, x - x0, y - y0, { x: start.x - x0, y: start.y - y0 }, radius);
   strokeCtx.globalCompositeOperation = "destination-out";
   for (const protectedKey of protectedKeys) {
-    strokeCtx.drawImage(layerLocks[protectedKey], 0, 0);
+    strokeCtx.drawImage(
+      layerLocks[protectedKey],
+      x0, y0, patchWidth, patchHeight,
+      0, 0, patchWidth, patchHeight
+    );
   }
   strokeCtx.globalCompositeOperation = "source-in";
   strokeCtx.fillStyle = colors[key];
-  strokeCtx.fillRect(0, 0, layerStrokeCanvas.width, layerStrokeCanvas.height);
+  strokeCtx.fillRect(0, 0, patchWidth, patchHeight);
   strokeCtx.restore();
 
-  layerMapCanvas.getContext("2d").drawImage(layerStrokeCanvas, 0, 0);
-  layerLocks[key].getContext("2d").drawImage(layerStrokeCanvas, 0, 0);
+  layerMapCanvas.getContext("2d").drawImage(layerStrokeCanvas, x0, y0);
+  layerLocks[key].getContext("2d").drawImage(layerStrokeCanvas, x0, y0);
 
   // A background plan can still correct a wrongly selected green subject
   // area, but only on the effective, non-protected part of the stroke.
@@ -672,17 +685,16 @@ function paintLayerMap(x, y, from) {
     const subjectCtx = subjectMask.getContext("2d");
     subjectCtx.save();
     subjectCtx.globalCompositeOperation = "destination-out";
-    subjectCtx.drawImage(layerStrokeCanvas, 0, 0);
+    subjectCtx.drawImage(layerStrokeCanvas, x0, y0);
     subjectCtx.restore();
     backgroundCanvas = null;
   }
 
-  // Direct preview keeps Pencil latency low and shows only pixels that were
-  // really assigned to the active layer.
+  // Draw only the modified patch in the preview.
   const previewCtx = selectCanvas.getContext("2d");
   previewCtx.save();
   previewCtx.globalAlpha = 0.42;
-  previewCtx.drawImage(layerStrokeCanvas, 0, 0);
+  previewCtx.drawImage(layerStrokeCanvas, x0, y0);
   previewCtx.restore();
 }
 
