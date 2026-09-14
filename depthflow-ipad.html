@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V8</title>
+<title>MicroPlayer — Depth iPad V9</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,8 +39,8 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V8</h1>
-<div class="sub">9 vues avec sujet rigide et écart de profondeur minimum garanti avec le décor. Les contours et les bords restent protégés. Vue 05 = photo originale stricte.</div>
+<h1>MicroPlayer — profondeur locale iPad V9</h1>
+<div class="sub">9 vues avec sujet stable, écart de plans garanti et gestion renforcée des zones cachées. Les traînées de reconstruction sont filtrées. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
   <div class="row">
@@ -72,8 +72,8 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
   <div class="range"><label>Micro-relief du sujet</label><input id="subjectRelief" type="range" min="0.00" max="0.70" step="0.05" value="0.25"><output id="subjectReliefOut">0.25</output></div>
   <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.20"><output id="subjectToleranceOut">0.20</output></div>
   <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.70"><output id="edgeProtectOut">0.70</output></div>
-  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, micro-relief 0,25. Le moteur impose maintenant un recul minimum au décor : le sujet ressort davantage sans être étiré. Si l’effet devient trop fort, baissez d’abord « Séparation avant-plan ».</div>
-  <div class="mode">Mode : sujet rigide + écart de plans garanti + bords protégés</div>
+  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, micro-relief 0,25. La séparation vient désormais surtout du décor ; le déplacement physique du sujet est volontairement limité pour ne pas révéler de grandes zones absentes de la photo.</div>
+  <div class="mode">Mode : sujet stable + plans séparés + occlusions filtrées</div>
   <div id="qc" class="qc"></div>
 </section>
 
@@ -299,8 +299,8 @@ viewsBtn.addEventListener("click", () => {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • sujet rigide • écart sujet/décor garanti • micro-relief limité • bords propres";
-  status.textContent = "9 vues générées ✓ — sujet nettement détaché du décor, sans déformation globale.";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • sujet stable • reconstruction croisée • pixels d’occlusion filtrés • bords propres";
+  status.textContent = "9 vues générées ✓ — profondeur conservée et traînées d’occlusion filtrées.";
   animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
@@ -549,6 +549,9 @@ function buildCleanBackground(image, mask) {
   const filled = new Uint8ClampedArray(sourcePixels.data);
   const left = new Int32Array(width);
   const right = new Int32Array(width);
+  const top = new Int32Array(height);
+  const bottom = new Int32Array(height);
+  const horizontalDistance = new Float32Array(width * height);
 
   for (let y = 0; y < height; y++) {
     let nearest = -1;
@@ -585,6 +588,51 @@ function buildCleanBackground(image, mask) {
         filled[target + channel] = sourcePixels.data[leftIndex + channel] * leftWeight + sourcePixels.data[rightIndex + channel] * rightWeight;
       }
       filled[target + 3] = 255;
+      horizontalDistance[pixel] = Math.min(dl, dr);
+    }
+  }
+
+  // A second vertical reconstruction prevents the long horizontal streaks
+  // that appear when a large foreground subject uncovers its old position.
+  for (let x = 0; x < width; x++) {
+    let nearest = -1;
+    for (let y = 0; y < height; y++) {
+      if (maskPixels[(y * width + x) * 4] < 72) nearest = y;
+      top[y] = nearest;
+    }
+
+    nearest = -1;
+    for (let y = height - 1; y >= 0; y--) {
+      if (maskPixels[(y * width + x) * 4] < 72) nearest = y;
+      bottom[y] = nearest;
+    }
+
+    for (let y = 0; y < height; y++) {
+      const pixel = y * width + x;
+      if (maskPixels[pixel * 4] < 72) continue;
+      const ty = top[y];
+      const by = bottom[y];
+      if (ty < 0 && by < 0) continue;
+      const topY = ty < 0 ? by : ty;
+      const bottomY = by < 0 ? ty : by;
+      const dt = Math.max(1, y - topY);
+      const db = Math.max(1, bottomY - y);
+      const total = dt + db;
+      const topWeight = db / total;
+      const bottomWeight = dt / total;
+      const topIndex = (topY * width + x) * 4;
+      const bottomIndex = (bottomY * width + x) * 4;
+      const target = pixel * 4;
+      const hWeight = 1 / Math.max(1, horizontalDistance[pixel]);
+      const vWeight = 1 / Math.max(1, Math.min(dt, db));
+      const blendTotal = hWeight + vWeight;
+      for (let channel = 0; channel < 3; channel++) {
+        const vertical =
+          sourcePixels.data[topIndex + channel] * topWeight +
+          sourcePixels.data[bottomIndex + channel] * bottomWeight;
+        filled[target + channel] =
+          (filled[target + channel] * hWeight + vertical * vWeight) / blendTotal;
+      }
     }
   }
 
@@ -694,8 +742,11 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
     " relative=mix(relative,min(relative,minimumBackground),outsideSubject*.75);",
     " float protectedShift=safeShift*mix(1.,.58,edge*edgeProtect);",
     " vec2 backgroundQ=clamp(base+vec2(relative*protectedShift,0.),vec2(.001),vec2(.999));",
-    " vec4 background=texture(bg,backgroundQ);",
-    " vec2 rigidQ=clamp(base+vec2(safeShift*subjectPlane,0.),vec2(.001),vec2(.999));",
+    " vec4 warpedBackground=texture(bg,backgroundQ);",
+    " vec4 stableBackground=texture(bg,base);",
+    " float invalidWarp=smoothstep(.05,.55,M(backgroundQ))*(1.-subjectAtBase);",
+    " vec4 background=mix(warpedBackground,stableBackground,invalidWarp);",
+    " vec2 rigidQ=clamp(base+vec2(safeShift*subjectPlane*.16,0.),vec2(.001),vec2(.999));",
     " float rigidMask=M(rigidQ);",
     " float subject=smoothstep(.06,.94,rigidMask);",
     " float core=smoothstep(.78,.995,rigidMask);",
