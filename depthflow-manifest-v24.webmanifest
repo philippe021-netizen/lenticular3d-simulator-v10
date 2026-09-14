@@ -1,0 +1,15 @@
+{
+  "name": "MicroPlayer Depth iPad",
+  "short_name": "DepthFlow",
+  "description": "Création locale de neuf vues lenticulaires avec quatre plans de profondeur.",
+  "start_url": "./depthflow-ipad.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b0c10",
+  "theme_color": "#0b0c10",
+  "categories": [
+    "photo",
+    "utilities"
+  ]
+}
