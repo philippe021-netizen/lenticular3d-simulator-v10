@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V20</title>
+<title>MicroPlayer — Depth iPad V21</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V20</h1>
+<h1>MicroPlayer — profondeur locale iPad V21</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -70,7 +70,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
     <button id="validateLayersBtn">✓ Valider et actualiser</button>
   </div>
-  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Dès que vous changez de couleur, la sélection précédente est figée. Vous pouvez déborder dessus sans la modifier. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
+  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Dès que vous changez de couleur, toute la couche précédente est figée, y compris sa sélection automatique. Vous pouvez déborder dessus sans la modifier. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
 </section>
 
 <section class="card">
@@ -326,7 +326,7 @@ for (const eventName of ["pointerup", "pointercancel"]) {
     }
     drawSelection();
     if (editMode.startsWith("layer-")) {
-      status.textContent = "Plan manuel mis à jour ✓ — les autres sélections déjà peintes restent figées.";
+      status.textContent = "Plan manuel mis à jour ✓ — au changement de couleur, toute cette couche sera figée.";
     } else {
       backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
       status.textContent = "Masque du sujet mis à jour ✓.";
@@ -577,7 +577,53 @@ function resizeAndFeatherMask(source, width, height) {
   return output;
 }
 
+function freezeLayer(mode) {
+  if (!layerMapCanvas || !layerLocks || !mode.startsWith("layer-")) return;
+  const key = mode.slice(6);
+  const targetIndex = { near: 0, mid: 1, far: 2 }[key];
+  if (targetIndex == null) return;
+
+  const colors = [
+    [255, 115, 26],
+    [38, 140, 255],
+    [164, 56, 234]
+  ];
+  const width = layerMapCanvas.width;
+  const height = layerMapCanvas.height;
+  const source = layerMapCanvas.getContext("2d").getImageData(0, 0, width, height).data;
+  const lockCtx = layerLocks[key].getContext("2d");
+  const locked = lockCtx.createImageData(width, height);
+
+  for (let i = 0; i < width * height; i++) {
+    const offset = i * 4;
+    let closest = 0;
+    let closestDistance = Infinity;
+    for (let colorIndex = 0; colorIndex < colors.length; colorIndex++) {
+      const color = colors[colorIndex];
+      const dr = source[offset] - color[0];
+      const dg = source[offset + 1] - color[1];
+      const db = source[offset + 2] - color[2];
+      const distance = dr * dr + dg * dg + db * db;
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closest = colorIndex;
+      }
+    }
+    if (closest === targetIndex) {
+      locked.data[offset] = 255;
+      locked.data[offset + 1] = 255;
+      locked.data[offset + 2] = 255;
+      locked.data[offset + 3] = 255;
+    }
+  }
+  lockCtx.putImageData(locked, 0, 0);
+}
+
 function setEditMode(mode) {
+  const previousMode = editMode;
+  if (previousMode !== mode && previousMode.startsWith("layer-")) {
+    freezeLayer(previousMode);
+  }
   editMode = mode;
   autoModeBtn.classList.toggle("active", mode === "auto");
   paintModeBtn.classList.toggle("active", mode === "paint");
