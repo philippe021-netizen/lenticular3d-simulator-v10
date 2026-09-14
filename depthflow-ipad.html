@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V23</title>
+<title>MicroPlayer — Depth iPad V25</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V23</h1>
+<h1>MicroPlayer — profondeur locale iPad V25</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -70,7 +70,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
     <button id="validateLayersBtn">✓ Valider et actualiser</button>
   </div>
-  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Dès que vous changez de couleur, toute la couche précédente est figée, y compris sa sélection automatique. Vous pouvez déborder dessus sans la modifier. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
+  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Les zones ajoutées au stylet sont verrouillées avec un bord net. Vous pouvez déborder dessus avec une autre couleur sans les modifier ; les zones automatiques restent corrigibles. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
 </section>
 
 <section class="card">
@@ -326,7 +326,7 @@ for (const eventName of ["pointerup", "pointercancel"]) {
     }
     drawSelection();
     if (editMode.startsWith("layer-")) {
-      status.textContent = "Plan manuel mis à jour ✓ — au changement de couleur, toute cette couche sera figée.";
+      status.textContent = "Plan manuel mis à jour ✓ — cette zone peinte est maintenant verrouillée.";
     } else {
       backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
       status.textContent = "Masque du sujet mis à jour ✓.";
@@ -577,53 +577,7 @@ function resizeAndFeatherMask(source, width, height) {
   return output;
 }
 
-function freezeLayer(mode) {
-  if (!layerMapCanvas || !layerLocks || !mode.startsWith("layer-")) return;
-  const key = mode.slice(6);
-  const targetIndex = { near: 0, mid: 1, far: 2 }[key];
-  if (targetIndex == null) return;
-
-  const colors = [
-    [255, 115, 26],
-    [38, 140, 255],
-    [164, 56, 234]
-  ];
-  const width = layerMapCanvas.width;
-  const height = layerMapCanvas.height;
-  const source = layerMapCanvas.getContext("2d").getImageData(0, 0, width, height).data;
-  const lockCtx = layerLocks[key].getContext("2d");
-  const locked = lockCtx.createImageData(width, height);
-
-  for (let i = 0; i < width * height; i++) {
-    const offset = i * 4;
-    let closest = 0;
-    let closestDistance = Infinity;
-    for (let colorIndex = 0; colorIndex < colors.length; colorIndex++) {
-      const color = colors[colorIndex];
-      const dr = source[offset] - color[0];
-      const dg = source[offset + 1] - color[1];
-      const db = source[offset + 2] - color[2];
-      const distance = dr * dr + dg * dg + db * db;
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closest = colorIndex;
-      }
-    }
-    if (closest === targetIndex) {
-      locked.data[offset] = 255;
-      locked.data[offset + 1] = 255;
-      locked.data[offset + 2] = 255;
-      locked.data[offset + 3] = 255;
-    }
-  }
-  lockCtx.putImageData(locked, 0, 0);
-}
-
 function setEditMode(mode) {
-  const previousMode = editMode;
-  if (previousMode !== mode && previousMode.startsWith("layer-")) {
-    freezeLayer(previousMode);
-  }
   editMode = mode;
   autoModeBtn.classList.toggle("active", mode === "auto");
   paintModeBtn.classList.toggle("active", mode === "paint");
@@ -723,7 +677,43 @@ function paintLayerMap(x, y, from) {
   strokeCtx.restore();
 
   layerMapCanvas.getContext("2d").drawImage(layerStrokeCanvas, x0, y0);
-  layerLocks[key].getContext("2d").drawImage(layerStrokeCanvas, x0, y0);
+
+  // Store a hard, one-pixel-expanded lock for the actual Pencil stroke.
+  // Automatic pixels are deliberately not locked, so another layer can still
+  // correct the depth estimate without blocking the intermediate brush.
+  const lockCtx = layerLocks[key].getContext("2d");
+  lockCtx.save();
+  for (let offsetY = -1; offsetY <= 1; offsetY++) {
+    for (let offsetX = -1; offsetX <= 1; offsetX++) {
+      lockCtx.drawImage(layerStrokeCanvas, x0 + offsetX, y0 + offsetY);
+    }
+  }
+  const lockX0 = Math.max(0, x0 - 1);
+  const lockY0 = Math.max(0, y0 - 1);
+  const lockX1 = Math.min(selectCanvas.width, x0 + patchWidth + 1);
+  const lockY1 = Math.min(selectCanvas.height, y0 + patchHeight + 1);
+  const lockWidth = Math.max(1, lockX1 - lockX0);
+  const lockHeight = Math.max(1, lockY1 - lockY0);
+  lockCtx.globalCompositeOperation = "destination-out";
+  for (const protectedKey of protectedKeys) {
+    lockCtx.drawImage(
+      layerLocks[protectedKey],
+      lockX0, lockY0, lockWidth, lockHeight,
+      lockX0, lockY0, lockWidth, lockHeight
+    );
+  }
+  lockCtx.restore();
+
+  const lockPixels = lockCtx.getImageData(lockX0, lockY0, lockWidth, lockHeight);
+  for (let i = 0; i < lockPixels.data.length; i += 4) {
+    if (lockPixels.data[i + 3] > 0) {
+      lockPixels.data[i] = 255;
+      lockPixels.data[i + 1] = 255;
+      lockPixels.data[i + 2] = 255;
+      lockPixels.data[i + 3] = 255;
+    }
+  }
+  lockCtx.putImageData(lockPixels, lockX0, lockY0);
 
   // A background plan can still correct a wrongly selected green subject
   // area, but only on the effective, non-protected part of the stroke.
