@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V11</title>
+<title>MicroPlayer — Depth iPad V12</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,8 +39,8 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V11</h1>
-<div class="sub">9 vues réparties sur quatre plans rigides : sujet principal, décor proche, décor intermédiaire et horizon. La profondeur augmente sans warping continu. Vue 05 = photo originale stricte.</div>
+<h1>MicroPlayer — profondeur locale iPad V12</h1>
+<div class="sub">Quatre plans rigides avec carte colorée contrôlable au doigt ou à l’Apple Pencil. L’automatique propose les zones ; vous pouvez les corriger avant les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
   <div class="row">
@@ -60,9 +60,16 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="autoModeBtn" class="secondary active">Point automatique</button>
     <button id="paintModeBtn" class="secondary">Pinceau +</button>
     <button id="eraseModeBtn" class="secondary">Gomme</button>
+    <button id="layersBtn" class="secondary">Voir les plans</button>
     <div class="brush"><label>Taille</label><input id="brushSize" type="range" min="12" max="100" step="4" value="40"><output id="brushSizeOut">40</output></div>
   </div>
-  <div class="hint">Vert = zone réellement verrouillée. Touchez d’abord le sujet avec « Point automatique ». Utilisez ensuite le pinceau si une aile, une hélice ou un contour manque.</div>
+  <div id="layerTools" class="maskTools" style="display:none">
+    <button id="nearLayerBtn" class="secondary">🟠 Proche</button>
+    <button id="midLayerBtn" class="secondary">🔵 Intermédiaire</button>
+    <button id="farLayerBtn" class="secondary">🟣 Horizon</button>
+    <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
+  </div>
+  <div class="hint">Vert = sujet principal. En mode « Voir les plans » : orange = proche, bleu = intermédiaire, violet = horizon/ciel. Choisissez une couleur puis peignez directement les zones mal classées.</div>
 </section>
 
 <section class="card">
@@ -110,6 +117,12 @@ const selectCanvas = byId("selectCanvas");
 const autoModeBtn = byId("autoModeBtn");
 const paintModeBtn = byId("paintModeBtn");
 const eraseModeBtn = byId("eraseModeBtn");
+const layersBtn = byId("layersBtn");
+const layerTools = byId("layerTools");
+const nearLayerBtn = byId("nearLayerBtn");
+const midLayerBtn = byId("midLayerBtn");
+const farLayerBtn = byId("farLayerBtn");
+const autoLayersBtn = byId("autoLayersBtn");
 const brushSize = byId("brushSize");
 const brushSizeOut = byId("brushSizeOut");
 const animWrap = byId("animWrap");
@@ -129,6 +142,7 @@ let backend = "";
 let imageCanvas = null;
 let depthCanvas = null;
 let subjectMask = null;
+let layerMapCanvas = null;
 let backgroundCanvas = null;
 let seed = { x: 0.5, y: 0.45, depth: 0.5 };
 let frames = [];
@@ -139,6 +153,7 @@ let playing = true;
 let maskTimer = null;
 let editMode = "auto";
 let drawingMask = false;
+let showLayers = false;
 
 for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
   byId(id).addEventListener("input", () => {
@@ -158,6 +173,26 @@ brushSize.addEventListener("input", () => { brushSizeOut.textContent = brushSize
 autoModeBtn.addEventListener("click", () => setEditMode("auto"));
 paintModeBtn.addEventListener("click", () => setEditMode("paint"));
 eraseModeBtn.addEventListener("click", () => setEditMode("erase"));
+nearLayerBtn.addEventListener("click", () => setEditMode("layer-near"));
+midLayerBtn.addEventListener("click", () => setEditMode("layer-mid"));
+farLayerBtn.addEventListener("click", () => setEditMode("layer-far"));
+layersBtn.addEventListener("click", () => {
+  showLayers = !showLayers;
+  layersBtn.classList.toggle("active", showLayers);
+  layersBtn.textContent = showLayers ? "Masquer les plans" : "Voir les plans";
+  layerTools.style.display = showLayers ? "flex" : "none";
+  setEditMode(showLayers ? "layer-near" : "auto");
+  drawSelection();
+  status.textContent = showLayers
+    ? "Carte des plans visible. Choisissez une couleur puis peignez les erreurs."
+    : "Carte des plans masquée.";
+});
+autoLayersBtn.addEventListener("click", () => {
+  if (!depthCanvas) return;
+  layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
+  drawSelection();
+  status.textContent = "Répartition automatique des trois plans recalculée ✓.";
+});
 
 status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
 
@@ -177,7 +212,12 @@ file.addEventListener("change", async () => {
   srcImg = await loadImage(srcUrl);
   depthRaw = null;
   subjectMask = null;
+  layerMapCanvas = null;
   backgroundCanvas = null;
+  showLayers = false;
+  layersBtn.classList.remove("active");
+  layersBtn.textContent = "Voir les plans";
+  layerTools.style.display = "none";
   grid.innerHTML = "";
   depthBtn.disabled = false;
   viewsBtn.disabled = true;
@@ -236,26 +276,30 @@ selectCanvas.addEventListener("pointerdown", event => {
   }
   drawingMask = true;
   selectCanvas.setPointerCapture(event.pointerId);
-  paintSubjectMask(point.x, point.y);
+  paintActiveMap(point.x, point.y);
 });
 
 selectCanvas.addEventListener("pointermove", event => {
   if (!drawingMask || editMode === "auto") return;
   const point = canvasPoint(event);
-  paintSubjectMask(point.x, point.y);
+  paintActiveMap(point.x, point.y);
 });
 
 for (const eventName of ["pointerup", "pointercancel"]) {
   selectCanvas.addEventListener(eventName, () => {
     if (!drawingMask) return;
     drawingMask = false;
-    backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
-    status.textContent = "Masque manuel mis à jour ✓.";
+    if (editMode.startsWith("layer-")) {
+      status.textContent = "Plan manuel mis à jour ✓.";
+    } else {
+      backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+      status.textContent = "Masque du sujet mis à jour ✓.";
+    }
   });
 }
 
 viewsBtn.addEventListener("click", () => {
-  if (!depthRaw || !srcImg || !subjectMask || !backgroundCanvas) return;
+  if (!depthRaw || !srcImg || !subjectMask || !layerMapCanvas || !backgroundCanvas) return;
   stopAnimation();
   grid.innerHTML = "";
   frames = [];
@@ -274,7 +318,7 @@ viewsBtn.addEventListener("click", () => {
     if (i === 4) {
       canvas.getContext("2d").drawImage(imageCanvas, 0, 0);
     } else {
-      renderLockedSubject(canvas, imageCanvas, backgroundCanvas, depthCanvas, subjectMask, ((i - 4) / 4) * amplitude, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, seed.depth);
+      renderLockedSubject(canvas, imageCanvas, backgroundCanvas, depthCanvas, subjectMask, layerMapCanvas, ((i - 4) / 4) * amplitude, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, seed.depth);
     }
     frames.push(canvas);
     const box = document.createElement("div");
@@ -301,8 +345,8 @@ viewsBtn.addEventListener("click", () => {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • 4 plans rigides • aucun warping continu • extrémités miroir • sujet protégé";
-  status.textContent = "9 vues générées ✓ — quatre plans rigides avec profondeur graduée.";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans appliquée • corrections manuelles conservées • aucun warping continu";
+  status.textContent = "9 vues générées ✓ — quatre plans rigides selon la carte automatique ou corrigée.";
   animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
@@ -364,6 +408,7 @@ function prepareSubjectMask(keepPoint) {
   subjectMask = resizeAndFeatherMask(result.canvas, imageCanvas.width, imageCanvas.height);
   backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
   seed.depth = result.seedDepth;
+  if (!keepPoint || !layerMapCanvas) layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
   drawSelection();
   if (!keepPoint) viewsBtn.disabled = false;
 }
@@ -489,6 +534,9 @@ function setEditMode(mode) {
   autoModeBtn.classList.toggle("active", mode === "auto");
   paintModeBtn.classList.toggle("active", mode === "paint");
   eraseModeBtn.classList.toggle("active", mode === "erase");
+  nearLayerBtn.classList.toggle("active", mode === "layer-near");
+  midLayerBtn.classList.toggle("active", mode === "layer-mid");
+  farLayerBtn.classList.toggle("active", mode === "layer-far");
 }
 
 function canvasPoint(event) {
@@ -497,6 +545,27 @@ function canvasPoint(event) {
     x: Math.max(0, Math.min(selectCanvas.width, (event.clientX - rect.left) * selectCanvas.width / rect.width)),
     y: Math.max(0, Math.min(selectCanvas.height, (event.clientY - rect.top) * selectCanvas.height / rect.height))
   };
+}
+
+function paintActiveMap(x, y) {
+  if (editMode.startsWith("layer-")) paintLayerMap(x, y);
+  else paintSubjectMask(x, y);
+}
+
+function paintLayerMap(x, y) {
+  if (!layerMapCanvas) return;
+  const radius = Number(brushSize.value) * selectCanvas.width / 900;
+  const colors = {
+    "layer-near": "#ff731a",
+    "layer-mid": "#268cff",
+    "layer-far": "#a438ea"
+  };
+  const ctx = layerMapCanvas.getContext("2d");
+  ctx.fillStyle = colors[editMode] || colors["layer-near"];
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(5, radius), 0, Math.PI * 2);
+  ctx.fill();
+  drawSelection();
 }
 
 function paintSubjectMask(x, y) {
@@ -518,6 +587,11 @@ function drawSelection() {
   const ctx = selectCanvas.getContext("2d");
   ctx.clearRect(0, 0, selectCanvas.width, selectCanvas.height);
   ctx.drawImage(imageCanvas, 0, 0);
+  if (showLayers && layerMapCanvas) {
+    ctx.globalAlpha = 0.42;
+    ctx.drawImage(layerMapCanvas, 0, 0);
+    ctx.globalAlpha = 1;
+  }
   const tint = document.createElement("canvas");
   tint.width = selectCanvas.width;
   tint.height = selectCanvas.height;
@@ -526,7 +600,7 @@ function drawSelection() {
   tctx.fillRect(0, 0, tint.width, tint.height);
   tctx.globalCompositeOperation = "destination-in";
   tctx.drawImage(subjectMask, 0, 0);
-  ctx.globalAlpha = 0.34;
+  ctx.globalAlpha = showLayers ? 0.56 : 0.34;
   ctx.drawImage(tint, 0, 0);
   ctx.globalAlpha = 1;
   const x = seed.x * selectCanvas.width;
@@ -540,6 +614,34 @@ function drawSelection() {
   ctx.arc(x, y, Math.max(4, selectCanvas.width * 0.004), 0, Math.PI * 2);
   ctx.fillStyle = "#22d36f";
   ctx.fill();
+}
+
+function buildAutoLayerMap(depth, subjectDepth) {
+  const width = depth.width;
+  const height = depth.height;
+  const source = depth.getContext("2d").getImageData(0, 0, width, height).data;
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  const ctx = output.getContext("2d");
+  const pixels = ctx.createImageData(width, height);
+  const colors = {
+    near: [255, 115, 26],
+    mid: [38, 140, 255],
+    far: [164, 56, 234]
+  };
+
+  for (let i = 0, j = 0; i < width * height; i++, j += 4) {
+    const depthValue = source[j] / 255;
+    const distanceBehind = Math.max(0, Math.min(1, (subjectDepth - depthValue) * 4));
+    const color = distanceBehind < 0.35 ? colors.near : distanceBehind < 0.67 ? colors.mid : colors.far;
+    pixels.data[j] = color[0];
+    pixels.data[j + 1] = color[1];
+    pixels.data[j + 2] = color[2];
+    pixels.data[j + 3] = 255;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  return output;
 }
 
 function buildCleanBackground(image, mask) {
@@ -688,7 +790,7 @@ function rawDepthToCanvas(raw, width, height) {
   return output;
 }
 
-function renderLockedSubject(out, image, backgroundImage, depth, mask, position, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, subjectDepth) {
+function renderLockedSubject(out, image, backgroundImage, depth, mask, layerMap, position, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, subjectDepth) {
   const gl = out.getContext("webgl2", { premultipliedAlpha: false, preserveDrawingBuffer: true });
   if (!gl) {
     out.getContext("2d").drawImage(image, 0, 0);
@@ -711,6 +813,7 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
     "uniform sampler2D bg;",
     "uniform sampler2D dm;",
     "uniform sampler2D mm;",
+    "uniform sampler2D lm;",
     "uniform float shift;",
     "uniform float subjectDepth;",
     "uniform float subjectPlane;",
@@ -720,6 +823,14 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
     "uniform vec2 texel;",
     "float D(vec2 p){return texture(dm,clamp(p,vec2(.001),vec2(.999))).r;}",
     "float M(vec2 p){return texture(mm,clamp(p,vec2(.001),vec2(.999))).r;}",
+    "vec3 L(vec2 p){return texture(lm,clamp(p,vec2(.001),vec2(.999))).rgb;}",
+    "vec3 LW(vec3 c){",
+    " vec3 n=vec3(1.,.451,.102);",
+    " vec3 m=vec3(.149,.549,1.);",
+    " vec3 f=vec3(.643,.220,.918);",
+    " vec3 w=vec3(exp(-dot(c-n,c-n)*18.),exp(-dot(c-m,c-m)*18.),exp(-dot(c-f,c-f)*18.));",
+    " return w/(w.x+w.y+w.z+.00001);",
+    "}",
     "void main(){",
     " vec2 base=uv;",
     " float dc=D(base);",
@@ -742,15 +853,15 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
     " vec2 nearQ=base-vec2(safeShift*nearShift,0.);",
     " vec2 midQ=base-vec2(safeShift*midShift,0.);",
     " vec2 farQ=base-vec2(safeShift*farShift,0.);",
-    " float nearZ=clamp((subjectDepth-D(nearQ))*4.,0.,1.);",
-    " float midZ=clamp((subjectDepth-D(midQ))*4.,0.,1.);",
-    " float farZ=clamp((subjectDepth-D(farQ))*4.,0.,1.);",
+    " vec3 nearWeights=LW(L(nearQ));",
+    " vec3 midWeights=LW(L(midQ));",
+    " vec3 farWeights=LW(L(farQ));",
     " float nearValid=1.-smoothstep(.06,.94,M(nearQ));",
     " float midValid=1.-smoothstep(.06,.94,M(midQ));",
     " float farValid=1.-smoothstep(.06,.94,M(farQ));",
-    " float nearAlpha=(1.-smoothstep(.30,.42,nearZ))*nearValid;",
-    " float midAlpha=smoothstep(.24,.36,midZ)*(1.-smoothstep(.62,.74,midZ))*midValid;",
-    " float farAlpha=smoothstep(.58,.70,farZ)*farValid;",
+    " float nearAlpha=nearWeights.x*nearValid;",
+    " float midAlpha=midWeights.y*midValid;",
+    " float farAlpha=farWeights.z*farValid;",
     " vec4 background=texture(bg,base);",
     " background=mix(background,texture(bg,farQ),farAlpha);",
     " background=mix(background,texture(bg,midQ),midAlpha);",
@@ -785,10 +896,12 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
   bindTexture(gl, backgroundImage, 1, true);
   bindTexture(gl, depth, 2);
   bindTexture(gl, mask, 3);
+  bindTexture(gl, layerMap, 4);
   gl.uniform1i(gl.getUniformLocation(programObject, "im"), 0);
   gl.uniform1i(gl.getUniformLocation(programObject, "bg"), 1);
   gl.uniform1i(gl.getUniformLocation(programObject, "dm"), 2);
   gl.uniform1i(gl.getUniformLocation(programObject, "mm"), 3);
+  gl.uniform1i(gl.getUniformLocation(programObject, "lm"), 4);
   gl.uniform1f(gl.getUniformLocation(programObject, "shift"), position * strength);
   gl.uniform1f(gl.getUniformLocation(programObject, "subjectDepth"), subjectDepth);
   gl.uniform1f(gl.getUniformLocation(programObject, "subjectPlane"), subjectPlane);
