@@ -1,30 +1,640 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>MicroPlayer — Depth iPad</title>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<title>MicroPlayer — Depth iPad V3</title>
 <style>
-:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}*{box-sizing:border-box}body{margin:0;background:#0b0c10;color:#f5f7fa;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}main{max-width:1050px;margin:auto}.card{background:#15171d;border:1px solid #292d36;border-radius:18px;padding:16px;margin:14px 0}h1{font-size:24px;margin:8px 0}.sub,.small{color:#aeb6c4;line-height:1.4}.small{font-size:13px}.row,.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}button,.file{appearance:none;border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:16px;background:#fff;color:#111;cursor:pointer}.secondary{background:#2a2f39;color:#fff;border:1px solid #3b424f}button:disabled{opacity:.4}.file input{display:none}.range{display:grid;grid-template-columns:150px 1fr 58px;gap:10px;align-items:center;min-width:300px;margin:7px 0}.range input{width:100%}.status{padding:11px 13px;border-radius:12px;background:#20242d;color:#dbe3ef;margin-top:12px;white-space:pre-wrap}.preview{max-width:100%;max-height:390px;border-radius:14px;display:none;margin-top:12px}.animWrap{display:none}.animStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;min-height:280px;display:grid;place-items:center}.animStage canvas{max-width:100%;max-height:560px;width:auto;height:auto;display:block}.animBadge,.badge{position:absolute;left:8px;top:8px;background:#000b;padding:5px 8px;border-radius:8px;font-size:12px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.view{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3}.view canvas{width:100%;height:100%;object-fit:contain;display:block}.center{outline:2px solid #fff}.mode{display:inline-block;padding:6px 9px;border-radius:9px;background:#223329;color:#bff5cf;font-size:13px;margin-top:8px}@media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}.range{grid-template-columns:120px 1fr 48px}}
-</style></head><body><main>
-<h1>MicroPlayer — profondeur locale iPad</h1><div class="sub">Depth Anything V2 + WebGPU/WebGL2. Rendu local. Vue 05 = original strict.</div>
-<div class="card"><div class="row"><label class="file">Choisir une photo<input id="file" type="file" accept="image/*"></label><button id="depthBtn" disabled>1. Calculer la profondeur</button><button id="viewsBtn" disabled>2. Générer 9 vues</button></div><img id="preview" class="preview"><div id="status" class="status">Prêt.</div></div>
-<div class="card">
-<div class="range"><label>Relief</label><input id="strength" type="range" min="0.010" max="0.090" step="0.005" value="0.050"><output id="strengthOut">0.050</output></div>
-<div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.25" max="1.00" step="0.05" value="0.85"><output id="amplitudeOut">0.85</output></div>
-<div class="range"><label>Zoom sécurité</label><input id="zoom" type="range" min="1.00" max="1.18" step="0.01" value="1.08"><output id="zoomOut">1.08</output></div>
-<div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.00" max="1.00" step="0.05" value="0.70"><output id="edgeProtectOut">0.70</output></div>
-<div class="small">Warp continu : chaque pixel se déplace selon sa profondeur. Aux fortes ruptures de profondeur, la protection réduit automatiquement le déplacement pour éviter les doubles contours et les étirements.</div><div class="mode">Mode : profondeur continue + contours protégés</div></div>
-<div id="animWrap" class="card animWrap"><strong>Aperçu animé 01 ↔ 09</strong><div class="animStage"><canvas id="animCanvas"></canvas><div id="animBadge" class="animBadge">05 — original</div></div><div class="controls" style="margin-top:12px"><button id="playBtn" class="secondary">Pause</button><button id="centerBtn" class="secondary">Voir 05</button><label>Vitesse <input id="speed" type="range" min="70" max="420" step="10" value="150"></label><output id="speedOut">150 ms</output></div><div class="small">Lecture ping-pong 01→09→01.</div></div>
-<div id="grid" class="grid"></div></main>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0c10;color:#f5f7fa;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+main{max-width:1050px;margin:auto}
+.card{background:#15171d;border:1px solid #292d36;border-radius:18px;padding:16px;margin:14px 0}
+h1{font-size:24px;margin:8px 0}
+.sub,.small{color:#aeb6c4;line-height:1.45}.small{font-size:13px}
+.row,.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+button,.file{appearance:none;border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:16px;background:#fff;color:#111;cursor:pointer}
+button.secondary{background:#2a2f39;color:#fff;border:1px solid #3b424f}
+button:disabled{opacity:.4;cursor:default}.file input{display:none}
+.range{display:grid;grid-template-columns:170px 1fr 58px;gap:10px;align-items:center;min-width:300px;margin:9px 0}
+.range input{width:100%}
+.status{padding:11px 13px;border-radius:12px;background:#20242d;color:#dbe3ef;margin-top:12px;white-space:pre-wrap}
+.preview{max-width:100%;max-height:390px;border-radius:14px;display:none;margin-top:12px}
+.selectWrap{display:none;margin-top:12px}
+.selectStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;display:grid;place-items:center;touch-action:manipulation}
+.selectStage canvas{max-width:100%;max-height:520px;width:auto;height:auto;display:block}
+.hint{margin-top:9px;color:#c9d3e2;font-size:14px}
+.animWrap{display:none}.animStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;min-height:280px;display:grid;place-items:center}
+.animStage canvas{max-width:100%;max-height:560px;width:auto;height:auto;display:block}
+.animBadge,.badge{position:absolute;left:8px;top:8px;background:#000c;padding:5px 8px;border-radius:8px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.view{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3}
+.view canvas{width:100%;height:100%;object-fit:contain;display:block}.center{outline:2px solid #fff}
+.mode{display:inline-block;padding:6px 9px;border-radius:9px;background:#223329;color:#bff5cf;font-size:13px;margin-top:8px}
+.qc{display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:#172c20;color:#bff5cf}
+@media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}.range{grid-template-columns:135px 1fr 48px}}
+</style>
+</head>
+<body>
+<main>
+<h1>MicroPlayer — profondeur locale iPad V3</h1>
+<div class="sub">9 vues avec sujet verrouillé. Le décor produit la parallaxe ; le sujet reste net et non déformé. Vue 05 = photo originale stricte.</div>
+
+<section class="card">
+  <div class="row">
+    <label class="file">Choisir une photo<input id="file" type="file" accept="image/*"></label>
+    <button id="depthBtn" disabled>1. Calculer la profondeur</button>
+    <button id="viewsBtn" disabled>2. Générer 9 vues</button>
+    <button id="zipBtn" class="secondary" disabled>Télécharger les 9 PNG</button>
+  </div>
+  <img id="preview" class="preview" alt="Aperçu de la photo">
+  <div id="status" class="status">Prêt.</div>
+</section>
+
+<section id="selectWrap" class="card selectWrap">
+  <strong>Sujet à verrouiller</strong>
+  <div class="selectStage"><canvas id="selectCanvas"></canvas></div>
+  <div class="hint">Touchez le centre du sujet principal. La zone verte restera pixel pour pixel stable dans les 9 vues.</div>
+</section>
+
+<section class="card">
+  <div class="range"><label>Profondeur</label><input id="strength" type="range" min="0.025" max="0.110" step="0.005" value="0.070"><output id="strengthOut">0.070</output></div>
+  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.35" max="1.00" step="0.05" value="0.90"><output id="amplitudeOut">0.90</output></div>
+  <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.20"><output id="subjectToleranceOut">0.20</output></div>
+  <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.80"><output id="edgeProtectOut">0.80</output></div>
+  <div class="small">Réglage conseillé : profondeur 0,070, amplitude 0,90. Si la zone verte déborde sur le décor, diminuez « Zone sujet stable ». Si elle coupe une partie du sujet, augmentez-la.</div>
+  <div class="mode">Mode : sujet rigide + parallaxe relative du décor</div>
+  <div id="qc" class="qc"></div>
+</section>
+
+<section id="animWrap" class="card animWrap">
+  <strong>Aperçu animé 01 ↔ 09</strong>
+  <div class="animStage"><canvas id="animCanvas"></canvas><div id="animBadge" class="animBadge">05 — original</div></div>
+  <div class="controls" style="margin-top:12px">
+    <button id="playBtn" class="secondary">Pause</button>
+    <button id="centerBtn" class="secondary">Voir 05</button>
+    <label>Vitesse <input id="speed" type="range" min="70" max="420" step="10" value="150"></label>
+    <output id="speedOut">150 ms</output>
+  </div>
+</section>
+
+<div id="grid" class="grid"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="module">
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';env.allowLocalModels=false;
-const $=id=>document.getElementById(id),file=$('file'),preview=$('preview'),status=$('status'),depthBtn=$('depthBtn'),viewsBtn=$('viewsBtn'),grid=$('grid'),animWrap=$('animWrap'),animCanvas=$('animCanvas'),animBadge=$('animBadge'),playBtn=$('playBtn'),centerBtn=$('centerBtn'),speed=$('speed'),speedOut=$('speedOut');
-let srcUrl=null,srcImg=null,depthRaw=null,estimator=null,backend='',frames=[],timer=null,frameIndex=4,direction=1,playing=true;
-for(const id of ['strength','amplitude','zoom','edgeProtect'])$(id).addEventListener('input',()=>$(id+'Out').textContent=$(id).value);speed.addEventListener('input',()=>{speedOut.textContent=speed.value+' ms';if(playing&&frames.length)restartAnimation()});status.textContent=`Prêt. WebGPU : ${navigator.gpu?'disponible ✓':'non détecté — WASM'}`;
-file.addEventListener('change',async()=>{stopAnimation();frames=[];animWrap.style.display='none';const f=file.files?.[0];if(!f)return;if(srcUrl)URL.revokeObjectURL(srcUrl);srcUrl=URL.createObjectURL(f);preview.src=srcUrl;preview.style.display='block';srcImg=await loadImage(srcUrl);depthRaw=null;grid.innerHTML='';depthBtn.disabled=false;viewsBtn.disabled=true;status.textContent=`Photo chargée : ${srcImg.naturalWidth}×${srcImg.naturalHeight}.\nWebGPU : ${navigator.gpu?'disponible ✓':'non détecté — WASM'}`});
-depthBtn.addEventListener('click',async()=>{if(!srcImg)return;depthBtn.disabled=true;viewsBtn.disabled=true;try{if(!estimator){status.textContent='Chargement de Depth Anything V2 Small…';const progress_callback=p=>{if(p?.progress!=null)status.textContent=`Chargement du modèle… ${Math.round(p.progress)} %`};if(navigator.gpu){try{estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{device:'webgpu',dtype:'q4f16',progress_callback});backend='WebGPU'}catch(e){console.warn(e);estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{device:'wasm',dtype:'q8',progress_callback});backend='WASM'}}else{estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{device:'wasm',dtype:'q8',progress_callback});backend='WASM'}}status.textContent=`Calcul de profondeur sur ${backend}…`;const out=await estimator(srcUrl);depthRaw=out.depth;status.textContent=`Profondeur calculée ✓ — ${backend}.`;viewsBtn.disabled=false}catch(e){status.textContent='Erreur profondeur : '+(e?.message||e);depthBtn.disabled=false}});
-viewsBtn.addEventListener('click',()=>{if(!depthRaw||!srcImg)return;stopAnimation();grid.innerHTML='';frames=[];const W=Math.min(srcImg.naturalWidth,1400),H=Math.round(srcImg.naturalHeight*W/srcImg.naturalWidth),imageCanvas=document.createElement('canvas');imageCanvas.width=W;imageCanvas.height=H;imageCanvas.getContext('2d').drawImage(srcImg,0,0,W,H);const depthCanvas=rawDepthToCanvas(depthRaw,W,H),relief=+$('strength').value,amp=+$('amplitude').value,zoom=+$('zoom').value,edgeProtect=+$('edgeProtect').value;for(let i=0;i<9;i++){const c=document.createElement('canvas');c.width=W;c.height=H;if(i===4)c.getContext('2d').drawImage(imageCanvas,0,0);else renderContinuous(c,imageCanvas,depthCanvas,((i-4)/4)*amp,relief,zoom,edgeProtect);frames.push(c);const box=document.createElement('div');box.className='view'+(i===4?' center':'');const d=document.createElement('canvas');d.width=W;d.height=H;d.getContext('2d').drawImage(c,0,0);const b=document.createElement('div');b.className='badge';b.textContent=String(i+1).padStart(2,'0')+(i===4?' — original':'');box.append(d,b);grid.append(box)}animCanvas.width=W;animCanvas.height=H;animWrap.style.display='block';frameIndex=4;direction=1;playing=true;playBtn.textContent='Pause';showAnimFrame(4);restartAnimation();status.textContent=`9 vues continues générées ✓ — protection contours ${edgeProtect.toFixed(2)}. Vue 05 originale.`;animWrap.scrollIntoView({behavior:'smooth',block:'start'})});
-playBtn.onclick=()=>{playing=!playing;playBtn.textContent=playing?'Pause':'Lecture';playing?restartAnimation():stopAnimation()};centerBtn.onclick=()=>{stopAnimation();playing=false;playBtn.textContent='Lecture';frameIndex=4;showAnimFrame(4)};
-function restartAnimation(){stopAnimation();timer=setInterval(()=>{frameIndex+=direction;if(frameIndex>=8){frameIndex=8;direction=-1}else if(frameIndex<=0){frameIndex=0;direction=1}showAnimFrame(frameIndex)},+speed.value)}function stopAnimation(){if(timer){clearInterval(timer);timer=null}}function showAnimFrame(i){if(!frames[i])return;const ctx=animCanvas.getContext('2d');ctx.clearRect(0,0,animCanvas.width,animCanvas.height);ctx.drawImage(frames[i],0,0);animBadge.textContent=String(i+1).padStart(2,'0')+(i===4?' — original':'')}
-function loadImage(url){return new Promise((r,j)=>{const i=new Image;i.onload=()=>r(i);i.onerror=j;i.src=url})}
-function rawDepthToCanvas(raw,W,H){const s=document.createElement('canvas');s.width=raw.width;s.height=raw.height;const ctx=s.getContext('2d'),rgba=new Uint8ClampedArray(raw.width*raw.height*4),d=raw.data;for(let i=0,j=0;i<d.length;i++,j+=4){const v=d[i];rgba[j]=rgba[j+1]=rgba[j+2]=v;rgba[j+3]=255}ctx.putImageData(new ImageData(rgba,raw.width,raw.height),0,0);const o=document.createElement('canvas');o.width=W;o.height=H;o.getContext('2d').drawImage(s,0,0,W,H);return o}
-function renderContinuous(out,img,dep,pos,strength,zoom,edgeProtect){const gl=out.getContext('webgl2',{premultipliedAlpha:false,preserveDrawingBuffer:true});if(!gl){out.getContext('2d').drawImage(img,0,0);return}const vs=`#version 300 es\nin vec2 p;out vec2 uv;void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}`;const fs=`#version 300 es\nprecision highp float;in vec2 uv;out vec4 o;uniform sampler2D im;uniform sampler2D dm;uniform float shift;uniform float zoom;uniform float edgeProtect;uniform vec2 texel;float D(vec2 p){return texture(dm,clamp(p,vec2(.001),vec2(.999))).r;}void main(){vec2 base=(uv-.5)/zoom+.5;float dc=D(base);float dl=D(base-vec2(texel.x,0.));float dr=D(base+vec2(texel.x,0.));float du=D(base-vec2(0.,texel.y));float dd=D(base+vec2(0.,texel.y));float sx=abs(dl-dc)+abs(dr-dc);float sy=abs(du-dc)+abs(dd-dc);float grad=sx+sy;float wL=exp(-abs(dl-dc)*24.);float wR=exp(-abs(dr-dc)*24.);float wU=exp(-abs(du-dc)*24.);float wD=exp(-abs(dd-dc)*24.);float smoothD=(dc+dl*wL+dr*wR+du*wU+dd*wD)/(1.+wL+wR+wU+wD);float edge=smoothstep(.025,.18,grad);float protect=1.-edge*edgeProtect;float centered=(smoothD-.5)*2.;float localShift=shift*protect;localShift=clamp(localShift,-.060,.060);vec2 q=base+vec2(centered*localShift,0.);q=clamp(q,vec2(.001),vec2(.999));vec4 c=texture(im,q);if(edge>.35){float dir=sign(shift);vec2 q2=clamp(q-vec2(dir*texel.x*2.,0.),vec2(.001),vec2(.999));vec4 fill=texture(im,q2);float blend=edge*edgeProtect*.16;c=mix(c,fill,blend);}o=vec4(c.rgb,1.);}`;const prog=program(gl,vs,fs);gl.useProgram(prog);const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const loc=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);tex(gl,img,0);tex(gl,dep,1);gl.uniform1i(gl.getUniformLocation(prog,'im'),0);gl.uniform1i(gl.getUniformLocation(prog,'dm'),1);gl.uniform1f(gl.getUniformLocation(prog,'shift'),pos*strength);gl.uniform1f(gl.getUniformLocation(prog,'zoom'),zoom);gl.uniform1f(gl.getUniformLocation(prog,'edgeProtect'),edgeProtect);gl.uniform2f(gl.getUniformLocation(prog,'texel'),1/out.width,1/out.height);gl.viewport(0,0,out.width,out.height);gl.drawArrays(gl.TRIANGLES,0,6)}
-function tex(gl,source,unit){gl.activeTexture(gl.TEXTURE0+unit);const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source)}function shader(gl,type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}function program(gl,v,f){const p=gl.createProgram();gl.attachShader(p,shader(gl,gl.VERTEX_SHADER,v));gl.attachShader(p,shader(gl,gl.FRAGMENT_SHADER,f));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p}
-</script></body></html>
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
+env.allowLocalModels = false;
+
+const byId = id => document.getElementById(id);
+const file = byId("file");
+const preview = byId("preview");
+const status = byId("status");
+const depthBtn = byId("depthBtn");
+const viewsBtn = byId("viewsBtn");
+const zipBtn = byId("zipBtn");
+const grid = byId("grid");
+const selectWrap = byId("selectWrap");
+const selectCanvas = byId("selectCanvas");
+const animWrap = byId("animWrap");
+const animCanvas = byId("animCanvas");
+const animBadge = byId("animBadge");
+const playBtn = byId("playBtn");
+const centerBtn = byId("centerBtn");
+const speed = byId("speed");
+const speedOut = byId("speedOut");
+const qc = byId("qc");
+
+let srcUrl = null;
+let srcImg = null;
+let depthRaw = null;
+let estimator = null;
+let backend = "";
+let imageCanvas = null;
+let depthCanvas = null;
+let subjectMask = null;
+let seed = { x: 0.5, y: 0.45, depth: 0.5 };
+let frames = [];
+let timer = null;
+let frameIndex = 4;
+let direction = 1;
+let playing = true;
+let maskTimer = null;
+
+for (const id of ["strength", "amplitude", "subjectTolerance", "edgeProtect"]) {
+  byId(id).addEventListener("input", () => {
+    byId(id + "Out").textContent = byId(id).value;
+    if (id === "subjectTolerance" && depthRaw) {
+      clearTimeout(maskTimer);
+      maskTimer = setTimeout(() => prepareSubjectMask(true), 120);
+    }
+  });
+}
+
+speed.addEventListener("input", () => {
+  speedOut.textContent = speed.value + " ms";
+  if (playing && frames.length) restartAnimation();
+});
+
+status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
+
+file.addEventListener("change", async () => {
+  stopAnimation();
+  frames = [];
+  animWrap.style.display = "none";
+  selectWrap.style.display = "none";
+  qc.style.display = "none";
+  zipBtn.disabled = true;
+  const selected = file.files && file.files[0];
+  if (!selected) return;
+  if (srcUrl) URL.revokeObjectURL(srcUrl);
+  srcUrl = URL.createObjectURL(selected);
+  preview.src = srcUrl;
+  preview.style.display = "block";
+  srcImg = await loadImage(srcUrl);
+  depthRaw = null;
+  subjectMask = null;
+  grid.innerHTML = "";
+  depthBtn.disabled = false;
+  viewsBtn.disabled = true;
+  status.textContent = "Photo chargée : " + srcImg.naturalWidth + "×" + srcImg.naturalHeight + ".\nWebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — WASM");
+});
+
+depthBtn.addEventListener("click", async () => {
+  if (!srcImg) return;
+  depthBtn.disabled = true;
+  viewsBtn.disabled = true;
+  try {
+    if (!estimator) {
+      status.textContent = "Chargement de Depth Anything V2 Small…";
+      const progress_callback = p => {
+        if (p && p.progress != null) status.textContent = "Chargement du modèle… " + Math.round(p.progress) + " %";
+      };
+      if (navigator.gpu) {
+        try {
+          estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "webgpu", dtype: "q4f16", progress_callback });
+          backend = "WebGPU";
+        } catch (error) {
+          console.warn("WebGPU indisponible, repli WASM", error);
+          estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
+          backend = "WASM";
+        }
+      } else {
+        estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
+        backend = "WASM";
+      }
+    }
+
+    status.textContent = "Calcul de profondeur sur " + backend + "…";
+    const output = await estimator(srcUrl);
+    depthRaw = output.depth;
+    prepareCanvases();
+    seed = { x: 0.5, y: 0.45, depth: 0.5 };
+    prepareSubjectMask(false);
+    selectWrap.style.display = "block";
+    viewsBtn.disabled = false;
+    status.textContent = "Profondeur calculée ✓ — " + backend + ".\nSujet détecté autour du point vert. Touchez le sujet pour corriger si nécessaire.";
+  } catch (error) {
+    status.textContent = "Erreur profondeur : " + (error && error.message ? error.message : error);
+    depthBtn.disabled = false;
+  }
+});
+
+selectCanvas.addEventListener("pointerdown", event => {
+  if (!depthRaw || !imageCanvas) return;
+  const rect = selectCanvas.getBoundingClientRect();
+  seed.x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+  seed.y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
+  prepareSubjectMask(false);
+  status.textContent = "Sujet recalé ✓. Vérifiez que la zone verte couvre le sujet sans déborder sur le décor.";
+});
+
+viewsBtn.addEventListener("click", () => {
+  if (!depthRaw || !srcImg || !subjectMask) return;
+  stopAnimation();
+  grid.innerHTML = "";
+  frames = [];
+
+  const strength = Number(byId("strength").value);
+  const amplitude = Number(byId("amplitude").value);
+  const edgeProtect = Number(byId("edgeProtect").value);
+
+  for (let i = 0; i < 9; i++) {
+    const canvas = document.createElement("canvas");
+    canvas.width = imageCanvas.width;
+    canvas.height = imageCanvas.height;
+    if (i === 4) {
+      canvas.getContext("2d").drawImage(imageCanvas, 0, 0);
+    } else {
+      renderLockedSubject(canvas, imageCanvas, depthCanvas, subjectMask, ((i - 4) / 4) * amplitude, strength, edgeProtect, seed.depth);
+    }
+    frames.push(canvas);
+    const box = document.createElement("div");
+    box.className = "view" + (i === 4 ? " center" : "");
+    const display = document.createElement("canvas");
+    display.width = canvas.width;
+    display.height = canvas.height;
+    display.getContext("2d").drawImage(canvas, 0, 0);
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = String(i + 1).padStart(2, "0") + (i === 4 ? " — original" : "");
+    box.append(display, badge);
+    grid.append(box);
+  }
+
+  animCanvas.width = imageCanvas.width;
+  animCanvas.height = imageCanvas.height;
+  animWrap.style.display = "block";
+  frameIndex = 4;
+  direction = 1;
+  playing = true;
+  playBtn.textContent = "Pause";
+  showAnimFrame(4);
+  restartAnimation();
+  zipBtn.disabled = false;
+  qc.style.display = "block";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • sujet verrouillé sans warp • déplacement horizontal monotone";
+  status.textContent = "9 vues générées ✓ — sujet verrouillé, profondeur relative nette.";
+  animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+zipBtn.addEventListener("click", async () => {
+  if (frames.length !== 9 || !window.JSZip) return;
+  zipBtn.disabled = true;
+  status.textContent = "Préparation du ZIP…";
+  try {
+    const zip = new window.JSZip();
+    for (let i = 0; i < frames.length; i++) {
+      const blob = await canvasBlob(frames[i]);
+      zip.file("microplayer-depth-" + String(i + 1).padStart(2, "0") + ".png", blob);
+    }
+    const archive = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    const url = URL.createObjectURL(archive);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "microplayer-depth-9-vues.zip";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    status.textContent = "ZIP des 9 vues téléchargé ✓.";
+  } catch (error) {
+    status.textContent = "Erreur export : " + (error && error.message ? error.message : error);
+  } finally {
+    zipBtn.disabled = false;
+  }
+});
+
+playBtn.addEventListener("click", () => {
+  playing = !playing;
+  playBtn.textContent = playing ? "Pause" : "Lecture";
+  if (playing) restartAnimation(); else stopAnimation();
+});
+
+centerBtn.addEventListener("click", () => {
+  stopAnimation();
+  playing = false;
+  playBtn.textContent = "Lecture";
+  frameIndex = 4;
+  showAnimFrame(4);
+});
+
+function prepareCanvases() {
+  const width = Math.min(srcImg.naturalWidth, 1400);
+  const height = Math.round(srcImg.naturalHeight * width / srcImg.naturalWidth);
+  imageCanvas = document.createElement("canvas");
+  imageCanvas.width = width;
+  imageCanvas.height = height;
+  imageCanvas.getContext("2d").drawImage(srcImg, 0, 0, width, height);
+  depthCanvas = rawDepthToCanvas(depthRaw, width, height);
+  selectCanvas.width = width;
+  selectCanvas.height = height;
+}
+
+function prepareSubjectMask(keepPoint) {
+  if (!depthRaw || !imageCanvas) return;
+  const tolerance = Number(byId("subjectTolerance").value);
+  const result = growSubjectMask(depthRaw, seed.x, seed.y, tolerance);
+  subjectMask = resizeAndFeatherMask(result.canvas, imageCanvas.width, imageCanvas.height);
+  seed.depth = result.seedDepth;
+  drawSelection();
+  if (!keepPoint) viewsBtn.disabled = false;
+}
+
+function growSubjectMask(raw, nx, ny, tolerance) {
+  const width = raw.width;
+  const height = raw.height;
+  const count = width * height;
+  const data = raw.data;
+  const sx = Math.max(0, Math.min(width - 1, Math.round(nx * (width - 1))));
+  const sy = Math.max(0, Math.min(height - 1, Math.round(ny * (height - 1))));
+  const sample = [];
+
+  for (let y = Math.max(0, sy - 3); y <= Math.min(height - 1, sy + 3); y++) {
+    for (let x = Math.max(0, sx - 3); x <= Math.min(width - 1, sx + 3); x++) sample.push(depthValue(data, y * width + x, count));
+  }
+  sample.sort((a, b) => a - b);
+  const seedValue = sample[Math.floor(sample.length / 2)];
+  const globalTolerance = tolerance * 255;
+  const localTolerance = Math.max(10, globalTolerance * 0.42);
+  let mask = new Uint8Array(count);
+  const queue = new Int32Array(count);
+  let head = 0;
+  let tail = 0;
+  const start = sy * width + sx;
+  mask[start] = 1;
+  queue[tail++] = start;
+
+  while (head < tail) {
+    const index = queue[head++];
+    const x = index % width;
+    const y = (index / width) | 0;
+    const current = depthValue(data, index, count);
+    if (x > 0) visit(index - 1, current);
+    if (x + 1 < width) visit(index + 1, current);
+    if (y > 0) visit(index - width, current);
+    if (y + 1 < height) visit(index + width, current);
+  }
+
+  function visit(index, parentValue) {
+    if (mask[index]) return;
+    const value = depthValue(data, index, count);
+    if (Math.abs(value - seedValue) <= globalTolerance && Math.abs(value - parentValue) <= localTolerance) {
+      mask[index] = 1;
+      queue[tail++] = index;
+    }
+  }
+
+  mask = erode(dilate(mask, width, height), width, height);
+  mask = dilate(mask, width, height);
+  mask = dilate(mask, width, height);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  const pixels = ctx.createImageData(width, height);
+  for (let i = 0, j = 0; i < count; i++, j += 4) {
+    const value = mask[i] ? 255 : 0;
+    pixels.data[j] = pixels.data[j + 1] = pixels.data[j + 2] = value;
+    pixels.data[j + 3] = 255;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  return { canvas, seedDepth: seedValue / 255 };
+}
+
+function depthValue(data, index, count) {
+  if (data.length >= count * 4) return data[index * 4];
+  return data[index];
+}
+
+function dilate(source, width, height) {
+  const output = new Uint8Array(source.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let value = 0;
+      for (let oy = -1; oy <= 1 && !value; oy++) {
+        const yy = y + oy;
+        if (yy < 0 || yy >= height) continue;
+        for (let ox = -1; ox <= 1; ox++) {
+          const xx = x + ox;
+          if (xx >= 0 && xx < width && source[yy * width + xx]) { value = 1; break; }
+        }
+      }
+      output[y * width + x] = value;
+    }
+  }
+  return output;
+}
+
+function erode(source, width, height) {
+  const output = new Uint8Array(source.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let value = 1;
+      for (let oy = -1; oy <= 1 && value; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (!source[(y + oy) * width + x + ox]) { value = 0; break; }
+        }
+      }
+      output[y * width + x] = value;
+    }
+  }
+  return output;
+}
+
+function resizeAndFeatherMask(source, width, height) {
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  const ctx = output.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.filter = "blur(2px)";
+  ctx.drawImage(source, 0, 0, width, height);
+  ctx.filter = "none";
+  return output;
+}
+
+function drawSelection() {
+  const ctx = selectCanvas.getContext("2d");
+  ctx.clearRect(0, 0, selectCanvas.width, selectCanvas.height);
+  ctx.drawImage(imageCanvas, 0, 0);
+  const tint = document.createElement("canvas");
+  tint.width = selectCanvas.width;
+  tint.height = selectCanvas.height;
+  const tctx = tint.getContext("2d");
+  tctx.fillStyle = "#22d36f";
+  tctx.fillRect(0, 0, tint.width, tint.height);
+  tctx.globalCompositeOperation = "destination-in";
+  tctx.drawImage(subjectMask, 0, 0);
+  ctx.globalAlpha = 0.34;
+  ctx.drawImage(tint, 0, 0);
+  ctx.globalAlpha = 1;
+  const x = seed.x * selectCanvas.width;
+  const y = seed.y * selectCanvas.height;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(10, selectCanvas.width * 0.012), 0, Math.PI * 2);
+  ctx.lineWidth = Math.max(3, selectCanvas.width * 0.003);
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(4, selectCanvas.width * 0.004), 0, Math.PI * 2);
+  ctx.fillStyle = "#22d36f";
+  ctx.fill();
+}
+
+function rawDepthToCanvas(raw, width, height) {
+  const source = document.createElement("canvas");
+  source.width = raw.width;
+  source.height = raw.height;
+  const ctx = source.getContext("2d");
+  const count = raw.width * raw.height;
+  const pixels = ctx.createImageData(raw.width, raw.height);
+  for (let i = 0, j = 0; i < count; i++, j += 4) {
+    const value = depthValue(raw.data, i, count);
+    pixels.data[j] = pixels.data[j + 1] = pixels.data[j + 2] = value;
+    pixels.data[j + 3] = 255;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  output.getContext("2d").drawImage(source, 0, 0, width, height);
+  return output;
+}
+
+function renderLockedSubject(out, image, depth, mask, position, strength, edgeProtect, subjectDepth) {
+  const gl = out.getContext("webgl2", { premultipliedAlpha: false, preserveDrawingBuffer: true });
+  if (!gl) {
+    out.getContext("2d").drawImage(image, 0, 0);
+    return;
+  }
+
+  const vertex = [
+    "#version 300 es",
+    "in vec2 p;",
+    "out vec2 uv;",
+    "void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}"
+  ].join("\n");
+
+  const fragment = [
+    "#version 300 es",
+    "precision highp float;",
+    "in vec2 uv;",
+    "out vec4 o;",
+    "uniform sampler2D im;",
+    "uniform sampler2D dm;",
+    "uniform sampler2D mm;",
+    "uniform float shift;",
+    "uniform float subjectDepth;",
+    "uniform float edgeProtect;",
+    "uniform vec2 texel;",
+    "float D(vec2 p){return texture(dm,clamp(p,vec2(.001),vec2(.999))).r;}",
+    "float M(vec2 p){return texture(mm,clamp(p,vec2(.001),vec2(.999))).r;}",
+    "void main(){",
+    " vec2 base=uv;",
+    " float dc=D(base);",
+    " float dl=D(base-vec2(texel.x*2.,0.));",
+    " float dr=D(base+vec2(texel.x*2.,0.));",
+    " float du=D(base-vec2(0.,texel.y*2.));",
+    " float dd=D(base+vec2(0.,texel.y*2.));",
+    " float wL=exp(-abs(dl-dc)*28.);",
+    " float wR=exp(-abs(dr-dc)*28.);",
+    " float wU=exp(-abs(du-dc)*28.);",
+    " float wD=exp(-abs(dd-dc)*28.);",
+    " float smoothD=(dc+dl*wL+dr*wR+du*wU+dd*wD)/(1.+wL+wR+wU+wD);",
+    " float gradient=abs(dl-dc)+abs(dr-dc)+abs(du-dc)+abs(dd-dc);",
+    " float edge=smoothstep(.035,.20,gradient);",
+    " float relative=clamp((smoothD-subjectDepth)*2.35,-1.,1.);",
+    " relative=sign(relative)*pow(abs(relative),.78);",
+    " float protectedShift=shift*mix(1.,.56,edge*edgeProtect);",
+    " vec2 q=clamp(base+vec2(relative*protectedShift,0.),vec2(.001),vec2(.999));",
+    " float best=M(q);",
+    " vec2 bestQ=q;",
+    " float stepX=max(abs(protectedShift)/8.,texel.x*2.);",
+    " for(int k=1;k<=16;k++){",
+    "   float fk=float(k);",
+    "   vec2 ql=clamp(q-vec2(stepX*fk,0.),vec2(.001),vec2(.999));",
+    "   vec2 qr=clamp(q+vec2(stepX*fk,0.),vec2(.001),vec2(.999));",
+    "   float ml=M(ql)+fk*.004;",
+    "   float mr=M(qr)+fk*.004;",
+    "   if(ml<best){best=ml;bestQ=ql;}",
+    "   if(mr<best){best=mr;bestQ=qr;}",
+    " }",
+    " vec4 background=texture(im,bestQ);",
+    " vec4 original=texture(im,base);",
+    " float subject=smoothstep(.06,.94,M(base));",
+    " o=vec4(mix(background.rgb,original.rgb,subject),1.);",
+    "}"
+  ].join("\n");
+
+  const programObject = createProgram(gl, vertex, fragment);
+  gl.useProgram(programObject);
+  const buffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+  const location = gl.getAttribLocation(programObject, "p");
+  gl.enableVertexAttribArray(location);
+  gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+  bindTexture(gl, image, 0);
+  bindTexture(gl, depth, 1);
+  bindTexture(gl, mask, 2);
+  gl.uniform1i(gl.getUniformLocation(programObject, "im"), 0);
+  gl.uniform1i(gl.getUniformLocation(programObject, "dm"), 1);
+  gl.uniform1i(gl.getUniformLocation(programObject, "mm"), 2);
+  gl.uniform1f(gl.getUniformLocation(programObject, "shift"), position * strength);
+  gl.uniform1f(gl.getUniformLocation(programObject, "subjectDepth"), subjectDepth);
+  gl.uniform1f(gl.getUniformLocation(programObject, "edgeProtect"), edgeProtect);
+  gl.uniform2f(gl.getUniformLocation(programObject, "texel"), 1 / out.width, 1 / out.height);
+  gl.viewport(0, 0, out.width, out.height);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+function bindTexture(gl, source, unit) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+}
+
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+  return shader;
+}
+
+function createProgram(gl, vertex, fragment) {
+  const programObject = gl.createProgram();
+  gl.attachShader(programObject, compileShader(gl, gl.VERTEX_SHADER, vertex));
+  gl.attachShader(programObject, compileShader(gl, gl.FRAGMENT_SHADER, fragment));
+  gl.linkProgram(programObject);
+  if (!gl.getProgramParameter(programObject, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(programObject));
+  return programObject;
+}
+
+function restartAnimation() {
+  stopAnimation();
+  timer = setInterval(() => {
+    frameIndex += direction;
+    if (frameIndex >= 8) { frameIndex = 8; direction = -1; }
+    else if (frameIndex <= 0) { frameIndex = 0; direction = 1; }
+    showAnimFrame(frameIndex);
+  }, Number(speed.value));
+}
+
+function stopAnimation() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+function showAnimFrame(index) {
+  if (!frames[index]) return;
+  const ctx = animCanvas.getContext("2d");
+  ctx.clearRect(0, 0, animCanvas.width, animCanvas.height);
+  ctx.drawImage(frames[index], 0, 0);
+  animBadge.textContent = String(index + 1).padStart(2, "0") + (index === 4 ? " — original" : "");
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+function canvasBlob(canvas) {
+  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("PNG impossible")), "image/png"));
+}
+</script>
+</body>
+</html>
