@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V16</title>
+<title>MicroPlayer — Depth iPad V17</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V16</h1>
+<h1>MicroPlayer — profondeur locale iPad V17</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -77,12 +77,12 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
   <div class="range"><label>Profondeur globale</label><input id="strength" type="range" min="0.035" max="0.130" step="0.005" value="0.080"><output id="strengthOut">0.080</output></div>
   <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.40" max="1.10" step="0.05" value="0.95"><output id="amplitudeOut">0.95</output></div>
   <div class="range"><label>Séparation avant-plan</label><input id="subjectPlane" type="range" min="0.00" max="0.36" step="0.02" value="0.22"><output id="subjectPlaneOut">0.22</output></div>
-  <div class="range"><label>Écart entre les plans</label><input id="backgroundRelief" type="range" min="0.08" max="0.36" step="0.02" value="0.22"><output id="backgroundReliefOut">0.22</output></div>
+  <div class="range"><label>Écart entre les plans</label><input id="backgroundRelief" type="range" min="0.08" max="0.36" step="0.02" value="0.24"><output id="backgroundReliefOut">0.24</output></div>
   <div class="range"><label>Micro-relief du sujet</label><input id="subjectRelief" type="range" min="0.00" max="0.70" step="0.05" value="0.25"><output id="subjectReliefOut">0.25</output></div>
   <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.20"><output id="subjectToleranceOut">0.20</output></div>
   <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.70"><output id="edgeProtectOut">0.70</output></div>
-  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, écart des plans 0,22, micro-relief 0,25. Le fond n’est plus déformé en continu : chaque couche se déplace comme une plaque rigide.</div>
-  <div class="mode">Mode : 4 plans rigides — sujet / proche / intermédiaire / horizon</div>
+  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, écart des plans 0,24, micro-relief 0,25. Le plan violet reçoit désormais un recul supplémentaire pour être clairement distinct du bleu.</div>
+  <div class="mode">Mode : 4 plans rigides — horizon renforcé sans déformation</div>
   <div id="qc" class="qc"></div>
 </section>
 
@@ -382,8 +382,8 @@ function generateViews({ scroll = true } = {}) {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • aucune présélection forcée • plans remplaçant réellement le sujet • simulateur synchronisé";
-  status.textContent = "Simulateur actualisé ✓ — corrections appliquées avec le moteur accéléré.";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • plans rigides • séparation intermédiaire/lointain renforcée • sujet inchangé";
+  status.textContent = "Simulateur actualisé ✓ — horizon nettement séparé du plan intermédiaire.";
   if (scroll) animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -926,7 +926,7 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, layerMap,
     " float baseBack=.16+subjectPlane*.35;",
     " float nearShift=baseBack;",
     " float midShift=baseBack+backgroundRelief*.58;",
-    " float farShift=baseBack+backgroundRelief*1.16;",
+    " float farShift=baseBack+backgroundRelief*1.65;",
     " vec2 nearQ=base-vec2(safeShift*nearShift,0.);",
     " vec2 midQ=base-vec2(safeShift*midShift,0.);",
     " vec2 farQ=base-vec2(safeShift*farShift,0.);",
