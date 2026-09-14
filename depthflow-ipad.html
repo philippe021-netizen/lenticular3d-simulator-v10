@@ -10,9 +10,11 @@
 main{max-width:1050px;margin:auto}.card{background:#15171d;border:1px solid #292d36;border-radius:18px;padding:16px;margin:14px 0}
 h1{font-size:24px;margin:8px 0}.sub{color:#aeb6c4;line-height:1.4}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 button,.file{appearance:none;border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:16px;background:#fff;color:#111;cursor:pointer}
-button:disabled{opacity:.4}.file input{display:none}.range{display:grid;grid-template-columns:140px 1fr 54px;gap:10px;align-items:center;flex:1;min-width:300px}
-input[type=range]{width:100%}.status{padding:11px 13px;border-radius:12px;background:#20242d;color:#dbe3ef;margin-top:12px;white-space:pre-wrap}
-.preview{max-width:100%;max-height:420px;border-radius:14px;display:none;margin-top:12px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.view{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3}.view canvas{width:100%;height:100%;object-fit:contain;display:block}.badge{position:absolute;left:7px;top:7px;background:#000a;padding:4px 7px;border-radius:8px;font-size:12px}.center{outline:2px solid #fff}.small{font-size:13px;color:#99a3b1}@media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}.range{grid-template-columns:110px 1fr 45px}}
+button.secondary{background:#2a2f39;color:#fff;border:1px solid #3b424f}button:disabled{opacity:.4}.file input{display:none}
+.range{display:grid;grid-template-columns:140px 1fr 54px;gap:10px;align-items:center;flex:1;min-width:300px}input[type=range]{width:100%}
+.status{padding:11px 13px;border-radius:12px;background:#20242d;color:#dbe3ef;margin-top:12px;white-space:pre-wrap}.preview{max-width:100%;max-height:420px;border-radius:14px;display:none;margin-top:12px}
+.animWrap{display:none}.animStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;min-height:280px;display:grid;place-items:center}.animStage canvas{max-width:100%;max-height:560px;width:auto;height:auto;display:block}.animBadge{position:absolute;left:10px;top:10px;background:#000b;padding:6px 9px;border-radius:9px;font-size:13px}.animControls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}.speed{display:grid;grid-template-columns:75px 170px 50px;gap:8px;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}.view{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3}.view canvas{width:100%;height:100%;object-fit:contain;display:block}.badge{position:absolute;left:7px;top:7px;background:#000a;padding:4px 7px;border-radius:8px;font-size:12px}.center{outline:2px solid #fff}.small{font-size:13px;color:#99a3b1}@media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}.range{grid-template-columns:110px 1fr 45px}.speed{grid-template-columns:65px 130px 45px}}
 </style>
 </head>
 <body><main>
@@ -28,10 +30,20 @@ input[type=range]{width:100%}.status{padding:11px 13px;border-radius:12px;backgr
   <div id="status" class="status">Prêt. WebGPU : détection…</div>
 </div>
 <div class="card">
-  <div class="range"><label>Relief</label><input id="strength" type="range" min="0.005" max="0.090" step="0.005" value="0.035"><output id="strengthOut">0.035</output></div>
-  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.25" max="1.00" step="0.05" value="0.65"><output id="amplitudeOut">0.65</output></div>
-  <div class="range"><label>Zoom sécurité</label><input id="zoom" type="range" min="1.00" max="1.15" step="0.01" value="1.06"><output id="zoomOut">1.06</output></div>
-  <div class="small">Le zoom réduit les bords vides lorsque la parallaxe augmente. Pour le lenticulaire, commence avec Relief 0,035 / Amplitude 0,65.</div>
+  <div class="range"><label>Relief</label><input id="strength" type="range" min="0.005" max="0.090" step="0.005" value="0.055"><output id="strengthOut">0.055</output></div>
+  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.25" max="1.00" step="0.05" value="0.85"><output id="amplitudeOut">0.85</output></div>
+  <div class="range"><label>Zoom sécurité</label><input id="zoom" type="range" min="1.00" max="1.15" step="0.01" value="1.08"><output id="zoomOut">1.08</output></div>
+  <div class="small">Réglage de test renforcé : Relief 0,055 / Amplitude 0,85 / Zoom 1,08.</div>
+</div>
+<div id="animWrap" class="card animWrap">
+  <div class="row"><strong>Aperçu animé 01 ↔ 09</strong></div>
+  <div class="animStage"><canvas id="animCanvas"></canvas><div id="animBadge" class="animBadge">05 — original</div></div>
+  <div class="animControls">
+    <button id="playBtn" class="secondary">Pause</button>
+    <button id="centerBtn" class="secondary">Voir 05</button>
+    <div class="speed"><label>Vitesse</label><input id="speed" type="range" min="70" max="420" step="10" value="150"><output id="speedOut">150 ms</output></div>
+  </div>
+  <div class="small">Lecture ping-pong : 01→09→01. C’est cette prévisualisation qui permet de juger rapidement la sensation de profondeur lenticulaire.</div>
 </div>
 <div id="grid" class="grid"></div>
 </main>
@@ -40,10 +52,14 @@ import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transfo
 env.allowLocalModels = false;
 const $=id=>document.getElementById(id);
 const file=$('file'), preview=$('preview'), status=$('status'), depthBtn=$('depthBtn'), viewsBtn=$('viewsBtn'), grid=$('grid');
-let srcUrl=null, srcImg=null, depthRaw=null, estimator=null, backend='';
+const animWrap=$('animWrap'), animCanvas=$('animCanvas'), animBadge=$('animBadge'), playBtn=$('playBtn'), centerBtn=$('centerBtn'), speed=$('speed'), speedOut=$('speedOut');
+let srcUrl=null, srcImg=null, depthRaw=null, estimator=null, backend='', frames=[];
+let timer=null, frameIndex=4, direction=1, playing=true;
 for(const id of ['strength','amplitude','zoom']){$(id).addEventListener('input',()=>$(id+'Out').textContent=$(id).value)}
+speed.addEventListener('input',()=>{speedOut.textContent=speed.value+' ms';if(playing&&frames.length)restartAnimation()});
 status.textContent = `Prêt. WebGPU : ${navigator.gpu ? 'disponible ✓' : 'non détecté — repli WASM'}`;
 file.addEventListener('change', async()=>{
+  stopAnimation(); frames=[]; animWrap.style.display='none';
   const f=file.files?.[0]; if(!f)return;
   if(srcUrl) URL.revokeObjectURL(srcUrl);
   srcUrl=URL.createObjectURL(f); preview.src=srcUrl; preview.style.display='block';
@@ -62,27 +78,34 @@ depthBtn.addEventListener('click', async()=>{
       }else{ estimator=await pipeline('depth-estimation','onnx-community/depth-anything-v2-small',{device:'wasm',dtype:'q8',progress_callback}); backend='WASM'; }
     }
     status.textContent=`Calcul de la carte de profondeur sur ${backend}…`;
-    const out=await estimator(srcUrl);
-    depthRaw=out.depth;
+    const out=await estimator(srcUrl); depthRaw=out.depth;
     status.textContent=`Profondeur calculée ✓ — moteur ${backend}.\nAucune image n'a été envoyée à un serveur de rendu.`;
     viewsBtn.disabled=false;
   }catch(e){console.error(e); status.textContent='Erreur profondeur : '+(e?.message||e); depthBtn.disabled=false;}
 });
 viewsBtn.addEventListener('click',()=>{
-  if(!depthRaw||!srcImg)return; grid.innerHTML='';
+  if(!depthRaw||!srcImg)return; stopAnimation(); grid.innerHTML=''; frames=[];
   const W=Math.min(srcImg.naturalWidth,1400), H=Math.round(srcImg.naturalHeight*W/srcImg.naturalWidth);
   const imageCanvas=document.createElement('canvas'); imageCanvas.width=W; imageCanvas.height=H; imageCanvas.getContext('2d').drawImage(srcImg,0,0,W,H);
   const depthCanvas=rawDepthToCanvas(depthRaw,W,H);
   const relief=+$('strength').value, amp=+$('amplitude').value, zoom=+$('zoom').value;
   for(let i=0;i<9;i++){
-    const box=document.createElement('div'); box.className='view'+(i===4?' center':'');
     const c=document.createElement('canvas'); c.width=W; c.height=H;
-    if(i===4){ c.getContext('2d').drawImage(imageCanvas,0,0); }
-    else { renderParallax(c,imageCanvas,depthCanvas,((i-4)/4)*amp,relief,zoom); }
-    const b=document.createElement('div'); b.className='badge'; b.textContent=String(i+1).padStart(2,'0')+(i===4?' — original':''); box.append(c,b); grid.append(box);
+    if(i===4){ c.getContext('2d').drawImage(imageCanvas,0,0); } else { renderParallax(c,imageCanvas,depthCanvas,((i-4)/4)*amp,relief,zoom); }
+    frames.push(c);
+    const box=document.createElement('div'); box.className='view'+(i===4?' center':'');
+    const display=document.createElement('canvas'); display.width=W; display.height=H; display.getContext('2d').drawImage(c,0,0);
+    const b=document.createElement('div'); b.className='badge'; b.textContent=String(i+1).padStart(2,'0')+(i===4?' — original':''); box.append(display,b); grid.append(box);
   }
-  status.textContent='9 vues générées localement ✓ — la vue 05 est strictement l’original redimensionné.';
+  animCanvas.width=W; animCanvas.height=H; animWrap.style.display='block'; frameIndex=4; direction=1; playing=true; playBtn.textContent='Pause'; showAnimFrame(4); restartAnimation();
+  status.textContent='9 vues générées localement ✓ — aperçu animé actif. La vue 05 est strictement l’original redimensionné.';
+  animWrap.scrollIntoView({behavior:'smooth',block:'start'});
 });
+playBtn.addEventListener('click',()=>{playing=!playing;playBtn.textContent=playing?'Pause':'Lecture';if(playing)restartAnimation();else stopAnimation()});
+centerBtn.addEventListener('click',()=>{stopAnimation();playing=false;playBtn.textContent='Lecture';frameIndex=4;showAnimFrame(4)});
+function restartAnimation(){stopAnimation();timer=setInterval(()=>{frameIndex+=direction;if(frameIndex>=8){frameIndex=8;direction=-1}else if(frameIndex<=0){frameIndex=0;direction=1}showAnimFrame(frameIndex)},+speed.value)}
+function stopAnimation(){if(timer){clearInterval(timer);timer=null}}
+function showAnimFrame(i){if(!frames[i])return;const ctx=animCanvas.getContext('2d');ctx.clearRect(0,0,animCanvas.width,animCanvas.height);ctx.drawImage(frames[i],0,0);animBadge.textContent=String(i+1).padStart(2,'0')+(i===4?' — original':'')}
 function loadImage(url){return new Promise((res,rej)=>{const i=new Image;i.onload=()=>res(i);i.onerror=rej;i.src=url})}
 function rawDepthToCanvas(raw,W,H){
   const s=document.createElement('canvas'); s.width=raw.width; s.height=raw.height; const ctx=s.getContext('2d');
