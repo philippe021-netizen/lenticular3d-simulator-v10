@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V12</title>
+<title>MicroPlayer — Depth iPad V13</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -23,7 +23,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 .preview{max-width:100%;max-height:390px;border-radius:14px;display:none;margin-top:12px}
 .selectWrap{display:none;margin-top:12px}
 .selectStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;display:grid;place-items:center;touch-action:manipulation}
-.selectStage canvas{max-width:100%;max-height:520px;width:auto;height:auto;display:block}
+.selectStage canvas{max-width:100%;max-height:520px;width:auto;height:auto;display:block;touch-action:none}
 .hint{margin-top:9px;color:#c9d3e2;font-size:14px}
 .maskTools{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:11px}.maskTools button{padding:10px 13px;font-size:14px}.maskTools button.active{background:#25d975;color:#06150c}.brush{display:grid;grid-template-columns:auto 150px 42px;gap:8px;align-items:center;font-size:14px}
 .animWrap{display:none}.animStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;min-height:280px;display:grid;place-items:center}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V12</h1>
+<h1>MicroPlayer — profondeur locale iPad V13</h1>
 <div class="sub">Quatre plans rigides avec carte colorée contrôlable au doigt ou à l’Apple Pencil. L’automatique propose les zones ; vous pouvez les corriger avant les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -61,13 +61,14 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="paintModeBtn" class="secondary">Pinceau +</button>
     <button id="eraseModeBtn" class="secondary">Gomme</button>
     <button id="layersBtn" class="secondary">Voir les plans</button>
-    <div class="brush"><label>Taille</label><input id="brushSize" type="range" min="12" max="100" step="4" value="40"><output id="brushSizeOut">40</output></div>
+    <div class="brush"><label>Taille</label><input id="brushSize" type="range" min="2" max="80" step="2" value="10"><output id="brushSizeOut">10</output></div>
   </div>
   <div id="layerTools" class="maskTools" style="display:none">
     <button id="nearLayerBtn" class="secondary">🟠 Proche</button>
     <button id="midLayerBtn" class="secondary">🔵 Intermédiaire</button>
     <button id="farLayerBtn" class="secondary">🟣 Horizon</button>
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
+    <button id="validateLayersBtn">✓ Valider les plans</button>
   </div>
   <div class="hint">Vert = sujet principal. En mode « Voir les plans » : orange = proche, bleu = intermédiaire, violet = horizon/ciel. Choisissez une couleur puis peignez directement les zones mal classées.</div>
 </section>
@@ -123,6 +124,7 @@ const nearLayerBtn = byId("nearLayerBtn");
 const midLayerBtn = byId("midLayerBtn");
 const farLayerBtn = byId("farLayerBtn");
 const autoLayersBtn = byId("autoLayersBtn");
+const validateLayersBtn = byId("validateLayersBtn");
 const brushSize = byId("brushSize");
 const brushSizeOut = byId("brushSizeOut");
 const animWrap = byId("animWrap");
@@ -153,6 +155,7 @@ let playing = true;
 let maskTimer = null;
 let editMode = "auto";
 let drawingMask = false;
+let lastPaintPoint = null;
 let showLayers = false;
 
 for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
@@ -192,6 +195,17 @@ autoLayersBtn.addEventListener("click", () => {
   layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
   drawSelection();
   status.textContent = "Répartition automatique des trois plans recalculée ✓.";
+});
+validateLayersBtn.addEventListener("click", () => {
+  showLayers = false;
+  layersBtn.classList.remove("active");
+  layersBtn.textContent = "Voir les plans";
+  layerTools.style.display = "none";
+  setEditMode("auto");
+  drawSelection();
+  viewsBtn.disabled = false;
+  status.textContent = "Plans validés ✓. Les corrections sont mémorisées pour la génération des 9 vues.";
+  viewsBtn.scrollIntoView({ behavior: "smooth", block: "center" });
 });
 
 status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
@@ -275,20 +289,23 @@ selectCanvas.addEventListener("pointerdown", event => {
     return;
   }
   drawingMask = true;
+  lastPaintPoint = point;
   selectCanvas.setPointerCapture(event.pointerId);
-  paintActiveMap(point.x, point.y);
+  paintActiveMap(point.x, point.y, point);
 });
 
 selectCanvas.addEventListener("pointermove", event => {
   if (!drawingMask || editMode === "auto") return;
   const point = canvasPoint(event);
-  paintActiveMap(point.x, point.y);
+  paintActiveMap(point.x, point.y, lastPaintPoint || point);
+  lastPaintPoint = point;
 });
 
 for (const eventName of ["pointerup", "pointercancel"]) {
   selectCanvas.addEventListener(eventName, () => {
     if (!drawingMask) return;
     drawingMask = false;
+    lastPaintPoint = null;
     if (editMode.startsWith("layer-")) {
       status.textContent = "Plan manuel mis à jour ✓.";
     } else {
@@ -345,7 +362,7 @@ viewsBtn.addEventListener("click", () => {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans appliquée • corrections manuelles conservées • aucun warping continu";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans validée • pinceau haute précision • corrections manuelles conservées";
   status.textContent = "9 vues générées ✓ — quatre plans rigides selon la carte automatique ou corrigée.";
   animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 });
@@ -547,37 +564,44 @@ function canvasPoint(event) {
   };
 }
 
-function paintActiveMap(x, y) {
-  if (editMode.startsWith("layer-")) paintLayerMap(x, y);
-  else paintSubjectMask(x, y);
+function paintActiveMap(x, y, from) {
+  if (editMode.startsWith("layer-")) paintLayerMap(x, y, from);
+  else paintSubjectMask(x, y, from);
 }
 
-function paintLayerMap(x, y) {
+function strokeBrush(ctx, x, y, from, radius) {
+  const start = from || { x, y };
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(2, radius * 2);
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+}
+
+function paintLayerMap(x, y, from) {
   if (!layerMapCanvas) return;
-  const radius = Number(brushSize.value) * selectCanvas.width / 900;
+  const radius = Math.max(1, Number(brushSize.value) * selectCanvas.width / 900);
   const colors = {
     "layer-near": "#ff731a",
     "layer-mid": "#268cff",
     "layer-far": "#a438ea"
   };
   const ctx = layerMapCanvas.getContext("2d");
-  ctx.fillStyle = colors[editMode] || colors["layer-near"];
-  ctx.beginPath();
-  ctx.arc(x, y, Math.max(5, radius), 0, Math.PI * 2);
-  ctx.fill();
+  ctx.strokeStyle = colors[editMode] || colors["layer-near"];
+  strokeBrush(ctx, x, y, from, radius);
   drawSelection();
 }
 
-function paintSubjectMask(x, y) {
+function paintSubjectMask(x, y, from) {
   if (!subjectMask) return;
-  const radius = Number(brushSize.value) * selectCanvas.width / 900;
+  const radius = Math.max(1, Number(brushSize.value) * selectCanvas.width / 900);
   const ctx = subjectMask.getContext("2d");
   ctx.save();
   ctx.globalCompositeOperation = editMode === "erase" ? "destination-out" : "source-over";
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(x, y, Math.max(5, radius), 0, Math.PI * 2);
-  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  strokeBrush(ctx, x, y, from, radius);
   ctx.restore();
   backgroundCanvas = null;
   drawSelection();
