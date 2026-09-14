@@ -4,11 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DepthFlow">
-<link rel="manifest" href="./depthflow-manifest-v24.webmanifest">
-<title>MicroPlayer — Depth iPad V24</title>
+<title>MicroPlayer — Depth iPad V23</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -38,13 +34,12 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 .view canvas{width:100%;height:100%;object-fit:contain;display:block}.center{outline:2px solid #fff}
 .mode{display:inline-block;padding:6px 9px;border-radius:9px;background:#223329;color:#bff5cf;font-size:13px;margin-top:8px}
 .qc{display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:#172c20;color:#bff5cf}
-.offlineState{margin-top:10px;padding:9px 11px;border-radius:10px;background:#20242d}.offlineState.ready{background:#173522;color:#bff5cf}.offlineState.warn{background:#3b2c16;color:#ffe0a3}
 @media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}.range{grid-template-columns:135px 1fr 48px}}
 </style>
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V24</h1>
+<h1>MicroPlayer — profondeur locale iPad V23</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -53,11 +48,9 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="depthBtn" disabled>1. Calculer la profondeur</button>
     <button id="viewsBtn" disabled>2. Générer 9 vues</button>
     <button id="zipBtn" class="secondary" disabled>Télécharger les 9 PNG</button>
-    <button id="offlineBtn" class="secondary">Préparer hors ligne</button>
   </div>
   <img id="preview" class="preview" alt="Aperçu de la photo">
   <div id="status" class="status">Prêt.</div>
-  <div id="offlineState" class="small offlineState">Hors ligne non préparé : touchez « Préparer hors ligne » une première fois avec Internet.</div>
 </section>
 
 <section id="selectWrap" class="card selectWrap">
@@ -111,8 +104,6 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 <script type="module">
 import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
 env.allowLocalModels = false;
-env.useBrowserCache = true;
-if ("useWasmCache" in env) env.useWasmCache = true;
 
 const byId = id => document.getElementById(id);
 const file = byId("file");
@@ -121,8 +112,6 @@ const status = byId("status");
 const depthBtn = byId("depthBtn");
 const viewsBtn = byId("viewsBtn");
 const zipBtn = byId("zipBtn");
-const offlineBtn = byId("offlineBtn");
-const offlineState = byId("offlineState");
 const grid = byId("grid");
 const selectWrap = byId("selectWrap");
 const selectCanvas = byId("selectCanvas");
@@ -171,7 +160,6 @@ let selectionDrawFrame = null;
 let showLayers = false;
 let layerLocks = null;
 let layerStrokeCanvas = null;
-let offlineRegistration = null;
 
 for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
   byId(id).addEventListener("input", () => {
@@ -258,87 +246,31 @@ file.addEventListener("change", async () => {
   status.textContent = "Photo chargée : " + srcImg.naturalWidth + "×" + srcImg.naturalHeight + ".\nWebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — WASM");
 });
 
-async function registerOfflineWorker() {
-  if (!("serviceWorker" in navigator)) throw new Error("Le mode hors ligne n’est pas pris en charge par ce navigateur.");
-  if (!offlineRegistration) {
-    offlineRegistration = await navigator.serviceWorker.register("./depthflow-sw-v24.js", { scope: "./" });
-  }
-  await navigator.serviceWorker.ready;
-  if (!navigator.serviceWorker.controller) {
-    await Promise.race([
-      new Promise(resolve => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })),
-      new Promise(resolve => setTimeout(resolve, 2500))
-    ]);
-  }
-  return offlineRegistration;
-}
-
-function showOfflineState() {
-  const prepared = localStorage.getItem("microplayer-depth-offline-v24") === "ready";
-  offlineState.classList.toggle("ready", prepared);
-  offlineState.classList.toggle("warn", !navigator.onLine);
-  if (prepared) {
-    offlineState.textContent = navigator.onLine
-      ? "Mode hors ligne prêt ✓ — sur iPad : Partager → Sur l’écran d’accueil."
-      : "Mode hors ligne actif ✓ — aucune connexion détectée.";
-  } else {
-    offlineState.textContent = navigator.onLine
-      ? "Hors ligne non préparé : touchez « Préparer hors ligne » une première fois avec Internet."
-      : "Connexion nécessaire pour télécharger une première fois le moteur de profondeur.";
-  }
-}
-
-async function ensureEstimator() {
-  if (estimator) return estimator;
-  status.textContent = "Chargement de Depth Anything V2 Small…";
-  const progress_callback = p => {
-    if (p && p.progress != null) status.textContent = "Téléchargement hors ligne… " + Math.round(p.progress) + " %";
-  };
-  if (navigator.gpu) {
-    try {
-      estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "webgpu", dtype: "q4f16", progress_callback });
-      backend = "WebGPU";
-    } catch (error) {
-      console.warn("WebGPU indisponible, repli WASM", error);
-      estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
-      backend = "WASM";
-    }
-  } else {
-    estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
-    backend = "WASM";
-  }
-  localStorage.setItem("microplayer-depth-offline-v24", "ready");
-  showOfflineState();
-  return estimator;
-}
-
-offlineBtn.addEventListener("click", async () => {
-  offlineBtn.disabled = true;
-  try {
-    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-    status.textContent = "Préparation du fonctionnement hors ligne…";
-    await registerOfflineWorker();
-    await ensureEstimator();
-    status.textContent = "Mode hors ligne préparé ✓. Ajoutez maintenant DepthFlow à l’écran d’accueil de l’iPad.";
-  } catch (error) {
-    status.textContent = "Préparation hors ligne impossible : " + (error && error.message ? error.message : error);
-  } finally {
-    offlineBtn.disabled = false;
-  }
-});
-
-window.addEventListener("online", showOfflineState);
-window.addEventListener("offline", showOfflineState);
-showOfflineState();
-registerOfflineWorker().catch(error => console.warn("Service worker indisponible", error));
-
 depthBtn.addEventListener("click", async () => {
   if (!srcImg) return;
   depthBtn.disabled = true;
   viewsBtn.disabled = true;
   try {
-    await registerOfflineWorker();
-    await ensureEstimator();
+    if (!estimator) {
+      status.textContent = "Chargement de Depth Anything V2 Small…";
+      const progress_callback = p => {
+        if (p && p.progress != null) status.textContent = "Chargement du modèle… " + Math.round(p.progress) + " %";
+      };
+      if (navigator.gpu) {
+        try {
+          estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "webgpu", dtype: "q4f16", progress_callback });
+          backend = "WebGPU";
+        } catch (error) {
+          console.warn("WebGPU indisponible, repli WASM", error);
+          estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
+          backend = "WASM";
+        }
+      } else {
+        estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
+        backend = "WASM";
+      }
+    }
+
     status.textContent = "Calcul de profondeur sur " + backend + "…";
     const output = await estimator(srcUrl);
     depthRaw = output.depth;
