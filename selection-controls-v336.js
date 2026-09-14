@@ -2,8 +2,6 @@
 (() => {
   'use strict';
 
-  let originalRenderAt=null;
-  try{if(typeof renderAt==='function')originalRenderAt=renderAt;}catch(_){}
 
   const actionOptions=[
     ['Aucune action','none'],
@@ -67,10 +65,10 @@
     return layer;
   }
 
-  function multiRenderAt(norm,target){
-    const selections=plan();if(!sourceImage()||!bgImage()){if(originalRenderAt)return originalRenderAt(norm,target);return;}
+  function multiRenderAt(norm,target,next){
+    const selections=plan();if(!sourceImage()||!bgImage())return next?.(norm,target);
     // Dès qu'un plan existe, on compose nous-mêmes : ainsi le placement du sujet est identique dans aperçu et 9 vues.
-    if(!selections.length){if(originalRenderAt)return originalRenderAt(norm,target);return;}
+    if(!selections.length)return next?.(norm,target);
     target=resolveRenderTarget(target);if(!target)return;
     const x=target.getContext('2d'),W=target.width,H=target.height;x.clearRect(0,0,W,H);
     let amplitude=1.75,bgD=.10;try{if(typeof angle!=='undefined')amplitude=Number(angle.value)/4;if(typeof bgDepth!=='undefined')bgD=Number(bgDepth.value);}catch(_){}
@@ -87,7 +85,7 @@
     if(textDepth>=0)window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
   }
 
-  if(originalRenderAt){try{renderAt=multiRenderAt;}catch(_){}try{window.renderAt=multiRenderAt;}catch(_){}}
+  window.HappyHoloRenderPipeline?.register('selection-actions',multiRenderAt,{priority:30,enabled:()=>plan().length>0});
 
   function makeSelect(){const s=document.createElement('select');Object.assign(s.style,{width:'100%',padding:'9px 10px',border:'1px solid #ccc',borderRadius:'10px',background:'#fff',font:'inherit'});return s;}
 
