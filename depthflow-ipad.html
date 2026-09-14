@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V13</title>
+<title>MicroPlayer — Depth iPad V14</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V13</h1>
+<h1>MicroPlayer — profondeur locale iPad V14</h1>
 <div class="sub">Quatre plans rigides avec carte colorée contrôlable au doigt ou à l’Apple Pencil. L’automatique propose les zones ; vous pouvez les corriger avant les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -68,9 +68,9 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="midLayerBtn" class="secondary">🔵 Intermédiaire</button>
     <button id="farLayerBtn" class="secondary">🟣 Horizon</button>
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
-    <button id="validateLayersBtn">✓ Valider les plans</button>
+    <button id="validateLayersBtn">✓ Valider et actualiser</button>
   </div>
-  <div class="hint">Vert = sujet principal. En mode « Voir les plans » : orange = proche, bleu = intermédiaire, violet = horizon/ciel. Choisissez une couleur puis peignez directement les zones mal classées.</div>
+  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
 </section>
 
 <section class="card">
@@ -204,8 +204,8 @@ validateLayersBtn.addEventListener("click", () => {
   setEditMode("auto");
   drawSelection();
   viewsBtn.disabled = false;
-  status.textContent = "Plans validés ✓. Les corrections sont mémorisées pour la génération des 9 vues.";
-  viewsBtn.scrollIntoView({ behavior: "smooth", block: "center" });
+  status.textContent = "Plans validés ✓. Actualisation du simulateur…";
+  generateViews({ scroll: true });
 });
 
 status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
@@ -315,7 +315,7 @@ for (const eventName of ["pointerup", "pointercancel"]) {
   });
 }
 
-viewsBtn.addEventListener("click", () => {
+function generateViews({ scroll = true } = {}) {
   if (!depthRaw || !srcImg || !subjectMask || !layerMapCanvas || !backgroundCanvas) return;
   stopAnimation();
   grid.innerHTML = "";
@@ -362,10 +362,12 @@ viewsBtn.addEventListener("click", () => {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans validée • pinceau haute précision • corrections manuelles conservées";
-  status.textContent = "9 vues générées ✓ — quatre plans rigides selon la carte automatique ou corrigée.";
-  animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
-});
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans validée • pinceau haute précision • simulateur synchronisé";
+  status.textContent = "Simulateur actualisé ✓ — les 9 vues utilisent maintenant toutes les corrections validées.";
+  if (scroll) animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+viewsBtn.addEventListener("click", () => generateViews({ scroll: true }));
 
 zipBtn.addEventListener("click", async () => {
   if (frames.length !== 9 || !window.JSZip) return;
