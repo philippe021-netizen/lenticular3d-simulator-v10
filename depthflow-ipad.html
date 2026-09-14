@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V15</title>
+<title>MicroPlayer — Depth iPad V16</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V15</h1>
+<h1>MicroPlayer — profondeur locale iPad V16</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -60,7 +60,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="autoModeBtn" class="secondary active">Point automatique</button>
     <button id="paintModeBtn" class="secondary">Pinceau +</button>
     <button id="eraseModeBtn" class="secondary">Gomme</button>
-    <button id="layersBtn" class="secondary">Voir les plans</button>
+    <button id="layersBtn" class="secondary" disabled>Voir les plans</button>
     <div class="brush"><label>Taille</label><input id="brushSize" type="range" min="2" max="80" step="2" value="10"><output id="brushSizeOut">10</output></div>
   </div>
   <div id="layerTools" class="maskTools" style="display:none">
@@ -205,7 +205,8 @@ validateLayersBtn.addEventListener("click", () => {
   setEditMode("auto");
   drawSelection();
   viewsBtn.disabled = false;
-  status.textContent = "Plans validés ✓. Actualisation du simulateur…";
+  status.textContent = "Plans validés ✓. Préparation du simulateur…";
+  if (!backgroundCanvas) backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
   generateViews({ scroll: true });
 });
 
@@ -233,6 +234,7 @@ file.addEventListener("change", async () => {
   layersBtn.classList.remove("active");
   layersBtn.textContent = "Voir les plans";
   layerTools.style.display = "none";
+  layersBtn.disabled = true;
   grid.innerHTML = "";
   depthBtn.disabled = false;
   viewsBtn.disabled = true;
@@ -269,10 +271,16 @@ depthBtn.addEventListener("click", async () => {
     depthRaw = output.depth;
     prepareCanvases();
     seed = { x: 0.5, y: 0.45, depth: 0.5 };
-    prepareSubjectMask(false);
+    subjectMask = document.createElement("canvas");
+    subjectMask.width = imageCanvas.width;
+    subjectMask.height = imageCanvas.height;
+    layerMapCanvas = null;
+    backgroundCanvas = null;
     selectWrap.style.display = "block";
-    viewsBtn.disabled = false;
-    status.textContent = "Profondeur calculée ✓ — " + backend + ".\nSujet détecté autour du point vert. Touchez le sujet pour corriger si nécessaire.";
+    layersBtn.disabled = true;
+    viewsBtn.disabled = true;
+    drawSelection();
+    status.textContent = "Profondeur calculée ✓ — " + backend + ".\nTouchez maintenant le sujet principal : aucune zone verte n’est présélectionnée.";
   } catch (error) {
     status.textContent = "Erreur profondeur : " + (error && error.message ? error.message : error);
     depthBtn.disabled = false;
@@ -374,7 +382,7 @@ function generateViews({ scroll = true } = {}) {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • carte 4 plans validée • Pencil accéléré • moteur WebGL partagé • simulateur synchronisé";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • aucune présélection forcée • plans remplaçant réellement le sujet • simulateur synchronisé";
   status.textContent = "Simulateur actualisé ✓ — corrections appliquées avec le moteur accéléré.";
   if (scroll) animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -441,6 +449,7 @@ function prepareSubjectMask(keepPoint) {
   seed.depth = result.seedDepth;
   if (!keepPoint || !layerMapCanvas) layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
   drawSelection();
+  layersBtn.disabled = false;
   if (!keepPoint) viewsBtn.disabled = false;
 }
 
@@ -606,6 +615,19 @@ function paintLayerMap(x, y, from) {
   const ctx = layerMapCanvas.getContext("2d");
   ctx.strokeStyle = color;
   strokeBrush(ctx, x, y, from, radius);
+
+  // A background plan must be able to replace a wrongly selected green area.
+  // Remove the same stroke from the subject mask; the clean background is
+  // rebuilt once, only when the user validates the corrections.
+  if (subjectMask) {
+    const subjectCtx = subjectMask.getContext("2d");
+    subjectCtx.save();
+    subjectCtx.globalCompositeOperation = "destination-out";
+    subjectCtx.strokeStyle = "#ffffff";
+    strokeBrush(subjectCtx, x, y, from, radius);
+    subjectCtx.restore();
+    backgroundCanvas = null;
+  }
 
   // Paint the visible overlay directly instead of rebuilding the full
   // high-resolution preview at every Pencil event.
