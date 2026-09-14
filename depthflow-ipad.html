@@ -1,0 +1,1205 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0c10">
+<title>MicroPlayer — Depth iPad V27</title>
+<style>
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:#0b0c10;color:#f5f7fa;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+main{max-width:1050px;margin:auto}
+.card{background:#15171d;border:1px solid #292d36;border-radius:18px;padding:16px;margin:14px 0}
+h1{font-size:24px;margin:8px 0}
+.sub,.small{color:#aeb6c4;line-height:1.45}.small{font-size:13px}
+.row,.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+button,.file{appearance:none;border:0;border-radius:12px;padding:13px 16px;font-weight:700;font-size:16px;background:#fff;color:#111;cursor:pointer}
+button.secondary{background:#2a2f39;color:#fff;border:1px solid #3b424f}
+button:disabled{opacity:.4;cursor:default}.file input{display:none}
+.range{display:grid;grid-template-columns:170px 1fr 58px;gap:10px;align-items:center;min-width:300px;margin:9px 0}
+.range input{width:100%}
+.status{padding:11px 13px;border-radius:12px;background:#20242d;color:#dbe3ef;margin-top:12px;white-space:pre-wrap}
+.preview{max-width:100%;max-height:390px;border-radius:14px;display:none;margin-top:12px}
+.selectWrap{display:none;margin-top:12px}
+.selectStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;display:grid;place-items:center;touch-action:manipulation}
+.selectStage canvas{max-width:100%;max-height:520px;width:auto;height:auto;display:block;touch-action:none}
+.hint{margin-top:9px;color:#c9d3e2;font-size:14px}
+.maskTools{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:11px}.maskTools button{padding:10px 13px;font-size:14px}.maskTools button.active{background:#25d975;color:#06150c}.brush{display:grid;grid-template-columns:auto 150px 42px;gap:8px;align-items:center;font-size:14px}
+.animWrap{display:none}.animStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;min-height:280px;display:grid;place-items:center}
+.animStage canvas{max-width:100%;max-height:560px;width:auto;height:auto;display:block}
+.animBadge,.badge{position:absolute;left:8px;top:8px;background:#000c;padding:5px 8px;border-radius:8px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.view{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:4/3}
+.view canvas{width:100%;height:100%;object-fit:contain;display:block}.center{outline:2px solid #fff}
+.mode{display:inline-block;padding:6px 9px;border-radius:9px;background:#223329;color:#bff5cf;font-size:13px;margin-top:8px}
+.qc{display:none;margin-top:12px;padding:10px 12px;border-radius:12px;background:#172c20;color:#bff5cf}
+@media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}.range{grid-template-columns:135px 1fr 48px}}
+html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}html.hh-embedded main>h1,html.hh-embedded main>.sub{display:none}html.hh-embedded .card:first-of-type{margin-top:0}
+</style>
+</head>
+<body>
+<main>
+<h1>MicroPlayer — profondeur locale iPad V27</h1>
+<div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
+
+<section class="card">
+  <div class="row">
+    <label class="file">Choisir une photo<input id="file" type="file" accept="image/*"></label>
+    <button id="depthBtn" disabled>1. Calculer la profondeur</button>
+    <button id="viewsBtn" disabled>2. Générer 9 vues</button>
+    <button id="zipBtn" class="secondary" disabled>Télécharger les 9 PNG</button>
+  </div>
+  <img id="preview" class="preview" alt="Aperçu de la photo">
+  <div id="status" class="status">Prêt.</div>
+</section>
+
+<section id="selectWrap" class="card selectWrap">
+  <strong>Sujet à verrouiller</strong>
+  <div class="selectStage"><canvas id="selectCanvas"></canvas></div>
+  <div class="maskTools">
+    <button id="autoModeBtn" class="secondary active">Point automatique</button>
+    <button id="paintModeBtn" class="secondary">Pinceau +</button>
+    <button id="eraseModeBtn" class="secondary">Gomme</button>
+    <button id="layersBtn" class="secondary" disabled>Voir les plans</button>
+    <div class="brush"><label>Taille</label><input id="brushSize" type="range" min="2" max="80" step="2" value="10"><output id="brushSizeOut">10</output></div>
+  </div>
+  <div id="layerTools" class="maskTools" style="display:none">
+    <button id="nearLayerBtn" class="secondary">🟠 Proche</button>
+    <button id="midLayerBtn" class="secondary">🔵 Intermédiaire</button>
+    <button id="farLayerBtn" class="secondary">🟣 Horizon</button>
+    <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
+    <button id="validateLayersBtn">✓ Valider et actualiser</button>
+  </div>
+  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Le vert du sujet est toujours prioritaire : seul « Gomme » peut le modifier. Chaque trait coloré au stylet est conservé dans une couche maîtresse ; une autre couleur peut déborder dessus sans le remplacer. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
+</section>
+
+<section class="card">
+  <div class="range"><label>Profondeur globale</label><input id="strength" type="range" min="0.035" max="0.130" step="0.005" value="0.080"><output id="strengthOut">0.080</output></div>
+  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.40" max="1.10" step="0.05" value="0.95"><output id="amplitudeOut">0.95</output></div>
+  <div class="range"><label>Séparation avant-plan</label><input id="subjectPlane" type="range" min="0.00" max="0.36" step="0.02" value="0.22"><output id="subjectPlaneOut">0.22</output></div>
+  <div class="range"><label>Écart entre les plans</label><input id="backgroundRelief" type="range" min="0.08" max="0.36" step="0.02" value="0.24"><output id="backgroundReliefOut">0.24</output></div>
+  <div class="range"><label>Micro-relief du sujet</label><input id="subjectRelief" type="range" min="0.00" max="0.70" step="0.05" value="0.25"><output id="subjectReliefOut">0.25</output></div>
+  <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.20"><output id="subjectToleranceOut">0.20</output></div>
+  <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.70"><output id="edgeProtectOut">0.70</output></div>
+  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, écart des plans 0,24, micro-relief 0,25. Le plan violet reçoit désormais un recul supplémentaire pour être clairement distinct du bleu.</div>
+  <div class="mode">Mode : 4 plans rigides — horizon renforcé sans déformation</div>
+  <div id="qc" class="qc"></div>
+</section>
+
+<section id="animWrap" class="card animWrap">
+  <strong>Aperçu animé 01 ↔ 09</strong>
+  <div class="animStage"><canvas id="animCanvas"></canvas><div id="animBadge" class="animBadge">05 — original</div></div>
+  <div class="controls" style="margin-top:12px">
+    <button id="playBtn" class="secondary">Pause</button>
+    <button id="centerBtn" class="secondary">Voir 05</button>
+    <label>Vitesse <input id="speed" type="range" min="70" max="420" step="10" value="150"></label>
+    <output id="speedOut">150 ms</output>
+  </div>
+</section>
+
+<div id="grid" class="grid"></div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="module">
+import { pipeline, env } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0";
+if (new URLSearchParams(location.search).get("embed") === "1") document.documentElement.classList.add("hh-embedded");
+env.allowLocalModels = false;
+
+const byId = id => document.getElementById(id);
+const file = byId("file");
+const preview = byId("preview");
+const status = byId("status");
+const depthBtn = byId("depthBtn");
+const viewsBtn = byId("viewsBtn");
+const zipBtn = byId("zipBtn");
+const grid = byId("grid");
+const selectWrap = byId("selectWrap");
+const selectCanvas = byId("selectCanvas");
+const autoModeBtn = byId("autoModeBtn");
+const paintModeBtn = byId("paintModeBtn");
+const eraseModeBtn = byId("eraseModeBtn");
+const layersBtn = byId("layersBtn");
+const layerTools = byId("layerTools");
+const nearLayerBtn = byId("nearLayerBtn");
+const midLayerBtn = byId("midLayerBtn");
+const farLayerBtn = byId("farLayerBtn");
+const autoLayersBtn = byId("autoLayersBtn");
+const validateLayersBtn = byId("validateLayersBtn");
+const brushSize = byId("brushSize");
+const brushSizeOut = byId("brushSizeOut");
+const animWrap = byId("animWrap");
+const animCanvas = byId("animCanvas");
+const animBadge = byId("animBadge");
+const playBtn = byId("playBtn");
+const centerBtn = byId("centerBtn");
+const speed = byId("speed");
+const speedOut = byId("speedOut");
+const qc = byId("qc");
+
+let srcUrl = null;
+let srcImg = null;
+let depthRaw = null;
+let estimator = null;
+let backend = "";
+let imageCanvas = null;
+let depthCanvas = null;
+let subjectMask = null;
+let layerMapCanvas = null;
+let backgroundCanvas = null;
+let seed = { x: 0.5, y: 0.45, depth: 0.5 };
+let frames = [];
+let timer = null;
+let frameIndex = 4;
+let direction = 1;
+let playing = true;
+let maskTimer = null;
+let editMode = "auto";
+let drawingMask = false;
+let lastPaintPoint = null;
+let selectionDrawFrame = null;
+let showLayers = false;
+let manualLayerCanvas = null;
+let layerStrokeCanvas = null;
+
+for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
+  byId(id).addEventListener("input", () => {
+    byId(id + "Out").textContent = byId(id).value;
+    if (id === "subjectTolerance" && depthRaw) {
+      clearTimeout(maskTimer);
+      maskTimer = setTimeout(() => prepareSubjectMask(true), 120);
+    }
+  });
+}
+
+speed.addEventListener("input", () => {
+  speedOut.textContent = speed.value + " ms";
+  if (playing && frames.length) restartAnimation();
+});
+brushSize.addEventListener("input", () => { brushSizeOut.textContent = brushSize.value; });
+autoModeBtn.addEventListener("click", () => setEditMode("auto"));
+paintModeBtn.addEventListener("click", () => setEditMode("paint"));
+eraseModeBtn.addEventListener("click", () => setEditMode("erase"));
+nearLayerBtn.addEventListener("click", () => setEditMode("layer-near"));
+midLayerBtn.addEventListener("click", () => setEditMode("layer-mid"));
+farLayerBtn.addEventListener("click", () => setEditMode("layer-far"));
+layersBtn.addEventListener("click", () => {
+  showLayers = !showLayers;
+  layersBtn.classList.toggle("active", showLayers);
+  layersBtn.textContent = showLayers ? "Masquer les plans" : "Voir les plans";
+  layerTools.style.display = showLayers ? "flex" : "none";
+  setEditMode(showLayers ? "layer-near" : "auto");
+  drawSelection();
+  status.textContent = showLayers
+    ? "Carte des plans visible. Choisissez une couleur puis peignez les erreurs."
+    : "Carte des plans masquée.";
+});
+autoLayersBtn.addEventListener("click", () => {
+  if (!depthCanvas) return;
+  layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
+  resetLayerLocks();
+  drawSelection();
+  status.textContent = "Répartition automatique recalculée ✓. Les protections manuelles ont été remises à zéro.";
+});
+validateLayersBtn.addEventListener("click", () => {
+  showLayers = false;
+  layersBtn.classList.remove("active");
+  layersBtn.textContent = "Voir les plans";
+  layerTools.style.display = "none";
+  setEditMode("auto");
+  drawSelection();
+  viewsBtn.disabled = false;
+  status.textContent = "Plans validés ✓. Préparation du simulateur…";
+  if (!backgroundCanvas) backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+  generateViews({ scroll: true });
+});
+
+status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
+
+file.addEventListener("change", async () => {
+  stopAnimation();
+  frames = [];
+  animWrap.style.display = "none";
+  selectWrap.style.display = "none";
+  qc.style.display = "none";
+  zipBtn.disabled = true;
+  const selected = file.files && file.files[0];
+  if (!selected) return;
+  if (srcUrl) URL.revokeObjectURL(srcUrl);
+  srcUrl = URL.createObjectURL(selected);
+  preview.src = srcUrl;
+  preview.style.display = "block";
+  srcImg = await loadImage(srcUrl);
+  depthRaw = null;
+  subjectMask = null;
+  layerMapCanvas = null;
+  manualLayerCanvas = null;
+  layerStrokeCanvas = null;
+  backgroundCanvas = null;
+  showLayers = false;
+  layersBtn.classList.remove("active");
+  layersBtn.textContent = "Voir les plans";
+  layerTools.style.display = "none";
+  layersBtn.disabled = true;
+  grid.innerHTML = "";
+  depthBtn.disabled = false;
+  viewsBtn.disabled = true;
+  status.textContent = "Photo chargée : " + srcImg.naturalWidth + "×" + srcImg.naturalHeight + ".\nWebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — WASM");
+});
+
+depthBtn.addEventListener("click", async () => {
+  if (!srcImg) return;
+  depthBtn.disabled = true;
+  viewsBtn.disabled = true;
+  try {
+    if (!estimator) {
+      status.textContent = "Chargement de Depth Anything V2 Small…";
+      const progress_callback = p => {
+        if (p && p.progress != null) status.textContent = "Chargement du modèle… " + Math.round(p.progress) + " %";
+      };
+      if (navigator.gpu) {
+        try {
+          estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "webgpu", dtype: "q4f16", progress_callback });
+          backend = "WebGPU";
+        } catch (error) {
+          console.warn("WebGPU indisponible, repli WASM", error);
+          estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
+          backend = "WASM";
+        }
+      } else {
+        estimator = await pipeline("depth-estimation", "onnx-community/depth-anything-v2-small", { device: "wasm", dtype: "q8", progress_callback });
+        backend = "WASM";
+      }
+    }
+
+    status.textContent = "Calcul de profondeur sur " + backend + "…";
+    const output = await estimator(srcUrl);
+    depthRaw = output.depth;
+    prepareCanvases();
+    seed = { x: 0.5, y: 0.45, depth: 0.5 };
+    subjectMask = document.createElement("canvas");
+    subjectMask.width = imageCanvas.width;
+    subjectMask.height = imageCanvas.height;
+    layerMapCanvas = null;
+    backgroundCanvas = null;
+    selectWrap.style.display = "block";
+    layersBtn.disabled = true;
+    viewsBtn.disabled = true;
+    drawSelection();
+    status.textContent = "Profondeur calculée ✓ — " + backend + ".\nTouchez maintenant le sujet principal : aucune zone verte n’est présélectionnée.";
+  } catch (error) {
+    status.textContent = "Erreur profondeur : " + (error && error.message ? error.message : error);
+    depthBtn.disabled = false;
+  }
+});
+
+selectCanvas.addEventListener("pointerdown", event => {
+  if (!depthRaw || !imageCanvas) return;
+  const point = canvasPoint(event);
+  if (editMode === "auto") {
+    seed.x = point.x / selectCanvas.width;
+    seed.y = point.y / selectCanvas.height;
+    prepareSubjectMask(false);
+    status.textContent = "Masque automatique recalé ✓. Le vert doit couvrir tout le sujet, et uniquement lui.";
+    return;
+  }
+  drawingMask = true;
+  lastPaintPoint = point;
+  selectCanvas.setPointerCapture(event.pointerId);
+  paintActiveMap(point.x, point.y, point);
+});
+
+selectCanvas.addEventListener("pointermove", event => {
+  if (!drawingMask || editMode === "auto") return;
+  const point = canvasPoint(event);
+  paintActiveMap(point.x, point.y, lastPaintPoint || point);
+  lastPaintPoint = point;
+});
+
+for (const eventName of ["pointerup", "pointercancel"]) {
+  selectCanvas.addEventListener(eventName, () => {
+    if (!drawingMask) return;
+    drawingMask = false;
+    lastPaintPoint = null;
+    if (selectionDrawFrame) {
+      cancelAnimationFrame(selectionDrawFrame);
+      selectionDrawFrame = null;
+    }
+    drawSelection();
+    if (editMode.startsWith("layer-")) {
+      status.textContent = "Plan manuel mis à jour ✓ — le sujet vert et les traits précédents restent protégés.";
+    } else {
+      backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+      status.textContent = "Masque du sujet mis à jour ✓.";
+    }
+  });
+}
+
+function generateViews({ scroll = true } = {}) {
+  if (!depthRaw || !srcImg || !subjectMask || !layerMapCanvas || !backgroundCanvas) return;
+  stopAnimation();
+  grid.innerHTML = "";
+  frames = [];
+
+  const strength = Number(byId("strength").value);
+  const amplitude = Number(byId("amplitude").value);
+  const subjectPlane = Number(byId("subjectPlane").value);
+  const backgroundRelief = Number(byId("backgroundRelief").value);
+  const subjectRelief = Number(byId("subjectRelief").value);
+  const edgeProtect = Number(byId("edgeProtect").value);
+
+  const renderCanvas = document.createElement("canvas");
+  renderCanvas.width = imageCanvas.width;
+  renderCanvas.height = imageCanvas.height;
+
+  for (let i = 0; i < 9; i++) {
+    const canvas = document.createElement("canvas");
+    canvas.width = imageCanvas.width;
+    canvas.height = imageCanvas.height;
+    const frameCtx = canvas.getContext("2d");
+    if (i === 4) {
+      frameCtx.drawImage(imageCanvas, 0, 0);
+    } else {
+      renderLockedSubject(renderCanvas, imageCanvas, backgroundCanvas, depthCanvas, subjectMask, layerMapCanvas, ((i - 4) / 4) * amplitude, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, seed.depth);
+      frameCtx.drawImage(renderCanvas, 0, 0);
+    }
+    frames.push(canvas);
+    const box = document.createElement("div");
+    box.className = "view" + (i === 4 ? " center" : "");
+    const display = document.createElement("canvas");
+    display.width = canvas.width;
+    display.height = canvas.height;
+    display.getContext("2d").drawImage(canvas, 0, 0);
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = String(i + 1).padStart(2, "0") + (i === 4 ? " — original" : "");
+    box.append(display, badge);
+    grid.append(box);
+  }
+
+  animCanvas.width = imageCanvas.width;
+  animCanvas.height = imageCanvas.height;
+  animWrap.style.display = "block";
+  frameIndex = 4;
+  direction = 1;
+  playing = true;
+  playBtn.textContent = "Pause";
+  showAnimFrame(4);
+  restartAnimation();
+  zipBtn.disabled = false;
+  qc.style.display = "block";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • plans rigides • séparation intermédiaire/lointain renforcée • cheveux et contours nettoyés";
+  status.textContent = "Simulateur actualisé ✓ — horizon nettement séparé du plan intermédiaire.";
+  if (scroll) animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+viewsBtn.addEventListener("click", () => generateViews({ scroll: true }));
+
+zipBtn.addEventListener("click", async () => {
+  if (frames.length !== 9 || !window.JSZip) return;
+  zipBtn.disabled = true;
+  status.textContent = "Préparation du ZIP…";
+  try {
+    const zip = new window.JSZip();
+    for (let i = 0; i < frames.length; i++) {
+      const blob = await canvasBlob(frames[i]);
+      zip.file("microplayer-depth-" + String(i + 1).padStart(2, "0") + ".png", blob);
+    }
+    const archive = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    const url = URL.createObjectURL(archive);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "microplayer-depth-9-vues.zip";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    status.textContent = "ZIP des 9 vues téléchargé ✓.";
+  } catch (error) {
+    status.textContent = "Erreur export : " + (error && error.message ? error.message : error);
+  } finally {
+    zipBtn.disabled = false;
+  }
+});
+
+playBtn.addEventListener("click", () => {
+  playing = !playing;
+  playBtn.textContent = playing ? "Pause" : "Lecture";
+  if (playing) restartAnimation(); else stopAnimation();
+});
+
+centerBtn.addEventListener("click", () => {
+  stopAnimation();
+  playing = false;
+  playBtn.textContent = "Lecture";
+  frameIndex = 4;
+  showAnimFrame(4);
+});
+
+function prepareCanvases() {
+  const width = Math.min(srcImg.naturalWidth, 1400);
+  const height = Math.round(srcImg.naturalHeight * width / srcImg.naturalWidth);
+  imageCanvas = document.createElement("canvas");
+  imageCanvas.width = width;
+  imageCanvas.height = height;
+  imageCanvas.getContext("2d").drawImage(srcImg, 0, 0, width, height);
+  depthCanvas = rawDepthToCanvas(depthRaw, width, height);
+  selectCanvas.width = width;
+  selectCanvas.height = height;
+}
+
+function prepareSubjectMask(keepPoint) {
+  if (!depthRaw || !imageCanvas) return;
+  const tolerance = Number(byId("subjectTolerance").value);
+  const result = growSubjectMask(depthRaw, seed.x, seed.y, tolerance);
+  subjectMask = resizeAndFeatherMask(result.canvas, imageCanvas.width, imageCanvas.height);
+  backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+  seed.depth = result.seedDepth;
+  if (!keepPoint || !layerMapCanvas) {
+    layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
+    resetLayerLocks();
+  }
+  drawSelection();
+  layersBtn.disabled = false;
+  if (!keepPoint) viewsBtn.disabled = false;
+}
+
+function growSubjectMask(raw, nx, ny, tolerance) {
+  const width = raw.width;
+  const height = raw.height;
+  const count = width * height;
+  const data = raw.data;
+  const visited = new Uint8Array(count);
+  const sx = Math.max(0, Math.min(width - 1, Math.round(nx * (width - 1))));
+  const sy = Math.max(0, Math.min(height - 1, Math.round(ny * (height - 1))));
+  const sample = [];
+
+  for (let y = Math.max(0, sy - 3); y <= Math.min(height - 1, sy + 3); y++) {
+    for (let x = Math.max(0, sx - 3); x <= Math.min(width - 1, sx + 3); x++) sample.push(depthValue(data, y * width + x, count));
+  }
+  sample.sort((a, b) => a - b);
+  const seedValue = sample[Math.floor(sample.length / 2)];
+  const globalTolerance = tolerance * 255;
+  const localTolerance = Math.max(12, globalTolerance * 0.34);
+  let mask = new Uint8Array(count);
+  const queue = new Int32Array(count);
+  let head = 0;
+  let tail = 0;
+  const start = sy * width + sx;
+  mask[start] = 1;
+  visited[start] = 1;
+  queue[tail++] = start;
+
+  while (head < tail) {
+    const index = queue[head++];
+    const x = index % width;
+    const y = (index / width) | 0;
+    const current = depthValue(data, index, count);
+    if (x > 0) visit(index - 1, current);
+    if (x + 1 < width) visit(index + 1, current);
+    if (y > 0) visit(index - width, current);
+    if (y + 1 < height) visit(index + width, current);
+  }
+
+  function visit(index, parentValue) {
+    if (visited[index]) return;
+    visited[index] = 1;
+    const value = depthValue(data, index, count);
+    if (value >= seedValue - globalTolerance && Math.abs(value - parentValue) <= localTolerance) {
+      mask[index] = 1;
+      queue[tail++] = index;
+    }
+  }
+
+  mask = erode(dilate(mask, width, height), width, height);
+  for (let pass = 0; pass < 7; pass++) mask = dilate(mask, width, height);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  const pixels = ctx.createImageData(width, height);
+  for (let i = 0, j = 0; i < count; i++, j += 4) {
+    const value = mask[i] ? 255 : 0;
+    pixels.data[j] = pixels.data[j + 1] = pixels.data[j + 2] = value;
+    pixels.data[j + 3] = value;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  return { canvas, seedDepth: seedValue / 255 };
+}
+
+function depthValue(data, index, count) {
+  if (data.length >= count * 4) return data[index * 4];
+  return data[index];
+}
+
+function dilate(source, width, height) {
+  const output = new Uint8Array(source.length);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let value = 0;
+      for (let oy = -1; oy <= 1 && !value; oy++) {
+        const yy = y + oy;
+        if (yy < 0 || yy >= height) continue;
+        for (let ox = -1; ox <= 1; ox++) {
+          const xx = x + ox;
+          if (xx >= 0 && xx < width && source[yy * width + xx]) { value = 1; break; }
+        }
+      }
+      output[y * width + x] = value;
+    }
+  }
+  return output;
+}
+
+function erode(source, width, height) {
+  const output = new Uint8Array(source.length);
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let value = 1;
+      for (let oy = -1; oy <= 1 && value; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (!source[(y + oy) * width + x + ox]) { value = 0; break; }
+        }
+      }
+      output[y * width + x] = value;
+    }
+  }
+  return output;
+}
+
+function resizeAndFeatherMask(source, width, height) {
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  const ctx = output.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.filter = "blur(2px)";
+  ctx.drawImage(source, 0, 0, width, height);
+  ctx.filter = "none";
+  return output;
+}
+
+function setEditMode(mode) {
+  editMode = mode;
+  autoModeBtn.classList.toggle("active", mode === "auto");
+  paintModeBtn.classList.toggle("active", mode === "paint");
+  eraseModeBtn.classList.toggle("active", mode === "erase");
+  nearLayerBtn.classList.toggle("active", mode === "layer-near");
+  midLayerBtn.classList.toggle("active", mode === "layer-mid");
+  farLayerBtn.classList.toggle("active", mode === "layer-far");
+}
+
+function canvasPoint(event) {
+  const rect = selectCanvas.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(selectCanvas.width, (event.clientX - rect.left) * selectCanvas.width / rect.width)),
+    y: Math.max(0, Math.min(selectCanvas.height, (event.clientY - rect.top) * selectCanvas.height / rect.height))
+  };
+}
+
+function paintActiveMap(x, y, from) {
+  if (editMode.startsWith("layer-")) paintLayerMap(x, y, from);
+  else paintSubjectMask(x, y, from);
+}
+
+function strokeBrush(ctx, x, y, from, radius) {
+  const start = from || { x, y };
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(2, radius * 2);
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+}
+
+function makeMaskCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = selectCanvas.width;
+  canvas.height = selectCanvas.height;
+  return canvas;
+}
+
+function resetLayerLocks() {
+  if (!selectCanvas.width || !selectCanvas.height) return;
+  manualLayerCanvas = makeMaskCanvas();
+  layerStrokeCanvas = document.createElement("canvas");
+}
+
+function paintLayerMap(x, y, from) {
+  if (!layerMapCanvas) return;
+  if (!manualLayerCanvas || !layerStrokeCanvas) resetLayerLocks();
+
+  const radius = Math.max(1, Number(brushSize.value) * selectCanvas.width / 900);
+  const colors = {
+    "layer-near": "#ff731a",
+    "layer-mid": "#268cff",
+    "layer-far": "#a438ea"
+  };
+  const color = colors[editMode] || colors["layer-near"];
+  const start = from || { x, y };
+
+  // Work only inside the small rectangle touched by this Pencil segment.
+  const protection = 2;
+  const margin = radius + protection + 3;
+  const x0 = Math.max(0, Math.floor(Math.min(start.x, x) - margin));
+  const y0 = Math.max(0, Math.floor(Math.min(start.y, y) - margin));
+  const x1 = Math.min(selectCanvas.width, Math.ceil(Math.max(start.x, x) + margin));
+  const y1 = Math.min(selectCanvas.height, Math.ceil(Math.max(start.y, y) + margin));
+  const patchWidth = Math.max(1, x1 - x0);
+  const patchHeight = Math.max(1, y1 - y0);
+
+  layerStrokeCanvas.width = patchWidth;
+  layerStrokeCanvas.height = patchHeight;
+  const strokeCtx = layerStrokeCanvas.getContext("2d");
+  strokeCtx.save();
+  strokeCtx.strokeStyle = "#ffffff";
+  strokeBrush(strokeCtx, x - x0, y - y0, { x: start.x - x0, y: start.y - y0 }, radius);
+  strokeCtx.globalCompositeOperation = "source-in";
+  strokeCtx.fillStyle = color;
+  strokeCtx.fillRect(0, 0, patchWidth, patchHeight);
+  strokeCtx.restore();
+
+  const mapCtx = layerMapCanvas.getContext("2d");
+  mapCtx.drawImage(layerStrokeCanvas, x0, y0);
+
+  // The master canvas is the final authority for every manual stroke.
+  // destination-over adds only unprotected pixels; an existing orange/blue/
+  // violet manual choice can therefore never be replaced by a later choice.
+  const masterCtx = manualLayerCanvas.getContext("2d");
+  masterCtx.save();
+  masterCtx.globalCompositeOperation = "destination-over";
+  for (let offsetY = -protection; offsetY <= protection; offsetY++) {
+    for (let offsetX = -protection; offsetX <= protection; offsetX++) {
+      masterCtx.drawImage(layerStrokeCanvas, x0 + offsetX, y0 + offsetY);
+    }
+  }
+  masterCtx.restore();
+
+  // Convert antialiased Pencil edges to an opaque protection.
+  const masterPixels = masterCtx.getImageData(x0, y0, patchWidth, patchHeight);
+  for (let i = 0; i < masterPixels.data.length; i += 4) {
+    if (masterPixels.data[i + 3] > 0) {
+      masterPixels.data[i + 3] = 255;
+    }
+  }
+  masterCtx.putImageData(masterPixels, x0, y0);
+
+  // Restore the protected manual choices above the new stroke. This explicit
+  // restore is reliable on Safari even when alpha compositing varies.
+  mapCtx.drawImage(
+    manualLayerCanvas,
+    x0, y0, patchWidth, patchHeight,
+    x0, y0, patchWidth, patchHeight
+  );
+
+  // Background layers never alter the green subject. An incorrect green
+  // selection must be removed explicitly with the Eraser tool.
+
+  // Show the authoritative result, not the unprotected raw stroke.
+  const previewCtx = selectCanvas.getContext("2d");
+  previewCtx.save();
+  previewCtx.globalAlpha = 0.42;
+  previewCtx.drawImage(
+    layerMapCanvas,
+    x0, y0, patchWidth, patchHeight,
+    x0, y0, patchWidth, patchHeight
+  );
+  previewCtx.restore();
+}
+
+function paintSubjectMask(x, y, from) {
+  if (!subjectMask) return;
+  const radius = Math.max(1, Number(brushSize.value) * selectCanvas.width / 900);
+  const ctx = subjectMask.getContext("2d");
+  ctx.save();
+  ctx.globalCompositeOperation = editMode === "erase" ? "destination-out" : "source-over";
+  ctx.strokeStyle = "#ffffff";
+  strokeBrush(ctx, x, y, from, radius);
+  ctx.restore();
+  backgroundCanvas = null;
+  scheduleSelectionDraw();
+}
+
+function scheduleSelectionDraw() {
+  if (selectionDrawFrame) return;
+  selectionDrawFrame = requestAnimationFrame(() => {
+    selectionDrawFrame = null;
+    drawSelection();
+  });
+}
+
+function drawSelection() {
+  const ctx = selectCanvas.getContext("2d");
+  ctx.clearRect(0, 0, selectCanvas.width, selectCanvas.height);
+  ctx.drawImage(imageCanvas, 0, 0);
+  if (showLayers && layerMapCanvas) {
+    ctx.globalAlpha = 0.42;
+    ctx.drawImage(layerMapCanvas, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+  const tint = document.createElement("canvas");
+  tint.width = selectCanvas.width;
+  tint.height = selectCanvas.height;
+  const tctx = tint.getContext("2d");
+  tctx.fillStyle = "#22d36f";
+  tctx.fillRect(0, 0, tint.width, tint.height);
+  tctx.globalCompositeOperation = "destination-in";
+  tctx.drawImage(subjectMask, 0, 0);
+  ctx.globalAlpha = showLayers ? 0.56 : 0.34;
+  ctx.drawImage(tint, 0, 0);
+  ctx.globalAlpha = 1;
+  const x = seed.x * selectCanvas.width;
+  const y = seed.y * selectCanvas.height;
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(10, selectCanvas.width * 0.012), 0, Math.PI * 2);
+  ctx.lineWidth = Math.max(3, selectCanvas.width * 0.003);
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(4, selectCanvas.width * 0.004), 0, Math.PI * 2);
+  ctx.fillStyle = "#22d36f";
+  ctx.fill();
+}
+
+function buildAutoLayerMap(depth, subjectDepth) {
+  const width = depth.width;
+  const height = depth.height;
+  const source = depth.getContext("2d").getImageData(0, 0, width, height).data;
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  const ctx = output.getContext("2d");
+  const pixels = ctx.createImageData(width, height);
+  const colors = {
+    near: [255, 115, 26],
+    mid: [38, 140, 255],
+    far: [164, 56, 234]
+  };
+
+  for (let i = 0, j = 0; i < width * height; i++, j += 4) {
+    const depthValue = source[j] / 255;
+    const distanceBehind = Math.max(0, Math.min(1, (subjectDepth - depthValue) * 4));
+    const color = distanceBehind < 0.35 ? colors.near : distanceBehind < 0.67 ? colors.mid : colors.far;
+    pixels.data[j] = color[0];
+    pixels.data[j + 1] = color[1];
+    pixels.data[j + 2] = color[2];
+    pixels.data[j + 3] = 255;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  return output;
+}
+
+function expandMaskForCleanup(mask, radius) {
+  const width = mask.width;
+  const height = mask.height;
+  const source = mask.getContext("2d").getImageData(0, 0, width, height).data;
+  const horizontal = new Uint8Array(width * height);
+  const expanded = new Uint8Array(width * height);
+  const deque = new Int32Array(Math.max(width, height));
+
+  // Fast horizontal maximum filter.
+  for (let y = 0; y < height; y++) {
+    let head = 0;
+    let tail = 0;
+    for (let x = 0; x < width; x++) {
+      const index = y * width + x;
+      const value = source[index * 4 + 3];
+      while (tail > head && source[(y * width + deque[tail - 1]) * 4 + 3] <= value) tail--;
+      deque[tail++] = x;
+      while (deque[head] < x - radius * 2) head++;
+      if (x >= radius) horizontal[y * width + x - radius] = source[(y * width + deque[head]) * 4 + 3];
+    }
+    for (let x = Math.max(0, width - radius); x < width; x++) {
+      while (deque[head] < x - radius) head++;
+      horizontal[y * width + x] = source[(y * width + deque[head]) * 4 + 3];
+    }
+  }
+
+  // Fast vertical maximum filter.
+  for (let x = 0; x < width; x++) {
+    let head = 0;
+    let tail = 0;
+    for (let y = 0; y < height; y++) {
+      const value = horizontal[y * width + x];
+      while (tail > head && horizontal[deque[tail - 1] * width + x] <= value) tail--;
+      deque[tail++] = y;
+      while (deque[head] < y - radius * 2) head++;
+      if (y >= radius) expanded[(y - radius) * width + x] = horizontal[deque[head] * width + x];
+    }
+    for (let y = Math.max(0, height - radius); y < height; y++) {
+      while (deque[head] < y - radius) head++;
+      expanded[y * width + x] = horizontal[deque[head] * width + x];
+    }
+  }
+
+  const hardCanvas = document.createElement("canvas");
+  hardCanvas.width = width;
+  hardCanvas.height = height;
+  const hardCtx = hardCanvas.getContext("2d");
+  const pixels = hardCtx.createImageData(width, height);
+  for (let i = 0; i < expanded.length; i++) {
+    const offset = i * 4;
+    const alpha = expanded[i] > 36 ? 255 : 0;
+    pixels.data[offset] = pixels.data[offset + 1] = pixels.data[offset + 2] = 255;
+    pixels.data[offset + 3] = alpha;
+  }
+  hardCtx.putImageData(pixels, 0, 0);
+
+  // A tiny feather avoids replacing the fine-hair ghost with a hard halo.
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  const outputCtx = output.getContext("2d");
+  outputCtx.filter = "blur(2px)";
+  outputCtx.drawImage(hardCanvas, 0, 0);
+  outputCtx.filter = "none";
+  return output;
+}
+
+function buildCleanBackground(image, mask) {
+  const width = image.width;
+  const height = image.height;
+  const cleanupRadius = Math.max(6, Math.min(20, Math.round(Math.min(width, height) * 0.012)));
+  const cleanupMask = expandMaskForCleanup(mask, cleanupRadius);
+  const imageCtx = image.getContext("2d");
+  const sourcePixels = imageCtx.getImageData(0, 0, width, height);
+  const maskPixels = cleanupMask.getContext("2d").getImageData(0, 0, width, height).data;
+  const filled = new Uint8ClampedArray(sourcePixels.data);
+  const left = new Int32Array(width);
+  const right = new Int32Array(width);
+  const top = new Int32Array(height);
+  const bottom = new Int32Array(height);
+  const horizontalDistance = new Float32Array(width * height);
+
+  for (let y = 0; y < height; y++) {
+    let nearest = -1;
+    for (let x = 0; x < width; x++) {
+      const alpha = maskPixels[(y * width + x) * 4];
+      if (alpha < 72) nearest = x;
+      left[x] = nearest;
+    }
+
+    nearest = -1;
+    for (let x = width - 1; x >= 0; x--) {
+      const alpha = maskPixels[(y * width + x) * 4];
+      if (alpha < 72) nearest = x;
+      right[x] = nearest;
+    }
+
+    for (let x = 0; x < width; x++) {
+      const pixel = y * width + x;
+      if (maskPixels[pixel * 4] < 72) continue;
+      const lx = left[x];
+      const rx = right[x];
+      if (lx < 0 && rx < 0) continue;
+      const leftX = lx < 0 ? rx : lx;
+      const rightX = rx < 0 ? lx : rx;
+      const dl = Math.max(1, x - leftX);
+      const dr = Math.max(1, rightX - x);
+      const leftIndex = (y * width + leftX) * 4;
+      const rightIndex = (y * width + rightX) * 4;
+      const target = pixel * 4;
+      const total = dl + dr;
+      const leftWeight = dr / total;
+      const rightWeight = dl / total;
+      for (let channel = 0; channel < 3; channel++) {
+        filled[target + channel] = sourcePixels.data[leftIndex + channel] * leftWeight + sourcePixels.data[rightIndex + channel] * rightWeight;
+      }
+      filled[target + 3] = 255;
+      horizontalDistance[pixel] = Math.min(dl, dr);
+    }
+  }
+
+  // A second vertical reconstruction prevents the long horizontal streaks
+  // that appear when a large foreground subject uncovers its old position.
+  for (let x = 0; x < width; x++) {
+    let nearest = -1;
+    for (let y = 0; y < height; y++) {
+      if (maskPixels[(y * width + x) * 4] < 72) nearest = y;
+      top[y] = nearest;
+    }
+
+    nearest = -1;
+    for (let y = height - 1; y >= 0; y--) {
+      if (maskPixels[(y * width + x) * 4] < 72) nearest = y;
+      bottom[y] = nearest;
+    }
+
+    for (let y = 0; y < height; y++) {
+      const pixel = y * width + x;
+      if (maskPixels[pixel * 4] < 72) continue;
+      const ty = top[y];
+      const by = bottom[y];
+      if (ty < 0 && by < 0) continue;
+      const topY = ty < 0 ? by : ty;
+      const bottomY = by < 0 ? ty : by;
+      const dt = Math.max(1, y - topY);
+      const db = Math.max(1, bottomY - y);
+      const total = dt + db;
+      const topWeight = db / total;
+      const bottomWeight = dt / total;
+      const topIndex = (topY * width + x) * 4;
+      const bottomIndex = (bottomY * width + x) * 4;
+      const target = pixel * 4;
+      const hWeight = 1 / Math.max(1, horizontalDistance[pixel]);
+      const vWeight = 1 / Math.max(1, Math.min(dt, db));
+      const blendTotal = hWeight + vWeight;
+      for (let channel = 0; channel < 3; channel++) {
+        const vertical =
+          sourcePixels.data[topIndex + channel] * topWeight +
+          sourcePixels.data[bottomIndex + channel] * bottomWeight;
+        filled[target + channel] =
+          (filled[target + channel] * hWeight + vertical * vWeight) / blendTotal;
+      }
+    }
+  }
+
+  const filledCanvas = document.createElement("canvas");
+  filledCanvas.width = width;
+  filledCanvas.height = height;
+  filledCanvas.getContext("2d").putImageData(new ImageData(filled, width, height), 0, 0);
+
+  const blurred = document.createElement("canvas");
+  blurred.width = width;
+  blurred.height = height;
+  const blurCtx = blurred.getContext("2d");
+  blurCtx.filter = "blur(10px)";
+  blurCtx.drawImage(filledCanvas, 0, 0);
+  blurCtx.filter = "none";
+
+  const patch = document.createElement("canvas");
+  patch.width = width;
+  patch.height = height;
+  const patchCtx = patch.getContext("2d");
+  patchCtx.drawImage(blurred, 0, 0);
+  patchCtx.globalCompositeOperation = "destination-in";
+  patchCtx.drawImage(cleanupMask, 0, 0);
+
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  const outputCtx = output.getContext("2d");
+  outputCtx.drawImage(image, 0, 0);
+  outputCtx.drawImage(patch, 0, 0);
+  return output;
+}
+
+function rawDepthToCanvas(raw, width, height) {
+  const source = document.createElement("canvas");
+  source.width = raw.width;
+  source.height = raw.height;
+  const ctx = source.getContext("2d");
+  const count = raw.width * raw.height;
+  const pixels = ctx.createImageData(raw.width, raw.height);
+  for (let i = 0, j = 0; i < count; i++, j += 4) {
+    const value = depthValue(raw.data, i, count);
+    pixels.data[j] = pixels.data[j + 1] = pixels.data[j + 2] = value;
+    pixels.data[j + 3] = 255;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  const output = document.createElement("canvas");
+  output.width = width;
+  output.height = height;
+  output.getContext("2d").drawImage(source, 0, 0, width, height);
+  return output;
+}
+
+function renderLockedSubject(out, image, backgroundImage, depth, mask, layerMap, position, strength, subjectPlane, backgroundRelief, subjectRelief, edgeProtect, subjectDepth) {
+  const gl = out.getContext("webgl2", { premultipliedAlpha: false, preserveDrawingBuffer: true });
+  if (!gl) {
+    out.getContext("2d").drawImage(image, 0, 0);
+    return;
+  }
+
+  const vertex = [
+    "#version 300 es",
+    "in vec2 p;",
+    "out vec2 uv;",
+    "void main(){uv=p*.5+.5;gl_Position=vec4(p,0.,1.);}"
+  ].join("\n");
+
+  const fragment = [
+    "#version 300 es",
+    "precision highp float;",
+    "in vec2 uv;",
+    "out vec4 o;",
+    "uniform sampler2D im;",
+    "uniform sampler2D bg;",
+    "uniform sampler2D dm;",
+    "uniform sampler2D mm;",
+    "uniform sampler2D lm;",
+    "uniform float shift;",
+    "uniform float subjectDepth;",
+    "uniform float subjectPlane;",
+    "uniform float backgroundRelief;",
+    "uniform float subjectRelief;",
+    "uniform float edgeProtect;",
+    "uniform vec2 texel;",
+    "float D(vec2 p){return texture(dm,clamp(p,vec2(.001),vec2(.999))).r;}",
+    "float M(vec2 p){return texture(mm,clamp(p,vec2(.001),vec2(.999))).r;}",
+    "vec3 L(vec2 p){return texture(lm,clamp(p,vec2(.001),vec2(.999))).rgb;}",
+    "vec3 LW(vec3 c){",
+    " vec3 n=vec3(1.,.451,.102);",
+    " vec3 m=vec3(.149,.549,1.);",
+    " vec3 f=vec3(.643,.220,.918);",
+    " vec3 w=vec3(exp(-dot(c-n,c-n)*18.),exp(-dot(c-m,c-m)*18.),exp(-dot(c-f,c-f)*18.));",
+    " return w/(w.x+w.y+w.z+.00001);",
+    "}",
+    "void main(){",
+    " vec2 base=uv;",
+    " float dc=D(base);",
+    " float dl=D(base-vec2(texel.x*2.,0.));",
+    " float dr=D(base+vec2(texel.x*2.,0.));",
+    " float du=D(base-vec2(0.,texel.y*2.));",
+    " float dd=D(base+vec2(0.,texel.y*2.));",
+    " float wL=exp(-abs(dl-dc)*28.);",
+    " float wR=exp(-abs(dr-dc)*28.);",
+    " float wU=exp(-abs(du-dc)*28.);",
+    " float wD=exp(-abs(dd-dc)*28.);",
+    " float smoothD=(dc+dl*wL+dr*wR+du*wU+dd*wD)/(1.+wL+wR+wU+wD);",
+    " float gradient=abs(dl-dc)+abs(dr-dc)+abs(du-dc)+abs(dd-dc);",
+    " float edge=smoothstep(.035,.20,gradient);",
+    " float safeShift=shift;",
+    " float baseBack=.16+subjectPlane*.35;",
+    " float nearShift=baseBack;",
+    " float midShift=baseBack+backgroundRelief*.58;",
+    " float farShift=baseBack+backgroundRelief*1.65;",
+    " vec2 nearQ=base-vec2(safeShift*nearShift,0.);",
+    " vec2 midQ=base-vec2(safeShift*midShift,0.);",
+    " vec2 farQ=base-vec2(safeShift*farShift,0.);",
+    " vec3 nearWeights=LW(L(nearQ));",
+    " vec3 midWeights=LW(L(midQ));",
+    " vec3 farWeights=LW(L(farQ));",
+    " float nearValid=1.-smoothstep(.06,.94,M(nearQ));",
+    " float midValid=1.-smoothstep(.06,.94,M(midQ));",
+    " float farValid=1.-smoothstep(.06,.94,M(farQ));",
+    " float nearAlpha=nearWeights.x*nearValid;",
+    " float midAlpha=midWeights.y*midValid;",
+    " float farAlpha=farWeights.z*farValid;",
+    " vec4 background=texture(bg,base);",
+    " background=mix(background,texture(bg,farQ),farAlpha);",
+    " background=mix(background,texture(bg,midQ),midAlpha);",
+    " background=mix(background,texture(bg,nearQ),nearAlpha);",
+    " vec2 rigidQ=clamp(base+vec2(safeShift*subjectPlane*.16,0.),vec2(.001),vec2(.999));",
+    " float rigidMask=M(rigidQ);",
+    " float subject=smoothstep(.06,.94,rigidMask);",
+    " float core=smoothstep(.78,.995,rigidMask);",
+    " float surfaceDepth=D(rigidQ);",
+    " float surface=clamp((surfaceDepth-subjectDepth)*4.20,-1.,1.);",
+    " surface=sign(surface)*pow(abs(surface),.76);",
+    " float surfaceProtect=core*mix(1.,.30,edge*edgeProtect);",
+    " vec2 subjectQ=clamp(rigidQ+vec2(surface*safeShift*subjectRelief*.14*surfaceProtect,0.),vec2(.001),vec2(.999));",
+    " float sourceInside=smoothstep(.72,.98,M(subjectQ));",
+    " vec4 rigidSubject=texture(im,rigidQ);",
+    " vec4 reliefSubject=texture(im,subjectQ);",
+    " float reliefMix=sourceInside*surfaceProtect;",
+    " vec3 subjectPixel=mix(rigidSubject.rgb,reliefSubject.rgb,reliefMix);",
+    " o=vec4(mix(background.rgb,subjectPixel,subject),1.);",
+    "}"
+  ].join("\n");
+
+  let programObject = out.__microPlayerProgram;
+  if (!programObject) {
+    programObject = createProgram(gl, vertex, fragment);
+    out.__microPlayerProgram = programObject;
+    gl.useProgram(programObject);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]), gl.STATIC_DRAW);
+    const location = gl.getAttribLocation(programObject, "p");
+    gl.enableVertexAttribArray(location);
+    gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+    bindTexture(gl, image, 0);
+    bindTexture(gl, backgroundImage, 1, true);
+    bindTexture(gl, depth, 2);
+    bindTexture(gl, mask, 3);
+    bindTexture(gl, layerMap, 4);
+    gl.uniform1i(gl.getUniformLocation(programObject, "im"), 0);
+    gl.uniform1i(gl.getUniformLocation(programObject, "bg"), 1);
+    gl.uniform1i(gl.getUniformLocation(programObject, "dm"), 2);
+    gl.uniform1i(gl.getUniformLocation(programObject, "mm"), 3);
+    gl.uniform1i(gl.getUniformLocation(programObject, "lm"), 4);
+  } else {
+    gl.useProgram(programObject);
+  }
+  gl.uniform1f(gl.getUniformLocation(programObject, "shift"), position * strength);
+  gl.uniform1f(gl.getUniformLocation(programObject, "subjectDepth"), subjectDepth);
+  gl.uniform1f(gl.getUniformLocation(programObject, "subjectPlane"), subjectPlane);
+  gl.uniform1f(gl.getUniformLocation(programObject, "backgroundRelief"), backgroundRelief);
+  gl.uniform1f(gl.getUniformLocation(programObject, "subjectRelief"), subjectRelief);
+  gl.uniform1f(gl.getUniformLocation(programObject, "edgeProtect"), edgeProtect);
+  gl.uniform2f(gl.getUniformLocation(programObject, "texel"), 1 / out.width, 1 / out.height);
+  gl.viewport(0, 0, out.width, out.height);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+function bindTexture(gl, source, unit, mirrorX = false) {
+  gl.activeTexture(gl.TEXTURE0 + unit);
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, mirrorX ? gl.MIRRORED_REPEAT : gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+}
+
+function compileShader(gl, type, source) {
+  const shader = gl.createShader(type);
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader));
+  return shader;
+}
+
+function createProgram(gl, vertex, fragment) {
+  const programObject = gl.createProgram();
+  gl.attachShader(programObject, compileShader(gl, gl.VERTEX_SHADER, vertex));
+  gl.attachShader(programObject, compileShader(gl, gl.FRAGMENT_SHADER, fragment));
+  gl.linkProgram(programObject);
+  if (!gl.getProgramParameter(programObject, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(programObject));
+  return programObject;
+}
+
+function restartAnimation() {
+  stopAnimation();
+  timer = setInterval(() => {
+    frameIndex += direction;
+    if (frameIndex >= 8) { frameIndex = 8; direction = -1; }
+    else if (frameIndex <= 0) { frameIndex = 0; direction = 1; }
+    showAnimFrame(frameIndex);
+  }, Number(speed.value));
+}
+
+function stopAnimation() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+function showAnimFrame(index) {
+  if (!frames[index]) return;
+  const ctx = animCanvas.getContext("2d");
+  ctx.clearRect(0, 0, animCanvas.width, animCanvas.height);
+  ctx.drawImage(frames[index], 0, 0);
+  animBadge.textContent = String(index + 1).padStart(2, "0") + (index === 4 ? " — original" : "");
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+function canvasBlob(canvas) {
+  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("PNG impossible")), "image/png"));
+}
+</script>
+</body>
+</html>
