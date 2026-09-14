@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V10</title>
+<title>MicroPlayer — Depth iPad V11</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,8 +39,8 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V10</h1>
-<div class="sub">9 vues avec sujet stable et décor quasi rigide. Le relief du fond est limité pour supprimer l’effet accordéon, tandis que les extrémités sont prolongées hors cadre. Vue 05 = photo originale stricte.</div>
+<h1>MicroPlayer — profondeur locale iPad V11</h1>
+<div class="sub">9 vues réparties sur quatre plans rigides : sujet principal, décor proche, décor intermédiaire et horizon. La profondeur augmente sans warping continu. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
   <div class="row">
@@ -69,12 +69,12 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
   <div class="range"><label>Profondeur globale</label><input id="strength" type="range" min="0.035" max="0.130" step="0.005" value="0.080"><output id="strengthOut">0.080</output></div>
   <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.40" max="1.10" step="0.05" value="0.95"><output id="amplitudeOut">0.95</output></div>
   <div class="range"><label>Séparation avant-plan</label><input id="subjectPlane" type="range" min="0.00" max="0.36" step="0.02" value="0.22"><output id="subjectPlaneOut">0.22</output></div>
-  <div class="range"><label>Relief du décor</label><input id="backgroundRelief" type="range" min="0.00" max="0.50" step="0.02" value="0.18"><output id="backgroundReliefOut">0.18</output></div>
+  <div class="range"><label>Écart entre les plans</label><input id="backgroundRelief" type="range" min="0.08" max="0.36" step="0.02" value="0.22"><output id="backgroundReliefOut">0.22</output></div>
   <div class="range"><label>Micro-relief du sujet</label><input id="subjectRelief" type="range" min="0.00" max="0.70" step="0.05" value="0.25"><output id="subjectReliefOut">0.25</output></div>
   <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.20"><output id="subjectToleranceOut">0.20</output></div>
   <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.70"><output id="edgeProtectOut">0.70</output></div>
-  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, relief du décor 0,18, micro-relief 0,25. « Relief du décor » contrôle uniquement ses variations internes : laissez-le bas pour garder les bâtiments et l’horizon rigides.</div>
-  <div class="mode">Mode : sujet stable + fond quasi rigide + extrémités non compressées</div>
+  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, écart des plans 0,22, micro-relief 0,25. Le fond n’est plus déformé en continu : chaque couche se déplace comme une plaque rigide.</div>
+  <div class="mode">Mode : 4 plans rigides — sujet / proche / intermédiaire / horizon</div>
   <div id="qc" class="qc"></div>
 </section>
 
@@ -301,8 +301,8 @@ viewsBtn.addEventListener("click", () => {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • sujet stable • fond quasi rigide • extrémités miroir • occlusions filtrées";
-  status.textContent = "9 vues générées ✓ — profondeur conservée, fond stabilisé sans effet accordéon.";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • 4 plans rigides • aucun warping continu • extrémités miroir • sujet protégé";
+  status.textContent = "9 vues générées ✓ — quatre plans rigides avec profondeur graduée.";
   animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
@@ -735,20 +735,26 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
     " float gradient=abs(dl-dc)+abs(dr-dc)+abs(du-dc)+abs(dd-dc);",
     " float edge=smoothstep(.035,.20,gradient);",
     " float safeShift=shift;",
-    " float depthRelative=clamp((smoothD-subjectDepth)*2.75,-.92,.92);",
-    " depthRelative=sign(depthRelative)*pow(abs(depthRelative),.72);",
-    " float subjectAtBase=smoothstep(.06,.94,M(base));",
-    " float outsideSubject=1.-subjectAtBase;",
-    " float minimumBackground=-(.16+subjectPlane*.45);",
-    " float guaranteedBackground=min(depthRelative,minimumBackground);",
-    " float rigidBackground=mix(minimumBackground,guaranteedBackground,backgroundRelief);",
-    " float relative=mix(depthRelative,rigidBackground,outsideSubject);",
-    " float protectedShift=safeShift*mix(1.,.72,edge*edgeProtect);",
-    " vec2 backgroundQ=base+vec2(relative*protectedShift,0.);",
-    " vec4 warpedBackground=texture(bg,backgroundQ);",
-    " vec4 stableBackground=texture(bg,base);",
-    " float invalidWarp=smoothstep(.05,.55,M(backgroundQ))*(1.-subjectAtBase);",
-    " vec4 background=mix(warpedBackground,stableBackground,invalidWarp);",
+    " float baseBack=.16+subjectPlane*.35;",
+    " float nearShift=baseBack;",
+    " float midShift=baseBack+backgroundRelief*.58;",
+    " float farShift=baseBack+backgroundRelief*1.16;",
+    " vec2 nearQ=base-vec2(safeShift*nearShift,0.);",
+    " vec2 midQ=base-vec2(safeShift*midShift,0.);",
+    " vec2 farQ=base-vec2(safeShift*farShift,0.);",
+    " float nearZ=clamp((subjectDepth-D(nearQ))*4.,0.,1.);",
+    " float midZ=clamp((subjectDepth-D(midQ))*4.,0.,1.);",
+    " float farZ=clamp((subjectDepth-D(farQ))*4.,0.,1.);",
+    " float nearValid=1.-smoothstep(.06,.94,M(nearQ));",
+    " float midValid=1.-smoothstep(.06,.94,M(midQ));",
+    " float farValid=1.-smoothstep(.06,.94,M(farQ));",
+    " float nearAlpha=(1.-smoothstep(.30,.42,nearZ))*nearValid;",
+    " float midAlpha=smoothstep(.24,.36,midZ)*(1.-smoothstep(.62,.74,midZ))*midValid;",
+    " float farAlpha=smoothstep(.58,.70,farZ)*farValid;",
+    " vec4 background=texture(bg,base);",
+    " background=mix(background,texture(bg,farQ),farAlpha);",
+    " background=mix(background,texture(bg,midQ),midAlpha);",
+    " background=mix(background,texture(bg,nearQ),nearAlpha);",
     " vec2 rigidQ=clamp(base+vec2(safeShift*subjectPlane*.16,0.),vec2(.001),vec2(.999));",
     " float rigidMask=M(rigidQ);",
     " float subject=smoothstep(.06,.94,rigidMask);",
