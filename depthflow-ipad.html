@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V18</title>
+<title>MicroPlayer — Depth iPad V19</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V18</h1>
+<h1>MicroPlayer — profondeur locale iPad V19</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -70,7 +70,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
     <button id="validateLayersBtn">✓ Valider et actualiser</button>
   </div>
-  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Ordre conseillé : proche → intermédiaire → horizon. Vous pouvez déborder : les zones déjà peintes sur un plan plus proche restent protégées. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
+  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Dès que vous changez de couleur, la sélection précédente est figée. Vous pouvez déborder dessus sans la modifier. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
 </section>
 
 <section class="card">
@@ -326,7 +326,7 @@ for (const eventName of ["pointerup", "pointercancel"]) {
     }
     drawSelection();
     if (editMode.startsWith("layer-")) {
-      status.textContent = "Plan manuel mis à jour ✓ — les plans plus proches déjà peints restent protégés.";
+      status.textContent = "Plan manuel mis à jour ✓ — les autres sélections déjà peintes restent figées.";
     } else {
       backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
       status.textContent = "Masque du sujet mis à jour ✓.";
@@ -644,11 +644,11 @@ function paintLayerMap(x, y, from) {
     far: "#a438ea"
   };
   const key = keys[editMode] || "near";
-  const protectedKeys = key === "far" ? ["near", "mid"] : key === "mid" ? ["near"] : [];
+  const protectedKeys = ["near", "mid", "far"].filter(layerKey => layerKey !== key);
 
-  // Build only the effective part of the Pencil stroke. A farther layer may
-  // overlap the brush footprint of a previously painted closer layer, but it
-  // cannot replace those protected pixels.
+  // Build only the effective part of the Pencil stroke. Every manually
+  // painted layer is frozen when another color is used, so the Pencil may
+  // overlap its footprint without replacing any protected pixel.
   const strokeCtx = layerStrokeCanvas.getContext("2d");
   strokeCtx.clearRect(0, 0, layerStrokeCanvas.width, layerStrokeCanvas.height);
   strokeCtx.save();
