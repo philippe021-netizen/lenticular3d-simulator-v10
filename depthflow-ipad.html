@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V6</title>
+<title>MicroPlayer — Depth iPad V7</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,8 +39,8 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V6</h1>
-<div class="sub">9 vues avec silhouette verrouillée et relief interne contrôlé. Le sujet reste stable, mais ses volumes réagissent à la profondeur. Vue 05 = photo originale stricte.</div>
+<h1>MicroPlayer — profondeur locale iPad V7</h1>
+<div class="sub">9 vues avec sujet rigide, séparation avant-plan/décor et micro-relief protégé. Aucun étirement sur les bords. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
   <div class="row">
@@ -66,13 +66,14 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </section>
 
 <section class="card">
-  <div class="range"><label>Profondeur globale</label><input id="strength" type="range" min="0.035" max="0.160" step="0.005" value="0.100"><output id="strengthOut">0.100</output></div>
-  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.40" max="1.15" step="0.05" value="1.00"><output id="amplitudeOut">1.00</output></div>
-  <div class="range"><label>Relief du sujet</label><input id="subjectRelief" type="range" min="0.20" max="1.00" step="0.05" value="0.70"><output id="subjectReliefOut">0.70</output></div>
+  <div class="range"><label>Profondeur globale</label><input id="strength" type="range" min="0.035" max="0.130" step="0.005" value="0.085"><output id="strengthOut">0.085</output></div>
+  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.40" max="1.10" step="0.05" value="0.95"><output id="amplitudeOut">0.95</output></div>
+  <div class="range"><label>Séparation avant-plan</label><input id="subjectPlane" type="range" min="0.00" max="0.30" step="0.02" value="0.16"><output id="subjectPlaneOut">0.16</output></div>
+  <div class="range"><label>Micro-relief du sujet</label><input id="subjectRelief" type="range" min="0.00" max="0.70" step="0.05" value="0.35"><output id="subjectReliefOut">0.35</output></div>
   <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.20"><output id="subjectToleranceOut">0.20</output></div>
   <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.70"><output id="edgeProtectOut">0.70</output></div>
-  <div class="small">Réglage conseillé : profondeur 0,100, amplitude 1,00, relief du sujet 0,70. La silhouette reste fixe ; seul le volume intérieur du sujet reçoit une micro-parallaxe. Si un détail se déforme, augmentez « Protection contours ».</div>
-  <div class="mode">Mode : silhouette stable + relief interne + décor en profondeur renforcée</div>
+  <div class="small">Réglage conseillé : profondeur 0,085, amplitude 0,95, séparation 0,16, micro-relief 0,35. La forme du sujet se déplace comme un bloc rigide ; le micro-relief reste secondaire. Si un détail se déforme, baissez « Micro-relief du sujet » avant de réduire la profondeur globale.</div>
+  <div class="mode">Mode : sujet rigide + séparation de plans + bords protégés</div>
   <div id="qc" class="qc"></div>
 </section>
 
@@ -138,7 +139,7 @@ let maskTimer = null;
 let editMode = "auto";
 let drawingMask = false;
 
-for (const id of ["strength", "amplitude", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
+for (const id of ["strength", "amplitude", "subjectPlane", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
   byId(id).addEventListener("input", () => {
     byId(id + "Out").textContent = byId(id).value;
     if (id === "subjectTolerance" && depthRaw) {
@@ -260,6 +261,7 @@ viewsBtn.addEventListener("click", () => {
 
   const strength = Number(byId("strength").value);
   const amplitude = Number(byId("amplitude").value);
+  const subjectPlane = Number(byId("subjectPlane").value);
   const subjectRelief = Number(byId("subjectRelief").value);
   const edgeProtect = Number(byId("edgeProtect").value);
 
@@ -270,7 +272,7 @@ viewsBtn.addEventListener("click", () => {
     if (i === 4) {
       canvas.getContext("2d").drawImage(imageCanvas, 0, 0);
     } else {
-      renderLockedSubject(canvas, imageCanvas, backgroundCanvas, depthCanvas, subjectMask, ((i - 4) / 4) * amplitude, strength, subjectRelief, edgeProtect, seed.depth);
+      renderLockedSubject(canvas, imageCanvas, backgroundCanvas, depthCanvas, subjectMask, ((i - 4) / 4) * amplitude, strength, subjectPlane, subjectRelief, edgeProtect, seed.depth);
     }
     frames.push(canvas);
     const box = document.createElement("div");
@@ -297,8 +299,8 @@ viewsBtn.addEventListener("click", () => {
   restartAnimation();
   zipBtn.disabled = false;
   qc.style.display = "block";
-  qc.textContent = "QC ✓ 9 vues • vue 05 originale • silhouette verrouillée • micro-relief interne protégé • fond nettoyé avant parallaxe";
-  status.textContent = "9 vues générées ✓ — profondeur renforcée, silhouette stable et relief interne actif.";
+  qc.textContent = "QC ✓ 9 vues • vue 05 originale • sujet rigide • micro-relief limité • fond nettoyé • étirement des bords supprimé";
+  status.textContent = "9 vues générées ✓ — séparation nette des plans, sujet rigide et bords propres.";
   animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
@@ -636,7 +638,7 @@ function rawDepthToCanvas(raw, width, height) {
   return output;
 }
 
-function renderLockedSubject(out, image, backgroundImage, depth, mask, position, strength, subjectRelief, edgeProtect, subjectDepth) {
+function renderLockedSubject(out, image, backgroundImage, depth, mask, position, strength, subjectPlane, subjectRelief, edgeProtect, subjectDepth) {
   const gl = out.getContext("webgl2", { premultipliedAlpha: false, preserveDrawingBuffer: true });
   if (!gl) {
     out.getContext("2d").drawImage(image, 0, 0);
@@ -661,6 +663,7 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
     "uniform sampler2D mm;",
     "uniform float shift;",
     "uniform float subjectDepth;",
+    "uniform float subjectPlane;",
     "uniform float subjectRelief;",
     "uniform float edgeProtect;",
     "uniform vec2 texel;",
@@ -680,23 +683,28 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
     " float smoothD=(dc+dl*wL+dr*wR+du*wU+dd*wD)/(1.+wL+wR+wU+wD);",
     " float gradient=abs(dl-dc)+abs(dr-dc)+abs(du-dc)+abs(dd-dc);",
     " float edge=smoothstep(.035,.20,gradient);",
-    " float maskHere=M(base);",
-    " float relative=clamp((smoothD-subjectDepth)*3.35,-1.,1.);",
-    " relative=sign(relative)*pow(abs(relative),.68);",
-    " float protectedShift=shift*mix(1.,.52,edge*edgeProtect);",
-    " vec2 q=clamp(base+vec2(relative*protectedShift,0.),vec2(.001),vec2(.999));",
-    " vec4 background=texture(bg,q);",
-    " vec4 original=texture(im,base);",
-    " float subject=smoothstep(.06,.94,maskHere);",
-    " float core=smoothstep(.78,.995,maskHere);",
-    " float surface=clamp((smoothD-subjectDepth)*5.20,-1.,1.);",
-    " surface=sign(surface)*pow(abs(surface),.70);",
-    " float surfaceProtect=core*mix(1.,.24,edge*edgeProtect);",
-    " vec2 subjectQ=clamp(base+vec2(surface*shift*subjectRelief*.44*surfaceProtect,0.),vec2(.001),vec2(.999));",
+    " float borderDistance=min(base.x,1.-base.x);",
+    " float borderFade=smoothstep(.02,.16,borderDistance);",
+    " float safeShift=shift*borderFade;",
+    " float relative=clamp((smoothD-subjectDepth)*2.75,-.92,.92);",
+    " relative=sign(relative)*pow(abs(relative),.72);",
+    " float protectedShift=safeShift*mix(1.,.58,edge*edgeProtect);",
+    " vec2 backgroundQ=clamp(base+vec2(relative*protectedShift,0.),vec2(.001),vec2(.999));",
+    " vec4 background=texture(bg,backgroundQ);",
+    " vec2 rigidQ=clamp(base+vec2(safeShift*subjectPlane,0.),vec2(.001),vec2(.999));",
+    " float rigidMask=M(rigidQ);",
+    " float subject=smoothstep(.06,.94,rigidMask);",
+    " float core=smoothstep(.78,.995,rigidMask);",
+    " float surfaceDepth=D(rigidQ);",
+    " float surface=clamp((surfaceDepth-subjectDepth)*4.20,-1.,1.);",
+    " surface=sign(surface)*pow(abs(surface),.76);",
+    " float surfaceProtect=core*mix(1.,.30,edge*edgeProtect);",
+    " vec2 subjectQ=clamp(rigidQ+vec2(surface*safeShift*subjectRelief*.14*surfaceProtect,0.),vec2(.001),vec2(.999));",
     " float sourceInside=smoothstep(.72,.98,M(subjectQ));",
+    " vec4 rigidSubject=texture(im,rigidQ);",
     " vec4 reliefSubject=texture(im,subjectQ);",
     " float reliefMix=sourceInside*surfaceProtect;",
-    " vec3 subjectPixel=mix(original.rgb,reliefSubject.rgb,reliefMix);",
+    " vec3 subjectPixel=mix(rigidSubject.rgb,reliefSubject.rgb,reliefMix);",
     " o=vec4(mix(background.rgb,subjectPixel,subject),1.);",
     "}"
   ].join("\n");
@@ -719,6 +727,7 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, position,
   gl.uniform1i(gl.getUniformLocation(programObject, "mm"), 3);
   gl.uniform1f(gl.getUniformLocation(programObject, "shift"), position * strength);
   gl.uniform1f(gl.getUniformLocation(programObject, "subjectDepth"), subjectDepth);
+  gl.uniform1f(gl.getUniformLocation(programObject, "subjectPlane"), subjectPlane);
   gl.uniform1f(gl.getUniformLocation(programObject, "subjectRelief"), subjectRelief);
   gl.uniform1f(gl.getUniformLocation(programObject, "edgeProtect"), edgeProtect);
   gl.uniform2f(gl.getUniformLocation(programObject, "texel"), 1 / out.width, 1 / out.height);
