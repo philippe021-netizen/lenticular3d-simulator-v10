@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V17</title>
+<title>MicroPlayer — Depth iPad V18</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V17</h1>
+<h1>MicroPlayer — profondeur locale iPad V18</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -70,7 +70,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
     <button id="validateLayersBtn">✓ Valider et actualiser</button>
   </div>
-  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
+  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Ordre conseillé : proche → intermédiaire → horizon. Vous pouvez déborder : les zones déjà peintes sur un plan plus proche restent protégées. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
 </section>
 
 <section class="card">
@@ -158,6 +158,8 @@ let drawingMask = false;
 let lastPaintPoint = null;
 let selectionDrawFrame = null;
 let showLayers = false;
+let layerLocks = null;
+let layerStrokeCanvas = null;
 
 for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
   byId(id).addEventListener("input", () => {
@@ -194,8 +196,9 @@ layersBtn.addEventListener("click", () => {
 autoLayersBtn.addEventListener("click", () => {
   if (!depthCanvas) return;
   layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
+  resetLayerLocks();
   drawSelection();
-  status.textContent = "Répartition automatique des trois plans recalculée ✓.";
+  status.textContent = "Répartition automatique recalculée ✓. Les protections manuelles ont été remises à zéro.";
 });
 validateLayersBtn.addEventListener("click", () => {
   showLayers = false;
@@ -229,6 +232,8 @@ file.addEventListener("change", async () => {
   depthRaw = null;
   subjectMask = null;
   layerMapCanvas = null;
+  layerLocks = null;
+  layerStrokeCanvas = null;
   backgroundCanvas = null;
   showLayers = false;
   layersBtn.classList.remove("active");
@@ -321,7 +326,7 @@ for (const eventName of ["pointerup", "pointercancel"]) {
     }
     drawSelection();
     if (editMode.startsWith("layer-")) {
-      status.textContent = "Plan manuel mis à jour ✓.";
+      status.textContent = "Plan manuel mis à jour ✓ — les plans plus proches déjà peints restent protégés.";
     } else {
       backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
       status.textContent = "Masque du sujet mis à jour ✓.";
@@ -447,7 +452,10 @@ function prepareSubjectMask(keepPoint) {
   subjectMask = resizeAndFeatherMask(result.canvas, imageCanvas.width, imageCanvas.height);
   backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
   seed.depth = result.seedDepth;
-  if (!keepPoint || !layerMapCanvas) layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
+  if (!keepPoint || !layerMapCanvas) {
+    layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
+    resetLayerLocks();
+  }
   drawSelection();
   layersBtn.disabled = false;
   if (!keepPoint) viewsBtn.disabled = false;
@@ -603,39 +611,78 @@ function strokeBrush(ctx, x, y, from, radius) {
   ctx.stroke();
 }
 
+function makeMaskCanvas() {
+  const canvas = document.createElement("canvas");
+  canvas.width = selectCanvas.width;
+  canvas.height = selectCanvas.height;
+  return canvas;
+}
+
+function resetLayerLocks() {
+  if (!selectCanvas.width || !selectCanvas.height) return;
+  layerLocks = {
+    near: makeMaskCanvas(),
+    mid: makeMaskCanvas(),
+    far: makeMaskCanvas()
+  };
+  layerStrokeCanvas = makeMaskCanvas();
+}
+
 function paintLayerMap(x, y, from) {
   if (!layerMapCanvas) return;
-  const radius = Math.max(1, Number(brushSize.value) * selectCanvas.width / 900);
-  const colors = {
-    "layer-near": "#ff731a",
-    "layer-mid": "#268cff",
-    "layer-far": "#a438ea"
-  };
-  const color = colors[editMode] || colors["layer-near"];
-  const ctx = layerMapCanvas.getContext("2d");
-  ctx.strokeStyle = color;
-  strokeBrush(ctx, x, y, from, radius);
+  if (!layerLocks || !layerStrokeCanvas) resetLayerLocks();
 
-  // A background plan must be able to replace a wrongly selected green area.
-  // Remove the same stroke from the subject mask; the clean background is
-  // rebuilt once, only when the user validates the corrections.
+  const radius = Math.max(1, Number(brushSize.value) * selectCanvas.width / 900);
+  const keys = {
+    "layer-near": "near",
+    "layer-mid": "mid",
+    "layer-far": "far"
+  };
+  const colors = {
+    near: "#ff731a",
+    mid: "#268cff",
+    far: "#a438ea"
+  };
+  const key = keys[editMode] || "near";
+  const protectedKeys = key === "far" ? ["near", "mid"] : key === "mid" ? ["near"] : [];
+
+  // Build only the effective part of the Pencil stroke. A farther layer may
+  // overlap the brush footprint of a previously painted closer layer, but it
+  // cannot replace those protected pixels.
+  const strokeCtx = layerStrokeCanvas.getContext("2d");
+  strokeCtx.clearRect(0, 0, layerStrokeCanvas.width, layerStrokeCanvas.height);
+  strokeCtx.save();
+  strokeCtx.strokeStyle = "#ffffff";
+  strokeBrush(strokeCtx, x, y, from, radius);
+  strokeCtx.globalCompositeOperation = "destination-out";
+  for (const protectedKey of protectedKeys) {
+    strokeCtx.drawImage(layerLocks[protectedKey], 0, 0);
+  }
+  strokeCtx.globalCompositeOperation = "source-in";
+  strokeCtx.fillStyle = colors[key];
+  strokeCtx.fillRect(0, 0, layerStrokeCanvas.width, layerStrokeCanvas.height);
+  strokeCtx.restore();
+
+  layerMapCanvas.getContext("2d").drawImage(layerStrokeCanvas, 0, 0);
+  layerLocks[key].getContext("2d").drawImage(layerStrokeCanvas, 0, 0);
+
+  // A background plan can still correct a wrongly selected green subject
+  // area, but only on the effective, non-protected part of the stroke.
   if (subjectMask) {
     const subjectCtx = subjectMask.getContext("2d");
     subjectCtx.save();
     subjectCtx.globalCompositeOperation = "destination-out";
-    subjectCtx.strokeStyle = "#ffffff";
-    strokeBrush(subjectCtx, x, y, from, radius);
+    subjectCtx.drawImage(layerStrokeCanvas, 0, 0);
     subjectCtx.restore();
     backgroundCanvas = null;
   }
 
-  // Paint the visible overlay directly instead of rebuilding the full
-  // high-resolution preview at every Pencil event.
+  // Direct preview keeps Pencil latency low and shows only pixels that were
+  // really assigned to the active layer.
   const previewCtx = selectCanvas.getContext("2d");
   previewCtx.save();
   previewCtx.globalAlpha = 0.42;
-  previewCtx.strokeStyle = color;
-  strokeBrush(previewCtx, x, y, from, radius);
+  previewCtx.drawImage(layerStrokeCanvas, 0, 0);
   previewCtx.restore();
 }
 
