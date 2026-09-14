@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V4</title>
+<title>MicroPlayer — Depth iPad V5</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -25,6 +25,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 .selectStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;display:grid;place-items:center;touch-action:manipulation}
 .selectStage canvas{max-width:100%;max-height:520px;width:auto;height:auto;display:block}
 .hint{margin-top:9px;color:#c9d3e2;font-size:14px}
+.maskTools{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:11px}.maskTools button{padding:10px 13px;font-size:14px}.maskTools button.active{background:#25d975;color:#06150c}.brush{display:grid;grid-template-columns:auto 150px 42px;gap:8px;align-items:center;font-size:14px}
 .animWrap{display:none}.animStage{position:relative;background:#050506;border-radius:14px;overflow:hidden;min-height:280px;display:grid;place-items:center}
 .animStage canvas{max-width:100%;max-height:560px;width:auto;height:auto;display:block}
 .animBadge,.badge{position:absolute;left:8px;top:8px;background:#000c;padding:5px 8px;border-radius:8px;font-size:12px}
@@ -38,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V4</h1>
+<h1>MicroPlayer — profondeur locale iPad V5</h1>
 <div class="sub">9 vues avec sujet verrouillé. Le décor produit la parallaxe ; le sujet reste net et non déformé. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -55,7 +56,13 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 <section id="selectWrap" class="card selectWrap">
   <strong>Sujet à verrouiller</strong>
   <div class="selectStage"><canvas id="selectCanvas"></canvas></div>
-  <div class="hint">Touchez le centre du sujet principal. La zone verte restera pixel pour pixel stable dans les 9 vues.</div>
+  <div class="maskTools">
+    <button id="autoModeBtn" class="secondary active">Point automatique</button>
+    <button id="paintModeBtn" class="secondary">Pinceau +</button>
+    <button id="eraseModeBtn" class="secondary">Gomme</button>
+    <div class="brush"><label>Taille</label><input id="brushSize" type="range" min="12" max="100" step="4" value="40"><output id="brushSizeOut">40</output></div>
+  </div>
+  <div class="hint">Vert = zone réellement verrouillée. Touchez d’abord le sujet avec « Point automatique ». Utilisez ensuite le pinceau si une aile, une hélice ou un contour manque.</div>
 </section>
 
 <section class="card">
@@ -97,6 +104,11 @@ const zipBtn = byId("zipBtn");
 const grid = byId("grid");
 const selectWrap = byId("selectWrap");
 const selectCanvas = byId("selectCanvas");
+const autoModeBtn = byId("autoModeBtn");
+const paintModeBtn = byId("paintModeBtn");
+const eraseModeBtn = byId("eraseModeBtn");
+const brushSize = byId("brushSize");
+const brushSizeOut = byId("brushSizeOut");
 const animWrap = byId("animWrap");
 const animCanvas = byId("animCanvas");
 const animBadge = byId("animBadge");
@@ -122,6 +134,8 @@ let frameIndex = 4;
 let direction = 1;
 let playing = true;
 let maskTimer = null;
+let editMode = "auto";
+let drawingMask = false;
 
 for (const id of ["strength", "amplitude", "subjectTolerance", "edgeProtect"]) {
   byId(id).addEventListener("input", () => {
@@ -137,6 +151,10 @@ speed.addEventListener("input", () => {
   speedOut.textContent = speed.value + " ms";
   if (playing && frames.length) restartAnimation();
 });
+brushSize.addEventListener("input", () => { brushSizeOut.textContent = brushSize.value; });
+autoModeBtn.addEventListener("click", () => setEditMode("auto"));
+paintModeBtn.addEventListener("click", () => setEditMode("paint"));
+eraseModeBtn.addEventListener("click", () => setEditMode("erase"));
 
 status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
 
@@ -205,12 +223,33 @@ depthBtn.addEventListener("click", async () => {
 
 selectCanvas.addEventListener("pointerdown", event => {
   if (!depthRaw || !imageCanvas) return;
-  const rect = selectCanvas.getBoundingClientRect();
-  seed.x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-  seed.y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-  prepareSubjectMask(false);
-  status.textContent = "Sujet recalé ✓. Vérifiez que la zone verte couvre le sujet sans déborder sur le décor.";
+  const point = canvasPoint(event);
+  if (editMode === "auto") {
+    seed.x = point.x / selectCanvas.width;
+    seed.y = point.y / selectCanvas.height;
+    prepareSubjectMask(false);
+    status.textContent = "Masque automatique recalé ✓. Le vert doit couvrir tout le sujet, et uniquement lui.";
+    return;
+  }
+  drawingMask = true;
+  selectCanvas.setPointerCapture(event.pointerId);
+  paintSubjectMask(point.x, point.y);
 });
+
+selectCanvas.addEventListener("pointermove", event => {
+  if (!drawingMask || editMode === "auto") return;
+  const point = canvasPoint(event);
+  paintSubjectMask(point.x, point.y);
+});
+
+for (const eventName of ["pointerup", "pointercancel"]) {
+  selectCanvas.addEventListener(eventName, () => {
+    if (!drawingMask) return;
+    drawingMask = false;
+    backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+    status.textContent = "Masque manuel mis à jour ✓.";
+  });
+}
 
 viewsBtn.addEventListener("click", () => {
   if (!depthRaw || !srcImg || !subjectMask || !backgroundCanvas) return;
@@ -328,6 +367,7 @@ function growSubjectMask(raw, nx, ny, tolerance) {
   const height = raw.height;
   const count = width * height;
   const data = raw.data;
+  const visited = new Uint8Array(count);
   const sx = Math.max(0, Math.min(width - 1, Math.round(nx * (width - 1))));
   const sy = Math.max(0, Math.min(height - 1, Math.round(ny * (height - 1))));
   const sample = [];
@@ -338,13 +378,14 @@ function growSubjectMask(raw, nx, ny, tolerance) {
   sample.sort((a, b) => a - b);
   const seedValue = sample[Math.floor(sample.length / 2)];
   const globalTolerance = tolerance * 255;
-  const localTolerance = Math.max(10, globalTolerance * 0.42);
+  const localTolerance = Math.max(12, globalTolerance * 0.34);
   let mask = new Uint8Array(count);
   const queue = new Int32Array(count);
   let head = 0;
   let tail = 0;
   const start = sy * width + sx;
   mask[start] = 1;
+  visited[start] = 1;
   queue[tail++] = start;
 
   while (head < tail) {
@@ -359,9 +400,10 @@ function growSubjectMask(raw, nx, ny, tolerance) {
   }
 
   function visit(index, parentValue) {
-    if (mask[index]) return;
+    if (visited[index]) return;
+    visited[index] = 1;
     const value = depthValue(data, index, count);
-    if (Math.abs(value - seedValue) <= globalTolerance && Math.abs(value - parentValue) <= localTolerance) {
+    if (value >= seedValue - globalTolerance && Math.abs(value - parentValue) <= localTolerance) {
       mask[index] = 1;
       queue[tail++] = index;
     }
@@ -378,7 +420,7 @@ function growSubjectMask(raw, nx, ny, tolerance) {
   for (let i = 0, j = 0; i < count; i++, j += 4) {
     const value = mask[i] ? 255 : 0;
     pixels.data[j] = pixels.data[j + 1] = pixels.data[j + 2] = value;
-    pixels.data[j + 3] = 255;
+    pixels.data[j + 3] = value;
   }
   ctx.putImageData(pixels, 0, 0);
   return { canvas, seedDepth: seedValue / 255 };
@@ -434,6 +476,36 @@ function resizeAndFeatherMask(source, width, height) {
   ctx.drawImage(source, 0, 0, width, height);
   ctx.filter = "none";
   return output;
+}
+
+function setEditMode(mode) {
+  editMode = mode;
+  autoModeBtn.classList.toggle("active", mode === "auto");
+  paintModeBtn.classList.toggle("active", mode === "paint");
+  eraseModeBtn.classList.toggle("active", mode === "erase");
+}
+
+function canvasPoint(event) {
+  const rect = selectCanvas.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(selectCanvas.width, (event.clientX - rect.left) * selectCanvas.width / rect.width)),
+    y: Math.max(0, Math.min(selectCanvas.height, (event.clientY - rect.top) * selectCanvas.height / rect.height))
+  };
+}
+
+function paintSubjectMask(x, y) {
+  if (!subjectMask) return;
+  const radius = Number(brushSize.value) * selectCanvas.width / 900;
+  const ctx = subjectMask.getContext("2d");
+  ctx.save();
+  ctx.globalCompositeOperation = editMode === "erase" ? "destination-out" : "source-over";
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(x, y, Math.max(5, radius), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  backgroundCanvas = null;
+  drawSelection();
 }
 
 function drawSelection() {
