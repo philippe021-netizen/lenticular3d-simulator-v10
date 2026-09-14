@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V25</title>
+<title>MicroPlayer — Depth iPad V26</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -39,7 +39,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V25</h1>
+<h1>MicroPlayer — profondeur locale iPad V26</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -70,7 +70,7 @@ button:disabled{opacity:.4;cursor:default}.file input{display:none}
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
     <button id="validateLayersBtn">✓ Valider et actualiser</button>
   </div>
-  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Les zones ajoutées au stylet sont verrouillées avec un bord net. Vous pouvez déborder dessus avec une autre couleur sans les modifier ; les zones automatiques restent corrigibles. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
+  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Chaque trait au stylet est conservé dans une couche maîtresse prioritaire. Une autre couleur peut déborder dessus, mais ne peut jamais le remplacer ; les zones automatiques restent corrigibles. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
 </section>
 
 <section class="card">
@@ -158,7 +158,7 @@ let drawingMask = false;
 let lastPaintPoint = null;
 let selectionDrawFrame = null;
 let showLayers = false;
-let layerLocks = null;
+let manualLayerCanvas = null;
 let layerStrokeCanvas = null;
 
 for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
@@ -232,7 +232,7 @@ file.addEventListener("change", async () => {
   depthRaw = null;
   subjectMask = null;
   layerMapCanvas = null;
-  layerLocks = null;
+  manualLayerCanvas = null;
   layerStrokeCanvas = null;
   backgroundCanvas = null;
   showLayers = false;
@@ -326,7 +326,7 @@ for (const eventName of ["pointerup", "pointercancel"]) {
     }
     drawSelection();
     if (editMode.startsWith("layer-")) {
-      status.textContent = "Plan manuel mis à jour ✓ — cette zone peinte est maintenant verrouillée.";
+      status.textContent = "Plan manuel mis à jour ✓ — la couche maîtresse protège définitivement ce trait.";
     } else {
       backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
       status.textContent = "Masque du sujet mis à jour ✓.";
@@ -620,36 +620,26 @@ function makeMaskCanvas() {
 
 function resetLayerLocks() {
   if (!selectCanvas.width || !selectCanvas.height) return;
-  layerLocks = {
-    near: makeMaskCanvas(),
-    mid: makeMaskCanvas(),
-    far: makeMaskCanvas()
-  };
+  manualLayerCanvas = makeMaskCanvas();
   layerStrokeCanvas = document.createElement("canvas");
 }
 
 function paintLayerMap(x, y, from) {
   if (!layerMapCanvas) return;
-  if (!layerLocks || !layerStrokeCanvas) resetLayerLocks();
+  if (!manualLayerCanvas || !layerStrokeCanvas) resetLayerLocks();
 
   const radius = Math.max(1, Number(brushSize.value) * selectCanvas.width / 900);
-  const keys = {
-    "layer-near": "near",
-    "layer-mid": "mid",
-    "layer-far": "far"
-  };
   const colors = {
-    near: "#ff731a",
-    mid: "#268cff",
-    far: "#a438ea"
+    "layer-near": "#ff731a",
+    "layer-mid": "#268cff",
+    "layer-far": "#a438ea"
   };
-  const key = keys[editMode] || "near";
-  const protectedKeys = ["near", "mid", "far"].filter(layerKey => layerKey !== key);
+  const color = colors[editMode] || colors["layer-near"];
   const start = from || { x, y };
 
   // Work only inside the small rectangle touched by this Pencil segment.
-  // This avoids compositing several full-resolution canvases on every event.
-  const margin = radius + 3;
+  const protection = 2;
+  const margin = radius + protection + 3;
   const x0 = Math.max(0, Math.floor(Math.min(start.x, x) - margin));
   const y0 = Math.max(0, Math.floor(Math.min(start.y, y) - margin));
   const x1 = Math.min(selectCanvas.width, Math.ceil(Math.max(start.x, x) + margin));
@@ -663,60 +653,44 @@ function paintLayerMap(x, y, from) {
   strokeCtx.save();
   strokeCtx.strokeStyle = "#ffffff";
   strokeBrush(strokeCtx, x - x0, y - y0, { x: start.x - x0, y: start.y - y0 }, radius);
-  strokeCtx.globalCompositeOperation = "destination-out";
-  for (const protectedKey of protectedKeys) {
-    strokeCtx.drawImage(
-      layerLocks[protectedKey],
-      x0, y0, patchWidth, patchHeight,
-      0, 0, patchWidth, patchHeight
-    );
-  }
   strokeCtx.globalCompositeOperation = "source-in";
-  strokeCtx.fillStyle = colors[key];
+  strokeCtx.fillStyle = color;
   strokeCtx.fillRect(0, 0, patchWidth, patchHeight);
   strokeCtx.restore();
 
-  layerMapCanvas.getContext("2d").drawImage(layerStrokeCanvas, x0, y0);
+  const mapCtx = layerMapCanvas.getContext("2d");
+  mapCtx.drawImage(layerStrokeCanvas, x0, y0);
 
-  // Store a hard, one-pixel-expanded lock for the actual Pencil stroke.
-  // Automatic pixels are deliberately not locked, so another layer can still
-  // correct the depth estimate without blocking the intermediate brush.
-  const lockCtx = layerLocks[key].getContext("2d");
-  lockCtx.save();
-  for (let offsetY = -1; offsetY <= 1; offsetY++) {
-    for (let offsetX = -1; offsetX <= 1; offsetX++) {
-      lockCtx.drawImage(layerStrokeCanvas, x0 + offsetX, y0 + offsetY);
+  // The master canvas is the final authority for every manual stroke.
+  // destination-over adds only unprotected pixels; an existing orange/blue/
+  // violet manual choice can therefore never be replaced by a later choice.
+  const masterCtx = manualLayerCanvas.getContext("2d");
+  masterCtx.save();
+  masterCtx.globalCompositeOperation = "destination-over";
+  for (let offsetY = -protection; offsetY <= protection; offsetY++) {
+    for (let offsetX = -protection; offsetX <= protection; offsetX++) {
+      masterCtx.drawImage(layerStrokeCanvas, x0 + offsetX, y0 + offsetY);
     }
   }
-  const lockX0 = Math.max(0, x0 - 1);
-  const lockY0 = Math.max(0, y0 - 1);
-  const lockX1 = Math.min(selectCanvas.width, x0 + patchWidth + 1);
-  const lockY1 = Math.min(selectCanvas.height, y0 + patchHeight + 1);
-  const lockWidth = Math.max(1, lockX1 - lockX0);
-  const lockHeight = Math.max(1, lockY1 - lockY0);
-  lockCtx.globalCompositeOperation = "destination-out";
-  for (const protectedKey of protectedKeys) {
-    lockCtx.drawImage(
-      layerLocks[protectedKey],
-      lockX0, lockY0, lockWidth, lockHeight,
-      lockX0, lockY0, lockWidth, lockHeight
-    );
-  }
-  lockCtx.restore();
+  masterCtx.restore();
 
-  const lockPixels = lockCtx.getImageData(lockX0, lockY0, lockWidth, lockHeight);
-  for (let i = 0; i < lockPixels.data.length; i += 4) {
-    if (lockPixels.data[i + 3] > 0) {
-      lockPixels.data[i] = 255;
-      lockPixels.data[i + 1] = 255;
-      lockPixels.data[i + 2] = 255;
-      lockPixels.data[i + 3] = 255;
+  // Convert antialiased Pencil edges to an opaque protection.
+  const masterPixels = masterCtx.getImageData(x0, y0, patchWidth, patchHeight);
+  for (let i = 0; i < masterPixels.data.length; i += 4) {
+    if (masterPixels.data[i + 3] > 0) {
+      masterPixels.data[i + 3] = 255;
     }
   }
-  lockCtx.putImageData(lockPixels, lockX0, lockY0);
+  masterCtx.putImageData(masterPixels, x0, y0);
 
-  // A background plan can still correct a wrongly selected green subject
-  // area, but only on the effective, non-protected part of the stroke.
+  // Restore the protected manual choices above the new stroke. This explicit
+  // restore is reliable on Safari even when alpha compositing varies.
+  mapCtx.drawImage(
+    manualLayerCanvas,
+    x0, y0, patchWidth, patchHeight,
+    x0, y0, patchWidth, patchHeight
+  );
+
   if (subjectMask) {
     const subjectCtx = subjectMask.getContext("2d");
     subjectCtx.save();
@@ -726,11 +700,15 @@ function paintLayerMap(x, y, from) {
     backgroundCanvas = null;
   }
 
-  // Draw only the modified patch in the preview.
+  // Show the authoritative result, not the unprotected raw stroke.
   const previewCtx = selectCanvas.getContext("2d");
   previewCtx.save();
   previewCtx.globalAlpha = 0.42;
-  previewCtx.drawImage(layerStrokeCanvas, x0, y0);
+  previewCtx.drawImage(
+    layerMapCanvas,
+    x0, y0, patchWidth, patchHeight,
+    x0, y0, patchWidth, patchHeight
+  );
   previewCtx.restore();
 }
 
