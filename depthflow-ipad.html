@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V27</title>
+<title>MicroPlayer — Depth iPad V28</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -40,7 +40,7 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V27</h1>
+<h1>MicroPlayer — profondeur locale iPad V28</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -159,6 +159,7 @@ let editMode = "auto";
 let drawingMask = false;
 let lastPaintPoint = null;
 let selectionDrawFrame = null;
+let autoPointJob = 0;
 let showLayers = false;
 let manualLayerCanvas = null;
 let layerStrokeCanvas = null;
@@ -211,8 +212,10 @@ validateLayersBtn.addEventListener("click", () => {
   drawSelection();
   viewsBtn.disabled = false;
   status.textContent = "Plans validés ✓. Préparation du simulateur…";
-  if (!backgroundCanvas) backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
-  generateViews({ scroll: true });
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!backgroundCanvas) backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+    generateViews({ scroll: true });
+  }));
 });
 
 status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
@@ -296,22 +299,32 @@ depthBtn.addEventListener("click", async () => {
 
 selectCanvas.addEventListener("pointerdown", event => {
   if (!depthRaw || !imageCanvas) return;
+  event.preventDefault();
+  event.stopPropagation();
   const point = canvasPoint(event);
   if (editMode === "auto") {
+    const job = ++autoPointJob;
     seed.x = point.x / selectCanvas.width;
     seed.y = point.y / selectCanvas.height;
-    prepareSubjectMask(false);
-    status.textContent = "Masque automatique recalé ✓. Le vert doit couvrir tout le sujet, et uniquement lui.";
+    drawSelection();
+    status.textContent = "Point reçu ✓ — calcul du masque…";
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (job !== autoPointJob) return;
+      prepareSubjectMask(false);
+      status.textContent = "Masque automatique recalé ✓. Le vert doit couvrir tout le sujet, et uniquement lui.";
+    }));
     return;
   }
   drawingMask = true;
   lastPaintPoint = point;
   selectCanvas.setPointerCapture(event.pointerId);
   paintActiveMap(point.x, point.y, point);
-});
+}, { passive: false });
 
 selectCanvas.addEventListener("pointermove", event => {
   if (!drawingMask || editMode === "auto") return;
+  event.preventDefault();
+  event.stopPropagation();
   const point = canvasPoint(event);
   paintActiveMap(point.x, point.y, lastPaintPoint || point);
   lastPaintPoint = point;
@@ -330,8 +343,8 @@ for (const eventName of ["pointerup", "pointercancel"]) {
     if (editMode.startsWith("layer-")) {
       status.textContent = "Plan manuel mis à jour ✓ — le sujet vert et les traits précédents restent protégés.";
     } else {
-      backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
-      status.textContent = "Masque du sujet mis à jour ✓.";
+      backgroundCanvas = null;
+      status.textContent = "Masque du sujet mis à jour ✓ — le fond sera préparé à la validation.";
     }
   });
 }
@@ -452,7 +465,7 @@ function prepareSubjectMask(keepPoint) {
   const tolerance = Number(byId("subjectTolerance").value);
   const result = growSubjectMask(depthRaw, seed.x, seed.y, tolerance);
   subjectMask = resizeAndFeatherMask(result.canvas, imageCanvas.width, imageCanvas.height);
-  backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+  backgroundCanvas = null;
   seed.depth = result.seedDepth;
   if (!keepPoint || !layerMapCanvas) {
     layerMapCanvas = buildAutoLayerMap(depthCanvas, seed.depth);
