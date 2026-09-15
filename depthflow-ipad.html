@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V30</title>
+<title>MicroPlayer — Depth iPad V31</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -40,7 +40,7 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V30</h1>
+<h1>MicroPlayer — profondeur locale iPad V31</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -159,7 +159,12 @@ let editMode = "auto";
 let drawingMask = false;
 let lastPaintPoint = null;
 let selectionDrawFrame = null;
+let selectionTintCanvas = null;
+let selectionTintDirty = true;
 let autoPointJob = 0;
+let lastCanvasInputAt = 0;
+let lastPointerEventAt = 0;
+let touchFallbackActive = false;
 let showLayers = false;
 let manualLayerCanvas = null;
 let layerStrokeCanvas = null;
@@ -211,11 +216,7 @@ validateLayersBtn.addEventListener("click", () => {
   setEditMode("auto");
   drawSelection();
   viewsBtn.disabled = false;
-  status.textContent = "Plans validés ✓. Préparation du simulateur…";
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    if (!backgroundCanvas) backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
-    generateViews({ scroll: true });
-  }));
+  prepareAndGenerateViews({ scroll: true });
 });
 
 status.textContent = "Prêt. WebGPU : " + (navigator.gpu ? "disponible ✓" : "non détecté — repli WASM");
@@ -240,6 +241,8 @@ file.addEventListener("change", async () => {
   manualLayerCanvas = null;
   layerStrokeCanvas = null;
   backgroundCanvas = null;
+  selectionTintCanvas = null;
+  selectionTintDirty = true;
   showLayers = false;
   layersBtn.classList.remove("active");
   layersBtn.textContent = "Voir les plans";
@@ -280,10 +283,25 @@ depthBtn.addEventListener("click", async () => {
     const output = await estimator(srcUrl);
     depthRaw = output.depth;
     prepareCanvases();
+
+    // The inference model is the largest allocation in the page. It is no
+    // longer needed after depthRaw has been copied, so release it before the
+    // interactive Pencil stage starts.
+    const finishedEstimator = estimator;
+    estimator = null;
+    try {
+      if (finishedEstimator && typeof finishedEstimator.dispose === "function") {
+        await finishedEstimator.dispose();
+      }
+    } catch (disposeError) {
+      console.warn("Libération du modèle incomplète", disposeError);
+    }
+
     seed = { x: 0.5, y: 0.45, depth: 0.5 };
     subjectMask = document.createElement("canvas");
     subjectMask.width = imageCanvas.width;
     subjectMask.height = imageCanvas.height;
+    selectionTintDirty = true;
     layerMapCanvas = null;
     backgroundCanvas = null;
     selectWrap.style.display = "block";
@@ -297,56 +315,146 @@ depthBtn.addEventListener("click", async () => {
   }
 });
 
-selectCanvas.addEventListener("pointerdown", event => {
-  if (!depthRaw || !imageCanvas) return;
-  event.preventDefault();
-  event.stopPropagation();
-  const point = canvasPoint(event);
-  if (editMode === "auto") {
-    const job = ++autoPointJob;
-    seed.x = point.x / selectCanvas.width;
-    seed.y = point.y / selectCanvas.height;
-    drawSelection();
-    status.textContent = "Point reçu ✓ — calcul du masque…";
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      if (job !== autoPointJob) return;
+function scheduleAutomaticPoint(point) {
+  const job = ++autoPointJob;
+  seed.x = point.x / selectCanvas.width;
+  seed.y = point.y / selectCanvas.height;
+  drawSelection();
+  status.textContent = "Point reçu ✓ — calcul du masque…";
+
+  // A real timer gives Safari time to paint the target before the synchronous
+  // mask pass. Repeated taps keep only the most recent requested position.
+  setTimeout(() => {
+    if (job !== autoPointJob) return;
+    try {
       prepareSubjectMask(false);
       status.textContent = "Masque automatique recalé ✓. Le vert doit couvrir tout le sujet, et uniquement lui.";
-    }));
+    } catch (error) {
+      console.error("Sélection automatique impossible", error);
+      status.textContent = "Erreur de sélection : " + (error && error.message ? error.message : error);
+    }
+  }, 70);
+}
+
+function beginCanvasInput(clientX, clientY, pointerId = null) {
+  if (!depthRaw || !imageCanvas) return;
+  lastCanvasInputAt = performance.now();
+  const point = canvasPoint({ clientX, clientY });
+  if (editMode === "auto") {
+    scheduleAutomaticPoint(point);
     return;
   }
   drawingMask = true;
   lastPaintPoint = point;
-  selectCanvas.setPointerCapture(event.pointerId);
+  if (pointerId != null) {
+    try { selectCanvas.setPointerCapture(pointerId); } catch (_) {}
+  }
   paintActiveMap(point.x, point.y, point);
+}
+
+function moveCanvasInput(clientX, clientY) {
+  if (!drawingMask || editMode === "auto") return;
+  const point = canvasPoint({ clientX, clientY });
+  paintActiveMap(point.x, point.y, lastPaintPoint || point);
+  lastPaintPoint = point;
+}
+
+function finishCanvasInput() {
+  if (!drawingMask) return;
+  drawingMask = false;
+  lastPaintPoint = null;
+  if (selectionDrawFrame) {
+    cancelAnimationFrame(selectionDrawFrame);
+    selectionDrawFrame = null;
+  }
+  drawSelection();
+  if (editMode.startsWith("layer-")) {
+    status.textContent = "Plan manuel mis à jour ✓ — le sujet vert et les traits précédents restent protégés.";
+  } else {
+    backgroundCanvas = null;
+    status.textContent = "Masque du sujet mis à jour ✓ — le fond sera préparé à la validation.";
+  }
+}
+
+selectCanvas.addEventListener("pointerdown", event => {
+  lastPointerEventAt = performance.now();
+  event.preventDefault();
+  event.stopPropagation();
+  beginCanvasInput(event.clientX, event.clientY, event.pointerId);
 }, { passive: false });
 
 selectCanvas.addEventListener("pointermove", event => {
+  lastPointerEventAt = performance.now();
   if (!drawingMask || editMode === "auto") return;
   event.preventDefault();
   event.stopPropagation();
-  const point = canvasPoint(event);
-  paintActiveMap(point.x, point.y, lastPaintPoint || point);
-  lastPaintPoint = point;
-});
+  moveCanvasInput(event.clientX, event.clientY);
+}, { passive: false });
 
 for (const eventName of ["pointerup", "pointercancel"]) {
-  selectCanvas.addEventListener(eventName, () => {
-    if (!drawingMask) return;
-    drawingMask = false;
-    lastPaintPoint = null;
-    if (selectionDrawFrame) {
-      cancelAnimationFrame(selectionDrawFrame);
-      selectionDrawFrame = null;
+  selectCanvas.addEventListener(eventName, event => {
+    lastPointerEventAt = performance.now();
+    if (drawingMask) {
+      event.preventDefault();
+      event.stopPropagation();
     }
-    drawSelection();
-    if (editMode.startsWith("layer-")) {
-      status.textContent = "Plan manuel mis à jour ✓ — le sujet vert et les traits précédents restent protégés.";
-    } else {
-      backgroundCanvas = null;
-      status.textContent = "Masque du sujet mis à jour ✓ — le fond sera préparé à la validation.";
+    finishCanvasInput();
+  }, { passive: false });
+}
+
+// iPad Safari can advertise PointerEvent yet occasionally suppress pointerdown
+// inside a busy iframe. Touch events provide an independent, deduplicated path.
+selectCanvas.addEventListener("touchstart", event => {
+  if (performance.now() - lastPointerEventAt < 120) return;
+  const touch = event.changedTouches && event.changedTouches[0];
+  if (!touch) return;
+  event.preventDefault();
+  event.stopPropagation();
+  touchFallbackActive = true;
+  beginCanvasInput(touch.clientX, touch.clientY);
+}, { passive: false });
+
+selectCanvas.addEventListener("touchmove", event => {
+  if (!touchFallbackActive) return;
+  const touch = event.changedTouches && event.changedTouches[0];
+  if (!touch) return;
+  event.preventDefault();
+  event.stopPropagation();
+  moveCanvasInput(touch.clientX, touch.clientY);
+}, { passive: false });
+
+for (const eventName of ["touchend", "touchcancel"]) {
+  selectCanvas.addEventListener(eventName, event => {
+    if (!touchFallbackActive) return;
+    event.preventDefault();
+    event.stopPropagation();
+    touchFallbackActive = false;
+    finishCanvasInput();
+  }, { passive: false });
+}
+
+// Last-resort path for browsers that convert a tap only into a click.
+selectCanvas.addEventListener("click", event => {
+  if (editMode !== "auto" || performance.now() - lastCanvasInputAt < 450) return;
+  event.preventDefault();
+  beginCanvasInput(event.clientX, event.clientY);
+});
+
+function prepareAndGenerateViews({ scroll = true } = {}) {
+  if (!depthRaw || !srcImg || !subjectMask || !layerMapCanvas) {
+    status.textContent = "Sélectionnez d’abord le sujet principal.";
+    return;
+  }
+  status.textContent = "Préparation du fond et du simulateur…";
+  requestAnimationFrame(() => setTimeout(() => {
+    try {
+      if (!backgroundCanvas) backgroundCanvas = buildCleanBackground(imageCanvas, subjectMask);
+      generateViews({ scroll });
+    } catch (error) {
+      console.error("Génération impossible", error);
+      status.textContent = "Erreur de génération : " + (error && error.message ? error.message : error);
     }
-  });
+  }, 30));
 }
 
 function generateViews({ scroll = true } = {}) {
@@ -380,19 +488,18 @@ function generateViews({ scroll = true } = {}) {
     frames.push(canvas);
     const box = document.createElement("div");
     box.className = "view" + (i === 4 ? " center" : "");
-    const display = document.createElement("canvas");
-    display.width = canvas.width;
-    display.height = canvas.height;
-    display.getContext("2d").drawImage(canvas, 0, 0);
     const badge = document.createElement("div");
     badge.className = "badge";
     badge.textContent = String(i + 1).padStart(2, "0") + (i === 4 ? " — original" : "");
-    box.append(display, badge);
+    // Reuse the export canvas in the grid instead of allocating a second
+    // full-resolution copy for every view.
+    box.append(canvas, badge);
     grid.append(box);
   }
 
-  animCanvas.width = imageCanvas.width;
-  animCanvas.height = imageCanvas.height;
+  const animWidth = Math.min(imageCanvas.width, 960);
+  animCanvas.width = animWidth;
+  animCanvas.height = Math.round(imageCanvas.height * animWidth / imageCanvas.width);
   animWrap.style.display = "block";
   frameIndex = 4;
   direction = 1;
@@ -407,7 +514,7 @@ function generateViews({ scroll = true } = {}) {
   if (scroll) animWrap.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-viewsBtn.addEventListener("click", () => generateViews({ scroll: true }));
+viewsBtn.addEventListener("click", () => prepareAndGenerateViews({ scroll: true }));
 
 zipBtn.addEventListener("click", async () => {
   if (frames.length !== 9 || !window.JSZip) return;
@@ -465,6 +572,7 @@ function prepareSubjectMask(keepPoint) {
   const tolerance = Number(byId("subjectTolerance").value);
   const result = growSubjectMask(depthRaw, seed.x, seed.y, tolerance);
   subjectMask = resizeAndFeatherMask(result.canvas, imageCanvas.width, imageCanvas.height);
+  selectionTintDirty = true;
   backgroundCanvas = null;
   seed.depth = result.seedDepth;
   if (!keepPoint || !layerMapCanvas) {
@@ -730,6 +838,7 @@ function paintSubjectMask(x, y, from) {
   ctx.strokeStyle = "#ffffff";
   strokeBrush(ctx, x, y, from, radius);
   ctx.restore();
+  selectionTintDirty = true;
   backgroundCanvas = null;
   scheduleSelectionDraw();
 }
@@ -751,16 +860,27 @@ function drawSelection() {
     ctx.drawImage(layerMapCanvas, 0, 0);
     ctx.globalAlpha = 1;
   }
-  const tint = document.createElement("canvas");
-  tint.width = selectCanvas.width;
-  tint.height = selectCanvas.height;
-  const tctx = tint.getContext("2d");
-  tctx.fillStyle = "#22d36f";
-  tctx.fillRect(0, 0, tint.width, tint.height);
-  tctx.globalCompositeOperation = "destination-in";
-  tctx.drawImage(subjectMask, 0, 0);
+  if (!selectionTintCanvas ||
+      selectionTintCanvas.width !== selectCanvas.width ||
+      selectionTintCanvas.height !== selectCanvas.height) {
+    selectionTintCanvas = document.createElement("canvas");
+    selectionTintCanvas.width = selectCanvas.width;
+    selectionTintCanvas.height = selectCanvas.height;
+    selectionTintDirty = true;
+  }
+  if (selectionTintDirty) {
+    const tctx = selectionTintCanvas.getContext("2d");
+    tctx.globalCompositeOperation = "source-over";
+    tctx.clearRect(0, 0, selectionTintCanvas.width, selectionTintCanvas.height);
+    tctx.fillStyle = "#22d36f";
+    tctx.fillRect(0, 0, selectionTintCanvas.width, selectionTintCanvas.height);
+    tctx.globalCompositeOperation = "destination-in";
+    tctx.drawImage(subjectMask, 0, 0);
+    tctx.globalCompositeOperation = "source-over";
+    selectionTintDirty = false;
+  }
   ctx.globalAlpha = showLayers ? 0.56 : 0.34;
-  ctx.drawImage(tint, 0, 0);
+  ctx.drawImage(selectionTintCanvas, 0, 0);
   ctx.globalAlpha = 1;
   const x = seed.x * selectCanvas.width;
   const y = seed.y * selectCanvas.height;
@@ -1210,9 +1330,15 @@ function showAnimFrame(index) {
   if (!frames[index]) return;
   const ctx = animCanvas.getContext("2d");
   ctx.clearRect(0, 0, animCanvas.width, animCanvas.height);
-  ctx.drawImage(frames[index], 0, 0);
+  ctx.drawImage(frames[index], 0, 0, animCanvas.width, animCanvas.height);
   animBadge.textContent = String(index + 1).padStart(2, "0") + (index === 4 ? " — original" : "");
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopAnimation();
+  else if (playing && frames.length) restartAnimation();
+});
+window.addEventListener("pagehide", stopAnimation);
 
 function loadImage(url) {
   return new Promise((resolve, reject) => {
