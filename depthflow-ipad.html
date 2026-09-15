@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V29</title>
+<title>MicroPlayer — Depth iPad V30</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -40,7 +40,7 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V29</h1>
+<h1>MicroPlayer — profondeur locale iPad V30</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -873,7 +873,9 @@ function expandMaskForCleanup(mask, radius) {
 function buildCleanBackground(image, mask) {
   const width = image.width;
   const height = image.height;
-  const cleanupRadius = Math.max(6, Math.min(20, Math.round(Math.min(width, height) * 0.012)));
+  // Remove a wider collar than the maximum subject travel so no piece of
+  // the old silhouette can reappear in views 01 or 09.
+  const cleanupRadius = Math.max(12, Math.min(34, Math.round(Math.min(width, height) * 0.022)));
   const cleanupMask = expandMaskForCleanup(mask, cleanupRadius);
   const imageCtx = image.getContext("2d");
   const sourcePixels = imageCtx.getImageData(0, 0, width, height);
@@ -1084,11 +1086,9 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, layerMap,
     " vec3 nearWeights=LW(L(nearQ));",
     " vec3 midWeights=LW(L(midQ));",
     " vec3 farWeights=LW(L(farQ));",
-    // Harden only the final matte edge: this removes the pale double contour
-    // without eroding the mask geometry or weakening fine hair selection.
-    " float nearValid=1.-smoothstep(.16,.84,M(nearQ));",
-    " float midValid=1.-smoothstep(.16,.84,M(midQ));",
-    " float farValid=1.-smoothstep(.16,.84,M(farQ));",
+    " float nearValid=1.-smoothstep(.06,.94,M(nearQ));",
+    " float midValid=1.-smoothstep(.06,.94,M(midQ));",
+    " float farValid=1.-smoothstep(.06,.94,M(farQ));",
     " float nearAlpha=nearWeights.x*nearValid;",
     " float midAlpha=midWeights.y*midValid;",
     " float farAlpha=farWeights.z*farValid;",
@@ -1098,7 +1098,7 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, layerMap,
     " background=mix(background,texture(bg,nearQ),nearAlpha);",
     " vec2 rigidQ=clamp(base+vec2(safeShift*subjectPlane*.16,0.),vec2(.001),vec2(.999));",
     " float rigidMask=M(rigidQ);",
-    " float subject=smoothstep(.16,.84,rigidMask);",
+    " float subject=smoothstep(.06,.94,rigidMask);",
     " float core=smoothstep(.78,.995,rigidMask);",
     " float surfaceDepth=D(rigidQ);",
     " float surface=clamp((surfaceDepth-subjectDepth)*4.20,-1.,1.);",
@@ -1110,6 +1110,17 @@ function renderLockedSubject(out, image, backgroundImage, depth, mask, layerMap,
     " vec4 reliefSubject=texture(im,subjectQ);",
     " float reliefMix=sourceInside*surfaceProtect;",
     " vec3 subjectPixel=mix(rigidSubject.rgb,reliefSubject.rgb,reliefMix);",
+    // Pull edge colour a few pixels toward the subject interior. The original
+    // photograph otherwise carries background RGB in its antialiased border,
+    // which becomes a visible fringe once the rigid subject moves.
+    " float maskLeft=M(rigidQ-vec2(texel.x*2.,0.));",
+    " float maskRight=M(rigidQ+vec2(texel.x*2.,0.));",
+    " float maskUp=M(rigidQ-vec2(0.,texel.y*2.));",
+    " float maskDown=M(rigidQ+vec2(0.,texel.y*2.));",
+    " vec2 inward=normalize(vec2(maskRight-maskLeft,maskDown-maskUp)+vec2(.000001))*texel*2.5;",
+    " vec3 cleanEdge=texture(im,clamp(rigidQ+inward,vec2(.001),vec2(.999))).rgb;",
+    " float cleanCore=smoothstep(.42,.82,rigidMask);",
+    " subjectPixel=mix(cleanEdge,subjectPixel,cleanCore);",
     " o=vec4(mix(background.rgb,subjectPixel,subject),1.);",
     "}"
   ].join("\n");
