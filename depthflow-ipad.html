@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V32</title>
+<title>MicroPlayer — Depth iPad V33</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -40,7 +40,7 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V32</h1>
+<h1>MicroPlayer — profondeur locale iPad V33</h1>
 <div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée, liaison explicite au sujet et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
@@ -75,14 +75,15 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
 </section>
 
 <section class="card">
-  <div class="range"><label>Profondeur globale</label><input id="strength" type="range" min="0.035" max="0.130" step="0.005" value="0.080"><output id="strengthOut">0.080</output></div>
-  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.40" max="1.10" step="0.05" value="0.95"><output id="amplitudeOut">0.95</output></div>
+  <div class="row" style="margin-bottom:10px"><button id="defaultSettingsBtn" class="secondary">↺ Réglages par défaut</button><span class="small">Préréglage relief propre : profondeur nette avec déplacement et micro-relief limités pour réduire les halos.</span></div>
+  <div class="range"><label>Profondeur globale</label><input id="strength" type="range" min="0.035" max="0.130" step="0.005" value="0.075"><output id="strengthOut">0.075</output></div>
+  <div class="range"><label>Amplitude</label><input id="amplitude" type="range" min="0.40" max="1.10" step="0.05" value="0.90"><output id="amplitudeOut">0.90</output></div>
   <div class="range"><label>Séparation avant-plan</label><input id="subjectPlane" type="range" min="0.00" max="0.36" step="0.02" value="0.22"><output id="subjectPlaneOut">0.22</output></div>
-  <div class="range"><label>Écart entre les plans</label><input id="backgroundRelief" type="range" min="0.08" max="0.36" step="0.02" value="0.24"><output id="backgroundReliefOut">0.24</output></div>
-  <div class="range"><label>Micro-relief du sujet</label><input id="subjectRelief" type="range" min="0.00" max="0.70" step="0.05" value="0.25"><output id="subjectReliefOut">0.25</output></div>
-  <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.20"><output id="subjectToleranceOut">0.20</output></div>
-  <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.70"><output id="edgeProtectOut">0.70</output></div>
-  <div class="small">Réglage conseillé : profondeur 0,080, amplitude 0,95, séparation 0,22, écart des plans 0,24, micro-relief 0,25. Le plan violet reçoit désormais un recul supplémentaire pour être clairement distinct du bleu.</div>
+  <div class="range"><label>Écart entre les plans</label><input id="backgroundRelief" type="range" min="0.08" max="0.36" step="0.02" value="0.22"><output id="backgroundReliefOut">0.22</output></div>
+  <div class="range"><label>Micro-relief du sujet</label><input id="subjectRelief" type="range" min="0.00" max="0.70" step="0.05" value="0.15"><output id="subjectReliefOut">0.15</output></div>
+  <div class="range"><label>Zone sujet stable</label><input id="subjectTolerance" type="range" min="0.08" max="0.34" step="0.01" value="0.22"><output id="subjectToleranceOut">0.22</output></div>
+  <div class="range"><label>Protection contours</label><input id="edgeProtect" type="range" min="0.35" max="1.00" step="0.05" value="0.90"><output id="edgeProtectOut">0.90</output></div>
+  <div class="small">Réglage par défaut mémorisé : profondeur 0,075, amplitude 0,90, séparation 0,22, écart des plans 0,22, micro-relief 0,15, zone stable 0,22, protection 0,90. Le plan violet conserve un recul renforcé pour rester distinct du bleu.</div>
   <div class="mode">Mode : 4 plans rigides — horizon renforcé sans déformation</div>
   <div id="qc" class="qc"></div>
 </section>
@@ -129,6 +130,7 @@ const autoLayersBtn = byId("autoLayersBtn");
 const validateLayersBtn = byId("validateLayersBtn");
 const brushSize = byId("brushSize");
 const brushSizeOut = byId("brushSizeOut");
+const defaultSettingsBtn = byId("defaultSettingsBtn");
 const animWrap = byId("animWrap");
 const animCanvas = byId("animCanvas");
 const animBadge = byId("animBadge");
@@ -169,6 +171,28 @@ let showLayers = false;
 let manualLayerCanvas = null;
 let layerStrokeCanvas = null;
 
+const CLEAN_DEFAULTS = Object.freeze({
+  strength: "0.075",
+  amplitude: "0.90",
+  subjectPlane: "0.22",
+  backgroundRelief: "0.22",
+  subjectRelief: "0.15",
+  subjectTolerance: "0.22",
+  edgeProtect: "0.90"
+});
+
+function applyCleanDefaults() {
+  clearTimeout(maskTimer);
+  for (const [id, value] of Object.entries(CLEAN_DEFAULTS)) {
+    byId(id).value = value;
+    byId(id + "Out").textContent = value;
+  }
+  status.textContent = "Réglages par défaut restaurés ✓ — relief propre et protection anti-halo. Vos sélections manuelles sont conservées.";
+  if (frames.length === 9 && depthRaw && subjectMask && layerMapCanvas) {
+    prepareAndGenerateViews({ scroll: false });
+  }
+}
+
 for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "subjectRelief", "subjectTolerance", "edgeProtect"]) {
   byId(id).addEventListener("input", () => {
     byId(id + "Out").textContent = byId(id).value;
@@ -178,6 +202,8 @@ for (const id of ["strength", "amplitude", "subjectPlane", "backgroundRelief", "
     }
   });
 }
+
+defaultSettingsBtn.addEventListener("click", applyCleanDefaults);
 
 speed.addEventListener("input", () => {
   speedOut.textContent = speed.value + " ms";
