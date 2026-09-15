@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b0c10">
-<title>MicroPlayer — Depth iPad V31</title>
+<title>MicroPlayer — Depth iPad V32</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif}
 *{box-sizing:border-box}
@@ -40,8 +40,8 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
 </head>
 <body>
 <main>
-<h1>MicroPlayer — profondeur locale iPad V31</h1>
-<div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
+<h1>MicroPlayer — profondeur locale iPad V32</h1>
+<div class="sub">Quatre plans rigides avec retouche Apple Pencil locale accélérée, liaison explicite au sujet et moteur WebGL partagé entre les 9 vues. Vue 05 = photo originale stricte.</div>
 
 <section class="card">
   <div class="row">
@@ -59,7 +59,7 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
   <div class="selectStage"><canvas id="selectCanvas"></canvas></div>
   <div class="maskTools">
     <button id="autoModeBtn" class="secondary active">Point automatique</button>
-    <button id="paintModeBtn" class="secondary">Pinceau +</button>
+    <button id="paintModeBtn" class="secondary" title="Ajoute au masque vert tout élément qui doit se déplacer exactement avec le sujet">🔗 Solidaire du sujet</button>
     <button id="eraseModeBtn" class="secondary">Gomme</button>
     <button id="layersBtn" class="secondary" disabled>Voir les plans</button>
     <div class="brush"><label>Taille</label><input id="brushSize" type="range" min="2" max="80" step="2" value="10"><output id="brushSizeOut">10</output></div>
@@ -71,7 +71,7 @@ html.hh-embedded body{padding:6px 8px 14px}html.hh-embedded main{max-width:none}
     <button id="autoLayersBtn" class="secondary">↺ Recalcul automatique</button>
     <button id="validateLayersBtn">✓ Valider et actualiser</button>
   </div>
-  <div class="hint">Vert = sujet principal. Orange = proche, bleu = intermédiaire, violet = horizon/ciel. Le vert du sujet est toujours prioritaire : seul « Gomme » peut le modifier. Chaque trait coloré au stylet est conservé dans une couche maîtresse ; une autre couleur peut déborder dessus sans le remplacer. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
+  <div class="hint"><strong>Solidaire du sujet</strong> peint en vert tout ce qui doit rester exactement attaché au sujet : texte, logo, antenne ou accessoire. Peignez l’élément en entier, même lorsqu’il déborde sur le décor. Orange = plan proche indépendant, bleu = intermédiaire, violet = horizon/ciel. Le vert reste prioritaire : seule « Gomme » peut le modifier. Chaque trait coloré au stylet est conservé dans une couche maîtresse ; une autre couleur peut déborder dessus sans le remplacer. Après correction, « Valider et actualiser » régénère automatiquement le simulateur 01↔09.</div>
 </section>
 
 <section class="card">
@@ -372,7 +372,9 @@ function finishCanvasInput() {
     status.textContent = "Plan manuel mis à jour ✓ — le sujet vert et les traits précédents restent protégés.";
   } else {
     backgroundCanvas = null;
-    status.textContent = "Masque du sujet mis à jour ✓ — le fond sera préparé à la validation.";
+    status.textContent = editMode === "paint"
+      ? "Élément lié au sujet ✓ — toute la zone verte suivra exactement le sujet. Validez pour régénérer les 9 vues."
+      : "Masque du sujet mis à jour ✓ — le fond sera préparé à la validation.";
   }
 }
 
@@ -708,6 +710,9 @@ function setEditMode(mode) {
   nearLayerBtn.classList.toggle("active", mode === "layer-near");
   midLayerBtn.classList.toggle("active", mode === "layer-mid");
   farLayerBtn.classList.toggle("active", mode === "layer-far");
+  if (mode === "paint") {
+    status.textContent = "Mode solidaire du sujet ✓ — peignez en vert l’élément entier. Il suivra exactement le sujet dans les 9 vues.";
+  }
 }
 
 function canvasPoint(event) {
