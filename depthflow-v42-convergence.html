@@ -111,11 +111,16 @@
           <output id="reliefOut">135 %</output>
         </div>
         <div class="controls">
-          <label for="parallax">Parallaxe totale 01↔09</label>
-          <input id="parallax" type="range" min="0.5" max="6" step="0.1" value="2.4">
-          <output id="parallaxOut">2,4 %</output>
+          <label for="planeSeparation">Séparation des plans</label>
+          <input id="planeSeparation" type="range" min="100" max="250" step="5" value="175">
+          <output id="planeSeparationOut">175 %</output>
         </div>
-        <p class="tiny">Le relief sépare surtout les plans hors de la zone stable ; la parallaxe fixe séparément l’amplitude maximale. Le sujet peut donc rester calme pendant que le décor gagne en profondeur.</p>
+        <div class="controls">
+          <label for="parallax">Parallaxe totale 01↔09</label>
+          <input id="parallax" type="range" min="0.5" max="8" step="0.1" value="3.2">
+          <output id="parallaxOut">3,2 %</output>
+        </div>
+        <p class="tiny">La séparation amplifie progressivement les plans intermédiaires hors de la zone stable. La courbe reste continue aux contours : le sujet demeure calme tandis que le décor gagne réellement en profondeur.</p>
       </div>
     </div>
   </section>
@@ -228,16 +233,17 @@
     byId("zeroOut").textContent = byId("zero").value;
     byId("stabilityBandOut").textContent = `±${byId("stabilityBand").value}`;
     byId("reliefOut").textContent = `${byId("relief").value} %`;
+    byId("planeSeparationOut").textContent = `${byId("planeSeparation").value} %`;
     byId("parallaxOut").textContent = `${Number(byId("parallax").value).toLocaleString("fr-FR")} %`;
     byId("levelOut").textContent = byId("level").value;
     byId("softnessOut").textContent = `${byId("softness").value} %`;
     byId("brushOut").textContent = byId("brush").value;
   }
 
-  for (const id of ["zero", "stabilityBand", "relief", "parallax", "level", "softness", "brush"]) {
+  for (const id of ["zero", "stabilityBand", "relief", "planeSeparation", "parallax", "level", "softness", "brush"]) {
     byId(id).addEventListener("input", updateOutputs);
   }
-  for (const id of ["zero", "stabilityBand", "relief", "parallax", "renderSize"]) {
+  for (const id of ["zero", "stabilityBand", "relief", "planeSeparation", "parallax", "renderSize"]) {
     byId(id).addEventListener("input", () => scheduleRegeneration(360));
     byId(id).addEventListener("change", () => scheduleRegeneration(40));
   }
@@ -683,6 +689,7 @@
       zero: Number(byId("zero").value),
       stabilityBand: Number(byId("stabilityBand").value),
       relief: Number(byId("relief").value) / 100,
+      planeSeparation: Number(byId("planeSeparation").value) / 100,
       parallaxPercent: Number(byId("parallax").value)
     };
     let stablePixels = 0;
@@ -728,7 +735,7 @@
         ? ` · profondeur ${state.depthPerformance.mode} : ${state.depthPerformance.frames} rafraîchissements UI en ${(state.depthPerformance.milliseconds / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`
         : "";
       quality.textContent = `Contrôle : vue 05 ${centerCheck.equal ? "strictement identique ✓" : `${centerCheck.different} octets différents`} · zone stable ${stablePercent} % de l’image · désocclusions rebouchées ${totalHoles.toLocaleString("fr-FR")} px · budget image ≈ ${memoryMegabytes} Mo${workerQuality}.`;
-      setStatus(`9 vues prêtes ✓ — zéro ${options.zero}, zone stable ±${options.stabilityBand}, relief ${Math.round(options.relief * 100)} %, parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
+      setStatus(`9 vues prêtes ✓ — zéro ${options.zero}, zone stable ±${options.stabilityBand}, séparation ${Math.round(options.planeSeparation * 100)} %, relief ${Math.round(options.relief * 100)} %, parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
       if (scrollToSimulator) simulator.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       console.error(error);

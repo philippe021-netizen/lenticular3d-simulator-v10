@@ -70,8 +70,18 @@ test("la bande de convergence stabilise le sujet sans aplatir toute la scène", 
 });
 
 test("le remappage conserve les extrêmes de profondeur", () => {
-  assert.equal(mapDepthForParallax(0, 190, 1.35, 30), -1);
-  assert.equal(mapDepthForParallax(255, 190, 1.35, 30), 1);
+  assert.equal(mapDepthForParallax(0, 190, 1.35, 30, 1.75), -1);
+  assert.equal(mapDepthForParallax(255, 190, 1.35, 30, 1.75), 1);
+});
+
+test("la séparation renforce les plans intermédiaires sans casser la bande stable", () => {
+  const zero = 190;
+  const edgeOfStableBand = mapDepthForParallax(160, zero, 1.35, 30, 1.75);
+  const linearMiddle = Math.abs(mapDepthForParallax(125, zero, 1.35, 30, 1));
+  const separatedMiddle = Math.abs(mapDepthForParallax(125, zero, 1.35, 30, 1.75));
+  assert.equal(edgeOfStableBand, mapDepthForParallax(160, zero, 1.35, 30, 1));
+  assert.ok(separatedMiddle > linearMiddle * 1.35);
+  assert.ok(separatedMiddle < 1);
 });
 
 test("la parallaxe modifie réellement les vues", () => {

@@ -158,7 +158,22 @@ export function depthAt(depth, width, height, x, y, radius = 7) {
   return values[Math.floor(values.length / 2)] ?? 128;
 }
 
-export function mapDepthForParallax(value, zero, relief, stabilityBand = 0) {
+function amplifyOuterProgress(progress, planeSeparation) {
+  const normalizedProgress = clamp(progress, 0, 1);
+  const separation = clamp(Number(planeSeparation) || 1, 1, 2.5);
+  if (separation <= 1.0001 || normalizedProgress === 0 || normalizedProgress === 1) {
+    return normalizedProgress;
+  }
+
+  // A normalized exponential gives the middle depth planes more travel while
+  // preserving both ends exactly. Unlike a power curve below 1, its slope is
+  // finite at the stability-band boundary, which avoids a disparity jump and
+  // the bright/dark contour that jump would create around a face.
+  const gain = (separation - 1) * 2.2;
+  return (1 - Math.exp(-gain * normalizedProgress)) / (1 - Math.exp(-gain));
+}
+
+export function mapDepthForParallax(value, zero, relief, stabilityBand = 0, planeSeparation = 1) {
   const delta = value - zero;
   const denominator = delta >= 0 ? Math.max(1, 255 - zero) : Math.max(1, zero);
   const normalized = clamp(delta / denominator, -1, 1);
@@ -180,7 +195,8 @@ export function mapDepthForParallax(value, zero, relief, stabilityBand = 0) {
     remapped = magnitude * microRelief;
   } else {
     const outerProgress = (magnitude - poweredBand) / Math.max(1e-6, 1 - poweredBand);
-    remapped = poweredBand * microRelief + outerProgress * (1 - poweredBand * microRelief);
+    const separatedProgress = amplifyOuterProgress(outerProgress, planeSeparation);
+    remapped = poweredBand * microRelief + separatedProgress * (1 - poweredBand * microRelief);
   }
   return Math.sign(normalized) * clamp(remapped, 0, 1);
 }
@@ -196,6 +212,7 @@ export function renderNovelView(source, depth, width, height, position, options 
   const zero = clamp(Number(options.zero ?? 128), 0, 255);
   const relief = clamp(Number(options.relief ?? 1.2), 0.5, 2.5);
   const stabilityBand = clamp(Number(options.stabilityBand ?? 0), 0, 64);
+  const planeSeparation = clamp(Number(options.planeSeparation ?? 1), 1, 2.5);
   const parallaxPercent = clamp(Number(options.parallaxPercent ?? 2.4), 0, 8);
   const halfRangePixels = width * parallaxPercent / 200;
   const pixelCount = width * height;
@@ -211,7 +228,8 @@ export function renderNovelView(source, depth, width, height, position, options 
         depth[sourceIndex],
         zero,
         relief,
-        stabilityBand
+        stabilityBand,
+        planeSeparation
       ) * halfRangePixels;
       const targetX = Math.round(x - disparity);
       if (targetX < 0 || targetX >= width) continue;
