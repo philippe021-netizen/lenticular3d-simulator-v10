@@ -36,3 +36,38 @@ structuré autour des grosses pièces :
 La simulation interpole les vues pour rester fluide, mais les fichiers d'impression
 restent exactement `vue-01.png` à `vue-09.png`. Les exports ExplodeView utilisent
 60 LPI par défaut.
+
+## DepthFlow V42 — moteur multivue
+
+`depthflow-v42-convergence.html` est le studio photo actif de la branche
+`feature/integrate-depthflow-v27`. Il conserve une profondeur continue où 0 est
+le lointain et 255 le proche, permet d'ancrer le plan zéro par un toucher sur le
+sujet, et sépare le relief interne de la parallaxe totale. Une bande de
+convergence douce stabilise les visages voisins autour du zéro tout en
+redistribuant la profondeur vers le décor. L'ancrage explicite du sujet ou du
+groupe est requis avant la première génération. Le rendu des vues utilise un
+déplacement avant avec priorité aux pixels proches, puis remplit les zones
+désoccluses à partir du fond voisin. La vue 05 est recopiée directement depuis
+la photo source et contrôlée octet par octet après chaque génération.
+
+Le chargement de Depth Anything V2, l'inférence WASM et le raffinement guidé
+des contours s'exécutent dans `depthflow-v42-worker.js`. Le fil d'interface
+reste ainsi disponible pendant le calcul sur iPad. Un repli compatible conserve
+l'ancien calcul sur le fil principal si le navigateur refuse les Workers de
+module ; le résultat 0–255 et le moteur des neuf vues restent identiques.
+
+## MicroPlayer — Carte 3D Pro
+
+`microplayer-business-card-depthflow.html` combine la reconnaissance des textes,
+logos, QR, signatures, illustrations, objets et sujets avec le moteur DepthFlow.
+Chaque élément possède un masque corrigeable au Pencil et une hauteur continue
+0–255 indépendante. Les textes, logos et QR restent rigides, tandis qu'une photo
+ou illustration peut conserver un micro-relief interne issu de DepthFlow. Les
+préréglages Pro, Artistique, Découpe papier et QR prioritaire modifient réellement
+les neuf vues. La vue 05 reste une copie stricte de la carte de travail.
+
+Tests du cœur de rendu :
+
+```bash
+npm test
+```
