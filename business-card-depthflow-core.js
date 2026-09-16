@@ -48,47 +48,25 @@ function dilate(mask, width, height, radius = 1) {
 export function createSemanticMask(rgba, width, height, box, options = {}) {
   if (rgba.length !== width * height * 4) throw new Error("Dimensions couleur incohérentes");
   const rect = boxToPixels(box, width, height, Number(options.padding ?? 0.004));
-  const borderRed = [];
-  const borderGreen = [];
-  const borderBlue = [];
+  const borderRed = [], borderGreen = [], borderBlue = [];
   const step = Math.max(1, Math.floor(Math.min(rect.width, rect.height) / 48));
   const addColour = (x, y) => {
     const index = (y * width + x) * 4;
-    borderRed.push(rgba[index]);
-    borderGreen.push(rgba[index + 1]);
-    borderBlue.push(rgba[index + 2]);
+    borderRed.push(rgba[index]); borderGreen.push(rgba[index + 1]); borderBlue.push(rgba[index + 2]);
   };
-  for (let x = rect.x; x < rect.x + rect.width; x += step) {
-    addColour(x, rect.y);
-    addColour(x, rect.y + rect.height - 1);
-  }
-  for (let y = rect.y; y < rect.y + rect.height; y += step) {
-    addColour(rect.x, y);
-    addColour(rect.x + rect.width - 1, y);
-  }
+  for (let x = rect.x; x < rect.x + rect.width; x += step) { addColour(x, rect.y); addColour(x, rect.y + rect.height - 1); }
+  for (let y = rect.y; y < rect.y + rect.height; y += step) { addColour(rect.x, y); addColour(rect.x + rect.width - 1, y); }
   const background = [median(borderRed), median(borderGreen), median(borderBlue)];
   const threshold = clamp(Number(options.threshold ?? 38), 8, 160);
   const softness = clamp(Number(options.softness ?? 24), 4, 80);
   const mask = new Uint8ClampedArray(width * height);
-
   for (let y = rect.y; y < rect.y + rect.height; y += 1) {
     for (let x = rect.x; x < rect.x + rect.width; x += 1) {
-      const index = y * width + x;
-      const rgbaIndex = index * 4;
-      const redDelta = rgba[rgbaIndex] - background[0];
-      const greenDelta = rgba[rgbaIndex + 1] - background[1];
-      const blueDelta = rgba[rgbaIndex + 2] - background[2];
+      const index = y * width + x, rgbaIndex = index * 4;
+      const redDelta = rgba[rgbaIndex] - background[0], greenDelta = rgba[rgbaIndex + 1] - background[1], blueDelta = rgba[rgbaIndex + 2] - background[2];
       const colourDistance = Math.sqrt(redDelta ** 2 + greenDelta ** 2 + blueDelta ** 2);
-      const left = x > rect.x ? rgbaIndex - 4 : rgbaIndex;
-      const top = y > rect.y ? rgbaIndex - width * 4 : rgbaIndex;
-      const localEdge = (
-        Math.abs(rgba[rgbaIndex] - rgba[left]) +
-        Math.abs(rgba[rgbaIndex + 1] - rgba[left + 1]) +
-        Math.abs(rgba[rgbaIndex + 2] - rgba[left + 2]) +
-        Math.abs(rgba[rgbaIndex] - rgba[top]) +
-        Math.abs(rgba[rgbaIndex + 1] - rgba[top + 1]) +
-        Math.abs(rgba[rgbaIndex + 2] - rgba[top + 2])
-      ) / 3;
+      const left = x > rect.x ? rgbaIndex - 4 : rgbaIndex, top = y > rect.y ? rgbaIndex - width * 4 : rgbaIndex;
+      const localEdge = (Math.abs(rgba[rgbaIndex] - rgba[left]) + Math.abs(rgba[rgbaIndex + 1] - rgba[left + 1]) + Math.abs(rgba[rgbaIndex + 2] - rgba[left + 2]) + Math.abs(rgba[rgbaIndex] - rgba[top]) + Math.abs(rgba[rgbaIndex + 1] - rgba[top + 1]) + Math.abs(rgba[rgbaIndex + 2] - rgba[top + 2])) / 3;
       const score = Math.max(colourDistance, localEdge * 1.35);
       mask[index] = Math.round(clamp((score - threshold + softness) / (softness * 2), 0, 1) * 255);
     }
@@ -100,22 +78,16 @@ export function createBoxMask(width, height, box, feather = 0) {
   const rect = boxToPixels(box, width, height);
   const mask = new Uint8ClampedArray(width * height);
   const edge = Math.max(0, Math.round(feather));
-  for (let y = rect.y; y < rect.y + rect.height; y += 1) {
-    for (let x = rect.x; x < rect.x + rect.width; x += 1) {
-      const distance = Math.min(x - rect.x, y - rect.y, rect.x + rect.width - 1 - x, rect.y + rect.height - 1 - y);
-      mask[y * width + x] = edge ? Math.round(clamp((distance + 1) / edge, 0, 1) * 255) : 255;
-    }
+  for (let y = rect.y; y < rect.y + rect.height; y += 1) for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+    const distance = Math.min(x - rect.x, y - rect.y, rect.x + rect.width - 1 - x, rect.y + rect.height - 1 - y);
+    mask[y * width + x] = edge ? Math.round(clamp((distance + 1) / edge, 0, 1) * 255) : 255;
   }
   return mask;
 }
 
 export function maskCoverage(mask) {
-  let sum = 0;
-  let active = 0;
-  for (const value of mask) {
-    sum += value;
-    if (value > 24) active += 1;
-  }
+  let sum = 0, active = 0;
+  for (const value of mask) { sum += value; if (value > 24) active += 1; }
   return { active, percent: mask.length ? sum / (mask.length * 255) * 100 : 0 };
 }
 
@@ -127,58 +99,46 @@ export function medianDepthInMask(depth, mask) {
 }
 
 export function compressDepthAroundPlane(baseDepth, zero = 128, amount = 1) {
-  const plane = clamp(Number(zero), 0, 255);
-  const strength = clamp(Number(amount), 0, 1);
-  const output = new Uint8ClampedArray(baseDepth.length);
-  for (let index = 0; index < output.length; index += 1) {
-    output[index] = Math.round(plane + (baseDepth[index] - plane) * strength);
-  }
+  const plane = clamp(Number(zero), 0, 255), strength = clamp(Number(amount), 0, 1), output = new Uint8ClampedArray(baseDepth.length);
+  for (let index = 0; index < output.length; index += 1) output[index] = Math.round(plane + (baseDepth[index] - plane) * strength);
   return output;
 }
 
 export function composeSemanticDepth(baseDepth, layers, options = {}) {
-  const output = compressDepthAroundPlane(
-    baseDepth,
-    options.zero ?? 128,
-    options.backgroundRelief ?? 1
-  );
+  const output = compressDepthAroundPlane(baseDepth, options.zero ?? 128, options.backgroundRelief ?? 1);
   const orderedLayers = [...(layers ?? [])].sort((left, right) => Number(left?.depth ?? 128) - Number(right?.depth ?? 128));
   for (const layer of orderedLayers) {
     if (layer?.enabled === false || !layer?.mask || layer.mask.length !== output.length) continue;
-    const targetDepth = clamp(Number(layer.depth ?? 128), 0, 255);
-    const internalRelief = clamp(Number(layer.internalRelief ?? 0), 0, 1);
-    const reference = medianDepthInMask(baseDepth, layer.mask);
+    const targetDepth = clamp(Number(layer.depth ?? 128), 0, 255), internalRelief = clamp(Number(layer.internalRelief ?? 0), 0, 1), reference = medianDepthInMask(baseDepth, layer.mask);
     for (let index = 0; index < output.length; index += 1) {
       const alpha = layer.mask[index] / 255;
       if (!alpha) continue;
-      const detail = (baseDepth[index] - reference) * internalRelief;
-      const target = clamp(targetDepth + detail, 0, 255);
+      const detail = (baseDepth[index] - reference) * internalRelief, target = clamp(targetDepth + detail, 0, 255);
       output[index] = Math.round(output[index] * (1 - alpha) + target * alpha);
     }
   }
   return output;
 }
 
+// Edition manuelle iPad : le Pencil et la gomme sont autoritaires.
+// Le coeur du trait est écrit directement à 255/0 ; seul le bord externe est adouci.
+// Ainsi une correction utilisateur ne reste plus un simple voile semi-transparent.
 export function paintMask(mask, width, height, from, to, radius, value) {
+  const r = Math.max(1, Number(radius) || 1);
   const distance = Math.hypot(to.x - from.x, to.y - from.y);
-  const steps = Math.max(1, Math.ceil(distance / Math.max(1, radius * 0.35)));
-  const radiusSquared = radius * radius;
+  const steps = Math.max(1, Math.ceil(distance / Math.max(1, r * 0.28)));
+  const radiusSquared = r * r;
   for (let step = 0; step <= steps; step += 1) {
     const mix = step / steps;
-    const centerX = Math.round(from.x + (to.x - from.x) * mix);
-    const centerY = Math.round(from.y + (to.y - from.y) * mix);
-    const x0 = Math.max(0, centerX - radius);
-    const x1 = Math.min(width - 1, centerX + radius);
-    const y0 = Math.max(0, centerY - radius);
-    const y1 = Math.min(height - 1, centerY + radius);
+    const centerX = Math.round(from.x + (to.x - from.x) * mix), centerY = Math.round(from.y + (to.y - from.y) * mix);
+    const x0 = Math.max(0, Math.floor(centerX - r)), x1 = Math.min(width - 1, Math.ceil(centerX + r));
+    const y0 = Math.max(0, Math.floor(centerY - r)), y1 = Math.min(height - 1, Math.ceil(centerY + r));
     for (let y = y0; y <= y1; y += 1) for (let x = x0; x <= x1; x += 1) {
-      const squareDistance = (x - centerX) ** 2 + (y - centerY) ** 2;
-      if (squareDistance > radiusSquared) continue;
-      const normalisedDistance = Math.sqrt(squareDistance) / Math.max(1, radius);
-      const opacity = normalisedDistance <= 0.68
-        ? 1
-        : clamp((1 - normalisedDistance) / 0.32, 0.08, 1);
-      const index = y * width + x;
+      const d2 = (x - centerX) ** 2 + (y - centerY) ** 2;
+      if (d2 > radiusSquared) continue;
+      const n = Math.sqrt(d2) / r, index = y * width + x;
+      if (n <= 0.82) { mask[index] = value; continue; }
+      const opacity = clamp((1 - n) / 0.18, 0, 1);
       mask[index] = Math.round(mask[index] * (1 - opacity) + value * opacity);
     }
   }
