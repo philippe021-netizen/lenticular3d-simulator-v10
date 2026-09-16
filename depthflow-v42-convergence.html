@@ -700,6 +700,7 @@
   }
 
   window.__depthflowV42 = { state, finalDepth, generateViews, loadSyntheticFixture, renderNovelView };
+  if (new URLSearchParams(location.search).has("fixture")) await loadSyntheticFixture();
 </script>
 </body>
 </html>
