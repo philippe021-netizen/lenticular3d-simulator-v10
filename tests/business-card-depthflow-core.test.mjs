@@ -2,11 +2,28 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   composeSemanticDepth,
+  compressDepthAroundPlane,
   createBoxMask,
   createSemanticMask,
   maskCoverage,
   paintMask
 } from "../business-card-depthflow-core.js";
+
+test("le mode carte stabilise le graphisme de fond autour du plan zéro", () => {
+  const base = Uint8ClampedArray.from([0, 64, 128, 192, 255]);
+  const result = compressDepthAroundPlane(base, 150, 0.2);
+  assert.deepEqual([...result], [120, 133, 146, 158, 171]);
+});
+
+test("les calques gardent toute leur hauteur sur un fond stabilisé", () => {
+  const base = Uint8ClampedArray.from([0, 64, 128, 192]);
+  const mask = Uint8ClampedArray.from([0, 255, 0, 0]);
+  const result = composeSemanticDepth(base, [{ mask, depth: 220, internalRelief: 0 }], {
+    zero: 150,
+    backgroundRelief: 0.2
+  });
+  assert.deepEqual([...result], [120, 220, 146, 158]);
+});
 
 test("chaque calque impose sa propre hauteur 0–255", () => {
   const base = new Uint8ClampedArray(12).fill(90);

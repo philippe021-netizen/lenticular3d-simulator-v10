@@ -126,9 +126,24 @@ export function medianDepthInMask(depth, mask) {
   return median(values);
 }
 
-export function composeSemanticDepth(baseDepth, layers) {
-  const output = new Uint8ClampedArray(baseDepth);
-  for (const layer of layers ?? []) {
+export function compressDepthAroundPlane(baseDepth, zero = 128, amount = 1) {
+  const plane = clamp(Number(zero), 0, 255);
+  const strength = clamp(Number(amount), 0, 1);
+  const output = new Uint8ClampedArray(baseDepth.length);
+  for (let index = 0; index < output.length; index += 1) {
+    output[index] = Math.round(plane + (baseDepth[index] - plane) * strength);
+  }
+  return output;
+}
+
+export function composeSemanticDepth(baseDepth, layers, options = {}) {
+  const output = compressDepthAroundPlane(
+    baseDepth,
+    options.zero ?? 128,
+    options.backgroundRelief ?? 1
+  );
+  const orderedLayers = [...(layers ?? [])].sort((left, right) => Number(left?.depth ?? 128) - Number(right?.depth ?? 128));
+  for (const layer of orderedLayers) {
     if (layer?.enabled === false || !layer?.mask || layer.mask.length !== output.length) continue;
     const targetDepth = clamp(Number(layer.depth ?? 128), 0, 255);
     const internalRelief = clamp(Number(layer.internalRelief ?? 0), 0, 1);
