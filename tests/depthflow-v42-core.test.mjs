@@ -5,6 +5,7 @@ import {
   comparePixels,
   composeEditedDepth,
   depthAt,
+  mapDepthForParallax,
   normalizeDepthTensor,
   refineDepthEdgeAware,
   renderNovelView
@@ -56,6 +57,21 @@ test("un plan égal à la convergence reste immobile", () => {
     parallaxPercent: 6
   });
   assert.equal(comparePixels(input.source, view.data).equal, true);
+});
+
+test("la bande de convergence stabilise le sujet sans aplatir toute la scène", () => {
+  const zero = 190;
+  const withoutBand = Math.abs(mapDepthForParallax(205, zero, 1.35, 0));
+  const stableFace = Math.abs(mapDepthForParallax(205, zero, 1.35, 30));
+  const farBackground = Math.abs(mapDepthForParallax(45, zero, 1.35, 30));
+  assert.ok(stableFace < withoutBand * 0.12);
+  assert.ok(farBackground > stableFace * 20);
+  assert.equal(mapDepthForParallax(zero, zero, 1.35, 30), 0);
+});
+
+test("le remappage conserve les extrêmes de profondeur", () => {
+  assert.equal(mapDepthForParallax(0, 190, 1.35, 30), -1);
+  assert.equal(mapDepthForParallax(255, 190, 1.35, 30), 1);
 });
 
 test("la parallaxe modifie réellement les vues", () => {

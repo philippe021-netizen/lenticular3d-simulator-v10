@@ -158,13 +158,31 @@ export function depthAt(depth, width, height, x, y, radius = 7) {
   return values[Math.floor(values.length / 2)] ?? 128;
 }
 
-function shapedDepth(value, zero, relief) {
+export function mapDepthForParallax(value, zero, relief, stabilityBand = 0) {
   const delta = value - zero;
   const denominator = delta >= 0 ? Math.max(1, 255 - zero) : Math.max(1, zero);
   const normalized = clamp(delta / denominator, -1, 1);
   if (!normalized) return 0;
+
   const gamma = 1 / clamp(relief, 0.5, 2.5);
-  return Math.sign(normalized) * Math.pow(Math.abs(normalized), gamma);
+  const magnitude = Math.pow(Math.abs(normalized), gamma);
+  const band = clamp(Number(stabilityBand) || 0, 0, denominator * 0.8) / denominator;
+  if (!band) return Math.sign(normalized) * magnitude;
+
+  // A single zero-depth value is too fragile for faces and groups: neighbouring
+  // pixels never share exactly the same predicted depth. Compress a continuous
+  // band around convergence while redistributing the remaining range up to 1.
+  // Keeping 8% of the local relief avoids turning a face into a cardboard cutout.
+  const poweredBand = Math.pow(band, gamma);
+  const microRelief = 0.08;
+  let remapped;
+  if (magnitude <= poweredBand) {
+    remapped = magnitude * microRelief;
+  } else {
+    const outerProgress = (magnitude - poweredBand) / Math.max(1e-6, 1 - poweredBand);
+    remapped = poweredBand * microRelief + outerProgress * (1 - poweredBand * microRelief);
+  }
+  return Math.sign(normalized) * clamp(remapped, 0, 1);
 }
 
 export function renderNovelView(source, depth, width, height, position, options = {}) {
@@ -177,6 +195,7 @@ export function renderNovelView(source, depth, width, height, position, options 
 
   const zero = clamp(Number(options.zero ?? 128), 0, 255);
   const relief = clamp(Number(options.relief ?? 1.2), 0.5, 2.5);
+  const stabilityBand = clamp(Number(options.stabilityBand ?? 0), 0, 64);
   const parallaxPercent = clamp(Number(options.parallaxPercent ?? 2.4), 0, 8);
   const halfRangePixels = width * parallaxPercent / 200;
   const pixelCount = width * height;
@@ -188,7 +207,12 @@ export function renderNovelView(source, depth, width, height, position, options 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const sourceIndex = y * width + x;
-      const disparity = position * shapedDepth(depth[sourceIndex], zero, relief) * halfRangePixels;
+      const disparity = position * mapDepthForParallax(
+        depth[sourceIndex],
+        zero,
+        relief,
+        stabilityBand
+      ) * halfRangePixels;
       const targetX = Math.round(x - disparity);
       if (targetX < 0 || targetX >= width) continue;
       const targetIndex = y * width + targetX;

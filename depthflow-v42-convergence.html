@@ -95,22 +95,27 @@
           <output id="zeroOut">128</output>
         </div>
         <div class="row">
-          <button id="anchorBtn" class="secondary" disabled>◎ Ancrer le sujet sur la photo</button>
+          <button id="anchorBtn" class="secondary" disabled>◎ Ancrer le sujet / groupe</button>
         </div>
-        <p class="tiny">Touchez ensuite le visage ou le sujet principal : sa profondeur restera stable dans les neuf vues.</p>
+        <div class="controls">
+          <label for="stabilityBand">Zone stable du sujet</label>
+          <input id="stabilityBand" type="range" min="0" max="48" step="1" value="30">
+          <output id="stabilityBandOut">±30</output>
+        </div>
+        <p class="tiny">Touchez un visage pour placer le zéro. La zone stable absorbe les petites différences entre les visages d’un groupe, sans supprimer leur micro-relief.</p>
       </div>
       <div class="setting-block">
         <div class="controls">
           <label for="relief">Relief interne</label>
-          <input id="relief" type="range" min="50" max="200" step="5" value="120">
-          <output id="reliefOut">120 %</output>
+          <input id="relief" type="range" min="50" max="200" step="5" value="135">
+          <output id="reliefOut">135 %</output>
         </div>
         <div class="controls">
           <label for="parallax">Parallaxe totale 01↔09</label>
           <input id="parallax" type="range" min="0.5" max="6" step="0.1" value="2.4">
           <output id="parallaxOut">2,4 %</output>
         </div>
-        <p class="tiny">Le relief répartit les plans ; la parallaxe fixe séparément l’amplitude maximale. Augmenter l’un n’oblige plus à brutaliser l’autre.</p>
+        <p class="tiny">Le relief sépare surtout les plans hors de la zone stable ; la parallaxe fixe séparément l’amplitude maximale. Le sujet peut donc rester calme pendant que le décor gagne en profondeur.</p>
       </div>
     </div>
   </section>
@@ -192,6 +197,7 @@
     mode: "paint",
     showMap: false,
     anchorPicking: false,
+    anchorConfirmed: false,
     drawing: false,
     pointerId: null,
     rect: null,
@@ -213,6 +219,7 @@
 
   function updateOutputs() {
     byId("zeroOut").textContent = byId("zero").value;
+    byId("stabilityBandOut").textContent = `±${byId("stabilityBand").value}`;
     byId("reliefOut").textContent = `${byId("relief").value} %`;
     byId("parallaxOut").textContent = `${Number(byId("parallax").value).toLocaleString("fr-FR")} %`;
     byId("levelOut").textContent = byId("level").value;
@@ -220,13 +227,20 @@
     byId("brushOut").textContent = byId("brush").value;
   }
 
-  for (const id of ["zero", "relief", "parallax", "level", "softness", "brush"]) {
+  for (const id of ["zero", "stabilityBand", "relief", "parallax", "level", "softness", "brush"]) {
     byId(id).addEventListener("input", updateOutputs);
   }
-  for (const id of ["zero", "relief", "parallax", "renderSize"]) {
+  for (const id of ["zero", "stabilityBand", "relief", "parallax", "renderSize"]) {
     byId(id).addEventListener("input", () => scheduleRegeneration(360));
     byId(id).addEventListener("change", () => scheduleRegeneration(40));
   }
+  byId("zero").addEventListener("input", () => {
+    if (!state.baseDepth) return;
+    state.anchorConfirmed = true;
+    state.anchorPicking = false;
+    byId("anchorBtn").classList.remove("active");
+    generateBtn.disabled = false;
+  });
   updateOutputs();
 
   file.addEventListener("change", async () => {
@@ -244,6 +258,7 @@
     photoCanvas.getContext("2d", { alpha: false }).drawImage(image, 0, 0, width, height);
     depthOverlay.getContext("2d").clearRect(0, 0, width, height);
     state.baseDepth = null;
+    state.anchorConfirmed = false;
     state.frames = [];
     state.showMap = false;
     grid.innerHTML = "";
@@ -299,6 +314,7 @@
       await yieldFrame();
       refined = refineDepthEdgeAware(refined, fullGuide, photoCanvas.width, photoCanvas.height, 2);
       state.baseDepth = refined;
+      state.anchorConfirmed = false;
       initialiseCorrectionCanvases(refined);
 
       const automaticZero = depthAt(
@@ -311,10 +327,12 @@
       );
       byId("zero").value = automaticZero;
       updateOutputs();
-      generateBtn.disabled = false;
+      generateBtn.disabled = true;
       setEditorEnabled(true);
       renderOverlay();
-      setStatus(`Profondeur prête ✓ — plan zéro initial ${automaticZero}. Touchez « Ancrer le sujet » pour le placer précisément.`, "ok");
+      state.anchorPicking = true;
+      byId("anchorBtn").classList.add("active");
+      setStatus(`Profondeur prête ✓ — touchez maintenant un visage du sujet ou du groupe. Cet ancrage est obligatoire avant la première génération.`, "ok");
     } catch (error) {
       console.error(error);
       setStatus(`Erreur profondeur : ${error?.message ?? error}`, "error");
@@ -347,7 +365,7 @@
     if (!state.baseDepth) return;
     state.anchorPicking = !state.anchorPicking;
     byId("anchorBtn").classList.toggle("active", state.anchorPicking);
-    setStatus(state.anchorPicking ? "Touchez maintenant le visage ou le sujet à immobiliser." : "Ancrage annulé.");
+    setStatus(state.anchorPicking ? "Touchez maintenant un visage du sujet ou du groupe à stabiliser." : "Ancrage annulé.");
   });
 
   byId("mapBtn").addEventListener("click", () => {
@@ -388,9 +406,11 @@
       const value = depthAt(final, photoCanvas.width, photoCanvas.height, point.x, point.y, Math.max(5, Math.round(photoCanvas.width * .012)));
       byId("zero").value = value;
       updateOutputs();
+      state.anchorConfirmed = true;
       state.anchorPicking = false;
       byId("anchorBtn").classList.remove("active");
-      setStatus(`Sujet ancré au plan ${value} ✓ — cette zone restera stable.`, "ok");
+      generateBtn.disabled = false;
+      setStatus(`Sujet ancré au plan ${value} ✓ — profondeur ${Math.max(0, value - Number(byId("stabilityBand").value))} à ${Math.min(255, value + Number(byId("stabilityBand").value))} stabilisée.`, "ok");
       scheduleRegeneration(60);
       return;
     }
@@ -517,6 +537,10 @@
 
   async function generateViews(scrollToSimulator = false) {
     if (!state.baseDepth) return;
+    if (!state.anchorConfirmed) {
+      setStatus("Ancrez d’abord le sujet ou le groupe sur la photo.", "error");
+      return;
+    }
     stopAuto();
     const generation = ++state.generation;
     generateBtn.disabled = true;
@@ -539,9 +563,14 @@
     quality.textContent = "";
     const options = {
       zero: Number(byId("zero").value),
+      stabilityBand: Number(byId("stabilityBand").value),
       relief: Number(byId("relief").value) / 100,
       parallaxPercent: Number(byId("parallax").value)
     };
+    let stablePixels = 0;
+    for (const value of depth) {
+      if (Math.abs(value - options.zero) <= options.stabilityBand) stablePixels += 1;
+    }
     let totalHoles = 0;
     try {
       for (let view = 0; view < 9; view += 1) {
@@ -572,14 +601,16 @@
       const centerPixels = state.frames[4].getContext("2d", { willReadFrequently: true }).getImageData(0, 0, targetWidth, targetHeight).data;
       const centerCheck = comparePixels(source, centerPixels);
       const memoryMegabytes = Math.round((targetWidth * targetHeight * 4 * 12) / 1048576);
-      quality.textContent = `Contrôle : vue 05 ${centerCheck.equal ? "strictement identique ✓" : `${centerCheck.different} octets différents`} · désocclusions rebouchées ${totalHoles.toLocaleString("fr-FR")} px · budget image ≈ ${memoryMegabytes} Mo.`;
-      setStatus(`9 vues prêtes ✓ — plan zéro ${options.zero}, relief ${Math.round(options.relief * 100)} %, parallaxe ${options.parallaxPercent.toLocaleString("fr-FR")} %.`, "ok");
+      const stablePercent = Math.round(stablePixels / depth.length * 100);
+      const halfParallaxPixels = Math.round(targetWidth * options.parallaxPercent / 200 * 10) / 10;
+      quality.textContent = `Contrôle : vue 05 ${centerCheck.equal ? "strictement identique ✓" : `${centerCheck.different} octets différents`} · zone stable ${stablePercent} % de l’image · désocclusions rebouchées ${totalHoles.toLocaleString("fr-FR")} px · budget image ≈ ${memoryMegabytes} Mo.`;
+      setStatus(`9 vues prêtes ✓ — zéro ${options.zero}, zone stable ±${options.stabilityBand}, relief ${Math.round(options.relief * 100)} %, parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
       if (scrollToSimulator) simulator.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       console.error(error);
       setStatus(`Erreur génération : ${error?.message ?? error}`, "error");
     } finally {
-      if (generation === state.generation) generateBtn.disabled = false;
+      if (generation === state.generation) generateBtn.disabled = !state.anchorConfirmed;
     }
   }
 
@@ -688,6 +719,7 @@
       if (x >= 220 && x <= 288 && y >= 136 && y <= 202 && armDistance < 6) depth[index] = 205;
     }
     state.baseDepth = depth;
+    state.anchorConfirmed = true;
     initialiseCorrectionCanvases(depth);
     byId("zero").value = 190;
     updateOutputs();
