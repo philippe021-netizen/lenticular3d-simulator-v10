@@ -190,6 +190,13 @@
   const state = {
     imageUrl: null,
     estimator: null,
+    depthWorker: null,
+    workerResolve: null,
+    workerReject: null,
+    workerProgress: null,
+    workerRequestId: 0,
+    depthJob: 0,
+    depthPerformance: null,
     baseDepth: null,
     editedCanvas: null,
     weightCanvas: null,
@@ -248,6 +255,8 @@
     if (!selected) return;
     stopAuto();
     state.generation += 1;
+    state.depthJob += 1;
+    if (state.workerReject) stopDepthWorker("Photo remplacée");
     if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
     state.imageUrl = URL.createObjectURL(selected);
     const image = await loadImage(state.imageUrl);
@@ -272,47 +281,153 @@
 
   depthBtn.addEventListener("click", calculateDepth);
 
+  function clearWorkerRequest() {
+    state.workerResolve = null;
+    state.workerReject = null;
+    state.workerProgress = null;
+  }
+
+  function stopDepthWorker(reason = "Calcul annulé") {
+    const reject = state.workerReject;
+    state.depthWorker?.terminate();
+    state.depthWorker = null;
+    clearWorkerRequest();
+    if (reject) reject(new DOMException(reason, "AbortError"));
+  }
+
+  function getDepthWorker() {
+    if (!window.Worker) throw new Error("Web Worker indisponible");
+    if (state.depthWorker) return state.depthWorker;
+    const worker = new Worker(new URL("./depthflow-v42-worker.js", import.meta.url), { type: "module" });
+    worker.addEventListener("message", event => {
+      const message = event.data ?? {};
+      if (message.requestId !== state.workerRequestId) return;
+      if (message.type === "progress") {
+        state.workerProgress?.(message.stage, message.percent);
+        return;
+      }
+      if (message.type === "result") {
+        const resolve = state.workerResolve;
+        clearWorkerRequest();
+        resolve?.(new Uint8ClampedArray(message.refinedBuffer));
+        return;
+      }
+      if (message.type === "error") {
+        const reject = state.workerReject;
+        clearWorkerRequest();
+        reject?.(new Error(message.message || "Erreur Worker"));
+      }
+    });
+    worker.addEventListener("error", event => {
+      const reject = state.workerReject;
+      state.depthWorker?.terminate();
+      state.depthWorker = null;
+      clearWorkerRequest();
+      reject?.(new Error(event.message || "Le Worker de profondeur a échoué"));
+    });
+    state.depthWorker = worker;
+    return worker;
+  }
+
+  function runDepthWorker(type, payload, transfers, onProgress) {
+    if (state.workerReject) throw new Error("Un calcul de profondeur est déjà en cours");
+    const worker = getDepthWorker();
+    const requestId = ++state.workerRequestId;
+    return new Promise((resolve, reject) => {
+      state.workerResolve = resolve;
+      state.workerReject = reject;
+      state.workerProgress = onProgress;
+      worker.postMessage({ type, requestId, payload }, transfers);
+    });
+  }
+
+  function monitorUiFrames() {
+    let running = true;
+    let frames = 0;
+    const started = performance.now();
+    const tick = () => {
+      if (!running) return;
+      frames += 1;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return () => {
+      running = false;
+      return { milliseconds: Math.round(performance.now() - started), frames };
+    };
+  }
+
+  async function calculateDepthFallback(fullGuide) {
+    setStatus("Mode compatibilité : chargement de Depth Anything V2…");
+    if (!state.estimator) {
+      const transformers = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0");
+      transformers.env.allowLocalModels = false;
+      state.estimator = await transformers.pipeline(
+        "depth-estimation",
+        "onnx-community/depth-anything-v2-small",
+        { device: "wasm", dtype: "q8" }
+      );
+    }
+    setStatus("Mode compatibilité : analyse de la profondeur…");
+    const result = await state.estimator(state.imageUrl);
+    const normalized = normalizeDepthTensor(result.predicted_depth ?? result.depth);
+    await yieldFrame();
+    const smallGuideCanvas = makeCanvas(normalized.width, normalized.height);
+    smallGuideCanvas.getContext("2d").drawImage(photoCanvas, 0, 0, normalized.width, normalized.height);
+    const lowGuide = smallGuideCanvas.getContext("2d", { willReadFrequently: true })
+      .getImageData(0, 0, normalized.width, normalized.height).data;
+    setStatus("Mode compatibilité : raffinement des contours…");
+    let refined = jointBilateralUpsample(
+      normalized.data,
+      normalized.width,
+      normalized.height,
+      lowGuide,
+      fullGuide,
+      photoCanvas.width,
+      photoCanvas.height
+    );
+    await yieldFrame();
+    refined = refineDepthEdgeAware(refined, fullGuide, photoCanvas.width, photoCanvas.height, 2);
+    return refined;
+  }
+
   async function calculateDepth() {
     if (!state.imageUrl) return;
+    const depthJob = ++state.depthJob;
+    state.depthPerformance = null;
     depthBtn.disabled = true;
     generateBtn.disabled = true;
     setEditorEnabled(false);
     quality.textContent = "";
+    const stopMonitoring = monitorUiFrames();
     try {
-      setStatus("Chargement de Depth Anything V2…");
-      if (!state.estimator) {
-        const transformers = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0");
-        transformers.env.allowLocalModels = false;
-        state.estimator = await transformers.pipeline(
-          "depth-estimation",
-          "onnx-community/depth-anything-v2-small",
-          { device: "wasm", dtype: "q8" }
-        );
-      }
-      setStatus("Analyse de la profondeur générale…");
-      const result = await state.estimator(state.imageUrl);
-      const raw = result.predicted_depth ?? result.depth;
-      const normalized = normalizeDepthTensor(raw);
-      await yieldFrame();
-
-      setStatus("Raffinement guidé des visages, cheveux et objets fins…");
       const photoContext = photoCanvas.getContext("2d", { willReadFrequently: true });
       const fullGuide = photoContext.getImageData(0, 0, photoCanvas.width, photoCanvas.height).data;
-      const smallGuideCanvas = makeCanvas(normalized.width, normalized.height);
-      smallGuideCanvas.getContext("2d").drawImage(photoCanvas, 0, 0, normalized.width, normalized.height);
-      const lowGuide = smallGuideCanvas.getContext("2d", { willReadFrequently: true })
-        .getImageData(0, 0, normalized.width, normalized.height).data;
-      let refined = jointBilateralUpsample(
-        normalized.data,
-        normalized.width,
-        normalized.height,
-        lowGuide,
-        fullGuide,
-        photoCanvas.width,
-        photoCanvas.height
-      );
-      await yieldFrame();
-      refined = refineDepthEdgeAware(refined, fullGuide, photoCanvas.width, photoCanvas.height, 2);
+      const guideForWorker = new Uint8ClampedArray(fullGuide);
+      let refined;
+      let mode = "Worker";
+      try {
+        refined = await runDepthWorker(
+          "estimate-and-refine",
+          {
+            imageUrl: state.imageUrl,
+            width: photoCanvas.width,
+            height: photoCanvas.height,
+            fullGuideBuffer: guideForWorker.buffer
+          },
+          [guideForWorker.buffer],
+          (stage, percent) => setStatus(`${stage} ${percent ?? 0} %`)
+        );
+      } catch (workerError) {
+        if (workerError?.name === "AbortError") return;
+        console.warn("Worker de profondeur indisponible, repli principal", workerError);
+        mode = "compatibilité";
+        setStatus("Worker indisponible : poursuite en mode compatibilité…");
+        await yieldFrame();
+        refined = await calculateDepthFallback(fullGuide);
+      }
+      if (depthJob !== state.depthJob) return;
+      state.depthPerformance = { ...stopMonitoring(), mode };
       state.baseDepth = refined;
       state.anchorConfirmed = false;
       initialiseCorrectionCanvases(refined);
@@ -332,12 +447,15 @@
       renderOverlay();
       state.anchorPicking = true;
       byId("anchorBtn").classList.add("active");
-      setStatus(`Profondeur prête ✓ — touchez maintenant un visage du sujet ou du groupe. Cet ancrage est obligatoire avant la première génération.`, "ok");
+      const seconds = (state.depthPerformance.milliseconds / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+      setStatus(`Profondeur prête ✓ en ${seconds} s · ${state.depthPerformance.mode} · interface active pendant ${state.depthPerformance.frames} rafraîchissements. Touchez maintenant un visage du sujet ou du groupe.`, "ok");
     } catch (error) {
+      if (error?.name === "AbortError") return;
       console.error(error);
       setStatus(`Erreur profondeur : ${error?.message ?? error}`, "error");
     } finally {
-      depthBtn.disabled = false;
+      if (!state.depthPerformance && depthJob === state.depthJob) state.depthPerformance = { ...stopMonitoring(), mode: "erreur" };
+      if (depthJob === state.depthJob) depthBtn.disabled = false;
     }
   }
 
@@ -695,7 +813,7 @@
     return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
   }
 
-  async function loadSyntheticFixture() {
+  function drawSyntheticPhoto() {
     const width = 360;
     const height = 260;
     photoCanvas.width = depthOverlay.width = width;
@@ -713,6 +831,11 @@
     context.fillStyle = "#d49b7b";
     context.beginPath(); context.moveTo(180, 102); context.lineTo(192, 132); context.lineTo(176, 130); context.fill();
     context.strokeStyle = "#f0c0a2"; context.lineWidth = 9; context.beginPath(); context.moveTo(224, 142); context.lineTo(284, 194); context.stroke();
+    return { width, height };
+  }
+
+  async function loadSyntheticFixture(useWorker = false) {
+    const { width, height } = drawSyntheticPhoto();
     const depth = new Uint8ClampedArray(width * height).fill(52);
     for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
       const index = y * width + x;
@@ -721,21 +844,71 @@
       const armDistance = Math.abs((y - 142) * 60 - (x - 224) * 52) / Math.hypot(60, 52);
       if (x >= 220 && x <= 288 && y >= 136 && y <= 202 && armDistance < 6) depth[index] = 205;
     }
-    state.baseDepth = depth;
+    let testedDepth = depth;
+    if (useWorker) {
+      const lowWidth = 90;
+      const lowHeight = 65;
+      const lowDepth = new Uint8ClampedArray(lowWidth * lowHeight);
+      for (let y = 0; y < lowHeight; y += 1) for (let x = 0; x < lowWidth; x += 1) {
+        const sourceX = Math.min(width - 1, Math.floor(x * width / lowWidth));
+        const sourceY = Math.min(height - 1, Math.floor(y * height / lowHeight));
+        lowDepth[y * lowWidth + x] = depth[sourceY * width + sourceX];
+      }
+      const fullGuide = photoCanvas.getContext("2d", { willReadFrequently: true })
+        .getImageData(0, 0, width, height).data;
+      const smallGuideCanvas = makeCanvas(lowWidth, lowHeight);
+      smallGuideCanvas.getContext("2d").drawImage(photoCanvas, 0, 0, lowWidth, lowHeight);
+      const lowGuide = smallGuideCanvas.getContext("2d", { willReadFrequently: true })
+        .getImageData(0, 0, lowWidth, lowHeight).data;
+      const stopMonitoring = monitorUiFrames();
+      setStatus("Test Worker : raffinement hors du fil principal…");
+      testedDepth = await runDepthWorker(
+        "refine-only",
+        {
+          lowDepthBuffer: lowDepth.buffer,
+          lowWidth,
+          lowHeight,
+          lowGuideBuffer: lowGuide.buffer,
+          fullGuideBuffer: fullGuide.buffer,
+          width,
+          height
+        },
+        [lowDepth.buffer, lowGuide.buffer, fullGuide.buffer],
+        (stage, percent) => setStatus(`Test Worker : ${stage} ${percent ?? 0} %`)
+      );
+      state.depthPerformance = { ...stopMonitoring(), mode: "Worker-test" };
+    }
+    state.baseDepth = testedDepth;
     state.anchorConfirmed = true;
-    initialiseCorrectionCanvases(depth);
+    initialiseCorrectionCanvases(testedDepth);
     byId("zero").value = 190;
     updateOutputs();
     generateBtn.disabled = false;
     depthBtn.disabled = true;
     setEditorEnabled(true);
     renderOverlay();
-    setStatus("Fixture de contrôle chargée.", "ok");
+    const workerReport = state.depthPerformance
+      ? ` Worker actif : ${state.depthPerformance.frames} rafraîchissements UI en ${state.depthPerformance.milliseconds} ms.`
+      : "";
+    setStatus(`Fixture de contrôle chargée.${workerReport}`, "ok");
     await generateViews(false);
   }
 
-  window.__depthflowV42 = { state, finalDepth, generateViews, loadSyntheticFixture, renderNovelView };
-  if (new URLSearchParams(location.search).has("fixture")) await loadSyntheticFixture();
+  async function loadModelWorkerFixture() {
+    drawSyntheticPhoto();
+    state.imageUrl = photoCanvas.toDataURL("image/png");
+    state.baseDepth = null;
+    state.anchorConfirmed = false;
+    depthBtn.disabled = false;
+    setStatus("Fixture modèle : lancement de Depth Anything V2 dans le Worker…");
+    await calculateDepth();
+  }
+
+  window.__depthflowV42 = { state, finalDepth, generateViews, loadSyntheticFixture, loadModelWorkerFixture, renderNovelView };
+  const fixtureParameters = new URLSearchParams(location.search);
+  if (fixtureParameters.has("modelworkerfixture")) await loadModelWorkerFixture();
+  else if (fixtureParameters.has("workerfixture")) await loadSyntheticFixture(true);
+  else if (fixtureParameters.has("fixture")) await loadSyntheticFixture();
 </script>
 </body>
 </html>

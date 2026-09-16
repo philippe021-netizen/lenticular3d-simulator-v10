@@ -50,6 +50,12 @@ déplacement avant avec priorité aux pixels proches, puis remplit les zones
 désoccluses à partir du fond voisin. La vue 05 est recopiée directement depuis
 la photo source et contrôlée octet par octet après chaque génération.
 
+Le chargement de Depth Anything V2, l'inférence WASM et le raffinement guidé
+des contours s'exécutent dans `depthflow-v42-worker.js`. Le fil d'interface
+reste ainsi disponible pendant le calcul sur iPad. Un repli compatible conserve
+l'ancien calcul sur le fil principal si le navigateur refuse les Workers de
+module ; le résultat 0–255 et le moteur des neuf vues restent identiques.
+
 Tests du cœur de rendu :
 
 ```bash
