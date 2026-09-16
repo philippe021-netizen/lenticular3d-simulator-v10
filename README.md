@@ -56,6 +56,16 @@ reste ainsi disponible pendant le calcul sur iPad. Un repli compatible conserve
 l'ancien calcul sur le fil principal si le navigateur refuse les Workers de
 module ; le résultat 0–255 et le moteur des neuf vues restent identiques.
 
+## MicroPlayer — Carte 3D Pro
+
+`microplayer-business-card-depthflow.html` combine la reconnaissance des textes,
+logos, QR, signatures, illustrations, objets et sujets avec le moteur DepthFlow.
+Chaque élément possède un masque corrigeable au Pencil et une hauteur continue
+0–255 indépendante. Les textes, logos et QR restent rigides, tandis qu'une photo
+ou illustration peut conserver un micro-relief interne issu de DepthFlow. Les
+préréglages Pro, Artistique, Découpe papier et QR prioritaire modifient réellement
+les neuf vues. La vue 05 reste une copie stricte de la carte de travail.
+
 Tests du cœur de rendu :
 
 ```bash
