@@ -174,7 +174,10 @@ export function paintMask(mask, width, height, from, to, radius, value) {
     for (let y = y0; y <= y1; y += 1) for (let x = x0; x <= x1; x += 1) {
       const squareDistance = (x - centerX) ** 2 + (y - centerY) ** 2;
       if (squareDistance > radiusSquared) continue;
-      const opacity = clamp(1 - Math.sqrt(squareDistance) / Math.max(1, radius), 0.18, 1);
+      const normalisedDistance = Math.sqrt(squareDistance) / Math.max(1, radius);
+      const opacity = normalisedDistance <= 0.68
+        ? 1
+        : clamp((1 - normalisedDistance) / 0.32, 0.08, 1);
       const index = y * width + x;
       mask[index] = Math.round(mask[index] * (1 - opacity) + value * opacity);
     }

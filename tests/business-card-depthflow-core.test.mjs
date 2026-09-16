@@ -76,3 +76,11 @@ test("le Pencil corrige le masque sans toucher le reste", () => {
   assert.ok(mask[5 * 20 + 13] > 0);
   assert.equal(mask[9 * 20 + 19], beforeFar);
 });
+
+test("la gomme retire franchement le masque au premier passage", () => {
+  const mask = new Uint8ClampedArray(20 * 10).fill(255);
+  paintMask(mask, 20, 10, { x: 5, y: 5 }, { x: 12, y: 5 }, 3, 0);
+  assert.equal(mask[5 * 20 + 8], 0);
+  assert.equal(mask[5 * 20 + 12], 0);
+  assert.equal(mask[0], 255);
+});

@@ -35,12 +35,14 @@ export default async function handler(req,res){
   try{
     const body=typeof req.body==='string'?JSON.parse(req.body):(req.body||{});
     const image=String(body.image||'');
+    const focusBox=bbox(body?.focus?.bbox),focusLabel=String(body?.focus?.label||'élément composite').slice(0,160);
     if(!/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(image))return res.status(400).json({error:'Image invalide.'});
     if(image.length>12_000_000)return res.status(413).json({error:'Image trop lourde.'});
-    const instructions=`Tu analyses une carte de visite ou photo souvenir pour HappyHolo. Le but n'est PAS de recréer la carte : il faut préserver l'image originale et la découper en calques exploitables pour un effet lenticulaire.
+    const instructions=`Tu analyses une carte de visite ou photo souvenir pour MicroPlayer. Le but n'est PAS de recréer la carte : il faut préserver l'image originale et la découper en calques exploitables pour un effet lenticulaire.
+${focusBox?`MODE DÉCOMPOSITION CIBLÉE : analyse UNIQUEMENT « ${focusLabel} » dans la zone normalisée ${JSON.stringify(focusBox)}. Décompose cet élément composite en au moins deux sous-éléments visuellement autonomes. Pour un logo, sépare notamment les lettres ou monogrammes, triangle/flèche/play, panneaux/pages superposés, œil/visage, anneau et slogan lorsque ces parties sont visibles. Retourne des bbox dans les coordonnées normalisées de l'IMAGE ENTIÈRE. Ne retourne pas le logo parent complet et n'inclus aucun élément extérieur à la zone.`:''}
 Détecte :
 1) CHAQUE bloc de texte séparé (nom, métier, téléphone, mail, adresse, site, slogan, horaires, etc.). Recopie le texte le plus exactement possible et précise son rôle ;
-2) chaque logo/emblème/pictogramme important ;
+2) chaque logo/emblème/pictogramme important. Un logo composite doit être découpé en parties autonomes : lettres/monogramme, flèche ou triangle play, panneaux/pages, œil/visage, cercle/anneau et slogan. Ne crée pas en même temps un grand calque parent qui recouvre ces sous-parties ;
 3) chaque QR code comme type qr, séparé des logos et textes ;
 4) les signatures ou monogrammes manuscrits comme type signature ;
 5) les illustrations et ornements artistiques importants comme type artwork ;
