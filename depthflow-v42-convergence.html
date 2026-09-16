@@ -724,7 +724,10 @@
       const memoryMegabytes = Math.round((targetWidth * targetHeight * 4 * 12) / 1048576);
       const stablePercent = Math.round(stablePixels / depth.length * 100);
       const halfParallaxPixels = Math.round(targetWidth * options.parallaxPercent / 200 * 10) / 10;
-      quality.textContent = `Contrôle : vue 05 ${centerCheck.equal ? "strictement identique ✓" : `${centerCheck.different} octets différents`} · zone stable ${stablePercent} % de l’image · désocclusions rebouchées ${totalHoles.toLocaleString("fr-FR")} px · budget image ≈ ${memoryMegabytes} Mo.`;
+      const workerQuality = state.depthPerformance
+        ? ` · profondeur ${state.depthPerformance.mode} : ${state.depthPerformance.frames} rafraîchissements UI en ${(state.depthPerformance.milliseconds / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`
+        : "";
+      quality.textContent = `Contrôle : vue 05 ${centerCheck.equal ? "strictement identique ✓" : `${centerCheck.different} octets différents`} · zone stable ${stablePercent} % de l’image · désocclusions rebouchées ${totalHoles.toLocaleString("fr-FR")} px · budget image ≈ ${memoryMegabytes} Mo${workerQuality}.`;
       setStatus(`9 vues prêtes ✓ — zéro ${options.zero}, zone stable ±${options.stabilityBand}, relief ${Math.round(options.relief * 100)} %, parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
       if (scrollToSimulator) simulator.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
