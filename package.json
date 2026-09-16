@@ -2,5 +2,8 @@
   "name": "lentiprint-lab-v11-pixverse-9views",
   "version": "11.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
 }

@@ -1,1 +1,705 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MicroPlayer V42</title><style>html,body{margin:0;background:#0b0c10;color:#f5f7fa;font-family:-apple-system,system-ui}.panel{position:sticky;top:0;z-index:20;background:#15171df7;border-bottom:1px solid #292d36;padding:10px 16px}.panel h2{margin:0 0 6px}.ctl{display:grid;grid-template-columns:180px 1fr 70px;gap:8px;align-items:center;max-width:1050px;margin:7px auto}.ctl input{width:100%}.note{max-width:1050px;margin:auto;font-size:13px;color:#ddd}.state{max-width:1050px;margin:5px auto 0;font-size:12px;color:#9fd}iframe{border:0;width:100%;height:calc(100vh - 225px);display:block}</style></head><body><div class="panel"><h2>V42 — convergence / plan zéro</h2><div class="ctl"><label>Plan zéro</label><input id="zero" type="range" min="32" max="224" step="1" value="128"><output id="zo">128</output></div><div class="ctl"><label>Amplitude vues</label><input id="amp" type="range" min="50" max="300" step="5" value="130"><output id="ao">130 %</output></div><div class="note">Plan zéro = profondeur qui reste stable. Les curseurs recalculent maintenant automatiquement les 9 vues et le simulateur après relâchement.</div><div id="state" class="state">Chargez une photo et calculez sa profondeur dans le moteur ci-dessous.</div></div><iframe id="app"></iframe><script>const f=document.getElementById('app'),z=document.getElementById('zero'),a=document.getElementById('amp'),zo=document.getElementById('zo'),ao=document.getElementById('ao'),st=document.getElementById('state');let timer=0,pending=false;async function boot(){let t=await fetch('depthflow-v40-relief.html').then(r=>r.text());t=t.replace("<title>MicroPlayer V40</title>","<title>MicroPlayer V42 moteur</title>");t=t.replace("z=d[i]/255-.5,sx=", "z=d[i]/255-(window.parent.__V42ZERO??0.5),sx=");t=t.replace("let relief=+$('relief').value/100;", "let relief=(window.parent.__V42AMP??1.3);");f.srcdoc=t}function sync(){zo.textContent=z.value;ao.textContent=a.value+' %';window.__V42ZERO=(+z.value)/255;window.__V42AMP=(+a.value)/100}function regenerate(){sync();clearTimeout(timer);timer=setTimeout(async()=>{let d=f.contentDocument;if(!d)return;let g=d.getElementById('gen');if(!g||g.disabled){st.textContent='Réglage mémorisé — il sera appliqué à la prochaine génération.';pending=true;return}st.textContent='Recalcul automatique des 9 vues…';pending=false;g.click();let n=0;let watch=setInterval(()=>{n++;if(!g.disabled||n>300){clearInterval(watch);st.textContent=!g.disabled?'Simulateur recalculé avec les nouveaux réglages.':'Recalcul terminé.'}},100)},180)}z.oninput=sync;a.oninput=sync;z.onchange=regenerate;a.onchange=regenerate;f.onload=()=>{let d=f.contentDocument;if(!d)return;let g=d.getElementById('gen');if(g){let ob=new MutationObserver(()=>{if(pending&&!g.disabled)regenerate()});ob.observe(g,{attributes:true,attributeFilter:['disabled']})}};sync();boot();</script></body></html>
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b0c10">
+  <title>MicroPlayer — DepthFlow V42 professionnel</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+      --bg: #0b0c10;
+      --card: #15171d;
+      --line: #292d36;
+      --muted: #aeb6c4;
+      --accent: #66e0b4;
+      --blue: #1677ff;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: #f5f7fa; }
+    body { padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+    main { max-width: 1080px; margin: auto; }
+    h1 { margin: 6px 0 4px; font-size: clamp(22px, 4vw, 31px); letter-spacing: -.025em; }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    p { line-height: 1.45; }
+    .sub, .help { color: var(--muted); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px; margin: 14px 0; }
+    .row { display: flex; gap: 9px; flex-wrap: wrap; align-items: center; }
+    button, .file, select {
+      min-height: 46px; border: 0; border-radius: 12px; padding: 11px 14px; font: inherit;
+      font-weight: 750; background: #fff; color: #111; touch-action: manipulation;
+    }
+    button:disabled { opacity: .42; }
+    button.secondary, select { background: #2a2f39; color: #fff; }
+    button.active { background: var(--blue); color: #fff; box-shadow: 0 0 0 2px #8ab9ff inset; }
+    .file input { display: none; }
+    .status { padding: 12px; background: #20242d; border-radius: 12px; margin-top: 11px; white-space: pre-wrap; line-height: 1.4; }
+    .status.ok { color: #bff5d9; }
+    .status.error { color: #ffb6b6; }
+    .controls { display: grid; grid-template-columns: 190px minmax(120px, 1fr) 74px; gap: 10px; align-items: center; margin: 11px 0; }
+    .controls input { width: 100%; min-height: 32px; }
+    .controls output { text-align: right; font-variant-numeric: tabular-nums; }
+    .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .setting-block { min-width: 0; }
+    .spectrum { height: 25px; border-radius: 8px; background: linear-gradient(90deg, #000, #fff); border: 1px solid #ffffff24; }
+    .stage, .simstage { position: relative; background: #000; border-radius: 14px; overflow: hidden; margin-top: 12px; line-height: 0; }
+    .stage canvas, .simstage canvas { width: 100%; height: auto; display: block; }
+    #depthOverlay { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+    .simulator { display: none; }
+    .simulator.ready { display: block; }
+    .simbar { width: 100%; margin: 13px 0 3px; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .view { position: relative; min-width: 0; background: #000; border-radius: 10px; overflow: hidden; }
+    .view canvas { width: 100%; display: block; }
+    .view.center { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .badge { position: absolute; top: 6px; left: 6px; padding: 5px 8px; border-radius: 8px; background: #000d; font-size: 12px; line-height: 1; }
+    .quality { color: #a6f2d4; font-size: 13px; margin-top: 9px; min-height: 19px; }
+    .tiny { font-size: 12px; color: var(--muted); }
+    @media (max-width: 760px) {
+      .settings { grid-template-columns: 1fr; gap: 4px; }
+      .controls { grid-template-columns: 128px minmax(80px, 1fr) 62px; gap: 7px; }
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .card { padding: 13px; }
+      button, .file, select { min-height: 48px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>DepthFlow V42 — multivue professionnel</h1>
+  <p class="sub">Une photo, une profondeur continue 0–255, un vrai plan zéro et neuf vues avec gestion des occultations. La vue 05 reste la photo originale stricte.</p>
+
+  <section class="card">
+    <div class="row">
+      <label class="file">Choisir une photo<input id="file" type="file" accept="image/*"></label>
+      <button id="depthBtn" disabled>1. Calculer la profondeur</button>
+      <button id="generateBtn" disabled>3. Générer les 9 vues</button>
+      <select id="renderSize" aria-label="Définition de rendu">
+        <option value="720">iPad rapide · 720 px</option>
+        <option value="900" selected>iPad qualité · 900 px</option>
+        <option value="1100">Haute définition · 1100 px</option>
+      </select>
+    </div>
+    <div id="status" class="status">Prêt. Choisissez une photo.</div>
+    <div id="quality" class="quality"></div>
+  </section>
+
+  <section class="card">
+    <h2>Réglages 3D</h2>
+    <div class="settings">
+      <div class="setting-block">
+        <div class="controls">
+          <label for="zero">Plan zéro / convergence</label>
+          <input id="zero" type="range" min="0" max="255" step="1" value="128">
+          <output id="zeroOut">128</output>
+        </div>
+        <div class="row">
+          <button id="anchorBtn" class="secondary" disabled>◎ Ancrer le sujet sur la photo</button>
+        </div>
+        <p class="tiny">Touchez ensuite le visage ou le sujet principal : sa profondeur restera stable dans les neuf vues.</p>
+      </div>
+      <div class="setting-block">
+        <div class="controls">
+          <label for="relief">Relief interne</label>
+          <input id="relief" type="range" min="50" max="200" step="5" value="120">
+          <output id="reliefOut">120 %</output>
+        </div>
+        <div class="controls">
+          <label for="parallax">Parallaxe totale 01↔09</label>
+          <input id="parallax" type="range" min="0.5" max="6" step="0.1" value="2.4">
+          <output id="parallaxOut">2,4 %</output>
+        </div>
+        <p class="tiny">Le relief répartit les plans ; la parallaxe fixe séparément l’amplitude maximale. Augmenter l’un n’oblige plus à brutaliser l’autre.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>2. Correction locale au Pencil</h2>
+    <div class="spectrum" aria-label="0 noir lointain, 255 blanc proche"></div>
+    <div class="controls">
+      <label for="level">Profondeur 0–255</label>
+      <input id="level" type="range" min="0" max="255" step="1" value="160">
+      <output id="levelOut">160</output>
+    </div>
+    <div class="controls">
+      <label for="softness">Douceur</label>
+      <input id="softness" type="range" min="5" max="100" step="5" value="65">
+      <output id="softnessOut">65 %</output>
+    </div>
+    <div class="controls">
+      <label for="brush">Pinceau</label>
+      <input id="brush" type="range" min="4" max="120" step="1" value="28">
+      <output id="brushOut">28</output>
+    </div>
+    <div class="row">
+      <button id="paintBtn" class="active" disabled>✏️ Pencil</button>
+      <button id="eraseBtn" class="secondary" disabled>Gomme</button>
+      <button id="mapBtn" class="secondary" disabled>Afficher la carte</button>
+      <button id="resetBtn" class="secondary" disabled>Effacer les corrections</button>
+    </div>
+    <div class="stage">
+      <canvas id="photoCanvas"></canvas>
+      <canvas id="depthOverlay"></canvas>
+    </div>
+    <p class="help">Noir = loin · blanc = proche. Le tracé utilise les événements regroupés du Pencil et n’effectue aucun recalcul lourd pendant le geste.</p>
+  </section>
+
+  <section id="simulator" class="card simulator">
+    <div class="row">
+      <h2 style="margin:0;flex:1">Simulateur lenticulaire</h2>
+      <button id="autoBtn" class="secondary">▶ Aller-retour</button>
+    </div>
+    <div class="simstage"><canvas id="simCanvas"></canvas></div>
+    <input id="simRange" class="simbar" type="range" min="0" max="8" step="0.01" value="4">
+  </section>
+
+  <div id="grid" class="grid"></div>
+</main>
+
+<script type="module">
+  import {
+    comparePixels,
+    composeEditedDepth,
+    depthAt,
+    jointBilateralUpsample,
+    normalizeDepthTensor,
+    refineDepthEdgeAware,
+    renderNovelView
+  } from "./depthflow-v42-core.js";
+
+  const byId = id => document.getElementById(id);
+  const file = byId("file");
+  const depthBtn = byId("depthBtn");
+  const generateBtn = byId("generateBtn");
+  const status = byId("status");
+  const quality = byId("quality");
+  const photoCanvas = byId("photoCanvas");
+  const depthOverlay = byId("depthOverlay");
+  const grid = byId("grid");
+  const simulator = byId("simulator");
+  const simCanvas = byId("simCanvas");
+  const simRange = byId("simRange");
+
+  const state = {
+    imageUrl: null,
+    estimator: null,
+    baseDepth: null,
+    editedCanvas: null,
+    weightCanvas: null,
+    frames: [],
+    mode: "paint",
+    showMap: false,
+    anchorPicking: false,
+    drawing: false,
+    pointerId: null,
+    rect: null,
+    lastPoint: null,
+    pendingPoints: [],
+    paintFrame: 0,
+    generation: 0,
+    regenerationTimer: 0,
+    auto: false,
+    autoFrame: 0,
+    autoDirection: 1,
+    autoTime: 0
+  };
+
+  function setStatus(message, type = "") {
+    status.textContent = message;
+    status.className = `status ${type}`.trim();
+  }
+
+  function updateOutputs() {
+    byId("zeroOut").textContent = byId("zero").value;
+    byId("reliefOut").textContent = `${byId("relief").value} %`;
+    byId("parallaxOut").textContent = `${Number(byId("parallax").value).toLocaleString("fr-FR")} %`;
+    byId("levelOut").textContent = byId("level").value;
+    byId("softnessOut").textContent = `${byId("softness").value} %`;
+    byId("brushOut").textContent = byId("brush").value;
+  }
+
+  for (const id of ["zero", "relief", "parallax", "level", "softness", "brush"]) {
+    byId(id).addEventListener("input", updateOutputs);
+  }
+  for (const id of ["zero", "relief", "parallax", "renderSize"]) {
+    byId(id).addEventListener("input", () => scheduleRegeneration(360));
+    byId(id).addEventListener("change", () => scheduleRegeneration(40));
+  }
+  updateOutputs();
+
+  file.addEventListener("change", async () => {
+    const selected = file.files?.[0];
+    if (!selected) return;
+    stopAuto();
+    state.generation += 1;
+    if (state.imageUrl) URL.revokeObjectURL(state.imageUrl);
+    state.imageUrl = URL.createObjectURL(selected);
+    const image = await loadImage(state.imageUrl);
+    const width = Math.min(1100, image.naturalWidth);
+    const height = Math.max(1, Math.round(image.naturalHeight * width / image.naturalWidth));
+    photoCanvas.width = depthOverlay.width = width;
+    photoCanvas.height = depthOverlay.height = height;
+    photoCanvas.getContext("2d", { alpha: false }).drawImage(image, 0, 0, width, height);
+    depthOverlay.getContext("2d").clearRect(0, 0, width, height);
+    state.baseDepth = null;
+    state.frames = [];
+    state.showMap = false;
+    grid.innerHTML = "";
+    simulator.classList.remove("ready");
+    quality.textContent = "";
+    depthBtn.disabled = false;
+    generateBtn.disabled = true;
+    setEditorEnabled(false);
+    setStatus("Photo prête. Lancez le calcul de profondeur.", "ok");
+  });
+
+  depthBtn.addEventListener("click", calculateDepth);
+
+  async function calculateDepth() {
+    if (!state.imageUrl) return;
+    depthBtn.disabled = true;
+    generateBtn.disabled = true;
+    setEditorEnabled(false);
+    quality.textContent = "";
+    try {
+      setStatus("Chargement de Depth Anything V2…");
+      if (!state.estimator) {
+        const transformers = await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0");
+        transformers.env.allowLocalModels = false;
+        state.estimator = await transformers.pipeline(
+          "depth-estimation",
+          "onnx-community/depth-anything-v2-small",
+          { device: "wasm", dtype: "q8" }
+        );
+      }
+      setStatus("Analyse de la profondeur générale…");
+      const result = await state.estimator(state.imageUrl);
+      const raw = result.predicted_depth ?? result.depth;
+      const normalized = normalizeDepthTensor(raw);
+      await yieldFrame();
+
+      setStatus("Raffinement guidé des visages, cheveux et objets fins…");
+      const photoContext = photoCanvas.getContext("2d", { willReadFrequently: true });
+      const fullGuide = photoContext.getImageData(0, 0, photoCanvas.width, photoCanvas.height).data;
+      const smallGuideCanvas = makeCanvas(normalized.width, normalized.height);
+      smallGuideCanvas.getContext("2d").drawImage(photoCanvas, 0, 0, normalized.width, normalized.height);
+      const lowGuide = smallGuideCanvas.getContext("2d", { willReadFrequently: true })
+        .getImageData(0, 0, normalized.width, normalized.height).data;
+      let refined = jointBilateralUpsample(
+        normalized.data,
+        normalized.width,
+        normalized.height,
+        lowGuide,
+        fullGuide,
+        photoCanvas.width,
+        photoCanvas.height
+      );
+      await yieldFrame();
+      refined = refineDepthEdgeAware(refined, fullGuide, photoCanvas.width, photoCanvas.height, 2);
+      state.baseDepth = refined;
+      initialiseCorrectionCanvases(refined);
+
+      const automaticZero = depthAt(
+        refined,
+        photoCanvas.width,
+        photoCanvas.height,
+        photoCanvas.width * 0.5,
+        photoCanvas.height * 0.43,
+        Math.max(7, Math.round(photoCanvas.width * 0.018))
+      );
+      byId("zero").value = automaticZero;
+      updateOutputs();
+      generateBtn.disabled = false;
+      setEditorEnabled(true);
+      renderOverlay();
+      setStatus(`Profondeur prête ✓ — plan zéro initial ${automaticZero}. Touchez « Ancrer le sujet » pour le placer précisément.`, "ok");
+    } catch (error) {
+      console.error(error);
+      setStatus(`Erreur profondeur : ${error?.message ?? error}`, "error");
+    } finally {
+      depthBtn.disabled = false;
+    }
+  }
+
+  function initialiseCorrectionCanvases(depth) {
+    state.editedCanvas = makeCanvas(photoCanvas.width, photoCanvas.height);
+    state.weightCanvas = makeCanvas(photoCanvas.width, photoCanvas.height);
+    putDepthOnCanvas(state.editedCanvas, depth);
+  }
+
+  function setEditorEnabled(enabled) {
+    for (const id of ["anchorBtn", "paintBtn", "eraseBtn", "mapBtn", "resetBtn"]) byId(id).disabled = !enabled;
+  }
+
+  byId("paintBtn").addEventListener("click", () => setMode("paint"));
+  byId("eraseBtn").addEventListener("click", () => setMode("erase"));
+  function setMode(mode) {
+    state.mode = mode;
+    state.anchorPicking = false;
+    byId("anchorBtn").classList.remove("active");
+    byId("paintBtn").classList.toggle("active", mode === "paint");
+    byId("eraseBtn").classList.toggle("active", mode === "erase");
+  }
+
+  byId("anchorBtn").addEventListener("click", () => {
+    if (!state.baseDepth) return;
+    state.anchorPicking = !state.anchorPicking;
+    byId("anchorBtn").classList.toggle("active", state.anchorPicking);
+    setStatus(state.anchorPicking ? "Touchez maintenant le visage ou le sujet à immobiliser." : "Ancrage annulé.");
+  });
+
+  byId("mapBtn").addEventListener("click", () => {
+    state.showMap = !state.showMap;
+    byId("mapBtn").textContent = state.showMap ? "Masquer la carte" : "Afficher la carte";
+    renderOverlay();
+  });
+
+  byId("resetBtn").addEventListener("click", () => {
+    if (!state.baseDepth) return;
+    initialiseCorrectionCanvases(state.baseDepth);
+    renderOverlay();
+    scheduleRegeneration(80);
+    setStatus("Corrections effacées. La carte automatique est restaurée.", "ok");
+  });
+
+  depthOverlay.addEventListener("pointerdown", pointerDown, { passive: false });
+  depthOverlay.addEventListener("pointermove", pointerMove, { passive: false });
+  depthOverlay.addEventListener("pointerup", pointerFinish, { passive: false });
+  depthOverlay.addEventListener("pointercancel", pointerFinish, { passive: false });
+
+  function pointFromEvent(event) {
+    const rect = state.rect ?? depthOverlay.getBoundingClientRect();
+    return {
+      x: (event.clientX - rect.left) * depthOverlay.width / rect.width,
+      y: (event.clientY - rect.top) * depthOverlay.height / rect.height,
+      pressure: event.pointerType === "pen" ? Math.max(.15, event.pressure || .5) : .5
+    };
+  }
+
+  function pointerDown(event) {
+    if (!state.baseDepth) return;
+    event.preventDefault();
+    state.rect = depthOverlay.getBoundingClientRect();
+    const point = pointFromEvent(event);
+    if (state.anchorPicking) {
+      const final = finalDepth();
+      const value = depthAt(final, photoCanvas.width, photoCanvas.height, point.x, point.y, Math.max(5, Math.round(photoCanvas.width * .012)));
+      byId("zero").value = value;
+      updateOutputs();
+      state.anchorPicking = false;
+      byId("anchorBtn").classList.remove("active");
+      setStatus(`Sujet ancré au plan ${value} ✓ — cette zone restera stable.`, "ok");
+      scheduleRegeneration(60);
+      return;
+    }
+    state.drawing = true;
+    state.pointerId = event.pointerId;
+    state.lastPoint = point;
+    state.pendingPoints = [point];
+    depthOverlay.setPointerCapture(event.pointerId);
+    schedulePaintFrame();
+  }
+
+  function pointerMove(event) {
+    if (!state.drawing || event.pointerId !== state.pointerId) return;
+    event.preventDefault();
+    const events = event.getCoalescedEvents?.() ?? [event];
+    for (const coalesced of events) state.pendingPoints.push(pointFromEvent(coalesced));
+    schedulePaintFrame();
+  }
+
+  function pointerFinish(event) {
+    if (!state.drawing || event.pointerId !== state.pointerId) return;
+    event.preventDefault();
+    flushPaintPoints();
+    state.drawing = false;
+    state.pointerId = null;
+    state.rect = null;
+    renderOverlay();
+    scheduleRegeneration(120);
+  }
+
+  function schedulePaintFrame() {
+    if (state.paintFrame) return;
+    state.paintFrame = requestAnimationFrame(() => {
+      state.paintFrame = 0;
+      flushPaintPoints();
+    });
+  }
+
+  function flushPaintPoints() {
+    if (!state.pendingPoints.length || !state.editedCanvas || !state.weightCanvas) return;
+    for (const point of state.pendingPoints) {
+      drawDepthSegment(state.lastPoint ?? point, point);
+      state.lastPoint = point;
+    }
+    state.pendingPoints.length = 0;
+  }
+
+  function drawDepthSegment(from, to) {
+    const value = Number(byId("level").value);
+    const softness = Number(byId("softness").value) / 100;
+    const pressure = (from.pressure + to.pressure) * .5;
+    const size = Number(byId("brush").value) * (.72 + pressure * .56);
+    const editedContext = state.editedCanvas.getContext("2d");
+    const weightContext = state.weightCanvas.getContext("2d");
+    const overlayContext = depthOverlay.getContext("2d");
+    const contexts = [editedContext, weightContext, overlayContext];
+    for (const context of contexts) {
+      context.save();
+      context.lineWidth = size;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.beginPath();
+      context.moveTo(from.x, from.y);
+      context.lineTo(to.x, to.y);
+    }
+    if (state.mode === "erase") {
+      weightContext.globalCompositeOperation = "destination-out";
+      overlayContext.globalCompositeOperation = "destination-out";
+      weightContext.strokeStyle = overlayContext.strokeStyle = "#fff";
+      weightContext.stroke();
+      overlayContext.stroke();
+    } else {
+      editedContext.strokeStyle = `rgb(${value},${value},${value})`;
+      editedContext.stroke();
+      weightContext.globalAlpha = softness;
+      weightContext.strokeStyle = "#fff";
+      weightContext.stroke();
+      overlayContext.globalAlpha = state.showMap ? 1 : .56;
+      overlayContext.strokeStyle = `rgb(${value},${value},${value})`;
+      overlayContext.stroke();
+    }
+    for (const context of contexts) context.restore();
+  }
+
+  function finalDepth() {
+    if (!state.baseDepth || !state.editedCanvas || !state.weightCanvas) return null;
+    const width = photoCanvas.width;
+    const height = photoCanvas.height;
+    const editedRgba = state.editedCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, width, height).data;
+    const weightRgba = state.weightCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, width, height).data;
+    const edited = new Uint8ClampedArray(width * height);
+    const weights = new Uint8ClampedArray(width * height);
+    for (let index = 0, rgba = 0; index < edited.length; index += 1, rgba += 4) {
+      edited[index] = editedRgba[rgba];
+      weights[index] = weightRgba[rgba + 3] ? weightRgba[rgba] : 0;
+    }
+    return composeEditedDepth(state.baseDepth, edited, weights);
+  }
+
+  function renderOverlay() {
+    const context = depthOverlay.getContext("2d");
+    context.clearRect(0, 0, depthOverlay.width, depthOverlay.height);
+    if (!state.baseDepth) return;
+    if (state.showMap) {
+      const mapCanvas = makeCanvas(depthOverlay.width, depthOverlay.height);
+      putDepthOnCanvas(mapCanvas, finalDepth());
+      context.globalAlpha = .78;
+      context.drawImage(mapCanvas, 0, 0);
+      context.globalAlpha = 1;
+    } else if (state.weightCanvas) {
+      context.globalAlpha = .32;
+      context.drawImage(state.weightCanvas, 0, 0);
+      context.globalAlpha = 1;
+    }
+  }
+
+  generateBtn.addEventListener("click", () => generateViews(true));
+
+  function scheduleRegeneration(delay) {
+    clearTimeout(state.regenerationTimer);
+    if (!state.frames.length || !state.baseDepth) return;
+    state.regenerationTimer = setTimeout(() => generateViews(false), delay);
+  }
+
+  async function generateViews(scrollToSimulator = false) {
+    if (!state.baseDepth) return;
+    stopAuto();
+    const generation = ++state.generation;
+    generateBtn.disabled = true;
+    const targetWidth = Math.min(photoCanvas.width, Number(byId("renderSize").value));
+    const targetHeight = Math.max(1, Math.round(photoCanvas.height * targetWidth / photoCanvas.width));
+    const sourceCanvas = makeCanvas(targetWidth, targetHeight);
+    sourceCanvas.getContext("2d", { alpha: false }).drawImage(photoCanvas, 0, 0, targetWidth, targetHeight);
+    const source = sourceCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, targetWidth, targetHeight).data;
+    const depthCanvas = makeCanvas(photoCanvas.width, photoCanvas.height);
+    putDepthOnCanvas(depthCanvas, finalDepth());
+    const scaledDepthCanvas = makeCanvas(targetWidth, targetHeight);
+    scaledDepthCanvas.getContext("2d").drawImage(depthCanvas, 0, 0, targetWidth, targetHeight);
+    const depthRgba = scaledDepthCanvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, targetWidth, targetHeight).data;
+    const depth = new Uint8ClampedArray(targetWidth * targetHeight);
+    for (let index = 0, rgba = 0; index < depth.length; index += 1, rgba += 4) depth[index] = depthRgba[rgba];
+
+    grid.innerHTML = "";
+    state.frames = [];
+    simulator.classList.remove("ready");
+    quality.textContent = "";
+    const options = {
+      zero: Number(byId("zero").value),
+      relief: Number(byId("relief").value) / 100,
+      parallaxPercent: Number(byId("parallax").value)
+    };
+    let totalHoles = 0;
+    try {
+      for (let view = 0; view < 9; view += 1) {
+        if (generation !== state.generation) return;
+        setStatus(`Génération progressive vue ${view + 1}/9…`);
+        await yieldFrame();
+        const position = (view - 4) / 4;
+        const rendered = renderNovelView(source, depth, targetWidth, targetHeight, position, options);
+        totalHoles += rendered.holesBeforeFill;
+        const canvas = makeCanvas(targetWidth, targetHeight);
+        canvas.getContext("2d").putImageData(new ImageData(rendered.data, targetWidth, targetHeight), 0, 0);
+        state.frames.push(canvas);
+        const wrapper = document.createElement("div");
+        wrapper.className = `view${view === 4 ? " center" : ""}`;
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = `${String(view + 1).padStart(2, "0")}${view === 4 ? " — originale" : ""}`;
+        wrapper.append(canvas, badge);
+        grid.append(wrapper);
+        await yieldFrame();
+      }
+      if (generation !== state.generation) return;
+      simCanvas.width = targetWidth;
+      simCanvas.height = targetHeight;
+      simRange.value = 4;
+      drawSimulator(4);
+      simulator.classList.add("ready");
+      const centerPixels = state.frames[4].getContext("2d", { willReadFrequently: true }).getImageData(0, 0, targetWidth, targetHeight).data;
+      const centerCheck = comparePixels(source, centerPixels);
+      const memoryMegabytes = Math.round((targetWidth * targetHeight * 4 * 12) / 1048576);
+      quality.textContent = `Contrôle : vue 05 ${centerCheck.equal ? "strictement identique ✓" : `${centerCheck.different} octets différents`} · désocclusions rebouchées ${totalHoles.toLocaleString("fr-FR")} px · budget image ≈ ${memoryMegabytes} Mo.`;
+      setStatus(`9 vues prêtes ✓ — plan zéro ${options.zero}, relief ${Math.round(options.relief * 100)} %, parallaxe ${options.parallaxPercent.toLocaleString("fr-FR")} %.`, "ok");
+      if (scrollToSimulator) simulator.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      console.error(error);
+      setStatus(`Erreur génération : ${error?.message ?? error}`, "error");
+    } finally {
+      if (generation === state.generation) generateBtn.disabled = false;
+    }
+  }
+
+  simRange.addEventListener("input", () => {
+    stopAuto();
+    drawSimulator(Number(simRange.value));
+  });
+  byId("autoBtn").addEventListener("click", () => {
+    state.auto = !state.auto;
+    byId("autoBtn").classList.toggle("active", state.auto);
+    byId("autoBtn").textContent = state.auto ? "■ Arrêter" : "▶ Aller-retour";
+    if (state.auto) {
+      state.autoTime = performance.now();
+      state.autoFrame = requestAnimationFrame(animateSimulator);
+    } else cancelAnimationFrame(state.autoFrame);
+  });
+
+  function stopAuto() {
+    state.auto = false;
+    cancelAnimationFrame(state.autoFrame);
+    byId("autoBtn").classList.remove("active");
+    byId("autoBtn").textContent = "▶ Aller-retour";
+  }
+
+  function animateSimulator(time) {
+    if (!state.auto) return;
+    const elapsed = Math.min(.05, (time - state.autoTime) / 1000);
+    state.autoTime = time;
+    let value = Number(simRange.value) + state.autoDirection * elapsed * 2.1;
+    if (value >= 8) { value = 8; state.autoDirection = -1; }
+    if (value <= 0) { value = 0; state.autoDirection = 1; }
+    simRange.value = value;
+    drawSimulator(value);
+    state.autoFrame = requestAnimationFrame(animateSimulator);
+  }
+
+  function drawSimulator(value) {
+    if (state.frames.length !== 9) return;
+    const left = Math.max(0, Math.min(8, Math.floor(value)));
+    const right = Math.min(8, left + 1);
+    const mix = value - left;
+    const context = simCanvas.getContext("2d");
+    context.globalAlpha = 1;
+    context.drawImage(state.frames[left], 0, 0);
+    if (right !== left && mix > 0) {
+      context.globalAlpha = mix;
+      context.drawImage(state.frames[right], 0, 0);
+      context.globalAlpha = 1;
+    }
+  }
+
+  function putDepthOnCanvas(canvas, depth) {
+    const context = canvas.getContext("2d");
+    const image = context.createImageData(canvas.width, canvas.height);
+    for (let index = 0, rgba = 0; index < depth.length; index += 1, rgba += 4) {
+      image.data[rgba] = image.data[rgba + 1] = image.data[rgba + 2] = depth[index];
+      image.data[rgba + 3] = 255;
+    }
+    context.putImageData(image, 0, 0);
+  }
+
+  function makeCanvas(width, height) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  }
+
+  function loadImage(url) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("La photo n’a pas pu être lue"));
+      image.src = url;
+    });
+  }
+
+  function yieldFrame() {
+    return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+  }
+
+  async function loadSyntheticFixture() {
+    const width = 360;
+    const height = 260;
+    photoCanvas.width = depthOverlay.width = width;
+    photoCanvas.height = depthOverlay.height = height;
+    const context = photoCanvas.getContext("2d");
+    const gradient = context.createLinearGradient(0, 0, width, height);
+    gradient.addColorStop(0, "#17365c");
+    gradient.addColorStop(1, "#8ab6d6");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = "#f0c0a2";
+    context.beginPath(); context.ellipse(180, 112, 58, 72, 0, 0, Math.PI * 2); context.fill();
+    context.fillStyle = "#5b3326";
+    context.beginPath(); context.arc(180, 79, 61, Math.PI, Math.PI * 2); context.fill();
+    context.fillStyle = "#d49b7b";
+    context.beginPath(); context.moveTo(180, 102); context.lineTo(192, 132); context.lineTo(176, 130); context.fill();
+    context.strokeStyle = "#f0c0a2"; context.lineWidth = 9; context.beginPath(); context.moveTo(224, 142); context.lineTo(284, 194); context.stroke();
+    const depth = new Uint8ClampedArray(width * height).fill(52);
+    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      const face = ((x - 180) / 58) ** 2 + ((y - 112) / 72) ** 2 <= 1;
+      if (face) depth[index] = 188 + Math.max(0, 38 - Math.hypot(x - 185, y - 122));
+      const armDistance = Math.abs((y - 142) * 60 - (x - 224) * 52) / Math.hypot(60, 52);
+      if (x >= 220 && x <= 288 && y >= 136 && y <= 202 && armDistance < 6) depth[index] = 205;
+    }
+    state.baseDepth = depth;
+    initialiseCorrectionCanvases(depth);
+    byId("zero").value = 190;
+    updateOutputs();
+    generateBtn.disabled = false;
+    depthBtn.disabled = true;
+    setEditorEnabled(true);
+    renderOverlay();
+    setStatus("Fixture de contrôle chargée.", "ok");
+    await generateViews(false);
+  }
+
+  window.__depthflowV42 = { state, finalDepth, generateViews, loadSyntheticFixture, renderNovelView };
+</script>
+</body>
+</html>
