@@ -577,8 +577,10 @@
         if (generation !== state.generation) return;
         setStatus(`Génération progressive vue ${view + 1}/9…`);
         await yieldFrame();
+        if (generation !== state.generation) return;
         const position = (view - 4) / 4;
         const rendered = renderNovelView(source, depth, targetWidth, targetHeight, position, options);
+        if (generation !== state.generation) return;
         totalHoles += rendered.holesBeforeFill;
         const canvas = makeCanvas(targetWidth, targetHeight);
         canvas.getContext("2d").putImageData(new ImageData(rendered.data, targetWidth, targetHeight), 0, 0);
@@ -591,6 +593,7 @@
         wrapper.append(canvas, badge);
         grid.append(wrapper);
         await yieldFrame();
+        if (generation !== state.generation) return;
       }
       if (generation !== state.generation) return;
       simCanvas.width = targetWidth;
