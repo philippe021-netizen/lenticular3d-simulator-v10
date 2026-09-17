@@ -1,89 +1,29 @@
-// MicroPlayer Image Preprocess V1
-// Shared browser-side preprocessing for business cards/documents and normal photos.
-// No generative modification: pixels are only cropped, perspective-warped, resized and gently corrected.
-
-export const MP_PREPROCESS_VERSION = '1.0.0';
-
+// MicroPlayer Image Preprocess V1.1 — deterministic document scanner + photo preprocessing
+// No generative modification: crop, detected bounds, perspective warp, resize and gentle correction only.
+export const MP_PREPROCESS_VERSION='1.1.0';
 const clamp=(v,a=0,b=255)=>Math.max(a,Math.min(b,v));
-
-export function detectMode(width,height,{documentHint=false}={}){
-  const r=Math.max(width,height)/Math.max(1,Math.min(width,height));
-  if(documentHint || (r>1.35 && r<1.9)) return 'document';
-  return 'photo';
+export function detectMode(width,height,{documentHint=false}={}){const r=Math.max(width,height)/Math.max(1,Math.min(width,height));return documentHint||(r>1.35&&r<1.9)?'document':'photo'}
+export function normalizedBusinessCardRatio(){return 85/55}
+export function fitCrop(w,h,targetRatio){const r=w/h;if(Math.abs(r-targetRatio)<.002)return{x:0,y:0,w,h};if(r>targetRatio){const nw=h*targetRatio;return{x:(w-nw)/2,y:0,w:nw,h}}const nh=w/targetRatio;return{x:0,y:(h-nh)/2,w,h:nh}}
+export function normalizeQuad(points,w,h){if(!Array.isArray(points)||points.length!==4)return null;return points.map(p=>({x:clamp(+p.x||0,0,w-1),y:clamp(+p.y||0,0,h-1)}))}
+function canvasOf(source,max=900){const sw=source.width||source.naturalWidth,sh=source.height||source.naturalHeight,s=Math.min(1,max/Math.max(sw,sh)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(sw*s));c.height=Math.max(1,Math.round(sh*s));c.getContext('2d').drawImage(source,0,0,c.width,c.height);return{c,s,sw,sh}}
+function grayAt(d,i){return .299*d[i]+.587*d[i+1]+.114*d[i+2]}
+export function detectDocumentQuad(source){
+ const {c,s,sw,sh}=canvasOf(source,850),ctx=c.getContext('2d',{willReadFrequently:true}),im=ctx.getImageData(0,0,c.width,c.height),d=im.data,w=c.width,h=c.height;
+ const border=[];for(let x=0;x<w;x+=Math.max(1,Math.floor(w/80))){border.push(grayAt(d,x*4));border.push(grayAt(d,((h-1)*w+x)*4))}for(let y=0;y<h;y+=Math.max(1,Math.floor(h/80))){border.push(grayAt(d,(y*w)*4));border.push(grayAt(d,(y*w+w-1)*4))}border.sort((a,b)=>a-b);const bg=border[Math.floor(border.length/2)]||128;
+ const score=new Float32Array(w*h);let max=0;for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4,g=grayAt(d,i),gx=Math.abs(grayAt(d,i+4)-grayAt(d,i-4)),gy=Math.abs(grayAt(d,i+w*4)-grayAt(d,i-w*4)),v=Math.abs(g-bg)*.55+(gx+gy)*1.1;score[y*w+x]=v;if(v>max)max=v}
+ const thr=Math.max(30,max*.16),xs=[],ys=[];for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(score[y*w+x]>thr){xs.push(x);ys.push(y)}}
+ if(xs.length<w*h*.006)return null;xs.sort((a,b)=>a-b);ys.sort((a,b)=>a-b);const lo=.025,hi=.975;let x0=xs[Math.floor(xs.length*lo)],x1=xs[Math.floor(xs.length*hi)],y0=ys[Math.floor(ys.length*lo)],y1=ys[Math.floor(ys.length*hi)];
+ const bw=x1-x0,bh=y1-y0;if(bw<w*.25||bh<h*.18)return null;const pad=Math.max(2,Math.min(bw,bh)*.012);x0=clamp(x0-pad,0,w-1);x1=clamp(x1+pad,0,w-1);y0=clamp(y0-pad,0,h-1);y1=clamp(y1+pad,0,h-1);
+ // Refine each corner by searching high edge-energy pixels near the bounding-box corners.
+ const corner=(cx,cy,sx,sy)=>{let best={x:cx,y:cy,v:-1};const rx=Math.max(12,bw*.22),ry=Math.max(12,bh*.25);for(let y=Math.max(1,Math.floor(cy+(sy<0?-ry:0)));y<Math.min(h-1,Math.ceil(cy+(sy>0?ry:0)));y++)for(let x=Math.max(1,Math.floor(cx+(sx<0?-rx:0)));x<Math.min(w-1,Math.ceil(cx+(sx>0?rx:0)));x++){const v=score[y*w+x]-Math.hypot(x-cx,y-cy)*.18;if(v>best.v)best={x,y,v}}return best};
+ const q=[corner(x0,y0,1,1),corner(x1,y0,-1,1),corner(x1,y1,-1,-1),corner(x0,y1,1,-1)].map(p=>({x:p.x/s,y:p.y/s}));
+ const area=Math.abs(q.reduce((a,p,i)=>{const n=q[(i+1)%4];return a+p.x*n.y-n.x*p.y},0)/2);if(area<sw*sh*.08)return null;return q;
 }
-
-export function normalizedBusinessCardRatio(){ return 85/55; }
-
-export function fitCrop(w,h,targetRatio){
-  const r=w/h;
-  if(Math.abs(r-targetRatio)<0.002) return {x:0,y:0,w,h};
-  if(r>targetRatio){ const nw=h*targetRatio; return {x:(w-nw)/2,y:0,w:nw,h}; }
-  const nh=w/targetRatio; return {x:0,y:(h-nh)/2,w,h:nh};
-}
-
-export function normalizeQuad(points,w,h){
-  if(!Array.isArray(points)||points.length!==4) return null;
-  return points.map(p=>({x:clamp(+p.x||0,0,w-1),y:clamp(+p.y||0,0,h-1)}));
-}
-
-// Bilinear quad warp. This is intentionally deterministic and local: no AI hallucination.
-export function warpQuad(source,points,outW,outH){
-  const sw=source.width, sh=source.height, q=normalizeQuad(points,sw,sh);
-  if(!q) throw new Error('4 coins requis');
-  const sctx=source.getContext('2d',{willReadFrequently:true});
-  const src=sctx.getImageData(0,0,sw,sh), dst=new ImageData(outW,outH);
-  const [tl,tr,br,bl]=q;
-  for(let y=0;y<outH;y++){
-    const v=outH===1?0:y/(outH-1);
-    const lx=tl.x+(bl.x-tl.x)*v, ly=tl.y+(bl.y-tl.y)*v;
-    const rx=tr.x+(br.x-tr.x)*v, ry=tr.y+(br.y-tr.y)*v;
-    for(let x=0;x<outW;x++){
-      const u=outW===1?0:x/(outW-1), sx=lx+(rx-lx)*u, sy=ly+(ry-ly)*u;
-      const ix=clamp(Math.round(sx),0,sw-1), iy=clamp(Math.round(sy),0,sh-1);
-      const si=(iy*sw+ix)*4, di=(y*outW+x)*4;
-      dst.data[di]=src.data[si]; dst.data[di+1]=src.data[si+1]; dst.data[di+2]=src.data[si+2]; dst.data[di+3]=255;
-    }
-  }
-  const c=document.createElement('canvas'); c.width=outW;c.height=outH;c.getContext('2d').putImageData(dst,0,0);return c;
-}
-
-export function gentleEnhance(canvas,{brightness=0,contrast=1.04,saturation=1.02}={}){
-  const c=document.createElement('canvas');c.width=canvas.width;c.height=canvas.height;
-  const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(canvas,0,0);
-  const im=ctx.getImageData(0,0,c.width,c.height),d=im.data;
-  for(let i=0;i<d.length;i+=4){
-    let r=d[i]+brightness,g=d[i+1]+brightness,b=d[i+2]+brightness;
-    r=(r-128)*contrast+128;g=(g-128)*contrast+128;b=(b-128)*contrast+128;
-    const l=.2126*r+.7152*g+.0722*b;
-    d[i]=clamp(l+(r-l)*saturation);d[i+1]=clamp(l+(g-l)*saturation);d[i+2]=clamp(l+(b-l)*saturation);
-  }
-  ctx.putImageData(im,0,0);return c;
-}
-
-export function cropAndResize(source,crop,maxWidth=1536){
-  const ratio=crop.w/crop.h,w=Math.min(maxWidth,Math.max(1,Math.round(crop.w))),h=Math.max(1,Math.round(w/ratio));
-  const c=document.createElement('canvas');c.width=w;c.height=h;
-  c.getContext('2d').drawImage(source,crop.x,crop.y,crop.w,crop.h,0,0,w,h);return c;
-}
-
-export function preprocessPhoto(source,{maxWidth=1536,enhance=true,crop=null}={}){
-  const area=crop||{x:0,y:0,w:source.width,h:source.height};
-  let c=cropAndResize(source,area,maxWidth);if(enhance)c=gentleEnhance(c);return c;
-}
-
-export function preprocessBusinessCard(source,{corners=null,maxWidth=1536,enhance=true,forceRatio=true}={}){
-  const ratio=normalizedBusinessCardRatio();let c;
-  if(corners){
-    const w=Math.min(maxWidth,1536),h=Math.round(w/ratio);c=warpQuad(source,corners,w,h);
-  }else{
-    const crop=forceRatio?fitCrop(source.width,source.height,ratio):{x:0,y:0,w:source.width,h:source.height};
-    c=cropAndResize(source,crop,maxWidth);
-  }
-  if(enhance)c=gentleEnhance(c,{contrast:1.06,saturation:1.01});return c;
-}
-
-export async function canvasToDataURL(canvas,type='image/png',quality=.96){ return canvas.toDataURL(type,quality); }
-
-export function qualityReport(before,after,mode){
-  return {mode,before:`${before.width}×${before.height}`,after:`${after.width}×${after.height}`,nonGenerative:true,ready:true};
-}
+export function warpQuad(source,points,outW,outH){const sw=source.width||source.naturalWidth,sh=source.height||source.naturalHeight,q=normalizeQuad(points,sw,sh);if(!q)throw Error('4 coins requis');const srcC=document.createElement('canvas');srcC.width=sw;srcC.height=sh;const sc=srcC.getContext('2d',{willReadFrequently:true});sc.drawImage(source,0,0,sw,sh);const src=sc.getImageData(0,0,sw,sh),dst=new ImageData(outW,outH),[tl,tr,br,bl]=q;for(let y=0;y<outH;y++){const v=y/(outH-1||1),lx=tl.x+(bl.x-tl.x)*v,ly=tl.y+(bl.y-tl.y)*v,rx=tr.x+(br.x-tr.x)*v,ry=tr.y+(br.y-tr.y)*v;for(let x=0;x<outW;x++){const u=x/(outW-1||1),sx=lx+(rx-lx)*u,sy=ly+(ry-ly)*u,ix=clamp(Math.round(sx),0,sw-1),iy=clamp(Math.round(sy),0,sh-1),si=(iy*sw+ix)*4,di=(y*outW+x)*4;dst.data[di]=src.data[si];dst.data[di+1]=src.data[si+1];dst.data[di+2]=src.data[si+2];dst.data[di+3]=255}}const c=document.createElement('canvas');c.width=outW;c.height=outH;c.getContext('2d').putImageData(dst,0,0);return c}
+export function gentleEnhance(canvas,{brightness=0,contrast=1.04,saturation=1.02}={}){const c=document.createElement('canvas');c.width=canvas.width;c.height=canvas.height;const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(canvas,0,0);const im=ctx.getImageData(0,0,c.width,c.height),d=im.data;for(let i=0;i<d.length;i+=4){let r=d[i]+brightness,g=d[i+1]+brightness,b=d[i+2]+brightness;r=(r-128)*contrast+128;g=(g-128)*contrast+128;b=(b-128)*contrast+128;const l=.2126*r+.7152*g+.0722*b;d[i]=clamp(l+(r-l)*saturation);d[i+1]=clamp(l+(g-l)*saturation);d[i+2]=clamp(l+(b-l)*saturation)}ctx.putImageData(im,0,0);return c}
+export function cropAndResize(source,crop,maxWidth=1536){const ratio=crop.w/crop.h,w=Math.min(maxWidth,Math.max(1,Math.round(crop.w))),h=Math.max(1,Math.round(w/ratio)),c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(source,crop.x,crop.y,crop.w,crop.h,0,0,w,h);return c}
+export function preprocessPhoto(source,{maxWidth=1536,enhance=true,crop=null}={}){const area=crop||{x:0,y:0,w:source.width||source.naturalWidth,h:source.height||source.naturalHeight};let c=cropAndResize(source,area,maxWidth);return enhance?gentleEnhance(c):c}
+export function preprocessBusinessCard(source,{corners=null,maxWidth=1536,enhance=true,forceRatio=true,autoDetect=true}={}){const ratio=normalizedBusinessCardRatio();let q=corners||(autoDetect?detectDocumentQuad(source):null),c;if(q){const w=Math.min(maxWidth,1536),h=Math.round(w/ratio);c=warpQuad(source,q,w,h);c.detectedCorners=q;c.documentDetected=true}else{const sw=source.width||source.naturalWidth,sh=source.height||source.naturalHeight,crop=forceRatio?fitCrop(sw,sh,ratio):{x:0,y:0,w:sw,h:sh};c=cropAndResize(source,crop,maxWidth);c.documentDetected=false}if(enhance){const detected=c.documentDetected,cornersOut=c.detectedCorners;c=gentleEnhance(c,{contrast:1.06,saturation:1.01});c.documentDetected=detected;c.detectedCorners=cornersOut}return c}
+export async function canvasToDataURL(canvas,type='image/png',quality=.96){return canvas.toDataURL(type,quality)}
+export function qualityReport(before,after,mode){return{mode,before:`${before.width}×${before.height}`,after:`${after.width}×${after.height}`,documentDetected:!!after.documentDetected,nonGenerative:true,ready:true}}
