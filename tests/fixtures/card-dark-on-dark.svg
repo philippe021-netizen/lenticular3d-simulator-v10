@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="760" viewBox="0 0 1100 760">
+  <defs><filter id="shadow"><feGaussianBlur stdDeviation="12"/></filter><clipPath id="card"><polygon points="122,238 875,118 956,515 207,602"/></clipPath></defs>
+  <rect width="1100" height="760" fill="#161b20"/>
+  <g opacity=".3" stroke="#323a41" stroke-width="2"><path d="M0 100L1100 40"/><path d="M0 250L1100 190"/><path d="M0 410L1100 350"/><path d="M0 570L1100 510"/><path d="M0 710L1100 650"/></g>
+  <polygon points="143,258 897,137 980,539 226,628" fill="#000" opacity=".65" filter="url(#shadow)"/>
+  <polygon points="122,238 875,118 956,515 207,602" fill="#242b31" stroke="#4d5962" stroke-width="6"/>
+  <g clip-path="url(#card)" transform="rotate(-8 550 360)"><rect x="170" y="190" width="190" height="360" fill="#dc7d13"/><text x="220" y="380" font-family="Arial" font-size="58" font-weight="700" fill="white">MP</text><text x="430" y="300" font-family="Arial" font-size="54" font-weight="700" fill="#f0f3f5">MICROPLAYER</text><text x="430" y="370" font-family="Arial" font-size="27" fill="#bec8ce">Relief · Mouvement · Profondeur</text><text x="430" y="435" font-family="Arial" font-size="25" fill="#e39b48">06 00 00 00 00</text></g>
+</svg>

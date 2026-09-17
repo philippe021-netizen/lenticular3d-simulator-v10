@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071019">
+<title>MicroPlayer — Scanner de carte V31</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;color:#f7f9fb;background:#071019;--panel:#111c26;--panel2:#172530;--line:#2b4150;--blue:#1687ff;--green:#14845d;--amber:#b8790b;--red:#a33b47;--muted:#a6b5c0}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;min-height:100%;background:#071019}button,select,input{font:inherit}button{border:1px solid #3b5261;border-radius:13px;min-height:50px;padding:10px 13px;background:#243541;color:#fff;font-weight:800;touch-action:manipulation}button.primary{background:var(--blue);border-color:#3c9cff}button.green{background:var(--green);border-color:#32aa80}button.active{background:#e9f5ff;color:#071019;border-color:#fff}button:disabled{opacity:.38}.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:max(12px,env(safe-area-inset-top)) 18px 12px;background:#0a141deF;border-bottom:1px solid var(--line);backdrop-filter:blur(14px)}.top b{font-size:18px}.version{padding:5px 9px;border-radius:999px;background:#ffd60a;color:#111;font-size:12px;font-weight:900}.wrap{max-width:1500px;margin:auto;padding:14px}.intro{display:flex;justify-content:space-between;align-items:end;gap:20px}.intro h1{font-size:25px;margin:0 0 5px}.intro p{margin:0;color:var(--muted);line-height:1.45}.panel{background:linear-gradient(180deg,#13212c,#0f1a23);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:14px;box-shadow:0 14px 35px #0003}.grid{display:grid;grid-template-columns:380px minmax(0,1fr);gap:14px}.controls h2,.viewer h2{margin:0 0 12px;font-size:19px}.small{font-size:13px;color:var(--muted);line-height:1.45}.choice{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:9px 0 13px}.choice button{font-size:13px;padding:8px;min-height:46px}.field{display:grid;gap:6px;margin-top:12px}.field select,.field input[type=file]{width:100%;min-height:48px;border:1px solid #3b5261;border-radius:12px;background:#1b2a35;color:#fff;padding:10px}.button-stack{display:grid;gap:8px;margin-top:12px}.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{margin-top:12px;padding:12px;border-radius:12px;background:#22313b;color:#d5e0e7;font-size:13px;line-height:1.4}.status.ok{background:#143c31;color:#b8f5dc}.status.warn{background:#4a3714;color:#ffe3a3}.status.bad{background:#482127;color:#ffc4ca}.workflow{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.step{font-size:11px;padding:5px 8px;border:1px solid #314756;border-radius:999px;color:#8ea2af}.step.done{color:#c6f5e0;border-color:#28775d;background:#15362d}.viewer-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.confidence{font-size:12px;font-weight:850;padding:6px 9px;border-radius:999px;background:#21313c;color:#bed0dc}.canvas-shell{position:relative;min-height:280px;display:grid;place-items:center;overflow:hidden;border-radius:16px;background:repeating-conic-gradient(#0a1117 0 25%,#0d161e 0 50%) 50%/24px 24px;border:1px solid #263d4c}.canvas-shell canvas{display:block;max-width:100%;max-height:68dvh;width:auto;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}.corner-help{display:flex;justify-content:space-between;gap:10px;margin-top:10px}.corner-help span{font-size:12px;color:#91a5b2}.hidden{display:none!important}#app{position:fixed;inset:0;z-index:80;background:#071019}#app iframe{width:100%;height:100%;border:0;background:#071019}.back{position:fixed;right:max(12px,env(safe-area-inset-right));top:max(12px,env(safe-area-inset-top));z-index:100;width:50px;height:50px;border-radius:15px;background:#071019e8;border:2px solid #fff;font-size:22px}@media(max-width:900px){.grid{grid-template-columns:1fr}.intro{display:block}.viewer{padding:10px}.canvas-shell{min-height:220px}.canvas-shell canvas{max-height:56dvh}.wrap{padding:9px}.top span:not(.version){display:none}}@media(max-width:520px){.pair{grid-template-columns:1fr}.intro h1{font-size:21px}}
+</style>
+</head>
+<body>
+<header class="top"><b>MicroPlayer · Scanner de carte</b><span>Recadrage réel avant DepthFlow</span><span class="version">V31</span></header>
+<main id="prep" class="wrap">
+  <section class="panel intro">
+    <div><h1>Préparer l’image sans la réinventer</h1><p>La carte est détectée dans la photo, corrigée en perspective, puis seulement améliorée. Textes, logos et couleurs restent ceux de l’original.</p></div>
+  </section>
+  <div class="grid">
+    <aside class="panel controls">
+      <h2>1. Import et détection</h2>
+      <div class="field"><input id="file" type="file" accept="image/*" data-testid="file"></div>
+      <div class="choice" aria-label="Type d'image">
+        <button data-mode="auto" class="active">Auto</button><button data-mode="card">Carte</button><button data-mode="photo">Photo</button>
+      </div>
+      <div class="field"><label class="small" for="quality">Qualité de travail</label><select id="quality"><option value="960">iPad rapide · 960 px</option><option value="1280" selected>iPad qualité · 1280 px</option><option value="1536">Impression · 1536 px</option></select></div>
+      <div class="button-stack">
+        <button id="detect" class="primary" disabled>Détection automatique</button>
+        <button id="adjust" disabled>Ajuster les 4 coins</button>
+        <button id="restart" disabled>Recommencer</button>
+        <div class="pair"><button id="original" disabled>Original</button><button id="cropPreview" disabled>Aperçu recadré</button></div>
+        <button id="validate" class="green" disabled>Valider le recadrage</button>
+        <button id="continue" class="green" disabled>Continuer vers DepthFlow →</button>
+      </div>
+      <div id="status" class="status">Choisissez une photo de carte ou une image normale.</div>
+      <div class="workflow" aria-label="Étapes"><span class="step" id="stepDetect">Contour</span><span class="step" id="stepCrop">Perspective</span><span class="step" id="stepValidate">Validation</span><span class="step" id="stepDepth">DepthFlow</span></div>
+    </aside>
+    <section class="panel viewer">
+      <div class="viewer-head"><h2 id="previewTitle">Aperçu original</h2><span id="confidence" class="confidence">En attente</span></div>
+      <div class="canvas-shell"><canvas id="canvas" data-testid="scanner-canvas"></canvas></div>
+      <div class="corner-help"><span>Poignées : haut gauche · haut droit · bas droit · bas gauche</span><span>Doigt et Apple Pencil</span></div>
+      <p id="report" class="small">L’original restera intact.</p>
+    </section>
+  </div>
+</main>
+<section id="app" class="hidden"><button id="back" class="back" title="Revenir au scanner">×</button><iframe id="legacy" src="./microplayer-business-card-depthflow.html" title="MicroPlayer DepthFlow"></iframe></section>
+<script type="module">
+import {detectDocumentQuad,detectMode,normalizeQuad,preprocessPhoto,preprocessBusinessCard,canvasToDataURL,qualityReport,quadMetrics} from './microplayer-image-preprocess-v1.js';
+
+const $=id=>document.getElementById(id),canvas=$('canvas'),context=canvas.getContext('2d');
+const state={source:null,original:null,processed:null,corners:null,detection:null,mode:'auto',activeMode:null,name:'image.jpg',view:'original',dragIndex:-1,validated:false};
+const cornerLabels=['HG','HD','BD','BG'];
+const nextFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,12)));
+const status=(message,tone='')=>{$('status').textContent=message;$('status').className='status '+tone};
+const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('format image non reconnu'));image.src=url});
+
+function setStep(id,done){$(id).classList.toggle('done',done)}
+function updateControls(){
+  const hasSource=!!state.source,isCard=state.activeMode==='card',hasCorners=isCard&&state.corners?.length===4;
+  $('detect').disabled=!hasSource||state.mode==='photo';$('adjust').disabled=!hasCorners;$('restart').disabled=!hasSource;$('original').disabled=!hasSource;
+  $('cropPreview').disabled=!hasSource||(isCard&&!hasCorners);$('validate').disabled=!hasSource||(isCard&&!hasCorners);$('continue').disabled=!state.validated;
+  setStep('stepDetect',isCard?hasCorners:hasSource);setStep('stepCrop',!!state.processed);setStep('stepValidate',state.validated);setStep('stepDepth',false);
+}
+function invalidateResult(){state.processed=null;state.validated=false;updateControls()}
+function canvasSizeFor(source){const width=source.width||source.naturalWidth,height=source.height||source.naturalHeight,scale=Math.min(1,1400/Math.max(width,height));return{width:Math.round(width*scale),height:Math.round(height*scale),sourceWidth:width,sourceHeight:height}}
+function drawOriginal(){
+  if(!state.original)return;state.view='original';const size=canvasSizeFor(state.original);canvas.width=size.width;canvas.height=size.height;context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(state.original,0,0,canvas.width,canvas.height);
+  if(state.activeMode==='card'&&state.corners){
+    const sx=canvas.width/size.sourceWidth,sy=canvas.height/size.sourceHeight,points=state.corners.map(point=>({x:point.x*sx,y:point.y*sy}));
+    context.save();context.lineJoin='round';context.lineWidth=Math.max(3,canvas.width/300);context.strokeStyle='#00d7ff';context.fillStyle='#00d7ff22';context.beginPath();context.moveTo(points[0].x,points[0].y);points.slice(1).forEach(point=>context.lineTo(point.x,point.y));context.closePath();context.fill();context.stroke();
+    points.forEach((point,index)=>{const radius=Math.max(9,canvas.width/115);context.beginPath();context.arc(point.x,point.y,radius,0,Math.PI*2);context.fillStyle='#ffd60a';context.fill();context.lineWidth=Math.max(3,radius*.22);context.strokeStyle='#071019';context.stroke();context.fillStyle='#071019';context.font=`900 ${Math.max(11,radius)}px -apple-system`;context.textAlign='center';context.textBaseline='middle';context.fillText(String(index+1),point.x,point.y+.5)});context.restore();
+  }
+  $('previewTitle').textContent=state.activeMode==='card'?'Original · contour proposé':'Original · photo complète';
+}
+function drawProcessed(){if(!state.processed)return;state.view='crop';canvas.width=state.processed.width;canvas.height=state.processed.height;context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(state.processed,0,0);$('previewTitle').textContent=state.activeMode==='card'?'Aperçu recadré · 85 × 55':'Aperçu optimisé · photo'}
+function confidenceLabel(){
+  if(state.activeMode!=='card'){$('confidence').textContent='Photo normale';return}
+  const value=Math.round((state.detection?.confidence||0)*100);$('confidence').textContent=`Confiance ${value} %`;
+}
+function pointerToSource(event){const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*canvas.width/rect.width,y=(event.clientY-rect.top)*canvas.height/rect.height;return{x:x*(state.original.width/canvas.width),y:y*(state.original.height/canvas.height),cssX:event.clientX-rect.left,cssY:event.clientY-rect.top,rect}}
+function nearestCorner(event){
+  if(state.view!=='original'||!state.corners)return-1;const point=pointerToSource(event),rect=canvas.getBoundingClientRect();let best=-1,distance=46;
+  state.corners.forEach((corner,index)=>{const x=corner.x/state.original.width*rect.width,y=corner.y/state.original.height*rect.height,d=Math.hypot(x-point.cssX,y-point.cssY);if(d<distance){distance=d;best=index}});return best;
+}
+canvas.addEventListener('pointerdown',event=>{const index=nearestCorner(event);if(index<0)return;event.preventDefault();state.dragIndex=index;canvas.setPointerCapture(event.pointerId);status(`Déplacez le coin ${cornerLabels[index]}.`,'warn')});
+canvas.addEventListener('pointermove',event=>{if(state.dragIndex<0)return;event.preventDefault();const point=pointerToSource(event);state.corners[state.dragIndex]={x:Math.max(0,Math.min(state.original.width-1,point.x)),y:Math.max(0,Math.min(state.original.height-1,point.y))};invalidateResult();drawOriginal()});
+function endDrag(event){if(state.dragIndex<0)return;try{canvas.releasePointerCapture(event.pointerId)}catch{}state.corners=normalizeQuad(state.corners,state.original.width,state.original.height);state.dragIndex=-1;drawOriginal();const metrics=quadMetrics(state.corners,state.original.width,state.original.height);status(metrics.valid?'Coins ajustés. Vérifiez puis affichez l’aperçu recadré.':'Les coins se croisent ou la zone est trop petite. Corrigez-les.','warn')}
+canvas.addEventListener('pointerup',endDrag);canvas.addEventListener('pointercancel',endDrag);
+
+async function runDetection(){
+  if(!state.source)return;invalidateResult();drawOriginal();status('Analyse des bords, des lignes et de la perspective…','warn');$('confidence').textContent='Analyse…';await nextFrame();
+  try{
+    const detection=detectDocumentQuad(state.source,{maxSide:900});state.detection=detection;
+    state.activeMode=state.mode==='photo'?'photo':state.mode==='card'?'card':detectMode(state.source,null,{detection});
+    if(state.activeMode==='photo'){
+      state.corners=null;drawOriginal();confidenceLabel();$('report').textContent='Aucun ratio carte imposé. La photo entière est conservée avant amélioration douce.';status('Image reconnue comme photo normale. Aucun bord ni sujet n’est coupé automatiquement.','ok');updateControls();return;
+    }
+    state.corners=detection.corners.map(point=>({...point}));drawOriginal();confidenceLabel();const percent=Math.round(detection.confidence*100);
+    $('report').textContent=`Quadrilatère proposé · confiance ${percent} % · déplacez chaque poignée si nécessaire.`;
+    if(detection.requiresReview)status('Vérifiez les 4 coins : la confiance automatique est insuffisante pour recadrer sans contrôle.','warn');else status('Contour détecté. Vérifiez les 4 coins avant validation.','ok');
+    updateControls();
+  }catch(error){console.error(error);state.activeMode='card';state.corners=[{x:state.original.width*.08,y:state.original.height*.08},{x:state.original.width*.92,y:state.original.height*.08},{x:state.original.width*.92,y:state.original.height*.92},{x:state.original.width*.08,y:state.original.height*.92}];state.detection={confidence:0,requiresReview:true};drawOriginal();confidenceLabel();status('Vérifiez les 4 coins : détection automatique incomplète.','warn');updateControls()}
+}
+async function buildPreview(){
+  if(!state.source)return null;status(state.activeMode==='card'?'Correction de perspective et suppression de l’extérieur…':'Préparation douce de la photo…','warn');await nextFrame();const maxWidth=+$('quality').value;
+  state.processed=state.activeMode==='card'?preprocessBusinessCard(state.source,{corners:state.corners,maxWidth,enhance:true,forceRatio:true,autoDetect:false}):preprocessPhoto(state.source,{maxWidth,enhance:true});
+  drawProcessed();const report=qualityReport(state.original,state.processed,state.activeMode,state.detection);$('report').textContent=`${report.before} → ${report.after} · recadrage déterministe · aucune génération IA.`;updateControls();return state.processed;
+}
+
+$('file').addEventListener('change',async()=>{const file=$('file').files?.[0];if(!file)return;const url=URL.createObjectURL(file);try{state.name=file.name;state.source=await loadImage(url);state.original=document.createElement('canvas');state.original.width=state.source.naturalWidth;state.original.height=state.source.naturalHeight;state.original.getContext('2d').drawImage(state.source,0,0);state.activeMode=state.mode==='photo'?'photo':null;state.corners=null;state.detection=null;invalidateResult();drawOriginal();$('report').textContent=`Original intact · ${state.original.width} × ${state.original.height} px`;updateControls();if(state.mode==='photo'){confidenceLabel();status('Photo chargée. Affichez l’aperçu puis validez.','ok')}else await runDetection()}catch(error){console.error(error);status('Import impossible : '+error.message,'bad')}finally{URL.revokeObjectURL(url)}});
+document.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',async()=>{document.querySelectorAll('[data-mode]').forEach(item=>item.classList.remove('active'));button.classList.add('active');state.mode=button.dataset.mode;if(!state.source)return;if(state.mode==='photo'){state.activeMode='photo';state.corners=null;state.detection=null;invalidateResult();drawOriginal();confidenceLabel();status('Mode photo : aucune normalisation 85 × 55.','ok');updateControls()}else await runDetection()}));
+$('detect').addEventListener('click',runDetection);
+$('restart').addEventListener('click',runDetection);
+$('adjust').addEventListener('click',()=>{drawOriginal();canvas.scrollIntoView({block:'center',behavior:'smooth'});status('Ajustez les 4 poignées jaunes au doigt ou à l’Apple Pencil.','warn')});
+$('original').addEventListener('click',drawOriginal);
+$('cropPreview').addEventListener('click',async()=>{try{await buildPreview();status('Aperçu prêt. Si les quatre bords sont corrects, validez le recadrage.','ok')}catch(error){console.error(error);drawOriginal();status(error.message,'bad')}});
+$('validate').addEventListener('click',async()=>{try{if(!state.processed)await buildPreview();state.validated=true;drawProcessed();status('Recadrage validé. Cette image — et aucune autre — sera transmise à DepthFlow.','ok');updateControls()}catch(error){console.error(error);state.validated=false;status(error.message,'bad');updateControls()}});
+$('continue').addEventListener('click',async()=>{try{if(!state.validated||!state.processed)throw new Error('Validez d’abord le recadrage.');status('Transmission de l’image validée à DepthFlow…','warn');const data=canvasToDataURL(state.processed,'image/png');const blob=await(await fetch(data)).blob();const cleanName=state.name.replace(/\.[^.]+$/,'');const file=new File([blob],`${cleanName}-v31-validee.png`,{type:'image/png'});const frame=$('legacy');$('prep').classList.add('hidden');$('app').classList.remove('hidden');const inject=()=>{try{const doc=frame.contentDocument,input=doc?.getElementById('file');if(!input)throw new Error('entrée image introuvable');const transfer=new DataTransfer();transfer.items.add(file);input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));setStep('stepDepth',true);setTimeout(()=>{const message=doc.getElementById('status');if(message)message.textContent='Image recadrée et validée V31 chargée. Lancez la reconnaissance puis DepthFlow.'},450)}catch(error){console.error(error);$('app').classList.add('hidden');$('prep').classList.remove('hidden');status('Impossible d’ouvrir DepthFlow : '+error.message,'bad')}};if(frame.contentDocument?.readyState==='complete')inject();else frame.addEventListener('load',inject,{once:true})}catch(error){console.error(error);status('Transmission impossible : '+error.message,'bad')}});
+$('back').addEventListener('click',()=>{$('app').classList.add('hidden');$('prep').classList.remove('hidden');drawProcessed();status('Recadrage V31 toujours validé.','ok')});
+updateControls();
+</script>
+</body>
+</html>

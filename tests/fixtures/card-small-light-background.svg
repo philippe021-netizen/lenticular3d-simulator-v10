@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="950" viewBox="0 0 1400 950">
+  <defs><filter id="shadow"><feGaussianBlur stdDeviation="18"/></filter><clipPath id="card"><polygon points="405,310 1002,270 1044,630 370,675"/></clipPath></defs>
+  <rect width="1400" height="950" fill="#e9e6df"/>
+  <rect x="70" y="80" width="320" height="170" rx="12" fill="#ddd8ce"/><circle cx="1210" cy="190" r="92" fill="#d7d3ca"/><path d="M0 820C380 760 730 890 1400 790V950H0Z" fill="#dfdbd3"/>
+  <polygon points="425,334 1023,292 1068,657 394,704" fill="#777" opacity=".25" filter="url(#shadow)"/>
+  <polygon points="405,310 1002,270 1044,630 370,675" fill="#f5f4f0" stroke="#d4d0c7" stroke-width="5"/>
+  <g clip-path="url(#card)" transform="rotate(-4 700 480)"><path d="M430 330H610V650H430Z" fill="#167b9b"/><text x="475" y="500" font-family="Arial" font-size="52" font-weight="700" fill="white">MP</text><text x="670" y="415" font-family="Arial" font-size="47" font-weight="700" fill="#202d34">MICROPLAYER</text><text x="670" y="478" font-family="Arial" font-size="24" fill="#53656e">Votre image prend du relief</text><text x="670" y="535" font-family="Arial" font-size="22" fill="#53656e">contact@microplayer.fr</text></g>
+</svg>
