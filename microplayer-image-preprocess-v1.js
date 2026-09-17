@@ -462,6 +462,43 @@ export function gentleEnhance(canvas, { brightness = 0, contrast = 1.035, satura
   return output;
 }
 
+// Optimisation déterministe de type scanner : niveaux, micro-contraste et netteté.
+// Aucun pixel n'est inventé et la chromie est conservée en corrigeant surtout la luminance.
+export function optimizeCardGraphics(canvas, { profile = 'readable' } = {}) {
+  const profiles = {
+    faithful: { low: 0.012, high: 0.988, blend: 0.42, contrast: 1.035, saturation: 1.005, sharpness: 0.2 },
+    readable: { low: 0.018, high: 0.982, blend: 0.68, contrast: 1.065, saturation: 1.012, sharpness: 0.34 },
+    strong: { low: 0.025, high: 0.975, blend: 0.82, contrast: 1.09, saturation: 1.018, sharpness: 0.46 },
+  };
+  const settings = profiles[profile] || profiles.readable;
+  const output = document.createElement('canvas');
+  output.width = canvas.width; output.height = canvas.height;
+  const context = output.getContext('2d', { willReadFrequently: true });
+  context.drawImage(canvas, 0, 0);
+  const image = context.getImageData(0, 0, output.width, output.height), data = image.data;
+  const histogram = new Uint32Array(256);
+  for (let index = 0; index < data.length; index += 4) {
+    histogram[Math.round(0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2])] += 1;
+  }
+  const pixels = Math.max(1, data.length / 4);
+  const percentile = fraction => {
+    const target = pixels * fraction; let sum = 0;
+    for (let value = 0; value < 256; value += 1) { sum += histogram[value]; if (sum >= target) return value; }
+    return 255;
+  };
+  const black = percentile(settings.low), white = percentile(settings.high), range = Math.max(48, white - black);
+  for (let index = 0; index < data.length; index += 4) {
+    const red = data[index], green = data[index + 1], blue = data[index + 2];
+    const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    const levelled = clamp((luminance - black) * 255 / range);
+    const target = luminance + (levelled - luminance) * settings.blend;
+    const scale = target / Math.max(8, luminance);
+    data[index] = clamp(red * scale); data[index + 1] = clamp(green * scale); data[index + 2] = clamp(blue * scale);
+  }
+  context.putImageData(image, 0, 0);
+  return gentleEnhance(output, settings);
+}
+
 export function cropAndResize(source, crop, maxWidth = 1536) {
   const ratio = crop.w / crop.h, width = Math.min(maxWidth, Math.max(1, Math.round(crop.w))), height = Math.max(1, Math.round(width / ratio));
   const canvas = document.createElement('canvas');
@@ -494,7 +531,7 @@ export function preprocessBusinessCard(source, { corners = null, maxWidth = 1536
     outputHeight = Math.max(1, Math.round(outputWidth * metrics.vertical / metrics.horizontal));
   }
   let canvas = warpQuad(source, quad, outputWidth, outputHeight);
-  if (enhance) canvas = gentleEnhance(canvas);
+  if (enhance) canvas = optimizeCardGraphics(canvas);
   canvas.detectedCorners = quad;
   canvas.documentDetected = true;
   canvas.detectionConfidence = detected.confidence;

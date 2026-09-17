@@ -2,12 +2,55 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   composeSemanticDepth,
+  cardDepthSpread,
   compressDepthAroundPlane,
+  createCardDepthPreset,
   createBoxMask,
   createSemanticMask,
   maskCoverage,
   paintMask
 } from "../business-card-depthflow-core.js";
+import { comparePixels, renderNovelView } from "../depthflow-v42-core.js";
+
+test("le profil V31 répartit réellement les plans de part et d'autre du zéro", () => {
+  const layers = [
+    { type: "artwork", role: "artwork", bbox: [0, 0, 0.5, 0.5] },
+    { type: "logo", role: "logo", bbox: [0.1, 0.1, 0.2, 0.2] },
+    { type: "text", role: "name", bbox: [0.5, 0.2, 0.3, 0.08] },
+    { type: "qr", role: "qr", bbox: [0.8, 0.7, 0.15, 0.2] },
+  ];
+  const preset = createCardDepthPreset(layers, "professional");
+  assert.equal(preset.zero, 128);
+  assert.ok(preset.depths[0] < preset.zero);
+  assert.ok(preset.depths[1] > 225);
+  assert.equal(preset.depths[3], preset.zero);
+  assert.ok(Math.max(...preset.depths) - Math.min(...preset.depths) >= 145);
+});
+
+test("l'indicateur signale une profondeur trop plate", () => {
+  assert.equal(cardDepthSpread([{ depth: 160 }, { depth: 175 }], 150).span, 25);
+  const spread = cardDepthSpread([{ depth: 78 }, { depth: 239 }], 128);
+  assert.equal(spread.span, 161);
+  assert.ok(spread.meanDistance > 70);
+});
+
+test("les vues extrêmes V31 sont visiblement différentes", () => {
+  const width = 80, height = 50, rgba = new Uint8ClampedArray(width * height * 4), base = new Uint8ClampedArray(width * height).fill(128);
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const index = (y * width + x) * 4;
+    rgba[index] = 35 + x * 2; rgba[index + 1] = 20 + y * 3; rgba[index + 2] = 110; rgba[index + 3] = 255;
+  }
+  const layers = [
+    { type: "artwork", role: "artwork", bbox: [0, 0.55, 1, 0.45], mask: createBoxMask(width, height, [0, 0.55, 1, 0.45]), internalRelief: 0, enabled: true },
+    { type: "logo", role: "logo", bbox: [0.08, 0.12, 0.28, 0.34], mask: createBoxMask(width, height, [0.08, 0.12, 0.28, 0.34]), internalRelief: 0, enabled: true },
+  ];
+  const preset = createCardDepthPreset(layers, "professional");
+  layers.forEach((layer, index) => { layer.depth = preset.depths[index]; });
+  const depth = composeSemanticDepth(base, layers, { zero: preset.zero, backgroundRelief: 0.18 });
+  const options = { zero: preset.zero, relief: preset.reliefPercent / 100, stabilityBand: preset.stabilityBand, parallaxPercent: preset.parallaxPercent, planeSeparation: preset.planeSeparation };
+  const left = renderNovelView(rgba, depth, width, height, -1, options), right = renderNovelView(rgba, depth, width, height, 1, options);
+  assert.ok(comparePixels(left.data, right.data).different > width * height * 0.4);
+});
 
 test("le mode carte stabilise le graphisme de fond autour du plan zéro", () => {
   const base = Uint8ClampedArray.from([0, 64, 128, 192, 255]);

@@ -23,11 +23,12 @@
         <button data-mode="auto" class="active">Auto</button><button data-mode="card">Carte</button><button data-mode="photo">Photo</button>
       </div>
       <div class="field"><label class="small" for="quality">Qualité de travail</label><select id="quality"><option value="960">iPad rapide · 960 px</option><option value="1280" selected>iPad qualité · 1280 px</option><option value="1536">Impression · 1536 px</option></select></div>
+      <div class="field"><label class="small" for="enhancement">Optimisation graphique après découpe</label><select id="enhancement"><option value="faithful">Fidèle</option><option value="readable" selected>Lisible · recommandé</option><option value="strong">Renforcée</option></select></div>
       <div class="button-stack">
         <button id="detect" class="primary" disabled>Détection automatique</button>
         <button id="adjust" disabled>Ajuster les 4 coins</button>
         <button id="restart" disabled>Recommencer</button>
-        <div class="pair"><button id="original" disabled>Original</button><button id="cropPreview" disabled>Aperçu recadré</button></div>
+        <div class="choice"><button id="original" disabled>Original</button><button id="cropPreview" disabled>Recadré</button><button id="enhancedPreview" disabled>Optimisé</button></div>
         <button id="validate" class="green" disabled>Valider le recadrage</button>
         <button id="continue" class="green" disabled>Continuer vers DepthFlow →</button>
       </div>
@@ -44,10 +45,10 @@
 </main>
 <section id="app" class="hidden"><button id="back" class="back" title="Revenir au scanner">×</button><iframe id="legacy" src="./microplayer-business-card-depthflow.html" title="MicroPlayer DepthFlow"></iframe></section>
 <script type="module">
-import {detectDocumentQuad,detectMode,normalizeQuad,preprocessPhoto,preprocessBusinessCard,canvasToDataURL,qualityReport,quadMetrics} from './microplayer-image-preprocess-v1.js';
+import {detectDocumentQuad,detectMode,normalizeQuad,preprocessPhoto,preprocessBusinessCard,optimizeCardGraphics,canvasToDataURL,qualityReport,quadMetrics} from './microplayer-image-preprocess-v1.js';
 
 const $=id=>document.getElementById(id),canvas=$('canvas'),context=canvas.getContext('2d');
-const state={source:null,original:null,processed:null,corners:null,detection:null,mode:'auto',activeMode:null,name:'image.jpg',view:'original',dragIndex:-1,validated:false};
+const state={source:null,original:null,cropped:null,processed:null,corners:null,detection:null,mode:'auto',activeMode:null,name:'image.jpg',view:'original',dragIndex:-1,validated:false};
 const cornerLabels=['HG','HD','BD','BG'];
 const nextFrame=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,12)));
 const status=(message,tone='')=>{$('status').textContent=message;$('status').className='status '+tone};
@@ -57,10 +58,10 @@ function setStep(id,done){$(id).classList.toggle('done',done)}
 function updateControls(){
   const hasSource=!!state.source,isCard=state.activeMode==='card',hasCorners=isCard&&state.corners?.length===4;
   $('detect').disabled=!hasSource||state.mode==='photo';$('adjust').disabled=!hasCorners;$('restart').disabled=!hasSource;$('original').disabled=!hasSource;
-  $('cropPreview').disabled=!hasSource||(isCard&&!hasCorners);$('validate').disabled=!hasSource||(isCard&&!hasCorners);$('continue').disabled=!state.validated;
+  $('cropPreview').disabled=!hasSource||(isCard&&!hasCorners);$('enhancedPreview').disabled=!state.processed;$('validate').disabled=!hasSource||(isCard&&!hasCorners);$('continue').disabled=!state.validated;
   setStep('stepDetect',isCard?hasCorners:hasSource);setStep('stepCrop',!!state.processed);setStep('stepValidate',state.validated);setStep('stepDepth',false);
 }
-function invalidateResult(){state.processed=null;state.validated=false;updateControls()}
+function invalidateResult(){state.cropped=null;state.processed=null;state.validated=false;updateControls()}
 function canvasSizeFor(source){const width=source.width||source.naturalWidth,height=source.height||source.naturalHeight,scale=Math.min(1,1400/Math.max(width,height));return{width:Math.round(width*scale),height:Math.round(height*scale),sourceWidth:width,sourceHeight:height}}
 function drawOriginal(){
   if(!state.original)return;state.view='original';const size=canvasSizeFor(state.original);canvas.width=size.width;canvas.height=size.height;context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(state.original,0,0,canvas.width,canvas.height);
@@ -71,7 +72,8 @@ function drawOriginal(){
   }
   $('previewTitle').textContent=state.activeMode==='card'?'Original · contour proposé':'Original · photo complète';
 }
-function drawProcessed(){if(!state.processed)return;state.view='crop';canvas.width=state.processed.width;canvas.height=state.processed.height;context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(state.processed,0,0);$('previewTitle').textContent=state.activeMode==='card'?'Aperçu recadré · 85 × 55':'Aperçu optimisé · photo'}
+function drawCropped(){if(!state.cropped)return;state.view='crop';canvas.width=state.cropped.width;canvas.height=state.cropped.height;context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(state.cropped,0,0);$('previewTitle').textContent=state.activeMode==='card'?'Recadré brut · 85 × 55':'Photo recadrée'}
+function drawProcessed(){if(!state.processed)return;state.view='optimized';canvas.width=state.processed.width;canvas.height=state.processed.height;context.clearRect(0,0,canvas.width,canvas.height);context.drawImage(state.processed,0,0);$('previewTitle').textContent=state.activeMode==='card'?'Optimisé · niveaux + contraste + netteté':'Aperçu optimisé · photo'}
 function confidenceLabel(){
   if(state.activeMode!=='card'){$('confidence').textContent='Photo normale';return}
   const value=Math.round((state.detection?.confidence||0)*100);$('confidence').textContent=`Confiance ${value} %`;
@@ -101,9 +103,9 @@ async function runDetection(){
   }catch(error){console.error(error);state.activeMode='card';state.corners=[{x:state.original.width*.08,y:state.original.height*.08},{x:state.original.width*.92,y:state.original.height*.08},{x:state.original.width*.92,y:state.original.height*.92},{x:state.original.width*.08,y:state.original.height*.92}];state.detection={confidence:0,requiresReview:true};drawOriginal();confidenceLabel();status('Vérifiez les 4 coins : détection automatique incomplète.','warn');updateControls()}
 }
 async function buildPreview(){
-  if(!state.source)return null;status(state.activeMode==='card'?'Correction de perspective et suppression de l’extérieur…':'Préparation douce de la photo…','warn');await nextFrame();const maxWidth=+$('quality').value;
-  state.processed=state.activeMode==='card'?preprocessBusinessCard(state.source,{corners:state.corners,maxWidth,enhance:true,forceRatio:true,autoDetect:false}):preprocessPhoto(state.source,{maxWidth,enhance:true});
-  drawProcessed();const report=qualityReport(state.original,state.processed,state.activeMode,state.detection);$('report').textContent=`${report.before} → ${report.after} · recadrage déterministe · aucune génération IA.`;updateControls();return state.processed;
+  if(!state.source)return null;status(state.activeMode==='card'?'Perspective, découpe exacte, puis optimisation graphique…':'Préparation douce de la photo…','warn');await nextFrame();const maxWidth=+$('quality').value;
+  if(state.activeMode==='card'){state.cropped=preprocessBusinessCard(state.source,{corners:state.corners,maxWidth,enhance:false,forceRatio:true,autoDetect:false});state.processed=optimizeCardGraphics(state.cropped,{profile:$('enhancement').value})}else{state.cropped=preprocessPhoto(state.source,{maxWidth,enhance:false});state.processed=preprocessPhoto(state.source,{maxWidth,enhance:true})}
+  drawProcessed();const report=qualityReport(state.original,state.processed,state.activeMode,state.detection);$('report').textContent=`${report.before} → ${report.after} · niveaux, contraste local et netteté appliqués sans génération IA. Comparez Recadré / Optimisé.`;updateControls();return state.processed;
 }
 
 $('file').addEventListener('change',async()=>{const file=$('file').files?.[0];if(!file)return;const url=URL.createObjectURL(file);try{state.name=file.name;state.source=await loadImage(url);state.original=document.createElement('canvas');state.original.width=state.source.naturalWidth;state.original.height=state.source.naturalHeight;state.original.getContext('2d').drawImage(state.source,0,0);state.activeMode=state.mode==='photo'?'photo':null;state.corners=null;state.detection=null;invalidateResult();drawOriginal();$('report').textContent=`Original intact · ${state.original.width} × ${state.original.height} px`;updateControls();if(state.mode==='photo'){confidenceLabel();status('Photo chargée. Affichez l’aperçu puis validez.','ok')}else await runDetection()}catch(error){console.error(error);status('Import impossible : '+error.message,'bad')}finally{URL.revokeObjectURL(url)}});
@@ -112,8 +114,10 @@ $('detect').addEventListener('click',runDetection);
 $('restart').addEventListener('click',runDetection);
 $('adjust').addEventListener('click',()=>{drawOriginal();canvas.scrollIntoView({block:'center',behavior:'smooth'});status('Ajustez les 4 poignées jaunes au doigt ou à l’Apple Pencil.','warn')});
 $('original').addEventListener('click',drawOriginal);
-$('cropPreview').addEventListener('click',async()=>{try{await buildPreview();status('Aperçu prêt. Si les quatre bords sont corrects, validez le recadrage.','ok')}catch(error){console.error(error);drawOriginal();status(error.message,'bad')}});
-$('validate').addEventListener('click',async()=>{try{if(!state.processed)await buildPreview();state.validated=true;drawProcessed();status('Recadrage validé. Cette image — et aucune autre — sera transmise à DepthFlow.','ok');updateControls()}catch(error){console.error(error);state.validated=false;status(error.message,'bad');updateControls()}});
+$('cropPreview').addEventListener('click',async()=>{try{if(!state.cropped)await buildPreview();drawCropped();status('Recadrage brut affiché. Touchez Optimisé pour comparer le traitement graphique.','ok')}catch(error){console.error(error);drawOriginal();status(error.message,'bad')}});
+$('enhancedPreview').addEventListener('click',async()=>{try{if(!state.processed)await buildPreview();drawProcessed();status('Optimisation graphique affichée : niveaux, contraste et netteté, sans contenu généré.','ok')}catch(error){console.error(error);status(error.message,'bad')}});
+$('enhancement').addEventListener('change',async()=>{if(!state.source)return;invalidateResult();try{await buildPreview();status('Profil graphique recalculé. Comparez Recadré / Optimisé.','ok')}catch(error){status(error.message,'bad')}});
+$('validate').addEventListener('click',async()=>{try{if(!state.processed)await buildPreview();state.validated=true;drawProcessed();status('Recadrage et optimisation validés. Cette image — et aucune autre — sera transmise à DepthFlow.','ok');updateControls()}catch(error){console.error(error);state.validated=false;status(error.message,'bad');updateControls()}});
 $('continue').addEventListener('click',async()=>{try{if(!state.validated||!state.processed)throw new Error('Validez d’abord le recadrage.');status('Transmission de l’image validée à DepthFlow…','warn');const data=canvasToDataURL(state.processed,'image/png');const blob=await(await fetch(data)).blob();const cleanName=state.name.replace(/\.[^.]+$/,'');const file=new File([blob],`${cleanName}-v31-validee.png`,{type:'image/png'});const frame=$('legacy');$('prep').classList.add('hidden');$('app').classList.remove('hidden');const inject=()=>{try{const doc=frame.contentDocument,input=doc?.getElementById('file');if(!input)throw new Error('entrée image introuvable');const transfer=new DataTransfer();transfer.items.add(file);input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));setStep('stepDepth',true);setTimeout(()=>{const message=doc.getElementById('status');if(message)message.textContent='Image recadrée et validée V31 chargée. Lancez la reconnaissance puis DepthFlow.'},450)}catch(error){console.error(error);$('app').classList.add('hidden');$('prep').classList.remove('hidden');status('Impossible d’ouvrir DepthFlow : '+error.message,'bad')}};if(frame.contentDocument?.readyState==='complete')inject();else frame.addEventListener('load',inject,{once:true})}catch(error){console.error(error);status('Transmission impossible : '+error.message,'bad')}});
 $('back').addEventListener('click',()=>{$('app').classList.add('hidden');$('prep').classList.remove('hidden');drawProcessed();status('Recadrage V31 toujours validé.','ok')});
 updateControls();
