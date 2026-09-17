@@ -122,24 +122,24 @@ export function composeSemanticDepth(baseDepth, layers, options = {}) {
 
 export function createCardDepthPreset(layers, preset = 'professional') {
   const settings = {
-    professional: { zero: 128, reliefPercent: 170, parallaxPercent: 3.4, planeSeparation: 1.7, stabilityBand: 4 },
-    artistic: { zero: 128, reliefPercent: 205, parallaxPercent: 4.4, planeSeparation: 2.05, stabilityBand: 3 },
-    papercut: { zero: 128, reliefPercent: 190, parallaxPercent: 4, planeSeparation: 1.9, stabilityBand: 3 },
-    qr: { zero: 128, reliefPercent: 155, parallaxPercent: 3, planeSeparation: 1.55, stabilityBand: 5 },
+    professional: { zero: 128, reliefPercent: 200, parallaxPercent: 4.6, planeSeparation: 2.1, stabilityBand: 3 },
+    artistic: { zero: 128, reliefPercent: 225, parallaxPercent: 5.4, planeSeparation: 2.3, stabilityBand: 2 },
+    papercut: { zero: 128, reliefPercent: 210, parallaxPercent: 5, planeSeparation: 2.2, stabilityBand: 2 },
+    qr: { zero: 128, reliefPercent: 175, parallaxPercent: 3.8, planeSeparation: 1.8, stabilityBand: 4 },
   }[preset] || null;
-  const profile = settings || { zero: 128, reliefPercent: 170, parallaxPercent: 3.4, planeSeparation: 1.7, stabilityBand: 4 };
+  const profile = settings || { zero: 128, reliefPercent: 200, parallaxPercent: 4.6, planeSeparation: 2.1, stabilityBand: 3 };
   const depths = (layers || []).map((layer, index) => {
     const role = String(layer?.role || '').toLowerCase(), type = String(layer?.type || 'object').toLowerCase();
     const area = Array.isArray(layer?.bbox) ? Number(layer.bbox[2] || 0) * Number(layer.bbox[3] || 0) : 0;
     if (type === 'qr' || role === 'qr') return profile.zero;
-    if (type === 'logo' || role === 'logo') return clamp(232 + (index % 3) * 7, 0, 248);
-    if (type === 'signature') return 226;
-    if (role === 'name') return 218;
-    if (role === 'title' || role === 'slogan') return 202;
-    if (['phone', 'email', 'address', 'website', 'hours', 'service'].includes(role)) return 164 + (index % 4) * 7;
-    if (type === 'artwork') return area >= 0.055 ? (preset === 'artistic' ? 58 : 78) : 194;
-    if (type === 'subject' || type === 'object') return 204 + (index % 3) * 6;
-    if (type === 'text') return 176 + (index % 4) * 7;
+    if (type === 'logo' || role === 'logo') return clamp(238 + (index % 3) * 5, 0, 250);
+    if (type === 'signature') return 232;
+    if (role === 'name') return 226;
+    if (role === 'title' || role === 'slogan') return 210;
+    if (['phone', 'email', 'address', 'website', 'hours', 'service'].includes(role)) return 188 + (index % 4) * 8;
+    if (type === 'artwork') return area >= 0.055 ? (preset === 'artistic' ? 48 : 62) : 205;
+    if (type === 'subject' || type === 'object') return 218 + (index % 3) * 6;
+    if (type === 'text') return 194 + (index % 4) * 7;
     return 184;
   });
   return { ...profile, depths };

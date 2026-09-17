@@ -22,9 +22,11 @@ test("le profil V31 répartit réellement les plans de part et d'autre du zéro"
   const preset = createCardDepthPreset(layers, "professional");
   assert.equal(preset.zero, 128);
   assert.ok(preset.depths[0] < preset.zero);
-  assert.ok(preset.depths[1] > 225);
+  assert.ok(preset.depths[1] > 235);
   assert.equal(preset.depths[3], preset.zero);
-  assert.ok(Math.max(...preset.depths) - Math.min(...preset.depths) >= 145);
+  assert.ok(Math.max(...preset.depths) - Math.min(...preset.depths) >= 175);
+  assert.equal(preset.parallaxPercent, 4.6);
+  assert.equal(preset.reliefPercent, 200);
 });
 
 test("l'indicateur signale une profondeur trop plate", () => {
