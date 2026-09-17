@@ -11,6 +11,29 @@ import {
   paintMask
 } from "../business-card-depthflow-core.js";
 import { comparePixels, renderNovelView } from "../depthflow-v42-core.js";
+import { pairSemanticGroups } from "../api/card-layer-analyze.js";
+
+test("l'icône téléphone et son numéro forment automatiquement un même groupe", () => {
+  const grouped = pairSemanticGroups([
+    { id: "phone-icon", type: "logo", role: "other", bbox: [0.48, 0.35, 0.025, 0.04], label: "Icône téléphone" },
+    { id: "phone-number", type: "text", role: "phone", bbox: [0.52, 0.35, 0.25, 0.04], text: "+33 6 12 34 56 78" },
+  ]);
+  assert.equal(grouped[0].role, "phone");
+  assert.equal(grouped[0].groupId, grouped[1].groupId);
+  assert.equal(grouped[0].groupLabel, "Téléphone");
+});
+
+test("un pictogramme de contact reçoit la profondeur de son contenu, pas celle du logo principal", () => {
+  const layers = [
+    { type: "logo", role: "phone", groupId: "phone-1", bbox: [0.48, 0.35, 0.025, 0.04] },
+    { type: "text", role: "phone", groupId: "phone-1", bbox: [0.52, 0.35, 0.25, 0.04] },
+    { type: "logo", role: "logo", groupId: "logo-main", bbox: [0.1, 0.2, 0.22, 0.3] },
+  ];
+  const preset = createCardDepthPreset(layers, "professional");
+  assert.equal(preset.depths[0], 198);
+  assert.equal(preset.depths[1], 198);
+  assert.ok(preset.depths[2] >= 238);
+});
 
 test("le profil V31 répartit réellement les plans de part et d'autre du zéro", () => {
   const layers = [
