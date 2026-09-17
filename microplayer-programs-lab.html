@@ -1,0 +1,20 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>MicroPlayer — Programmes récents</title><style>*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#071019;color:#fff}body{display:grid;grid-template-rows:auto auto 1fr}.top{padding:12px 16px;border-bottom:1px solid #263746;display:flex;align-items:center;gap:12px}.top b{font-size:20px}.badge{background:#1687ff;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800}.tabs{display:flex;gap:7px;overflow-x:auto;padding:9px;background:#0c1620;border-bottom:1px solid #263746}.tab{white-space:nowrap;border:1px solid #34495b;background:#142331;color:#cbd6df;border-radius:10px;min-height:42px;padding:8px 12px;font-weight:800}.tab.on{background:#fff;color:#071019}.stage{position:relative;min-height:0}.stage iframe{width:100%;height:100%;border:0;background:#fff}.info{position:absolute;right:10px;top:10px;z-index:3;background:#071019dc;border:1px solid #3a4b59;border-radius:10px;padding:7px 10px;font-size:11px;color:#cbd6df;pointer-events:none}@media(max-width:700px){.top{padding:8px 10px}.top b{font-size:16px}.tabs{padding:6px}.tab{min-height:40px;padding:7px 10px;font-size:12px}.info{display:none}}</style></head><body><header class="top"><b>MicroPlayer · Laboratoire programmes</b><span class="badge">17/09/2026</span></header><nav class="tabs" id="tabs"></nav><main class="stage"><div class="info" id="info"></div><iframe id="view" allow="clipboard-read; clipboard-write; webgpu"></iframe></main><script>const programs=[
+['Carte V36.2 · 4 coins Pencil','microplayer-card-workflow-v36.html','Dernier scanner carte : 4 coins, perspective, reconnaissance'],
+['Carte V31 · complet','microplayer-business-card-v31.html','Scanner carte complet historique avec relief et 9 vues'],
+['Carte DepthFlow','microplayer-business-card-depthflow.html','Relief DepthFlow dédié carte de visite'],
+['Carte DepthFlow V32C','microplayer-business-card-depthflow-v32c.html','Renderer parallax sans couche fantôme — expérimental'],
+['Masques carte V35','microplayer-card-mask-v34.html','Validation des masques sémantiques/pixels'],
+['DepthFlow V42','depthflow-v42-convergence.html','Moteur photo profondeur continue et convergence'],
+['DepthFlow iPad','depthflow-ipad.html','Atelier DepthFlow iPad'],
+['DepthFlow V39','depthflow-v39-edge-aware.html','Profondeur avec protection des contours'],
+['DepthFlow V37 Pencil','depthflow-v37-pencil-fast.html','Correction rapide de profondeur au Pencil'],
+['Tiefling V22','happyholo-tiefling-v22.html','Éditeur sujet / multi-plans récent'],
+['Tiefling V15','happyholo-tiefling-v15.html','Version intégrée stable du moteur Tiefling'],
+['GLB 3D','glb-3d-studio.html','GLB vers 9 vues'],
+['PixVerse Actions','happyholo-pixverse-actions-test.html','Actions guidées PixVerse'],
+['PixVerse libre','happyholo-pixverse-free.html','Prompt libre PixVerse'],
+['Simulateur 9 vues','happyholo-simulator.html','Lecture et contrôle des 9 vues'],
+['ExplodeView','explodeview-auto-v337.html','Démontage progressif / machines'],
+['Triones Duo V6.9.2','triones-duo-v692/index.html','Contrôle éclairage Bluetooth — version récente'],
+['Programme complet','index.html','Hub MicroPlayer/HappyHolo actuel']
+];const tabs=document.getElementById('tabs'),view=document.getElementById('view'),info=document.getElementById('info');function open(i){document.querySelectorAll('.tab').forEach((b,n)=>b.classList.toggle('on',n===i));view.src=programs[i][1]+'?lab='+Date.now();info.textContent=programs[i][2];location.hash='p'+i}tabs.innerHTML=programs.map((p,i)=>`<button class="tab" data-i="${i}">${p[0]}</button>`).join('');tabs.onclick=e=>{let b=e.target.closest('.tab');if(b)open(+b.dataset.i)};let n=+(location.hash.match(/p(\d+)/)?.[1]||0);open(Math.min(n,programs.length-1));</script></body></html>
