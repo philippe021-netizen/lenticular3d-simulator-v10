@@ -51,7 +51,9 @@ export default async function handler(req,res){
       const layers=(Array.isArray(parsed.layers)?parsed.layers:[]).map(cleanLayer).filter(Boolean),unique=[];
       for(const l of layers){const duplicate=unique.some(u=>u.type===l.type&&u.label.toLowerCase()===l.label.toLowerCase()&&overlap(u.bbox,l.bbox)>.92);if(!duplicate)unique.push(l)}
       const grouped=pairSemanticGroups(unique);grouped.sort((a,b)=>a.bbox[1]-b.bbox[1]||a.bbox[0]-b.bbox[0]);
-      return res.status(200).json({summary:String(parsed.summary||''),layers:grouped,groups:[...new Map(grouped.map(layer=>[layer.groupId,{id:layer.groupId,label:layer.groupLabel,role:layer.role}])).values()],provider:useGateway?'vercel-ai-gateway':'openai-direct',segmentation:'v31-semantic-groups'});
+      const groupPriority={qr:0,logo:1,name:2,company:3,title:4,slogan:5,social:6,phone:7,email:8,address:9,website:10,artwork:11,subject:12,other:99},groupMap=new Map();
+      grouped.forEach(layer=>{const current=groupMap.get(layer.groupId);if(!current||(groupPriority[layer.role]??99)<(groupPriority[current.role]??99))groupMap.set(layer.groupId,{id:layer.groupId,label:layer.groupLabel,role:layer.role})});
+      return res.status(200).json({summary:String(parsed.summary||''),layers:grouped,groups:[...groupMap.values()],provider:useGateway?'vercel-ai-gateway':'openai-direct',segmentation:'v31-semantic-groups'});
     }finally{clearTimeout(timer)}
   }catch(e){return res.status(500).json({error:e?.name==='AbortError'?'Délai dépassé.':(e?.message||'Erreur analyse carte')})}
 }

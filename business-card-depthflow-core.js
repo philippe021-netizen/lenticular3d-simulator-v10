@@ -128,7 +128,8 @@ export function createCardDepthPreset(layers, preset = 'professional') {
     qr: { zero: 128, reliefPercent: 175, parallaxPercent: 3.8, planeSeparation: 1.8, stabilityBand: 4 },
   }[preset] || null;
   const profile = settings || { zero: 128, reliefPercent: 200, parallaxPercent: 4.6, planeSeparation: 2.1, stabilityBand: 3 };
-  const depths = (layers || []).map((layer, index) => {
+  const sourceLayers = layers || [];
+  const depthForLayer = (layer, index) => {
     const role = String(layer?.role || '').toLowerCase(), type = String(layer?.type || 'object').toLowerCase();
     const area = Array.isArray(layer?.bbox) ? Number(layer.bbox[2] || 0) * Number(layer.bbox[3] || 0) : 0;
     if (type === 'qr' || role === 'qr') return profile.zero;
@@ -142,13 +143,17 @@ export function createCardDepthPreset(layers, preset = 'professional') {
     if (role === 'social') return 202;
     if (role === 'hours') return 186;
     if (role === 'service') return 194;
-    if (type === 'logo' || role === 'logo') return clamp(238 + (index % 3) * 5, 0, 250);
+    if (type === 'logo' || role === 'logo') return 245;
     if (type === 'signature') return 232;
     if (type === 'artwork') return area >= 0.055 ? (preset === 'artistic' ? 48 : 62) : 205;
     if (type === 'subject' || type === 'object') return 218 + (index % 3) * 6;
     if (type === 'text') return 194 + (index % 4) * 7;
     return 184;
-  });
+  };
+  const rawDepths = sourceLayers.map(depthForLayer),groupDepths=new Map();
+  const rolePriority=['qr','logo','name','company','title','slogan','social','phone','service','email','hours','address','website','artwork','subject','other'];
+  sourceLayers.forEach((layer,index)=>{const group=String(layer?.groupId||'');if(!group)return;const current=groupDepths.get(group),priority=rolePriority.indexOf(String(layer?.role||'other')),rank=priority<0?rolePriority.length:priority;if(!current||rank<current.rank)groupDepths.set(group,{depth:rawDepths[index],rank})});
+  const depths=sourceLayers.map((layer,index)=>groupDepths.get(String(layer?.groupId||''))?.depth??rawDepths[index]);
   return { ...profile, depths };
 }
 

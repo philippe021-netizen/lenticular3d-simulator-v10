@@ -35,6 +35,19 @@ test("un pictogramme de contact reçoit la profondeur de son contenu, pas celle 
   assert.ok(preset.depths[2] >= 238);
 });
 
+test("tous les composants d'un groupe sémantique restent sur le même plan", () => {
+  const preset = createCardDepthPreset([
+    { type: "logo", role: "logo", groupId: "logo-main", bbox: [0.1, 0.2, 0.2, 0.25] },
+    { type: "text", role: "company", groupId: "logo-main", bbox: [0.1, 0.5, 0.25, 0.06] },
+    { type: "logo", role: "email", groupId: "email-1", bbox: [0.5, 0.5, 0.03, 0.04] },
+    { type: "text", role: "email", groupId: "email-1", bbox: [0.54, 0.5, 0.22, 0.04] },
+  ], "professional");
+  assert.equal(preset.depths[0], preset.depths[1]);
+  assert.equal(preset.depths[2], preset.depths[3]);
+  assert.equal(preset.depths[0], 245);
+  assert.equal(preset.depths[2], 190);
+});
+
 test("le profil V31 répartit réellement les plans de part et d'autre du zéro", () => {
   const layers = [
     { type: "artwork", role: "artwork", bbox: [0, 0, 0.5, 0.5] },
