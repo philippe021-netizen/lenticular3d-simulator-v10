@@ -271,8 +271,12 @@
         let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
         if(changed){renderGroups();compose();}
-        const threeOk=buildThreePlanControl();
-        $('aiGate').className='status '+(threeOk?'ok':'warn');$('aiGate').textContent=threeOk?'Photo 3 plans créée. Étape suivante : remplacer ses plans locaux par les calques RGBA retournés par l’IA avant de déverrouiller le simulateur.':'Photo 3 plans impossible : simulateur bloqué.';
+        let threeOk=false;
+        if(data.threePlaneImage){
+          try{const control=await loadImage(data.threePlaneImage);threePlan.width=control.naturalWidth;threePlan.height=control.naturalHeight;threePlan.getContext('2d').drawImage(control,0,0);$('threePlanWrap').classList.remove('hidden');threeOk=true}catch(_){}
+        }
+        $('aiGate').className='status '+(threeOk?'ok':'warn');
+        $('aiGate').textContent=threeOk?'Photo 3 plans IA reçue. Simulateur encore verrouillé jusqu’au retour des calques RGBA maîtres.':('Photo 3 plans IA absente : '+(data.threePlaneError||'composition indisponible')+'. Simulateur bloqué.');
         $('renderStatus').className='status ok';
         $('renderStatus').textContent='Composition autonome validée : '+data.groups.length+' plans · vue centrale verrouillée · 9 vues toujours calculées localement sans régénération.';
         /* Simulation volontairement différée : l’utilisateur lance les 9 vues après retour IA validé. */
