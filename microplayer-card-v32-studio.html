@@ -104,6 +104,7 @@
       const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
       const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
       const normal=Math.max(-1,Math.min(1,position)),zero=Number($('zero').value);
+      if(Math.abs(normal)<1e-9){ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
       ctx.drawImage(state.aiMaster.background,0,0,state.width,state.height);
       const ordered=[...state.aiMaster.layers].sort((a,b)=>a.depth-b.depth);
       const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
@@ -111,22 +112,24 @@
       for(const layer of ordered){const z=((Number(layer.depth)-dMin)/span)*2-1;ctx.drawImage(layer.image,normal*z*maxShift,0,state.width,state.height)}
       return canvas;
     }
+
     function buildThreePlanControl(){
-      if(!state.rigidPreview)buildRigidPreviewLayers();
-      const src=state.rigidPreview;if(!src||!src.layers?.length)return false;
+      const src=state.aiMaster;if(!src||!src.layers?.length)return false;
       const W=state.width,H=state.height;threePlan.width=W;threePlan.height=H;
       const ctx=threePlan.getContext('2d');ctx.clearRect(0,0,W,H);ctx.fillStyle='#08090c';ctx.fillRect(0,0,W,H);
       const zero=Number($('zero').value),ordered=[...src.layers].sort((a,b)=>(a.depth||zero)-(b.depth||zero));
       const d=ordered.map(x=>Number(x.depth)||zero),min=Math.min(...d,zero),max=Math.max(...d,zero),span=Math.max(1,max-min);
-      ctx.save();ctx.translate(W*.08,H*.08);ctx.transform(.90,-.045,-.02,.90,0,0);
-      ctx.drawImage(src.base,0,0,W,H);
+      const insetX=W*.08,insetY=H*.12,scale=.82;
+      ctx.save();ctx.translate(insetX,insetY);ctx.transform(scale,-.055,-.035,scale,0,0);
+      ctx.drawImage(src.background,0,0,W,H);
       for(const layer of ordered){
-        const z=((Number(layer.depth)-min)/span);
-        const gap=10+z*34;
-        ctx.save();ctx.translate(-gap,-gap*.42);ctx.drawImage(layer.canvas,0,0,W,H);ctx.restore();
+        const z=(Number(layer.depth)-min)/span;
+        const lift=8+z*Math.max(28,Math.min(W,H)*.10);
+        ctx.save();ctx.translate(-lift,-lift*.48);ctx.drawImage(layer.image,0,0,W,H);ctx.restore();
       }
       ctx.restore();$('threePlanWrap').classList.remove('hidden');return true;
     }
+
     async function generateViews(){
       if(!state.aiReady||!state.aiMaster){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
       compose();if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
@@ -271,12 +274,17 @@
         let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
         if(changed){renderGroups();compose();}
+        state.rigidPreview=null;buildRigidPreviewLayers();
+        const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
+        if(masterLayers.length<3)throw Error('Scène maîtresse incomplète : moins de 3 calques graphiques fiables.');
+        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'original-pixels-local-mattes'};
         const threeOk=buildThreePlanControl();
-        $('aiGate').className='status '+(threeOk?'ok':'warn');
-        $('aiGate').textContent=threeOk?'Photo 3 plans composée avec les pixels originaux. Aucun texte ni logo régénéré. Simulateur verrouillé jusqu’à validation de la scène maîtresse.':'Composition 3 plans impossible : simulateur bloqué.';
+        if(!threeOk)throw Error('Vue 3D de contrôle impossible.');
+        state.aiReady=true;$('generate').disabled=false;
+        $('aiGate').className='status ok';
+        $('aiGate').textContent='Scène maîtresse VALIDÉE : fond reconstruit + '+masterLayers.length+' calques RGBA issus de l’original. Vue 3D oblique prête. Simulateur déverrouillé.';
         $('renderStatus').className='status ok';
-        $('renderStatus').textContent='Composition autonome validée : '+data.groups.length+' plans · vue centrale verrouillée · 9 vues toujours calculées localement sans régénération.';
-        /* Simulation volontairement différée : l’utilisateur lance les 9 vues après retour IA validé. */
+        $('renderStatus').textContent='Aucun texte/logo régénéré · aucun rectangle artificiel · plans 2D plats · vue centrale verrouillée sur l’original · 9 vues déterministes.';
       }catch(error){
         $('renderStatus').className='status warn';
         $('renderStatus').textContent='Composition automatique indisponible : '+error.message+'\nLe moteur local reste actif; export de secours toujours disponible.';
