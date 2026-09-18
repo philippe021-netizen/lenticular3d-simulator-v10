@@ -236,6 +236,10 @@
         })});
         const data=await response.json();if(!response.ok)throw Error(data.error||('HTTP '+response.status));
         state.autoRelief=data;
+        const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
+        let changed=false;
+        state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
+        if(changed){renderGroups();compose();}
         $('renderStatus').className='status ok';
         $('renderStatus').textContent='Composition autonome validée : '+data.groups.length+' plans · vue centrale verrouillée · 9 vues toujours calculées localement sans régénération.';
         await generateViews();
