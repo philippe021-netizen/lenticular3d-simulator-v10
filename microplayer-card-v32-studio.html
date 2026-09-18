@@ -142,37 +142,36 @@
     function drawReliefPhoto(){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();stopAnimation();
       const W=1600,H=980;sim3d.width=W;sim3d.height=H;
-      let gl=sim3d.getContext('webgl2',{alpha:false,antialias:true,preserveDrawingBuffer:true});
-      if(!gl){$('renderStatus').textContent='WebGL2 indisponible : Photo relief 3D non générée.';return}
-      const vs=`#version 300 es
-      precision highp float;in vec2 p;uniform float z;uniform mat4 mvp;out vec2 uv;
-      void main(){uv=vec2(p.x,1.0-p.y);gl_Position=mvp*vec4((p.x-.5)*1.545,(p.y-.5),z,1.0);}`;
-      const fs=`#version 300 es
-      precision highp float;in vec2 uv;uniform sampler2D tex;uniform float alphaCut;out vec4 o;
-      void main(){vec4 c=texture(tex,uv);if(c.a<alphaCut)discard;o=c;}`;
+      const gl=sim3d.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})||sim3d.getContext('experimental-webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true});
+      if(!gl){drawReliefPhotoCanvas();return}
+      const vs='precision highp float;attribute vec2 p;uniform float z;uniform mat4 mvp;varying vec2 uv;void main(){uv=vec2(p.x,1.0-p.y);gl_Position=mvp*vec4((p.x-.5)*1.545,(p.y-.5),z,1.0);}';
+      const fs='precision highp float;varying vec2 uv;uniform sampler2D tex;uniform float alphaCut;void main(){vec4 c=texture2D(tex,uv);if(c.a<alphaCut)discard;gl_FragColor=c;}';
       const sh=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s};
-      const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);gl.useProgram(pr);
+      const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){drawReliefPhotoCanvas();return}gl.useProgram(pr);
       const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]),gl.STATIC_DRAW);
       const loc=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
       const mul=(a,b)=>{let o=new Float32Array(16);for(let r=0;r<4;r++)for(let q=0;q<4;q++)for(let k=0;k<4;k++)o[r*4+q]+=a[r*4+k]*b[k*4+q];return o};
       const persp=(fov,asp,n,far)=>{const f=1/Math.tan(fov/2),o=new Float32Array(16);o[0]=f/asp;o[5]=f;o[10]=(far+n)/(n-far);o[11]=-1;o[14]=2*far*n/(n-far);return o};
-      const norm=v=>{const l=Math.hypot(...v)||1;return v.map(x=>x/l)},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+      const norm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return v.map(x=>x/l)},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
       const look=(eye,at,up)=>{const z=norm([eye[0]-at[0],eye[1]-at[1],eye[2]-at[2]]),x=norm(cross(up,z)),y=cross(z,x),o=new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,0,0,0,1]);o[12]=-(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]);o[13]=-(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]);o[14]=-(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]);return o};
-      // Camera, not affine distortion: the planes remain perfectly flat and parallel.
-      const P=persp(34*Math.PI/180,W/H,.1,20),V=look([-1.38,.58,3.35],[0,0,.16],[0,1,0]),M=mul(P,V);
-      gl.uniformMatrix4fv(gl.getUniformLocation(pr,'mvp'),false,M);gl.uniform1i(gl.getUniformLocation(pr,'tex'),0);
-      gl.viewport(0,0,W,H);gl.clearColor(.025,.028,.035,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+      const M=mul(persp(34*Math.PI/180,W/H,.1,20),look([-1.38,.58,3.35],[0,0,.16],[0,1,0]));
+      gl.uniformMatrix4fv(gl.getUniformLocation(pr,'mvp'),false,M);gl.uniform1i(gl.getUniformLocation(pr,'tex'),0);gl.viewport(0,0,W,H);gl.clearColor(.025,.028,.035,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
       const texture=canvas=>{const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);return t};
       const zero=Number($('zero').value),layers=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),ds=layers.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
       const draw=(canvas,z,cut)=>{gl.bindTexture(gl.TEXTURE_2D,texture(canvas));gl.uniform1f(gl.getUniformLocation(pr,'z'),z);gl.uniform1f(gl.getUniformLocation(pr,'alphaCut'),cut);gl.drawArrays(gl.TRIANGLES,0,6)};
-      // Background/card at Z=0. Semantic depth is deliberately expanded to 0..0.34 for a readable client photograph.
-      draw(state.rigidPreview.base,0,0);
-      for(const layer of layers){const zn=(Number(layer.depth)-dMin)/span;draw(layer.canvas,.035+zn*.305,.035)}
-      $('simOut').textContent='Photo relief 3D';$('renderStatus').textContent='Photo relief WebGL : vrais plans parallèles sans épaisseur · caméra oblique · hauteur Z proportionnelle aux profondeurs V32.';
-      $('downloadRelief').disabled=false;
+      draw(state.rigidPreview.base,0,0);for(const layer of layers){const zn=(Number(layer.depth)-dMin)/span;draw(layer.canvas,.035+zn*.305,.035)}
+      $('simOut').textContent='Photo relief 3D';$('renderStatus').textContent='Photo relief WebGL1 iPad : plans plats flottants, caméra perspective, hauteurs issues des profondeurs V32.';$('downloadRelief').disabled=false;
     }
-    $('photoRelief').onclick=drawReliefPhoto;
-    $('downloadRelief').onclick=async()=>{drawReliefPhoto();await new Promise(r=>requestAnimationFrame(()=>r()));const blob=await toBlob(sim3d),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='microplayer-photo-relief-3d.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)};
+    function drawReliefPhotoCanvas(){
+      const W=1600,H=980,ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#07090c';ctx.fillRect(0,0,W,H);
+      const zero=Number($('zero').value),layers=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),ds=layers.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const x=225,y=190,w=1120,h=w/state.width*state.height,skew=-.115;
+      const plane=(canvas,z)=>{const zn=(z-dMin)/span,lift=zn*115,scale=1+zn*.035;ctx.save();ctx.setTransform(scale,skew,-.08,1,x+lift,y-lift*.35);ctx.drawImage(canvas,0,0,w,h);ctx.restore()};
+      plane(state.rigidPreview.base,dMin);for(const layer of layers)plane(layer.canvas,Number(layer.depth)||zero);
+      $('simOut').textContent='Photo relief 3D';$('renderStatus').textContent='Photo relief compatible iPad : projection de plans plats flottants, sans épaisseur ni ombre.';$('downloadRelief').disabled=false;
+    }
+    $('photoRelief').onclick=()=>{try{drawReliefPhoto()}catch(e){drawReliefPhotoCanvas()}};
+    $('downloadRelief').onclick=async()=>{try{drawReliefPhoto()}catch(e){drawReliefPhotoCanvas()}await new Promise(r=>requestAnimationFrame(()=>r()));const blob=await toBlob(sim3d),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='microplayer-photo-relief-3d.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)};
     function drawSimulation(position){if(!state.views.length)return;const p=Math.max(0,Math.min(8,position));$('simRange').value=String(p);$('simOut').textContent=`${(p+1).toFixed(2)} / 9`;drawRigidPreview(p)}
     function animationLoop(time){if(!state.playing)return;if(!state.lastTime)state.lastTime=time;const dt=Math.min(50,time-state.lastTime);state.lastTime=time;state.simPosition+=state.direction*dt/760;if(state.simPosition>=8){state.simPosition=8;state.direction=-1}if(state.simPosition<=0){state.simPosition=0;state.direction=1}drawSimulation(state.simPosition);state.animation=requestAnimationFrame(animationLoop)}
     function startAnimation(){cancelAnimationFrame(state.animation);state.playing=true;state.lastTime=0;$('toggle').textContent='Pause';state.animation=requestAnimationFrame(animationLoop)}
