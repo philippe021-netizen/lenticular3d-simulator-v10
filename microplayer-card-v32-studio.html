@@ -87,24 +87,25 @@
     function buildRigidPreviewLayers(){
       const source=document.createElement('canvas');source.width=state.width;source.height=state.height;
       source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-      const protectedMask=new Uint8ClampedArray(state.width*state.height);
-      const layers=[];
+      const N=state.width*state.height, displayUnion=new Uint8ClampedArray(N), layers=[];
       for(const group of state.groups){
         const rigid=!['artwork','subject','background','decor','decoration'].includes(String(group.role||'').toLowerCase());
         if(!rigid)continue;
         const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
         const ctx=canvas.getContext('2d'),img=ctx.createImageData(state.width,state.height);
-        for(let i=0;i<group.mask.length;i++){const a=group.mask[i];if(a<4)continue;protectedMask[i]=Math.max(protectedMask[i],a);const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
+        for(let i=0;i<group.mask.length;i++){let a=group.mask[i];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));displayUnion[i]=Math.max(displayUnion[i],a);const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
         ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label});
       }
-      const base=document.createElement('canvas');base.width=state.width;base.height=state.height;const bctx=base.getContext('2d');bctx.drawImage(source,0,0);
-      const clean=bctx.getImageData(0,0,state.width,state.height),src=new Uint8ClampedArray(state.rgba);
-      const radius=Math.max(5,Math.round(Math.min(state.width,state.height)*.012));
-      for(let i=0;i<protectedMask.length;i++){if(protectedMask[i]<20)continue;const x=i%state.width,y=(i/state.width)|0;let rr=0,gg=0,bb=0,n=0;
-        for(let k=0;k<12;k++){const a=k*Math.PI/6,xx=Math.max(0,Math.min(state.width-1,Math.round(x+Math.cos(a)*radius))),yy=Math.max(0,Math.min(state.height-1,Math.round(y+Math.sin(a)*radius))),q=yy*state.width+xx;if(protectedMask[q]>20)continue;const j=q*4;rr+=src[j];gg+=src[j+1];bb+=src[j+2];n++}
-        if(n){const j=i*4;clean.data[j]=rr/n;clean.data[j+1]=gg/n;clean.data[j+2]=bb/n;clean.data[j+3]=255}
-      }bctx.putImageData(clean,0,0);
-      state.rigidPreview={base,layers};
+      // LDI principle: display mask stays tight; removal mask is deliberately wider.
+      const removal=new Uint8ClampedArray(N),r=Math.max(2,Math.round(Math.min(state.width,state.height)*.006));
+      for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(displayUnion[i]<20)continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<state.width&&yy<state.height)removal[yy*state.width+xx]=255}}
+      // Deterministic local inpainting: propagate real neighbouring background inward.
+      const work=new Uint8ClampedArray(state.rgba), unknown=new Uint8Array(N);for(let i=0;i<N;i++)unknown[i]=removal[i]?1:0;
+      for(let pass=0;pass<Math.max(8,r*3);pass++){let changed=0;const next=unknown.slice();for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!unknown[i])continue;let rr=0,gg=0,bb=0,n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=state.width||yy>=state.height)continue;const q=yy*state.width+xx;if(unknown[q])continue;const j=q*4;rr+=work[j];gg+=work[j+1];bb+=work[j+2];n++}if(n>=2){const j=i*4;work[j]=rr/n;work[j+1]=gg/n;work[j+2]=bb/n;work[j+3]=255;next[i]=0;changed++}}unknown.set(next);if(!changed)break}
+      // Any unusually large unresolved hole gets a wider ring estimate, never the foreground pixel.
+      const R=Math.max(6,r*3);for(let i=0;i<N;i++)if(unknown[i]){const x=i%state.width,y=(i/state.width)|0;let rr=0,gg=0,bb=0,n=0;for(let k=0;k<24;k++){const ang=k*Math.PI/12,xx=Math.max(0,Math.min(state.width-1,Math.round(x+Math.cos(ang)*R))),yy=Math.max(0,Math.min(state.height-1,Math.round(y+Math.sin(ang)*R))),q=yy*state.width+xx;if(removal[q])continue;const j=q*4;rr+=state.rgba[j];gg+=state.rgba[j+1];bb+=state.rgba[j+2];n++}if(n){const j=i*4;work[j]=rr/n;work[j+1]=gg/n;work[j+2]=bb/n;work[j+3]=255}}
+      const base=document.createElement('canvas');base.width=state.width;base.height=state.height;base.getContext('2d').putImageData(new ImageData(work,state.width,state.height),0,0);
+      state.rigidPreview={base,layers,removalMask:removal};
     }
     function drawRigidPreview(position){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
