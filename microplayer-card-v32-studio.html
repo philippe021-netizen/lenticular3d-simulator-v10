@@ -114,10 +114,12 @@
     }
 
     function enforceExclusiveMasks(){
-      if(!state.groups.length)return;
-      const N=state.width*state.height,owner=new Int16Array(N);owner.fill(-1),best=new Uint8ClampedArray(N);
-      for(let g=0;g<state.groups.length;g++){const mask=state.groups[g].mask;for(let i=0;i<N;i++){const a=mask[i];if(a>best[i]){best[i]=a;owner[i]=g}}}
+      if(!state.groups.length)return {before:0,after:0};
+      const N=state.width*state.height,owner=new Int16Array(N);owner.fill(-1),best=new Uint8ClampedArray(N);let before=0;
+      for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++){const a=state.groups[g].mask[i];if(a>=20)hits++;if(a>best[i]){best[i]=a;owner[i]=g}}if(hits>1)before++}
       for(let g=0;g<state.groups.length;g++){const src=state.groups[g].mask,out=new Uint8ClampedArray(N);for(let i=0;i<N;i++)if(owner[i]===g&&src[i]>=20)out[i]=src[i];state.groups[g].mask=out}
+      let after=0;for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++)if(state.groups[g].mask[i]>=20)hits++;if(hits>1)after++}
+      return {before,after};
     }
     function qcMasterScene(){
       if(!state.rigidPreview)return {ok:false,reason:'no-master'};
@@ -294,17 +296,19 @@
         let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
         if(changed){renderGroups();compose();}
-        enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();
+        const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;
         const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
-        if(!state.masterQc.ok)throw Error('QC scène maître refusé : '+state.masterQc.collisions+' pixels appartiennent à plusieurs groupes.');
+        if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
         state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'production-original-pixels-exclusive-mattes'};
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
         state.aiReady=true;$('generate').disabled=false;
         $('aiGate').className='status ok';$('aiGate').textContent='PRODUCTION VALIDÉE : '+masterLayers.length+' calques exclusifs · chevauchements inter-groupes = 0 · pixels originaux verrouillés · 9 vues autorisées.';
         $('renderStatus').className='status ok';$('renderStatus').textContent='Chaîne impression séparée : scène maître → 9 vues déterministes. Aperçu client = branche indépendante, jamais injectée dans la production.';
       }catch(error){
-        $('renderStatus').className='status warn';
-        $('renderStatus').textContent='Composition automatique indisponible : '+error.message+'\nLe moteur local reste actif; export de secours toujours disponible.';
+        state.aiReady=false;$('generate').disabled=true;$('threePlanWrap').classList.add('hidden');
+        $('aiGate').className='status warn';$('aiGate').textContent='PRODUCTION BLOQUÉE — '+error.message;
+        $('clientGate').className='status warn';$('clientGate').textContent='Aperçu client bloqué tant que le QC de la scène maître échoue.';
+        $('renderStatus').className='status warn';$('renderStatus').textContent='Diagnostic QC : '+error.message+'\nAucun fallback vers l’ancien renderer.';
       }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Envoyer à l’IA et composer'}
     }
     $('photoRelief').onclick=createAutomaticRelief;
