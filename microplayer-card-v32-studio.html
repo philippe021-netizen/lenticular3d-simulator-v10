@@ -34,7 +34,7 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),sim3d=$('sim3d');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',preview:'card',baseDepth:null,finalDepth:null,history:[],drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',preview:'card',baseDepth:null,finalDepth:null,history:[],drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,simSource:null};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     const selected=()=>state.groups.find(group=>group.id===state.selected);
@@ -92,7 +92,7 @@
       context.clearRect(0,0,w,h);context.fillStyle='#07080a';context.fillRect(0,0,w,h);
       const angle=Number($('tilt').value),strength=Number($('simDepth').value),normal=(Math.max(0,Math.min(8,position))-4)/4;
       const yaw=(normal*angle)*Math.PI/180,pitch=(-angle*.24)*Math.PI/180;
-      const cols=Math.min(90,Math.max(42,Math.round(w/12))),rows=Math.min(58,Math.max(26,Math.round(h/12)));
+      const cols=Math.min(54,Math.max(38,Math.round(w/20))),rows=Math.min(36,Math.max(24,Math.round(h/20)));
       const sx=state.width/(cols-1),sy=state.height/(rows-1),focal=w*1.55,depthPx=Math.min(w,h)*.19*strength;
       const pts=Array.from({length:rows},()=>Array(cols));
       for(let gy=0;gy<rows;gy++)for(let gx=0;gx<cols;gx++){
@@ -107,12 +107,23 @@
       const cells=[];
       for(let gy=0;gy<rows-1;gy++)for(let gx=0;gx<cols-1;gx++){const p=[pts[gy][gx],pts[gy][gx+1],pts[gy+1][gx+1],pts[gy+1][gx]];cells.push({p,z:p.reduce((s,q)=>s+q.z,0)/4,gx,gy})}
       cells.sort((a,b)=>a.z-b.z);
-      const source=document.createElement('canvas');source.width=state.width;source.height=state.height;source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-      for(const cell of cells){const p=cell.p;context.save();context.beginPath();context.moveTo(p[0].x,p[0].y);for(let k=1;k<4;k++)context.lineTo(p[k].x,p[k].y);context.closePath();context.clip();
-        const minX=Math.min(...p.map(q=>q.x)),maxX=Math.max(...p.map(q=>q.x)),minY=Math.min(...p.map(q=>q.y)),maxY=Math.max(...p.map(q=>q.y));
-        const srcX=cell.gx*sx,srcY=cell.gy*sy;
-        context.drawImage(source,srcX,srcY,sx*1.08,sy*1.08,minX-1,minY-1,maxX-minX+2,maxY-minY+2);context.restore()}
-      context.strokeStyle='rgba(255,255,255,.16)';context.lineWidth=1;context.strokeRect(1,1,w-2,h-2);
+      if(!state.simSource){state.simSource=document.createElement('canvas');state.simSource.width=state.width;state.simSource.height=state.height;state.simSource.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0)}
+      const source=state.simSource;
+      function triangle(s0,s1,s2,d0,d1,d2){
+        const den=s0.x*(s1.y-s2.y)+s1.x*(s2.y-s0.y)+s2.x*(s0.y-s1.y);if(Math.abs(den)<1e-6)return;
+        const a=(d0.x*(s1.y-s2.y)+d1.x*(s2.y-s0.y)+d2.x*(s0.y-s1.y))/den;
+        const c=(d0.x*(s2.x-s1.x)+d1.x*(s0.x-s2.x)+d2.x*(s1.x-s0.x))/den;
+        const e=(d0.x*(s1.x*s2.y-s2.x*s1.y)+d1.x*(s2.x*s0.y-s0.x*s2.y)+d2.x*(s0.x*s1.y-s1.x*s0.y))/den;
+        const b=(d0.y*(s1.y-s2.y)+d1.y*(s2.y-s0.y)+d2.y*(s0.y-s1.y))/den;
+        const d=(d0.y*(s2.x-s1.x)+d1.y*(s0.x-s2.x)+d2.y*(s1.x-s0.x))/den;
+        const f=(d0.y*(s1.x*s2.y-s2.x*s1.y)+d1.y*(s2.x*s0.y-s0.x*s2.y)+d2.y*(s0.x*s1.y-s1.x*s0.y))/den;
+        context.save();context.beginPath();context.moveTo(d0.x,d0.y);context.lineTo(d1.x,d1.y);context.lineTo(d2.x,d2.y);context.closePath();context.clip();context.setTransform(a,b,c,d,e,f);context.drawImage(source,0,0);context.restore();
+      }
+      for(const cell of cells){const p=cell.p,x0=cell.gx*sx,y0=cell.gy*sy,x1=(cell.gx+1)*sx,y1=(cell.gy+1)*sy;
+        triangle({x:x0,y:y0},{x:x1,y:y0},{x:x1,y:y1},p[0],p[1],p[2]);
+        triangle({x:x0,y:y0},{x:x1,y:y1},{x:x0,y:y1},p[0],p[2],p[3]);
+      }
+      context.setTransform(1,0,0,1,0,0);context.strokeStyle='rgba(255,255,255,.16)';context.lineWidth=1;context.strokeRect(1,1,w-2,h-2);
       $('tiltOut').textContent=angle+'°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
     }
     function drawSimulation(position){if(!state.views.length)return;const p=Math.max(0,Math.min(8,position));$('simRange').value=String(p);$('simOut').textContent=`${(p+1).toFixed(2)} / 9`;drawDepthMesh(p)}
