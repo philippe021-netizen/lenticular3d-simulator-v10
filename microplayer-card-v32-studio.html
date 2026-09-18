@@ -24,7 +24,7 @@
     <section>
       <section class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
-      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><button id="generate" class="primary" style="width:100%" disabled>Générer les 9 vues</button></section>
+      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Photo 3 plans — contrôle avant simulation</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Vue oblique de contrôle : avant / intermédiaire / fond. Ce n’est pas une vue lenticulaire.</div></div><button id="generate" class="primary" style="width:100%" disabled>Générer les 9 vues</button></section>
       <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="downloadRelief" disabled>Résultat automatique</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
   </div></main>
@@ -32,7 +32,7 @@
     import { cardDepthSpread, composeSemanticDepth, createCardDepthPreset, createSemanticMask, maskCoverage, paintMask } from './business-card-depthflow-core.js';
     import { comparePixels, renderNovelView } from './depthflow-v42-core.js';
 
-    const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),sim3d=$('sim3d');
+    const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),sim3d=$('sim3d'),threePlan=$('threePlan');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
     const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',preview:'card',baseDepth:null,finalDepth:null,history:[],drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
@@ -110,6 +110,22 @@
       const maxShift=state.width*(Number($('parallax').value)/100);
       for(const layer of ordered){const z=((Number(layer.depth)-dMin)/span)*2-1;ctx.drawImage(layer.image,normal*z*maxShift,0,state.width,state.height)}
       return canvas;
+    }
+    function buildThreePlanControl(){
+      if(!state.rigidPreview)buildRigidPreviewLayers();
+      const src=state.rigidPreview;if(!src||!src.layers?.length)return false;
+      const W=state.width,H=state.height;threePlan.width=W;threePlan.height=H;
+      const ctx=threePlan.getContext('2d');ctx.clearRect(0,0,W,H);ctx.fillStyle='#08090c';ctx.fillRect(0,0,W,H);
+      const zero=Number($('zero').value),ordered=[...src.layers].sort((a,b)=>(a.depth||zero)-(b.depth||zero));
+      const d=ordered.map(x=>Number(x.depth)||zero),min=Math.min(...d,zero),max=Math.max(...d,zero),span=Math.max(1,max-min);
+      ctx.save();ctx.translate(W*.08,H*.08);ctx.transform(.90,-.045,-.02,.90,0,0);
+      ctx.drawImage(src.base,0,0,W,H);
+      for(const layer of ordered){
+        const z=((Number(layer.depth)-min)/span);
+        const gap=10+z*34;
+        ctx.save();ctx.translate(-gap,-gap*.42);ctx.drawImage(layer.canvas,0,0,W,H);ctx.restore();
+      }
+      ctx.restore();$('threePlanWrap').classList.remove('hidden');return true;
     }
     async function generateViews(){
       if(!state.aiReady||!state.aiMaster){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
@@ -250,11 +266,13 @@
         })});
         const data=await response.json();if(!response.ok)throw Error(data.error||('HTTP '+response.status));
         state.autoRelief=data;
-        state.aiReady=false;state.aiMaster=null;$('generate').disabled=true;$('aiGate').className='status warn';$('aiGate').textContent='Analyse sémantique reçue, mais aucune photo 3 plans IA n’a encore été recomposée. Simulateur et 9 vues bloqués.';
+        state.aiReady=false;state.aiMaster=null;$('generate').disabled=true;$('results').classList.add('hidden');$('aiGate').className='status warn';$('aiGate').textContent='Analyse IA reçue. Construction de la photo 3 plans de contrôle…';
         const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
         let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
         if(changed){renderGroups();compose();}
+        const threeOk=buildThreePlanControl();
+        $('aiGate').className='status '+(threeOk?'ok':'warn');$('aiGate').textContent=threeOk?'Photo 3 plans créée. Étape suivante : remplacer ses plans locaux par les calques RGBA retournés par l’IA avant de déverrouiller le simulateur.':'Photo 3 plans impossible : simulateur bloqué.';
         $('renderStatus').className='status ok';
         $('renderStatus').textContent='Composition autonome validée : '+data.groups.length+' plans · vue centrale verrouillée · 9 vues toujours calculées localement sans régénération.';
         /* Simulation volontairement différée : l’utilisateur lance les 9 vues après retour IA validé. */
