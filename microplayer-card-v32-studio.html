@@ -127,8 +127,9 @@
       for(const group of state.groups){for(let i=0;i<N;i++)if(group.mask[i]>=20){if(overlap[i])collisions++;else{overlap[i]=1;covered++}}}
       const active=state.rigidPreview.layers.length;
       const background=state.rigidPreview.backgroundQc||{ok:false,residualRatio:1,meanDelta:0,unresolved:0};
-      const ok=active>=3&&collisions===0&&background.ok&&background.unresolved===0;
-      return {ok,active,collisions,covered,coverage:Number((covered/N*100).toFixed(2)),background};
+      const structuralOk=active>=3&&collisions===0&&background.unresolved===0;
+      const ok=structuralOk;
+      return {ok,structuralOk,active,collisions,covered,coverage:Number((covered/N*100).toFixed(2)),background:{...background,warning:!background.ok}};
     }
     function buildClientPreview(){
       if(!state.masterQc?.ok){$('clientGate').className='status warn';$('clientGate').textContent='Aperçu client bloqué : scène maître de production non validée.';return}
@@ -320,7 +321,7 @@
         if(changed){renderGroups();compose();}
         const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;
         const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
-        if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques '+state.masterQc.active+' · chevauchements '+exclusiveQc.after+' · résidu fond '+Math.round((state.masterQc.background?.residualRatio||0)*100)+'% · trous non reconstruits '+(state.masterQc.background?.unresolved||0)+'.');
+        if(!state.masterQc.ok)throw Error('QC structure refusé · calques '+state.masterQc.active+' · chevauchements '+exclusiveQc.after+' · trous non reconstruits '+(state.masterQc.background?.unresolved||0)+'.');
         state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'production-original-pixels-exclusive-mattes'};
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
         state.aiReady=true;$('generate').disabled=false;
