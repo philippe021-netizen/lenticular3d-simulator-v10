@@ -18,12 +18,14 @@ Convert a photographed or digital business card into a clean lenticular 3D compo
 10. Export source, group manifest, masks, depth map and 9 views for QC.
 
 ## Pipeline
-INPUT -> boundary detection -> perspective rectification/crop -> conservative normalization -> layout/text/icon/logo detection -> semantic grouping -> mask refinement -> editable depth stack -> depth-map composition -> 9-view rendering -> lenticular preview -> export/QC.
+INPUT -> four-corner placement -> perspective rectification/crop -> conservative normalization -> local OCR with word/line coordinates -> semantic role assignment -> icon/logo/artwork detection -> deterministic grouping -> mask refinement -> editable depth stack -> depth-map composition -> 9-view rendering -> interpolated lenticular preview -> export/QC.
 
 ## Modules
 CardNormalizer: canonical full-card image + transform matrix; never invent artwork.
 
-SemanticAnalyzer: provider-independent objects with id, type, label, bbox, mask/polygon, confidence and relations.
+TextRecognizer: browser-side Tesseract worker on iPad. Its exact text and coordinates are authoritative and may not be rewritten by the visual model.
+
+SemanticAnalyzer: provider-independent objects with id, type, label, bbox, mask/polygon, confidence and relations. It classifies OCR lines and detects non-textual elements only.
 
 GroupResolver: associates related elements, e.g. phone icon + number, while preserving component masks.
 
@@ -41,5 +43,10 @@ Perspective rectangular; typography/logo unchanged; no mask leakage; coherent gr
 ## Reject
 Brightness-based depth for cards; AI-redrawn typography; 9 independent AI generations; connected-components treated as semantics; horizontal preview motion accepted as proof of 3D.
 
-## First milestone
-Build a V32 diagnostic page that stops after semantic grouping and depth-map composition. Show original/rectified card, groups, masks, editable depth values and grayscale depth map side by side. Feed the 9-view renderer only after this passes varied real cards.
+## Current implementation
+`microplayer-card-v32-scanner.html` performs perspective correction, local OCR and semantic grouping. It transfers the immutable rectified source, OCR lines and groups to `microplayer-card-v32-studio.html`.
+
+The studio creates pixel masks, supports low-latency Pencil add/erase with undo, keeps an editable depth per group, optionally limits DepthFlow to background/internal artwork relief, renders nine views from one source, verifies view 05 pixel-for-pixel, interpolates the preview continuously and exports source, OCR manifest, group manifest, masks, depth map and the nine PNG views.
+
+## Next validation gate
+Run a varied real-card corpus. Reject any card where OCR characters, group count, icon association, mask leakage or view-05 integrity fail. PP-DocLayoutV3 remains the server-side candidate for a later layout/segmentation backend; it must plug into the provider-independent element schema rather than replace the authoritative OCR text.
