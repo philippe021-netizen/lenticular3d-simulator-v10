@@ -115,8 +115,8 @@
 
     function enforceExclusiveMasks(){
       if(!state.groups.length)return {before:0,after:0};
-      const N=state.width*state.height,owner=new Int16Array(N);owner.fill(-1),best=new Uint8ClampedArray(N);let before=0;
-      for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++){const a=state.groups[g].mask[i];if(a>=20)hits++;if(a>best[i]){best[i]=a;owner[i]=g}}if(hits>1)before++}
+      const N=state.width*state.height,owner=new Int16Array(N),bestAlpha=new Uint8ClampedArray(N);owner.fill(-1);let before=0;
+      for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++){const a=state.groups[g].mask[i];if(a>=20)hits++;if(a>bestAlpha[i]){bestAlpha[i]=a;owner[i]=g}}if(hits>1)before++}
       for(let g=0;g<state.groups.length;g++){const src=state.groups[g].mask,out=new Uint8ClampedArray(N);for(let i=0;i<N;i++)if(owner[i]===g&&src[i]>=20)out[i]=src[i];state.groups[g].mask=out}
       let after=0;for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++)if(state.groups[g].mask[i]>=20)hits++;if(hits>1)after++}
       return {before,after};
