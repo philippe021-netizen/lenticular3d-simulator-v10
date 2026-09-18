@@ -25,7 +25,7 @@
       <section class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="generate" class="primary" style="width:100%">Générer les 9 vues</button></section>
-      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="28" step="1" value="14"></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
+      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
   </div></main>
   <script type="module">
@@ -101,25 +101,20 @@
       for(let i=0;i<protectedMask.length;i++){const j=i*4,a=protectedMask[i]/255;const paper=244;bi.data[j]=Math.round(state.rgba[j]*(1-a)+paper*a);bi.data[j+1]=Math.round(state.rgba[j+1]*(1-a)+paper*a);bi.data[j+2]=Math.round(state.rgba[j+2]*(1-a)+paper*a);bi.data[j+3]=255}bctx.putImageData(bi,0,0);
       state.rigidPreview={base,layers};
     }
-    function projectRigidPoint(x,y,z,yaw,pitch,w,h){
-      const aspect=state.width/state.height,focal=2.7;
-      let px=(x-.5)*1.72*aspect,py=(.5-y)*1.72,pz=z;
-      const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
-      const x1=px*cy+pz*sy,z1=-px*sy+pz*cy,y1=py*cp-z1*sp,z2=py*sp+z1*cp,k=focal/(focal-z2);
-      return{x:w/2+(x1*k/aspect)*w/2,y:h/2-(y1*k)*h/2,z:z2};
-    }
     function drawRigidPreview(position){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
       const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);if(sim3d.width!==w||sim3d.height!==h){sim3d.width=w;sim3d.height=h}
       const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);
-      const angle=Number($('tilt').value),strength=Number($('simDepth').value),normal=(Math.max(0,Math.min(8,position))-4)/4,yaw=normal*angle*Math.PI/180,pitch=-angle*.12*Math.PI/180,zero=Number($('zero').value);
-      const drawPlane=(canvas,depth,alpha=1)=>{
-        const z=((depth-zero)/127)*.34*strength,p0=projectRigidPoint(0,0,z,yaw,pitch,w,h),p1=projectRigidPoint(1,0,z,yaw,pitch,w,h),p3=projectRigidPoint(0,1,z,yaw,pitch,w,h);
-        ctx.save();ctx.globalAlpha=alpha;ctx.setTransform((p1.x-p0.x)/state.width,(p1.y-p0.y)/state.width,(p3.x-p0.x)/state.height,(p3.y-p0.y)/state.height,p0.x,p0.y);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(canvas,0,0);ctx.restore();
-      };
-      drawPlane(state.rigidPreview.base,zero,1);
-      [...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth).forEach(layer=>drawPlane(layer.canvas,layer.depth,1));
-      $('tiltOut').textContent=angle+'°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
+      const strength=Number($('simDepth').value),normal=(Math.max(0,Math.min(8,position))-4)/4,zero=Number($('zero').value);
+      const margin=w*.055,cardW=w-margin*2,cardH=h-margin*2;
+      ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(state.rigidPreview.base,margin,margin,cardW,cardH);
+      const maxShift=cardW*.055*strength;
+      [...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth).forEach(layer=>{
+        const rel=Math.max(-1,Math.min(1,(layer.depth-zero)/127));
+        const dx=normal*rel*maxShift;
+        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx,margin,cardW,cardH);ctx.restore();
+      });
+      $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
     }
     function drawSimulation(position){if(!state.views.length)return;const p=Math.max(0,Math.min(8,position));$('simRange').value=String(p);$('simOut').textContent=`${(p+1).toFixed(2)} / 9`;drawRigidPreview(p)}
     function animationLoop(time){if(!state.playing)return;if(!state.lastTime)state.lastTime=time;const dt=Math.min(50,time-state.lastTime);state.lastTime=time;state.simPosition+=state.direction*dt/760;if(state.simPosition>=8){state.simPosition=8;state.direction=-1}if(state.simPosition<=0){state.simPosition=0;state.direction=1}drawSimulation(state.simPosition);state.animation=requestAnimationFrame(animationLoop)}
