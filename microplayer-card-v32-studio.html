@@ -77,11 +77,41 @@
     function depthWorker(){if(state.worker)return state.worker;const worker=new Worker(new URL('./depthflow-v42-worker.js',import.meta.url),{type:'module'});worker.onmessage=event=>{const message=event.data||{};if(message.requestId!==state.requestId)return;if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);$('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow prêt. Le relief du fond reste volontairement limité pour protéger les textes.';$('progress').style.width='100%';compose()}if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow indisponible : '+message.message+'\nLe rendu par plans sémantiques reste utilisable.'}};state.worker=worker;return worker}
     $('depthflow').onclick=()=>{state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='DepthFlow démarre sur l’iPad…';const guide=new Uint8ClampedArray(state.rgba);depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer])};
 
+    function renderSemanticPlaneView(position){
+      if(!state.rigidPreview)buildRigidPreviewLayers();
+      const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      const normal=Math.max(-1,Math.min(1,position)),zero=Number($('zero').value);
+      if(Math.abs(normal)<1e-9){
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        return canvas;
+      }
+      ctx.drawImage(state.rigidPreview.base,0,0,state.width,state.height);
+      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
+      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const maxShift=state.width*(Number($('parallax').value)/100);
+      for(const layer of ordered){
+        const z=((Number(layer.depth)-dMin)/span)*2-1;
+        const dx=normal*z*maxShift;
+        // Production views: original RGBA plane only. No extrusion, scale, blur or cast shadow.
+        ctx.drawImage(layer.canvas,dx,0,state.width,state.height);
+      }
+      return canvas;
+    }
+
     async function generateViews(){
-      compose();$('generate').disabled=true;$('generate').textContent='Calcul des 9 vues…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
-      const options={zero:Number($('zero').value),relief:Number($('relief').value)/100,stabilityBand:2,parallaxPercent:Number($('parallax').value),planeSeparation:2.35};
-      for(let index=0;index<9;index++){await new Promise(requestAnimationFrame);const position=(index-4)/4;const rendered=renderNovelView(state.rgba,state.finalDepth,state.width,state.height,position,options);if(index===4)rendered.data.set(state.rgba);const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;canvas.getContext('2d').putImageData(new ImageData(rendered.data,state.width,state.height),0,0);const blob=await toBlob(canvas);state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,holesBeforeFill:rendered.holesBeforeFill,filledPixels:rendered.filledPixels});$('generate').textContent=`Vue ${index+1}/9…`}
-      const centre=state.views[4].getContext('2d').getImageData(0,0,state.width,state.height).data;const centreQc=comparePixels(centre,state.rgba);$('renderStatus').textContent=`QC vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · positions −1 à +1 · interpolation continue.`;$('views').innerHTML=state.urls.map((url,index)=>`<div class="view"><img src="${url}" alt="Vue ${index+1}"><span>${String(index+1).padStart(2,'0')}</span></div>`).join('');$('results').classList.remove('hidden');$('generate').disabled=false;$('generate').textContent='Régénérer les 9 vues';state.simPosition=4;$('simRange').value='4';drawSimulation(4);startAnimation()}
+      compose();if(!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      for(let index=0;index<9;index++){
+        await new Promise(requestAnimationFrame);const position=(index-4)/4;
+        const canvas=renderSemanticPlaneView(position),blob=await toBlob(canvas);
+        state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,mode:'semantic-flat-planes',shadow:false,extrusion:false});
+        $('generate').textContent=`Vue ${index+1}/9…`;
+      }
+      const centre=state.views[4].getContext('2d').getImageData(0,0,state.width,state.height).data,centreQc=comparePixels(centre,state.rgba);
+      $('renderStatus').textContent=`QC vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · 9 vues issues d’une scène maîtresse · plans plats · zéro extrusion · zéro ombre ajoutée.`;
+      $('views').innerHTML=state.urls.map((url,index)=>`<div class="view"><img src="${url}" alt="Vue ${index+1}"><span>${String(index+1).padStart(2,'0')}</span></div>`).join('');
+      $('results').classList.remove('hidden');$('generate').disabled=false;$('generate').textContent='Régénérer les 9 vues';state.simPosition=4;$('simRange').value='4';drawSimulation(4);startAnimation();
+    }
     $('generate').onclick=generateViews;
 
     function buildRigidPreviewLayers(){
@@ -130,10 +160,10 @@
         const dx=normal*z*maxShift;
         // A tiny scale change + contact shadow creates a static height cue without warping glyphs.
         const foreground=(Number(layer.depth)-zero)/127;
-        const scale=1+Math.max(-.006,Math.min(.014,foreground*.010*strength));
+        const scale=1;
         const dw=cardW*scale,dh=cardH*scale,ox=(dw-cardW)/2,oy=(dh-cardH)/2;
-        const shadowPx=Math.max(1,Math.abs(foreground)*3.2*strength);
-        ctx.save();ctx.globalAlpha=Math.min(.18,.045+Math.abs(foreground)*.07);ctx.filter='blur('+Math.min(2.2,.6+shadowPx*.32)+'px)';
+        const shadowPx=Math.max(.15,Math.abs(foreground)*.45*strength);
+        ctx.save();ctx.globalAlpha=Math.min(.035,.008+Math.abs(foreground)*.012);ctx.filter='blur('+Math.min(.55,.15+shadowPx*.18)+'px)';
         ctx.drawImage(layer.canvas,margin+dx-ox+Math.sign(normal)*shadowPx,margin-oy+shadowPx,dw,dh);ctx.restore();
         ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx-ox,margin-oy,dw,dh);ctx.restore();
       });
