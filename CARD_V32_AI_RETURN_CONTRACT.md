@@ -31,3 +31,10 @@ Etats UI
 WAITING_AI -> RECEIVING_AI -> COMPOSING -> QC_FAILED ou READY -> SIMULATING -> RENDERED
 
 Le panneau simulateur et les commandes de generation doivent etre absents ou desactives avant l etat READY.
+
+
+PHOTO 3 PLANS OBLIGATOIRE
+
+Avant toute simulation, le retour IA doit aussi fournir une photo de controle en perspective oblique montrant clairement trois niveaux de profondeur : plan avant, plan intermediaire et fond/carte. Les textes et logos restent des surfaces plates sans epaisseur, avec un vide visible entre les niveaux. Cette photo 3 plans sert de validation visuelle humaine de la scene maitre. Elle n est pas une des 9 vues lenticulaires et ne peut pas etre remplacee par la grille 01-09.
+
+Le statut READY exige donc deux validations : scene maitre RGBA techniquement validee ET photo 3 plans de controle disponible. Sans les deux, aucune grille 9 vues ni simulateur.
