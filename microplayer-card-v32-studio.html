@@ -24,7 +24,7 @@
     <section>
       <section class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
-      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="generate" class="primary" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
+      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
       <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="downloadRelief" disabled>Résultat automatique</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
   </div></main>
@@ -151,6 +151,26 @@
       }
       ctx.restore();$('threePlanWrap').classList.remove('hidden');return true;
     }
+
+    function showMasterBackground(){
+      if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Fond maître indisponible : composer et valider la scène maître d’abord.';return}
+      stopAnimation();$('results').classList.remove('hidden');
+      const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);sim3d.width=w;sim3d.height=h;
+      const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.drawImage(state.aiMaster.background,0,0,w,h);
+      $('simOut').textContent='FOND MAÎTRE';$('renderStatus').className='status warn';$('renderStatus').textContent='QC anti-fantôme : cette image doit contenir uniquement le fond/décor. Aucun texte, logo ou pictogramme destiné au relief ne doit rester visible.';
+    }
+    $('masterBg').onclick=showMasterBackground;
+
+    async function generateThreeViews(){
+      if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Test 3 vues verrouillé : scène maître non validée.';return}
+      stopAnimation();const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'];state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      for(let i=0;i<3;i++){const canvas=renderSemanticPlaneView(positions[i]),blob=await toBlob(canvas);state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:'master-scene-2.5d-test'});}
+      const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
+      $('views').innerHTML=state.urls.map((url,i)=>`<div class="view"><img src="${url}" alt="${labels[i]}"><span>${labels[i]}</span></div>`).join('');
+      $('results').classList.remove('hidden');$('renderStatus').className=qc.different===0?'status ok':'status warn';$('renderStatus').textContent=`TEST 3 VUES · centre : ${qc.different===0?'copie pixel parfaite':'écart '+qc.different+' pixels'} · vérifier zéro fantôme/dédoublement avant d’autoriser les 9 vues.`;
+      state.simPosition=4;drawRigidPreview(4);
+    }
+    $('threeViews').onclick=generateThreeViews;
 
     async function generateViews(){
       if(!state.aiReady||!state.aiMaster){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
@@ -301,8 +321,8 @@
         if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
         state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'production-original-pixels-exclusive-mattes'};
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
-        state.aiReady=true;$('generate').disabled=false;
-        $('aiGate').className='status ok';$('aiGate').textContent='PRODUCTION VALIDÉE : '+masterLayers.length+' calques exclusifs · chevauchements inter-groupes = 0 · pixels originaux verrouillés · 9 vues autorisées.';
+        state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
+        $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
         $('renderStatus').className='status ok';$('renderStatus').textContent='Chaîne impression séparée : scène maître → 9 vues déterministes. Aperçu client = branche indépendante, jamais injectée dans la production.';
       }catch(error){
         state.aiReady=false;$('generate').disabled=true;$('threePlanWrap').classList.add('hidden');
