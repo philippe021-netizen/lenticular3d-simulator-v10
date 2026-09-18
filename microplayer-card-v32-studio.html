@@ -34,7 +34,7 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),sim3d=$('sim3d');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',preview:'card',baseDepth:null,finalDepth:null,history:[],drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',preview:'card',baseDepth:null,finalDepth:null,history:[],drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     const selected=()=>state.groups.find(group=>group.id===state.selected);
@@ -78,6 +78,7 @@
     $('depthflow').onclick=()=>{state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='DepthFlow démarre sur l’iPad…';const guide=new Uint8ClampedArray(state.rgba);depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer])};
 
     function renderSemanticPlaneView(position){
+      if(state.aiMaster)return renderAiMasterView(position);
       if(!state.rigidPreview)buildRigidPreviewLayers();
       const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
       const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
@@ -99,9 +100,20 @@
       return canvas;
     }
 
+    function renderAiMasterView(position){
+      const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      const normal=Math.max(-1,Math.min(1,position)),zero=Number($('zero').value);
+      ctx.drawImage(state.aiMaster.background,0,0,state.width,state.height);
+      const ordered=[...state.aiMaster.layers].sort((a,b)=>a.depth-b.depth);
+      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const maxShift=state.width*(Number($('parallax').value)/100);
+      for(const layer of ordered){const z=((Number(layer.depth)-dMin)/span)*2-1;ctx.drawImage(layer.image,normal*z*maxShift,0,state.width,state.height)}
+      return canvas;
+    }
     async function generateViews(){
       if(!state.aiReady){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
-      compose();if(!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      compose();if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
       for(let index=0;index<9;index++){
         await new Promise(requestAnimationFrame);const position=(index-4)/4;
         const canvas=renderSemanticPlaneView(position),blob=await toBlob(canvas);
