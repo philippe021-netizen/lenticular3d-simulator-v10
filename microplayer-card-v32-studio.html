@@ -113,17 +113,29 @@
       const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);
       const strength=Number($('simDepth').value),normal=(Math.max(0,Math.min(8,position))-4)/4,zero=Number($('zero').value);
       const margin=w*.055,cardW=w-margin*2,cardH=h-margin*2;
+      // Centre is the contractual original: no inpainting, no shadow, no synthetic relief.
+      if(Math.abs(normal)<.0125){
+        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;
+        original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(original,margin,margin,cardW,cardH);
+        $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';return;
+      }
       ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(state.rigidPreview.base,margin,margin,cardW,cardH);
-      const maxShift=cardW*.11*strength;
-      [...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth).forEach(layer=>{
-        const rel=Math.max(-1,Math.min(1,(layer.depth-zero)/127));
-        const dx=normal*rel*maxShift;
-        const lift=Math.abs(rel)*strength;
-        if(lift>.04){
-          ctx.save();ctx.globalAlpha=Math.min(.16,.035+lift*.055);ctx.filter='blur('+Math.min(3,0.7+lift*1.2)+'px)';
-          ctx.drawImage(layer.canvas,margin+dx+Math.sign(normal||1)*(2+lift*2),margin+(2+lift*1.2),cardW,cardH);ctx.restore();ctx.filter='none';
-        }
-        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx,margin,cardW,cardH);ctx.restore();
+      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
+      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const maxShift=cardW*.075*strength;
+      ordered.forEach(layer=>{
+        // Normalize to the actual semantic depth range, so useful depth is not compressed around zero.
+        const z=((Number(layer.depth)-dMin)/span)*2-1;
+        const dx=normal*z*maxShift;
+        // A tiny scale change + contact shadow creates a static height cue without warping glyphs.
+        const foreground=(Number(layer.depth)-zero)/127;
+        const scale=1+Math.max(-.006,Math.min(.014,foreground*.010*strength));
+        const dw=cardW*scale,dh=cardH*scale,ox=(dw-cardW)/2,oy=(dh-cardH)/2;
+        const shadowPx=Math.max(1,Math.abs(foreground)*3.2*strength);
+        ctx.save();ctx.globalAlpha=Math.min(.18,.045+Math.abs(foreground)*.07);ctx.filter='blur('+Math.min(2.2,.6+shadowPx*.32)+'px)';
+        ctx.drawImage(layer.canvas,margin+dx-ox+Math.sign(normal)*shadowPx,margin-oy+shadowPx,dw,dh);ctx.restore();
+        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx-ox,margin-oy,dw,dh);ctx.restore();
       });
       $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
     }
