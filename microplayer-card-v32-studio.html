@@ -97,8 +97,13 @@
         for(let i=0;i<group.mask.length;i++){const a=group.mask[i];if(a<4)continue;protectedMask[i]=Math.max(protectedMask[i],a);const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
         ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label});
       }
-      const base=document.createElement('canvas');base.width=state.width;base.height=state.height;const bctx=base.getContext('2d'),bi=bctx.createImageData(state.width,state.height);
-      for(let i=0;i<protectedMask.length;i++){const j=i*4,a=protectedMask[i]/255;const paper=244;bi.data[j]=Math.round(state.rgba[j]*(1-a)+paper*a);bi.data[j+1]=Math.round(state.rgba[j+1]*(1-a)+paper*a);bi.data[j+2]=Math.round(state.rgba[j+2]*(1-a)+paper*a);bi.data[j+3]=255}bctx.putImageData(bi,0,0);
+      const base=document.createElement('canvas');base.width=state.width;base.height=state.height;const bctx=base.getContext('2d');bctx.drawImage(source,0,0);
+      const clean=bctx.getImageData(0,0,state.width,state.height),src=new Uint8ClampedArray(state.rgba);
+      const radius=Math.max(5,Math.round(Math.min(state.width,state.height)*.012));
+      for(let i=0;i<protectedMask.length;i++){if(protectedMask[i]<20)continue;const x=i%state.width,y=(i/state.width)|0;let rr=0,gg=0,bb=0,n=0;
+        for(let k=0;k<12;k++){const a=k*Math.PI/6,xx=Math.max(0,Math.min(state.width-1,Math.round(x+Math.cos(a)*radius))),yy=Math.max(0,Math.min(state.height-1,Math.round(y+Math.sin(a)*radius))),q=yy*state.width+xx;if(protectedMask[q]>20)continue;const j=q*4;rr+=src[j];gg+=src[j+1];bb+=src[j+2];n++}
+        if(n){const j=i*4;clean.data[j]=rr/n;clean.data[j+1]=gg/n;clean.data[j+2]=bb/n;clean.data[j+3]=255}
+      }bctx.putImageData(clean,0,0);
       state.rigidPreview={base,layers};
     }
     function drawRigidPreview(position){
@@ -108,10 +113,15 @@
       const strength=Number($('simDepth').value),normal=(Math.max(0,Math.min(8,position))-4)/4,zero=Number($('zero').value);
       const margin=w*.055,cardW=w-margin*2,cardH=h-margin*2;
       ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(state.rigidPreview.base,margin,margin,cardW,cardH);
-      const maxShift=cardW*.055*strength;
+      const maxShift=cardW*.11*strength;
       [...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth).forEach(layer=>{
         const rel=Math.max(-1,Math.min(1,(layer.depth-zero)/127));
         const dx=normal*rel*maxShift;
+        const lift=Math.abs(rel)*strength;
+        if(lift>.04){
+          ctx.save();ctx.globalAlpha=Math.min(.16,.035+lift*.055);ctx.filter='blur('+Math.min(3,0.7+lift*1.2)+'px)';
+          ctx.drawImage(layer.canvas,margin+dx+Math.sign(normal||1)*(2+lift*2),margin+(2+lift*1.2),cardW,cardH);ctx.restore();ctx.filter='none';
+        }
         ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx,margin,cardW,cardH);ctx.restore();
       });
       $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
