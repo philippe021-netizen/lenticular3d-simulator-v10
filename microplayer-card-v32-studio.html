@@ -112,7 +112,7 @@
       return canvas;
     }
     async function generateViews(){
-      if(!state.aiReady){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
+      if(!state.aiReady||!state.aiMaster){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
       compose();if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
       for(let index=0;index<9;index++){
         await new Promise(requestAnimationFrame);const position=(index-4)/4;
@@ -250,7 +250,7 @@
         })});
         const data=await response.json();if(!response.ok)throw Error(data.error||('HTTP '+response.status));
         state.autoRelief=data;
-        state.aiReady=true;$('generate').disabled=false;$('aiGate').className='status ok';$('aiGate').textContent='Retour IA reçu et composition validée. Simulateur déverrouillé.';
+        state.aiReady=false;state.aiMaster=null;$('generate').disabled=true;$('aiGate').className='status warn';$('aiGate').textContent='Analyse sémantique reçue, mais aucune photo 3 plans IA n’a encore été recomposée. Simulateur et 9 vues bloqués.';
         const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
         let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
