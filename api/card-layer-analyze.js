@@ -3,6 +3,7 @@ import {
   buildSemanticGroups,
   classifyCardText,
   documentInventory,
+  mergeRecoveredCardText,
   normaliseCardBox,
   pairSemanticGroups,
   sanitiseOcrLines,
@@ -147,15 +148,19 @@ Travail demandé :
 3. Détecte les seuls éléments NON TEXTUELS visibles : logo principal et ses composants, pictogrammes de téléphone/e-mail/adresse/web/réseau, QR, grand graphisme décoratif, illustration ou sujet.
 4. Un pictogramme associé reprend le groupId et le rôle de son texte. Les composants d'un logo peuvent partager logo-main.
 5. Les bbox et polygons sont normalisés sur la carte entière et serrés. Ne renvoie aucun texte dans visual_elements.
+6. Contrôle visuellement si une ligne lisible manque totalement dans OCR_LOCAL (baseline peu contrastée, signature ou slogan manuscrit). Seulement dans ce cas, ajoute-la à recovered_text_elements avec transcription exacte, bbox serrée et confiance. Ne duplique jamais une zone OCR_LOCAL et n'invente rien.
 
 Réponds uniquement en JSON valide :
-{"summary":"...","ocr_annotations":[{"ocrId":"ocr-1","role":"name","groupId":"name-main","groupLabel":"Nom"}],"visual_elements":[{"id":"visual-1","type":"logo|qr|object|artwork|subject|signature","role":"logo|phone|email|address|website|social|qr|artwork|subject|other","label":"...","bbox":[0,0,0,0],"polygon":[[0,0],[1,0],[1,1],[0,1]],"groupId":"...","groupLabel":"...","component":"icon|symbol|wordmark|decoration","confidence":0.95}]}
+{"summary":"...","ocr_annotations":[{"ocrId":"ocr-1","role":"name","groupId":"name-main","groupLabel":"Nom"}],"recovered_text_elements":[{"id":"recovered-1","text":"...","role":"slogan|company|other","groupId":"...","groupLabel":"...","bbox":[0,0,0,0],"confidence":0.9}],"visual_elements":[{"id":"visual-1","type":"logo|qr|object|artwork|subject|signature","role":"logo|phone|email|address|website|social|qr|artwork|subject|other","label":"...","bbox":[0,0,0,0],"polygon":[[0,0],[1,0],[1,1],[0,1]],"groupId":"...","groupLabel":"...","component":"icon|symbol|wordmark|decoration","confidence":0.95}]}
 
 Si OCR_LOCAL est vide, relève exceptionnellement les lignes dans fallback_text_elements avec texte exact et bbox, sans inventer : {"fallback_text_elements":[{"id":"fallback-1","text":"...","bbox":[0,0,0,0],"confidence":0.8}]}.`;
 
   const parsed = await runVision({ image, instructions, key, useGateway, maxOutputTokens: 8000 });
   const fallback = ocr.length ? [] : sanitiseOcrLines(parsed?.fallback_text_elements || []).map(line => ({ ...line, source: "vision-ocr-fallback" }));
-  const authoritativeText = applyOcrAnnotations(ocr.length ? ocr : fallback, parsed?.ocr_annotations || []);
+  const recoveredRaw = Array.isArray(parsed?.recovered_text_elements) ? parsed.recovered_text_elements : [];
+  const mergedText = mergeRecoveredCardText(ocr.length ? ocr : fallback, recoveredRaw);
+  const recoveredAnnotations = recoveredRaw.map(item => ({ ocrId:item?.id, role:item?.role, groupId:item?.groupId, groupLabel:item?.groupLabel }));
+  const authoritativeText = applyOcrAnnotations(mergedText, [...(parsed?.ocr_annotations || []), ...recoveredAnnotations]);
   const visual = (Array.isArray(parsed?.visual_elements) ? parsed.visual_elements : []).map(cleanVisualElement).filter(Boolean);
   const layers = pairSemanticGroups([...authoritativeText, ...visual]).sort((a, b) => a.bbox[1] - b.bbox[1] || a.bbox[0] - b.bbox[0]);
   const groups = buildSemanticGroups(layers);

@@ -249,6 +249,25 @@ export function renderNovelView(source, depth, width, height, position, options 
   let holesBeforeFill = 0;
   for (let index = 0; index < valid.length; index += 1) holesBeforeFill += valid[index] ? 0 : 1;
   const originalValid = new Uint8Array(valid);
+  const fillSource = new Int32Array(pixelCount);
+  const fillDistance = new Uint16Array(pixelCount);
+  fillSource.fill(-1);
+  fillDistance.fill(65535);
+  const considerFill = (index, candidateIndex, distance) => {
+    if (candidateIndex < 0 || !originalValid[candidateIndex]) return;
+    const currentIndex = fillSource[index];
+    if (currentIndex < 0) {
+      fillSource[index] = candidateIndex;
+      fillDistance[index] = distance;
+      return;
+    }
+    const currentDepth = depthBuffer[currentIndex];
+    const candidateDepth = depthBuffer[candidateIndex];
+    if (candidateDepth < currentDepth - 8 || (Math.abs(candidateDepth - currentDepth) <= 8 && distance < fillDistance[index])) {
+      fillSource[index] = candidateIndex;
+      fillDistance[index] = distance;
+    }
+  };
   const left = new Int32Array(width);
   const right = new Int32Array(width);
 
@@ -268,28 +287,49 @@ export function renderNovelView(source, depth, width, height, position, options 
     for (let x = 0; x < width; x += 1) {
       const index = y * width + x;
       if (valid[index]) continue;
-      const leftX = left[x];
-      const rightX = right[x];
-      let chosenX = leftX >= 0 ? leftX : rightX;
-      if (leftX >= 0 && rightX >= 0) {
-        const leftIndex = y * width + leftX;
-        const rightIndex = y * width + rightX;
-        const leftDepth = depthBuffer[leftIndex];
-        const rightDepth = depthBuffer[rightIndex];
-        if (Math.abs(leftDepth - rightDepth) > 8) chosenX = leftDepth < rightDepth ? leftX : rightX;
-        else chosenX = x - leftX <= rightX - x ? leftX : rightX;
-      }
-      if (chosenX < 0) continue;
-      const chosenIndex = y * width + chosenX;
-      const chosenColor = chosenIndex * 4;
-      const targetColor = index * 4;
-      output[targetColor] = output[chosenColor];
-      output[targetColor + 1] = output[chosenColor + 1];
-      output[targetColor + 2] = output[chosenColor + 2];
-      output[targetColor + 3] = 255;
-      depthBuffer[index] = depthBuffer[chosenIndex];
-      valid[index] = 1;
+      considerFill(index, left[x] < 0 ? -1 : y * width + left[x], left[x] < 0 ? 65535 : x - left[x]);
+      considerFill(index, right[x] < 0 ? -1 : y * width + right[x], right[x] < 0 ? 65535 : right[x] - x);
     }
+  }
+
+  const top = new Int32Array(height);
+  const bottom = new Int32Array(height);
+  for (let x = 0; x < width; x += 1) {
+    let nearest = -1;
+    for (let y = 0; y < height; y += 1) {
+      const index = y * width + x;
+      if (originalValid[index]) nearest = y;
+      top[y] = nearest;
+    }
+    nearest = -1;
+    for (let y = height - 1; y >= 0; y -= 1) {
+      const index = y * width + x;
+      if (originalValid[index]) nearest = y;
+      bottom[y] = nearest;
+    }
+    for (let y = 0; y < height; y += 1) {
+      const index = y * width + x;
+      if (originalValid[index]) continue;
+      considerFill(index, top[y] < 0 ? -1 : top[y] * width + x, top[y] < 0 ? 65535 : y - top[y]);
+      considerFill(index, bottom[y] < 0 ? -1 : bottom[y] * width + x, bottom[y] < 0 ? 65535 : bottom[y] - y);
+    }
+  }
+
+  for (let index = 0; index < valid.length; index += 1) {
+      if (valid[index]) continue;
+      const chosenIndex = fillSource[index];
+      if (chosenIndex < 0) continue;
+      const targetColor = index * 4;
+      const chosenDepth = depthBuffer[chosenIndex];
+      const sourceIsBackground = depth[index] <= chosenDepth + 8;
+      const chosenColor = sourceIsBackground ? targetColor : chosenIndex * 4;
+      const chosenPixels = sourceIsBackground ? source : output;
+      output[targetColor] = chosenPixels[chosenColor];
+      output[targetColor + 1] = chosenPixels[chosenColor + 1];
+      output[targetColor + 2] = chosenPixels[chosenColor + 2];
+      output[targetColor + 3] = 255;
+      depthBuffer[index] = sourceIsBackground ? depth[index] : chosenDepth;
+      valid[index] = 1;
   }
 
   let filledPixels = 0;

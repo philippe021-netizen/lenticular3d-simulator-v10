@@ -72,6 +72,15 @@ function intersectionOverUnion(a, b) {
   return union ? intersection / union : 0;
 }
 
+function overlapOverSmaller(a, b) {
+  const left = Math.max(a[0], b[0]);
+  const top = Math.max(a[1], b[1]);
+  const right = Math.min(a[0] + a[2], b[0] + b[2]);
+  const bottom = Math.min(a[1] + a[3], b[1] + b[3]);
+  const intersection = Math.max(0, right - left) * Math.max(0, bottom - top);
+  return intersection / Math.max(1e-9, Math.min(a[2] * a[3], b[2] * b[3]));
+}
+
 export function sanitiseOcrLines(lines = []) {
   const cleaned = lines.map((line, index) => {
     const bbox = normaliseCardBox(line?.bbox);
@@ -100,6 +109,16 @@ export function sanitiseOcrLines(lines = []) {
     other.text.toLocaleLowerCase("fr") === line.text.toLocaleLowerCase("fr") &&
     intersectionOverUnion(other.bbox, line.bbox) > 0.7
   )));
+}
+
+export function mergeRecoveredCardText(primaryLines = [], recoveredLines = []) {
+  const primary = sanitiseOcrLines(primaryLines);
+  const recovered = sanitiseOcrLines(recoveredLines).filter(line => (
+    line.confidence >= 0.78 &&
+    line.bbox[2] * line.bbox[3] <= 0.12 &&
+    !primary.some(existing => overlapOverSmaller(existing.bbox, line.bbox) >= 0.42)
+  )).map(line => ({ ...line, source: "vision-text-recovery" }));
+  return [...primary, ...recovered];
 }
 
 function centre(box) {
