@@ -227,8 +227,9 @@
       try{
         if(!state.rigidPreview)buildRigidPreviewLayers();
         const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-        const response=await fetch('/api/card-relief-compose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
           image:canvasDataUrl(original),
+          mode:'relief-compose-v32',
           background:canvasDataUrl(state.rigidPreview.base),
           width:state.width,height:state.height,
           zero:Number($('zero').value),parallax:Number($('parallax').value),
