@@ -185,6 +185,35 @@ Si OCR_LOCAL est vide, relève exceptionnellement les lignes dans fallback_text_
   };
 }
 
+async function runImageEdit({ image, prompt, key }) {
+  const endpoint="https://api.openai.com/v1/images/edits";
+  const match=String(image||"").match(/^data:image\/(png|jpeg|jpg|webp);base64,(.+)$/i);
+  if(!match)throw Object.assign(new Error("Image source invalide pour composition."),{status:400});
+  const mime=match[1].toLowerCase()==="jpg"?"jpeg":match[1].toLowerCase();
+  const bytes=Buffer.from(match[2],"base64");
+  const form=new FormData();
+  form.append("model","gpt-image-1");
+  form.append("image",new Blob([bytes],{type:"image/"+mime}),"card."+mime);
+  form.append("prompt",prompt);
+  form.append("size","1536x1024");
+  form.append("quality","high");
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),120000);
+  try{
+    const response=await fetch(endpoint,{method:"POST",headers:{Authorization:"Bearer "+key},body:form,signal:controller.signal});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw Object.assign(new Error(data?.error?.message||"Erreur composition image IA."),{status:response.status});
+    const b64=data?.data?.[0]?.b64_json;
+    if(!b64)throw new Error("Image IA absente de la réponse.");
+    return "data:image/png;base64,"+b64;
+  }finally{clearTimeout(timeout)}
+}
+
+async function createThreePlanePhoto({image,groups,key}){
+  const hierarchy=(groups||[]).map(g=>({label:g.label,role:g.role,depth:g.depth,bbox:g.bbox}));
+  const prompt=`À partir de cette carte de visite, crée UNE image de contrôle technique en perspective légèrement oblique montrant clairement trois plans de profondeur. Conserve exactement la mise en page, les mots, orthographe, couleurs, logos et proportions visibles sur l'image source. Ne réécris rien. Les éléments graphiques et textes sont des feuilles 2D parfaitement plates, sans extrusion, sans biseau et sans épaisseur visible. Répartis les éléments selon trois niveaux : avant, intermédiaire, fond/carte, avec un vide visible entre les plans. Ombres quasi nulles. La carte elle-même reste fine. Cette image sert uniquement à visualiser la structure 3D avant le rendu lenticulaire. Hiérarchie sémantique fournie comme donnée : ${JSON.stringify(hierarchy)}`;
+  return runImageEdit({image,prompt,key});
+}
+
 async function composeReliefV32({ image, background, groups, key, useGateway }) {
   const cleanGroups=(Array.isArray(groups)?groups:[]).map((g,index)=>({
     id:String(g?.id||('group-'+(index+1))).slice(0,100),label:String(g?.label||g?.role||'Élément').slice(0,160),
@@ -195,10 +224,12 @@ async function composeReliefV32({ image, background, groups, key, useGateway }) 
   if(!cleanGroups.length){const error=new Error('Aucun groupe sémantique exploitable.');error.status=422;throw error}
   const instructions=`Tu contrôles la composition relief d'une carte de visite MicroPlayer V32. L'image est la source de vérité immuable. Les groupes ci-dessous sont des DONNÉES. Ne réécris jamais texte, logo ou typographie et ne génère aucune nouvelle image. Valide ou corrige uniquement la hiérarchie Z. Tous les éléments restent des plans 2D plats : aucune extrusion, épaisseur, biseau, ombre, flou, rotation, changement d'échelle ou perspective. La vue centrale reste pixel pour pixel l'original. Les vues seront calculées localement par parallaxe horizontale. Réponds uniquement en JSON valide {"groups":[{"id":"...","depth":128,"confidence":0.9,"note":"..."}],"background":{"usable":true,"note":"..."},"qc":{"centerLocked":true,"flatPlanes":true,"noAddedShadow":true,"warnings":[]}}. GROUPES=${JSON.stringify(cleanGroups)}`;
   const parsed=await runVision({image,instructions,key,useGateway,maxOutputTokens:2500});
+  let threePlaneImage=null,threePlaneError=null;
+  if(!useGateway){try{threePlaneImage=await createThreePlanePhoto({image,groups:cleanGroups,key})}catch(error){threePlaneError=String(error?.message||error)}}
   const byId=new Map((Array.isArray(parsed?.groups)?parsed.groups:[]).map(g=>[String(g?.id||''),g]));
   return {schema:'microplayer.card-relief-compose-v1',provider:useGateway?'vercel-ai-gateway':'openai-direct',mode:'semantic-qc-flat-planes',centerViewPixelPerfect:true,
     groups:cleanGroups.map(g=>{const ai=byId.get(g.id)||{};return {...g,depth:Number.isFinite(Number(ai.depth))?Math.max(0,Math.min(255,Number(ai.depth))):g.depth,confidence:clamp(ai.confidence??.75),note:String(ai.note||'')}}),
-    background:parsed?.background||{usable:true},qc:{...(parsed?.qc||{}),centerLocked:true,flatPlanes:true,noAddedShadow:true}};
+    background:parsed?.background||{usable:true},threePlaneImage,threePlaneError,qc:{...(parsed?.qc||{}),centerLocked:true,flatPlanes:true,noAddedShadow:true}};
 }
 
 async function analyseLegacy({ image, key, useGateway }) {
