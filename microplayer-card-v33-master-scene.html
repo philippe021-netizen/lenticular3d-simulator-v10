@@ -387,17 +387,22 @@
         try{await rebuildMasterWithMigan();}catch(inpaintError){throw Error('Reconstruction IA du fond impossible — '+inpaintError.message);}
         $('aiGate').textContent='Analyse IA reçue · étape 3/5 : contrôle anti-fantôme…';
         state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine||'none';
-        // V33 anti-ghost gate: quantify whether foreground ink survived inside the reconstructed background.
-        // We compare removed pixels against their original foreground colour. A high similarity ratio means
-        // the old glyph/logo is still present in background_master and MUST block parallax generation.
+        // V33 strict anti-ghost gate. The previous colour-difference test could pass a master that still
+        // contained readable glyphs. Compare each reconstructed removal pixel with its local clean-background
+        // ring: a good master must be locally continuous, not merely different from the original foreground.
         const rm=state.rigidPreview.removalMask,bgCtx=state.rigidPreview.base.getContext('2d'),bgPx=bgCtx.getImageData(0,0,state.width,state.height).data;
-        let removed=0,ghost=0,deltaSum=0;
-        for(let i=0;i<rm.length;i++){if(!rm[i])continue;removed++;const j=i*4;const d=Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]);deltaSum+=d;if(d<24)ghost++;}
-        const ghostRatio=removed?ghost/removed:0,meanDelta=removed?deltaSum/removed:255;
-        state.masterQc.ghost={removed,ghost,ratio:Number((ghostRatio*100).toFixed(2)),meanDelta:Number(meanDelta.toFixed(2))};
-        // Conservative first gate: do not manufacture 3/9 views from a demonstrably contaminated master.
-        // Threshold is intentionally lenient because flat-colour foreground can legitimately resemble background.
-        if(removed>200&&ghostRatio>.18)throw Error('QC anti-fantôme refusé · '+state.masterQc.ghost.ratio+'% de la zone supprimée ressemble encore aux pixels d’origine. Fond maître à reconstruire avant simulation.');
+        const W=state.width,H=state.height,N=W*H,ringR=Math.max(3,Math.round(Math.min(W,H)*.008));
+        let removed=0,suspect=0,residual=0,errSum=0;
+        for(let i=0;i<N;i++){if(!rm[i])continue;removed++;const x=i%W,y=(i/W)|0,j=i*4;let rr=0,gg=0,bb=0,n=0;
+          for(let k=0;k<16;k++){const a=k*Math.PI/8,xx=Math.max(0,Math.min(W-1,Math.round(x+Math.cos(a)*ringR))),yy=Math.max(0,Math.min(H-1,Math.round(y+Math.sin(a)*ringR))),q=yy*W+xx;if(rm[q])continue;const p=q*4;rr+=bgPx[p];gg+=bgPx[p+1];bb+=bgPx[p+2];n++}
+          if(!n)continue;rr/=n;gg/=n;bb/=n;const localErr=(Math.abs(bgPx[j]-rr)+Math.abs(bgPx[j+1]-gg)+Math.abs(bgPx[j+2]-bb))/3;errSum+=localErr;
+          const originalDelta=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;
+          if(localErr>38)suspect++;if(localErr>28&&originalDelta<35)residual++;
+        }
+        const suspectRatio=removed?suspect/removed:0,residualRatio=removed?residual/removed:0,meanLocalError=removed?errSum/removed:0;
+        state.masterQc.ghost={removed,suspect,residual,ratio:Number((residualRatio*100).toFixed(2)),suspectRatio:Number((suspectRatio*100).toFixed(2)),meanLocalError:Number(meanLocalError.toFixed(2))};
+        // Do not unlock 3/9 views while reconstructed foreground-shaped residue remains.
+        if(removed>200&&(residualRatio>.035||suspectRatio>.12))throw Error('QC anti-fantôme strict refusé · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'%. Le fond maître contient encore des traces de texte/logo.');
         const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
         if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
         state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'v33-master-scene-anti-ghost-gated',qc:state.masterQc};
