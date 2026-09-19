@@ -110,7 +110,14 @@
       const ordered=[...state.aiMaster.layers].sort((a,b)=>a.depth-b.depth);
       const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
       const maxShift=state.width*(Number($('parallax').value)/100);
-      for(const layer of ordered){const z=((Number(layer.depth)-dMin)/span)*2-1;ctx.drawImage(layer.image,normal*z*maxShift,0,state.width,state.height)}
+      // Per-view LDI disocclusion: the master background is authoritative. Each foreground plane is
+      // translated once from its original RGBA pixels; vacated source pixels are therefore revealed
+      // from background_master, never from another copy of the original card.
+      for(const layer of ordered){
+        const z=((Number(layer.depth)-dMin)/span)*2-1,dx=normal*z*maxShift;
+        ctx.save();ctx.beginPath();ctx.rect(0,0,state.width,state.height);ctx.clip();
+        ctx.drawImage(layer.image,dx,0,state.width,state.height);ctx.restore();
+      }
       return canvas;
     }
 
@@ -421,7 +428,9 @@
           lctx.putImageData(lid,0,0);masterLayers.push({image:layer,depth:group.depth,label:group.label,groupId:group.id});
         }
         if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
-        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'v33-master-scene-original-pixels-exclusive',qc:state.masterQc};
+        // Freeze an immutable production background; later preview/simulator operations must not mutate it.
+        const frozenBg=document.createElement('canvas');frozenBg.width=state.width;frozenBg.height=state.height;frozenBg.getContext('2d').drawImage(state.rigidPreview.base,0,0);
+        state.aiMaster={background:frozenBg,layers:masterLayers,source:'v33-master-scene-ldi-disocclusion',qc:state.masterQc};
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
         state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
         $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
