@@ -228,10 +228,12 @@
       if(inputNames.length===1){
         // This MI-GAN export exposes one 4-channel input: RGB + mask, shape [1,4,H,W].
         // Mask convention follows inpaint-web: 255 = pixels kept, 0 = area to reconstruct.
-        const packed=new Uint8Array(4*N);
-        packed.set(rgb,0);
-        for(let i=0;i<N;i++)packed[3*N+i]=rm[i]?0:255;
-        feeds[inputNames[0]]=new ort.Tensor('uint8',packed,[1,4,H,W]);
+        // This ONNX export exposes one FLOAT input [1,4,H,W].
+        // MI-GAN expects normalized RGB plus mask in the fourth channel.
+        const packed=new Float32Array(4*N);
+        for(let i=0;i<3*N;i++)packed[i]=rgb[i]/255;
+        for(let i=0;i<N;i++)packed[3*N+i]=rm[i]?0:1;
+        feeds[inputNames[0]]=new ort.Tensor('float32',packed,[1,4,H,W]);
       }else{
         feeds[inputNames[0]]=new ort.Tensor('uint8',rgb,[1,3,H,W]);
         feeds[inputNames[1]]=new ort.Tensor('uint8',mask,[1,1,H,W]);
