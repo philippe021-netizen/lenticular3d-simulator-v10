@@ -410,9 +410,18 @@
         // Residual similarity is the foreground-ghost metric. Local discontinuity is diagnostic only:
         // legitimate card artwork/gradients can be discontinuous and must not be mislabeled as surviving text.
         if(removed>200&&residualRatio>.035)throw Error('QC anti-fantôme strict refusé · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'% (diagnostic). Le fond maître contient encore des traces probables de texte/logo.');
-        const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
+        // Rebuild production layers from the ORIGINAL pixels after exclusivity/QC.
+        // Their alpha is clipped by the removal mask so no source glyph can remain simultaneously
+        // in background_master and in a moving foreground plane.
+        const rmProd=state.rigidPreview.removalMask,NProd=state.width*state.height,masterLayers=[];
+        for(const group of state.groups){
+          const role=String(group.role||'').toLowerCase();if(['artwork','subject','background','decor','decoration'].includes(role))continue;
+          const layer=document.createElement('canvas');layer.width=state.width;layer.height=state.height;const lctx=layer.getContext('2d'),lid=lctx.createImageData(state.width,state.height);
+          for(let i=0;i<NProd;i++){const a=group.mask[i];if(a<12||!rmProd[i])continue;const j=i*4;lid.data[j]=state.rgba[j];lid.data[j+1]=state.rgba[j+1];lid.data[j+2]=state.rgba[j+2];lid.data[j+3]=a}
+          lctx.putImageData(lid,0,0);masterLayers.push({image:layer,depth:group.depth,label:group.label,groupId:group.id});
+        }
         if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
-        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'v33-master-scene-anti-ghost-gated',qc:state.masterQc};
+        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'v33-master-scene-original-pixels-exclusive',qc:state.masterQc};
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
         state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
         $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
