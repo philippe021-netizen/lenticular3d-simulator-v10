@@ -25,7 +25,7 @@
       <section class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="generate" class="primary" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
-      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="downloadRelief" disabled>Résultat automatique</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
+      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="-5" max="5" step=".1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="downloadRelief" disabled>Résultat automatique</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
   </div></main>
   <script type="module">
@@ -227,24 +227,31 @@
         ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(original,margin,margin,cardW,cardH);
         $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';return;
       }
-      ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(state.rigidPreview.base,margin,margin,cardW,cardH);
       const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
       const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
-      const maxShift=cardW*.075*strength;
+      // Turntable 2.5D: the card rotates; semantic planes keep their own Z height.
+      // A single projective transform is used for every plane, then each Z gets only the
+      // perspective/parallax displacement caused by its distance from the card.
+      const angleDeg=normal*5,angle=angleDeg*Math.PI/180,cos=Math.cos(angle);
+      const projectedW=cardW*cos,sideInset=(cardW-projectedW)/2;
+      const perspectiveSkew=normal*cardH*.018;
+      const drawPlane=(source,zNorm)=>{
+        const zLift=zNorm*cardW*.055*strength;
+        // Foreground planes counter-shift relative to the rotating base, creating the
+        // impression that lettering is suspended at different heights above the card.
+        const parallax=-Math.sin(angle)*zLift*3.2;
+        ctx.save();
+        ctx.setTransform(1,normal*.012,normal*.018,1,0,0);
+        ctx.drawImage(source,margin+sideInset+parallax,margin-perspectiveSkew*zNorm,projectedW,cardH);
+        ctx.restore();
+      };
+      ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      drawPlane(state.rigidPreview.base,0);
       ordered.forEach(layer=>{
-        // Normalize to the actual semantic depth range, so useful depth is not compressed around zero.
-        const z=((Number(layer.depth)-dMin)/span)*2-1;
-        const dx=normal*z*maxShift;
-        // A tiny scale change + contact shadow creates a static height cue without warping glyphs.
-        const foreground=(Number(layer.depth)-zero)/127;
-        const scale=1;
-        const dw=cardW*scale,dh=cardH*scale,ox=(dw-cardW)/2,oy=(dh-cardH)/2;
-        const shadowPx=Math.max(.15,Math.abs(foreground)*.45*strength);
-        ctx.save();ctx.globalAlpha=Math.min(.035,.008+Math.abs(foreground)*.012);ctx.filter='blur('+Math.min(.55,.15+shadowPx*.18)+'px)';
-        ctx.drawImage(layer.canvas,margin+dx-ox+Math.sign(normal)*shadowPx,margin-oy+shadowPx,dw,dh);ctx.restore();
-        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx-ox,margin-oy,dw,dh);ctx.restore();
+        const zNorm=Math.max(0,(Number(layer.depth)-dMin)/span);
+        drawPlane(layer.canvas,zNorm);
       });
-      $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
+      $('tiltOut').textContent=angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
     }
     function drawReliefPhoto(){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();stopAnimation();
