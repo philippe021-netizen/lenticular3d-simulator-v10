@@ -305,48 +305,45 @@
     $('reliefGuide').onclick=async()=>{const m=await buildReliefPackage(false);$('renderStatus').textContent='Diagnostic scène maîtresse : '+m.depth.groups.length+' plans exportables · zéro '+m.depth.zero+' · IA = reconstruction unique · MicroPlayer = 9 vues déterministes · sans extrusion ni ombre.'};
     function canvasDataUrl(canvas){return canvas.toDataURL('image/png')}
     async function createAutomaticRelief(){
-      if(!state.rgba)return;
-      $('photoRelief').disabled=true;$('photoRelief').textContent='Traitement IA…';
-      $('renderStatus').className='status';$('renderStatus').textContent='MicroPlayer envoie la carte comprise au moteur de composition. Aucun texte ni logo ne sera réécrit.';
+      if(!state.rgba){$('aiGate').className='status warn';$('aiGate').textContent='Carte non initialisée : impossible de lancer la composition.';return}
+      $('photoRelief').disabled=true;$('photoRelief').textContent='Préparation…';
+      $('renderStatus').className='status';$('renderStatus').textContent='Préparation locale de la scène maître…';
+      let timer=null;
       try{
-        if(!state.rigidPreview)buildRigidPreviewLayers();
+        // Build the local production master first. AI is advisory and must never gate the 9 production views.
+        if(!state.rigidPreview){await new Promise(resolve=>requestAnimationFrame(resolve));buildRigidPreviewLayers()}
+        state.masterQc=qcMasterScene();
+        state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master'};
+        state.aiReady=true;$('generate').disabled=false;
+        $('aiGate').className='status ok';$('aiGate').textContent='Scène maître locale prête · 9 vues déjà autorisées. Consultation IA en cours…';
+        $('photoRelief').textContent='IA en cours…';
         const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-        const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-          image:canvasDataUrl(original),
-          mode:'relief-compose-v32',
-          background:canvasDataUrl(state.rigidPreview.base),
-          width:state.width,height:state.height,
+        const controller=new AbortController();timer=setTimeout(()=>controller.abort(),45000);
+        const response=await fetch('/api/card-layer-analyze',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          image:canvasDataUrl(original),mode:'relief-compose-v32',width:state.width,height:state.height,
           zero:Number($('zero').value),parallax:Number($('parallax').value),
           groups:state.groups.map(group=>({id:group.id,label:group.label,role:group.role,type:group.type,depth:Number(group.depth),bbox:group.bbox,items:(group.items||[]).map(item=>({id:item.id,type:item.type,role:item.role,text:item.text||'',label:item.label||'',bbox:item.bbox}))}))
         })});
-        let data=null;
-        try{data=await response.json()}catch(parseError){data=null}
+        clearTimeout(timer);timer=null;
+        let data=null;try{data=await response.json()}catch(parseError){}
         if(!response.ok)throw Error((data&&data.error)||('IA HTTP '+response.status));
         state.autoRelief=data||{};
-        state.aiReady=false;state.aiMaster=null;$('generate').disabled=true;$('results').classList.add('hidden');$('aiGate').className='status warn';$('aiGate').textContent='Analyse IA reçue. Construction de la photo 3 plans de contrôle…';
-        const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
-        let changed=false;
+        const corrected=new Map((data?.groups||[]).map(group=>[String(group.id),Number(group.depth)]));let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
-        if(changed){renderGroups();compose();}
-        const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;
-        const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
-        // Diagnostic QC is reported but never blocks the AI/composition pipeline.
-        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'production-original-pixels-exclusive-mattes'};
-        const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
-        state.aiReady=true;$('generate').disabled=false;
-        $('aiGate').className='status ok';$('aiGate').textContent='PRODUCTION VALIDÉE : '+masterLayers.length+' calques exclusifs · chevauchements inter-groupes = 0 · pixels originaux verrouillés · 9 vues autorisées.';
-        $('renderStatus').className='status ok';$('renderStatus').textContent='Chaîne impression séparée : scène maître → 9 vues déterministes. Aperçu client = branche indépendante, jamais injectée dans la production.';
-      }catch(error){
-        // Network/AI failure must never stop local composition or diagnostic export.
-        if(!state.rigidPreview)buildRigidPreviewLayers();
-        state.masterQc=qcMasterScene();
-        state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-master-after-ai-network-failure'};
+        if(changed){renderGroups();compose();await new Promise(resolve=>requestAnimationFrame(resolve));state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master-ai-depth-qc'}}
         buildThreePlanControl();
         state.aiReady=true;$('generate').disabled=false;
-        $('aiGate').className='status warn';$('aiGate').textContent='IA distante indisponible ('+(error.message||'Load failed')+'). Pipeline local maintenu : production, 9 vues et ZIP restent accessibles.';
-        $('clientGate').className='status warn';$('clientGate').textContent='Aperçu client IA indisponible pour cet essai ; cela ne bloque plus la production.';
-        $('renderStatus').className='status warn';$('renderStatus').textContent='Diagnostic réseau IA : '+(error.message||'Load failed')+'. Scène maître locale conservée pour analyse.';
-      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Envoyer à l’IA et composer'}
+        $('aiGate').className='status ok';$('aiGate').textContent='IA reçue · profondeurs contrôlées · scène maître locale conservée · PRODUCTION 9 vues autorisée.';
+        $('renderStatus').className='status ok';$('renderStatus').textContent='Production indépendante de l’IA : pixels originaux + plans sémantiques + parallaxe déterministe.';
+      }catch(error){
+        if(timer)clearTimeout(timer);
+        if(!state.rigidPreview)buildRigidPreviewLayers();
+        state.masterQc=qcMasterScene();state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-master-ai-fallback'};
+        buildThreePlanControl();state.aiReady=true;$('generate').disabled=false;
+        const reason=error?.name==='AbortError'?'délai IA dépassé (45 s)':(error?.message||'erreur inconnue');
+        $('aiGate').className='status warn';$('aiGate').textContent='IA non disponible : '+reason+'. Les 9 vues restent autorisées avec la scène maître locale.';
+        $('renderStatus').className='status warn';$('renderStatus').textContent='Mode secours local actif : la panne IA ne bloque plus la production.';
+      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Relancer contrôle IA'}
     }
     $('photoRelief').onclick=createAutomaticRelief;
     $('downloadRelief').onclick=()=>{};
