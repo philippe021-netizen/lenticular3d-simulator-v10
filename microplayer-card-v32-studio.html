@@ -330,7 +330,7 @@
         state.autoRelief=data||{};
         const corrected=new Map((data?.groups||[]).map(group=>[String(group.id),Number(group.depth)]));let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
-        if(changed){renderGroups();compose();await new Promise(resolve=>requestAnimationFrame(resolve));state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master-ai-depth-qc'}}
+        if(changed){renderGroups();compose();const depthByLabel=new Map(state.groups.map(group=>[String(group.label),Number(group.depth)]));state.rigidPreview.layers.forEach(layer=>{const d=depthByLabel.get(String(layer.label));if(Number.isFinite(d))layer.depth=d});state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master-ai-depth-qc'}}
         buildThreePlanControl();
         state.aiReady=true;$('generate').disabled=false;
         $('aiGate').className='status ok';$('aiGate').textContent='IA reçue · profondeurs contrôlées · scène maître locale conservée · PRODUCTION 9 vues autorisée.';
@@ -345,7 +345,19 @@
         $('renderStatus').className='status warn';$('renderStatus').textContent='Mode secours local actif : la panne IA ne bloque plus la production.';
       }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Relancer contrôle IA'}
     }
-    $('photoRelief').onclick=createAutomaticRelief;
+    // iPad/Safari: attach both pointer and click activation and show feedback before any heavy work.
+    let reliefLaunchLock=false;
+    async function launchAutomaticRelief(event){
+      if(event){event.preventDefault();event.stopPropagation()}
+      if(reliefLaunchLock)return;
+      reliefLaunchLock=true;
+      $('aiGate').className='status warn';$('aiGate').textContent='Commande reçue · démarrage de la composition…';
+      $('photoRelief').textContent='Démarrage…';
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      try{await createAutomaticRelief()}finally{reliefLaunchLock=false}
+    }
+    $('photoRelief').onclick=launchAutomaticRelief;
+    $('photoRelief').addEventListener('pointerup',event=>{if(event.pointerType==='touch'||event.pointerType==='pen')launchAutomaticRelief(event)},{passive:false});
     $('downloadRelief').onclick=()=>{};
     function drawSimulation(position){if(!state.views.length)return;const p=Math.max(0,Math.min(8,position));$('simRange').value=String(p);$('simOut').textContent=`${(p+1).toFixed(2)} / 9`;drawRigidPreview(p)}
     function animationLoop(time){if(!state.playing)return;if(!state.lastTime)state.lastTime=time;const dt=Math.min(50,time-state.lastTime);state.lastTime=time;state.simPosition+=state.direction*dt/760;if(state.simPosition>=8){state.simPosition=8;state.direction=-1}if(state.simPosition<=0){state.simPosition=0;state.direction=1}drawSimulation(state.simPosition);state.animation=requestAnimationFrame(animationLoop)}
