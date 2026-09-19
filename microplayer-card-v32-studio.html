@@ -156,7 +156,7 @@
 
     async function generateViews(){
       if(!state.aiReady||!state.aiMaster){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
-      compose();if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      compose();if(!state.rigidPreview)buildRigidPreviewLayers();if(!state.aiMaster)state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master'};$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
       for(let index=0;index<9;index++){
         await new Promise(requestAnimationFrame);const position=(index-4)/4;
         const canvas=renderSemanticPlaneView(position),blob=await toBlob(canvas);
@@ -305,44 +305,38 @@
     $('reliefGuide').onclick=async()=>{const m=await buildReliefPackage(false);$('renderStatus').textContent='Diagnostic scène maîtresse : '+m.depth.groups.length+' plans exportables · zéro '+m.depth.zero+' · IA = reconstruction unique · MicroPlayer = 9 vues déterministes · sans extrusion ni ombre.'};
     function canvasDataUrl(canvas){return canvas.toDataURL('image/png')}
     async function createAutomaticRelief(){
-      if(!state.rgba){$('aiGate').className='status warn';$('aiGate').textContent='Carte non initialisée : impossible de lancer la composition.';return}
-      $('photoRelief').disabled=true;$('photoRelief').textContent='Préparation…';
-      $('renderStatus').className='status';$('renderStatus').textContent='Préparation locale de la scène maître…';
+      if(!state.rgba){$('aiGate').className='status warn';$('aiGate').textContent='Carte non initialisée.';return}
+      $('photoRelief').disabled=true;$('photoRelief').textContent='IA en cours…';
+      $('renderStatus').className='status';$('renderStatus').textContent='Envoi du contrôle sémantique à l’IA…';
       let timer=null;
       try{
-        // Build the local production master first. AI is advisory and must never gate the 9 production views.
-        if(!state.rigidPreview){await new Promise(resolve=>requestAnimationFrame(resolve));buildRigidPreviewLayers()}
-        state.masterQc=qcMasterScene();
-        state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master'};
-        state.aiReady=true;$('generate').disabled=false;
-        $('aiGate').className='status ok';$('aiGate').textContent='Scène maître locale prête · 9 vues déjà autorisées. Consultation IA en cours…';
-        $('photoRelief').textContent='IA en cours…';
-        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        // IMPORTANT iPad: no expensive background reconstruction before the network request.
+        // The AI only receives the original pixels + semantic metadata/depths.
+        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;
+        original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
         const controller=new AbortController();timer=setTimeout(()=>controller.abort(),45000);
         const response=await fetch('/api/card-layer-analyze',{method:'POST',signal:controller.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({
           image:canvasDataUrl(original),mode:'relief-compose-v32',width:state.width,height:state.height,
           zero:Number($('zero').value),parallax:Number($('parallax').value),
           groups:state.groups.map(group=>({id:group.id,label:group.label,role:group.role,type:group.type,depth:Number(group.depth),bbox:group.bbox,items:(group.items||[]).map(item=>({id:item.id,type:item.type,role:item.role,text:item.text||'',label:item.label||'',bbox:item.bbox}))}))
         })});
-        clearTimeout(timer);timer=null;
+        clearTimeout(timer);timer=null;$('renderStatus').textContent='Réponse IA reçue · validation des profondeurs…';
         let data=null;try{data=await response.json()}catch(parseError){}
         if(!response.ok)throw Error((data&&data.error)||('IA HTTP '+response.status));
         state.autoRelief=data||{};
         const corrected=new Map((data?.groups||[]).map(group=>[String(group.id),Number(group.depth)]));let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
-        if(changed){renderGroups();compose();const depthByLabel=new Map(state.groups.map(group=>[String(group.label),Number(group.depth)]));state.rigidPreview.layers.forEach(layer=>{const d=depthByLabel.get(String(layer.label));if(Number.isFinite(d))layer.depth=d});state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master-ai-depth-qc'}}
-        buildThreePlanControl();
-        state.aiReady=true;$('generate').disabled=false;
-        $('aiGate').className='status ok';$('aiGate').textContent='IA reçue · profondeurs contrôlées · scène maître locale conservée · PRODUCTION 9 vues autorisée.';
-        $('renderStatus').className='status ok';$('renderStatus').textContent='Production indépendante de l’IA : pixels originaux + plans sémantiques + parallaxe déterministe.';
+        if(changed){renderGroups();compose()}
+        // Unlock immediately. Heavy master reconstruction is deferred until preview/9-view generation.
+        state.aiReady=true;state.aiMaster=null;state.rigidPreview=null;$('generate').disabled=false;
+        $('aiGate').className='status ok';$('aiGate').textContent='IA reçue · PRODUCTION 9 vues autorisée.';
+        $('renderStatus').className='status ok';$('renderStatus').textContent='Contrôle IA terminé. Le fond maître sera construit uniquement au lancement des 9 vues.';
       }catch(error){
         if(timer)clearTimeout(timer);
-        if(!state.rigidPreview)buildRigidPreviewLayers();
-        state.masterQc=qcMasterScene();state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-master-ai-fallback'};
-        buildThreePlanControl();state.aiReady=true;$('generate').disabled=false;
+        state.aiReady=true;state.aiMaster=null;state.rigidPreview=null;$('generate').disabled=false;
         const reason=error?.name==='AbortError'?'délai IA dépassé (45 s)':(error?.message||'erreur inconnue');
-        $('aiGate').className='status warn';$('aiGate').textContent='IA non disponible : '+reason+'. Les 9 vues restent autorisées avec la scène maître locale.';
-        $('renderStatus').className='status warn';$('renderStatus').textContent='Mode secours local actif : la panne IA ne bloque plus la production.';
+        $('aiGate').className='status warn';$('aiGate').textContent='IA non disponible : '+reason+' · PRODUCTION locale 9 vues autorisée.';
+        $('renderStatus').className='status warn';$('renderStatus').textContent='Mode local prêt. Aucun blocage IA.';
       }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Relancer contrôle IA'}
     }
     // iPad/Safari: attach both pointer and click activation and show feedback before any heavy work.
