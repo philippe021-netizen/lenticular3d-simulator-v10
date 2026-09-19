@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
   <title>MicroPlayer V32 — Atelier lenticulaire</title>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>\n  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
   <style>
     :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#fff;background:#090a0d;--panel:#15171c;--line:#303541;--blue:#1687ff;--cyan:#00e5ff}*{box-sizing:border-box}body{margin:0}.top{position:sticky;top:0;z-index:20;padding:13px 18px;background:#0d0e12f2;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}.wrap{max-width:1500px;margin:auto;padding:16px}.grid{display:grid;grid-template-columns:410px 1fr;gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}.stage,.sim{position:relative;aspect-ratio:1.545;background:#050506;border-radius:14px;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}.stage canvas,.sim canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,select,input{font:inherit}button{border:0;border-radius:11px;min-height:44px;padding:10px;background:#2d323d;color:#fff;font-weight:800}button.active,button.primary{background:var(--blue)}button.green{background:#177052}button:disabled{opacity:.4}select,input[type=file]{width:100%}.status{padding:10px;margin-top:9px;border-radius:10px;background:#20242d;font-size:12px;white-space:pre-wrap}.ok{background:#17372c}.warn{background:#443a1b}.group{border:1px solid #373c48;border-radius:13px;padding:10px;margin:8px 0}.group.selected{border:2px solid var(--cyan)}.grouphead{display:flex;gap:7px;align-items:center}.grouphead b{flex:1}.group input[type=range]{width:100%}.small{font-size:12px;color:#aab0bd}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.view{position:relative;aspect-ratio:1.545}.view img{width:100%;height:100%;object-fit:contain}.view span{position:absolute;top:4px;left:4px;background:#000b;padding:3px}.simnav{display:grid;grid-template-columns:45px 1fr 45px 90px;gap:8px}.sim3d{perspective:1100px;padding:26px 22px 34px;overflow:visible;background:radial-gradient(circle at 50% 35%,#20242c,#08090b 70%)}.sim3d canvas{inset:4%;width:92%;height:92%;box-shadow:0 22px 50px #000b;border:1px solid #ffffff20;border-radius:8px}.simtools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.simtools label{font-size:12px;color:#aab0bd}.simtools input{width:100%}.hidden{display:none!important}.progress{height:7px;border-radius:8px;background:#090a0d;overflow:hidden;margin-top:8px}.progress i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s}@media(max-width:980px){.grid{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.top span{display:none}}
   </style>
@@ -188,6 +188,30 @@
     }
     $('generate').onclick=generateViews;
 
+    let miganSession=null;
+    async function rebuildMasterWithMigan(){
+      if(!state.rigidPreview||!state.rigidPreview.removalMask)throw Error('Masque de désocclusion absent.');
+      if(!window.ort)throw Error('ONNX Runtime indisponible.');
+      const W=state.width,H=state.height,N=W*H,rm=state.rigidPreview.removalMask;
+      // MI-GAN is deliberately isolated: it only receives original pixels + the removal mask.
+      // It can reconstruct background, but it never redraws text/logo layers and never changes OCR/grouping.
+      $('renderStatus').className='status';$('renderStatus').textContent='Reconstruction du fond maître avec MI-GAN (local navigateur)…';
+      if(!miganSession){
+        ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
+        const providers=(navigator.gpu?['webgpu','wasm']:['wasm']);
+        try{miganSession=await ort.InferenceSession.create('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx',{executionProviders:providers});}
+        catch(e){miganSession=await ort.InferenceSession.create('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx',{executionProviders:['wasm']});}
+      }
+      const rgb=new Uint8Array(3*N),mask=new Uint8Array(N);
+      for(let i=0;i<N;i++){const j=i*4;rgb[i]=state.rgba[j];rgb[N+i]=state.rgba[j+1];rgb[2*N+i]=state.rgba[j+2];mask[i]=rm[i]?255:0;}
+      const feeds={};feeds[miganSession.inputNames[0]]=new ort.Tensor('uint8',rgb,[1,3,H,W]);feeds[miganSession.inputNames[1]]=new ort.Tensor('uint8',mask,[1,1,H,W]);
+      const out=await miganSession.run(feeds),tensor=out[miganSession.outputNames[0]],data=tensor.data;
+      const img=new ImageData(W,H);
+      for(let i=0;i<N;i++){const j=i*4;img.data[j]=data[i];img.data[j+1]=data[N+i];img.data[j+2]=data[2*N+i];img.data[j+3]=255;}
+      const base=document.createElement('canvas');base.width=W;base.height=H;base.getContext('2d').putImageData(img,0,0);
+      state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN ONNX browser';
+      return base;
+    }
     function buildRigidPreviewLayers(){
       const source=document.createElement('canvas');source.width=state.width;source.height=state.height;
       source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
@@ -316,7 +340,7 @@
         let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
         if(changed){renderGroups();compose();}
-        const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;
+        const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();\n        try{await rebuildMasterWithMigan();}catch(inpaintError){throw Error('Reconstruction IA du fond impossible — '+inpaintError.message);}\n        state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine||'none';
         // V33 anti-ghost gate: quantify whether foreground ink survived inside the reconstructed background.
         // We compare removed pixels against their original foreground colour. A high similarity ratio means
         // the old glyph/logo is still present in background_master and MUST block parallax generation.
