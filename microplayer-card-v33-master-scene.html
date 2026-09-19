@@ -208,8 +208,12 @@
       if(!miganSession){
         ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
         const providers=(navigator.gpu?['webgpu','wasm']:['wasm']);
-        try{miganSession=await ort.InferenceSession.create('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx',{executionProviders:providers});}
-        catch(e){miganSession=await ort.InferenceSession.create('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx',{executionProviders:['wasm']});}
+        const modelUrl=new URL('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx');
+        try{miganSession=await ort.InferenceSession.create(modelUrl.href,{executionProviders:providers});}
+        catch(e){
+          try{miganSession=await ort.InferenceSession.create(modelUrl.href,{executionProviders:['wasm']});}
+          catch(e2){throw Error('MI-GAN modèle/ONNX non chargeable sur Safari : '+(e2?.message||e2));}
+        }
       }
       const rgb=new Uint8Array(3*N),mask=new Uint8Array(N);
       for(let i=0;i<N;i++){const j=i*4;rgb[i]=state.rgba[j];rgb[N+i]=state.rgba[j+1];rgb[2*N+i]=state.rgba[j+2];mask[i]=rm[i]?255:0;}
