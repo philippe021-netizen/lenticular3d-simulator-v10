@@ -201,6 +201,31 @@ async function composeReliefV32({ image, background, groups, key, useGateway }) 
     background:parsed?.background||{usable:true},threePlaneImage:null,threePlaneError:'disabled-by-design-pixel-lock',qc:{...(parsed?.qc||{}),centerLocked:true,flatPlanes:true,noAddedShadow:true}};
 }
 
+async function composeReliefMetadataV33({ groups }) {
+  const cleanGroups=(Array.isArray(groups)?groups:[]).map((g,index)=>({
+    id:String(g?.id||('group-'+(index+1))).slice(0,100),
+    label:String(g?.label||g?.role||'Élément').slice(0,160),
+    role:String(g?.role||'other').slice(0,40),
+    type:String(g?.type||'object').slice(0,40),
+    depth:Math.max(0,Math.min(255,Number(g?.depth)||128)),
+    bbox:normaliseCardBox(g?.bbox),
+    items:Array.isArray(g?.items)?g.items.slice(0,32).map(x=>({type:String(x?.type||''),role:String(x?.role||''),text:String(x?.text||'').slice(0,300),label:String(x?.label||'').slice(0,160),bbox:normaliseCardBox(x?.bbox)})):[]
+  })).filter(g=>g.bbox);
+  if(!cleanGroups.length){const error=new Error('Aucun groupe sémantique exploitable.');error.status=422;throw error}
+  // V33 deliberately does not send image pixels back to the server after document analysis.
+  // Preserve the already-established semantic Z hierarchy; master-background reconstruction/QC stays local.
+  return {
+    schema:'microplayer.card-relief-compose-v33',
+    provider:'local-semantic-pass-through',
+    mode:'semantic-metadata-flat-planes',
+    centerViewPixelPerfect:true,
+    groups:cleanGroups.map(g=>({...g,confidence:1,note:'profondeur V33 conservée'})),
+    background:{usable:true,note:'reconstruction et QC effectués localement sur la scène maître'},
+    threePlaneImage:null,
+    qc:{centerLocked:true,flatPlanes:true,noAddedShadow:true,warnings:[]}
+  };
+}
+
 async function analyseLegacy({ image, key, useGateway }) {
   const instructions = `Tu es le moteur de segmentation visuelle de MicroPlayer. Analyse cette carte de visite et retourne chaque élément visuel atomique avec un polygone normalisé serré.
 
@@ -231,13 +256,16 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const image = String(body.image || "");
-    if (!/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(image)) return res.status(400).json({ error: "Image invalide." });
-    if (image.length > 12_000_000) return res.status(413).json({ error: "Image trop lourde." });
-    const result = body.mode === "document-v32"
-      ? await analyseDocumentV32({ image, ocrLines: body.ocrLines, key, useGateway })
-      : body.mode === "relief-compose-v32"
-        ? await composeReliefV32({ image, background: body.background, groups: body.groups, key, useGateway })
-        : await analyseLegacy({ image, key, useGateway });
+    const metadataOnly = body.mode === "relief-compose-v33-metadata";
+    if (!metadataOnly && !/^data:image\/(png|jpeg|jpg|webp);base64,/i.test(image)) return res.status(400).json({ error: "Image invalide." });
+    if (!metadataOnly && image.length > 12_000_000) return res.status(413).json({ error: "Image trop lourde." });
+    const result = metadataOnly
+      ? await composeReliefMetadataV33({ groups: body.groups })
+      : body.mode === "document-v32"
+        ? await analyseDocumentV32({ image, ocrLines: body.ocrLines, key, useGateway })
+        : body.mode === "relief-compose-v32"
+          ? await composeReliefV32({ image, background: body.background, groups: body.groups, key, useGateway })
+          : await analyseLegacy({ image, key, useGateway });
     return res.status(200).json(result);
   } catch (error) {
     const status = Number(error?.status) || (error?.name === "AbortError" ? 504 : 500);
