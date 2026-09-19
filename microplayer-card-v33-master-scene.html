@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <title>MicroPlayer V33 — Master Scene</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#fff;background:#090a0d;--panel:#15171c;--line:#303541;--blue:#1687ff;--cyan:#00e5ff}*{box-sizing:border-box}body{margin:0}.top{position:sticky;top:0;z-index:20;padding:13px 18px;background:#0d0e12f2;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}.wrap{max-width:1500px;margin:auto;padding:16px}.grid{display:grid;grid-template-columns:410px 1fr;gap:16px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}.stage,.sim{position:relative;aspect-ratio:1.545;background:#050506;border-radius:14px;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}.stage canvas,.sim canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,select,input{font:inherit}button{border:0;border-radius:11px;min-height:44px;padding:10px;background:#2d323d;color:#fff;font-weight:800}button.active,button.primary{background:var(--blue)}button.green{background:#177052}button:disabled{opacity:.4}select,input[type=file]{width:100%}.status{padding:10px;margin-top:9px;border-radius:10px;background:#20242d;font-size:12px;white-space:pre-wrap}.ok{background:#17372c}.warn{background:#443a1b}.group{border:1px solid #373c48;border-radius:13px;padding:10px;margin:8px 0}.group.selected{border:2px solid var(--cyan)}.grouphead{display:flex;gap:7px;align-items:center}.grouphead b{flex:1}.group input[type=range]{width:100%}.small{font-size:12px;color:#aab0bd}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.view{position:relative;aspect-ratio:1.545}.view img{width:100%;height:100%;object-fit:contain}.view span{position:absolute;top:4px;left:4px;background:#000b;padding:3px}.simnav{display:grid;grid-template-columns:45px 1fr 45px 90px;gap:8px}.sim3d{perspective:1100px;padding:26px 22px 34px;overflow:visible;background:radial-gradient(circle at 50% 35%,#20242c,#08090b 70%)}.sim3d canvas{inset:4%;width:92%;height:92%;box-shadow:0 22px 50px #000b;border:1px solid #ffffff20;border-radius:8px}.simtools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.simtools label{font-size:12px;color:#aab0bd}.simtools input{width:100%}.hidden{display:none!important}.progress{height:7px;border-radius:8px;background:#090a0d;overflow:hidden;margin-top:8px}.progress i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s}@media(max-width:980px){.grid{grid-template-columns:1fr}.controls{grid-template-columns:1fr}.top span{display:none}}
+  </style>
+</head>
+<body>
+  <header class="top"><b>MicroPlayer V33 — Master Scene</b><span>Pencil · MI-GAN fond maître · QC anti-fantôme · 3 vues · 9 vues</span></header>
+  <main class="wrap"><div class="grid">
+    <aside>
+      <section class="panel">
+        <h2>1. Carte comprise</h2>
+        <div id="sourceInfo" class="status">Démarrage atelier V33…</div><div class="progress"><i id="activityBar"></i></div><div id="activityInfo" class="small" style="margin-top:6px">Initialisation…</div>
+        <div class="actions" style="margin-top:8px"><button id="back">← Scanner</button><button id="depthflow">DepthFlow décor</button></div>
+        <div class="progress"><i id="progress"></i></div>
+      </section>
+      <section class="panel"><h2>2. Groupes</h2><select id="preset"><option value="professional">Pro lisible</option><option value="artistic">Artistique</option><option value="papercut">Découpe papier</option><option value="qr">QR prioritaire</option></select><button id="auto" style="width:100%;margin-top:8px">Répartir automatiquement</button><div id="groups"></div></section>
+    </aside>
+    <section>
+      <section class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
+      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
+      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
+      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="downloadRelief" disabled>Résultat automatique</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
+    </section>
+  </div></main>
+  <script type="module">
+    import { cardDepthSpread, composeSemanticDepth, createCardDepthPreset, createSemanticMask, maskCoverage, paintMask } from './business-card-depthflow-core.js';
+    import { comparePixels, renderNovelView } from './depthflow-v42-core.js';
+
+    const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),sim3d=$('sim3d'),threePlan=$('threePlan');
+    const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',preview:'card',baseDepth:null,finalDepth:null,history:[],drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null};
+    const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
+    const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    const selected=()=>state.groups.find(group=>group.id===state.selected);
+    const escapeHtml=value=>String(value).replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+
+    function semanticMaskForGroup(group){
+      const combined=new Uint8ClampedArray(state.width*state.height);
+      const boxes=group.items.flatMap(item=>item.type==='text'&&item.words?.length?item.words.map(word=>word.bbox):[item.bbox]).filter(Boolean);
+      for(const box of boxes){const current=createSemanticMask(state.rgba,state.width,state.height,box,{threshold:group.type==='text'?22:36,softness:group.type==='text'?9:18,close:group.type==='text'?1:(group.role==='artwork'?0:2),dilate:group.type==='text'?0:1,padding:group.type==='text'?.002:.004});for(let index=0;index<combined.length;index++)if(current[index]>combined[index])combined[index]=current[index]}
+      return combined;
+    }
+
+    function compose(){state.rigidPreview=null;const layers=state.groups.map(group=>({mask:group.mask,depth:group.depth,enabled:true,internalRelief:['artwork','subject'].includes(group.role)?.18:0}));state.finalDepth=composeSemanticDepth(state.baseDepth,layers,{zero:Number($('zero').value),backgroundRelief:Number($('background').value)/100});if(state.preview==='depth')drawDepth();report()}
+    function report(){const spread=cardDepthSpread(state.groups,Number($('zero').value));const masks=state.groups.filter(group=>maskCoverage(group.mask).percent>.005).length;$('report').textContent=`${state.groups.length} groupes · ${masks} masques actifs · amplitude ${spread.span}/255 · fond ${$('background').value}% · vue 05 verrouillée.`;$('report').className='status '+(spread.span>=100&&masks===state.groups.length?'ok':'warn')}
+
+    function drawPhoto(){photoContext.clearRect(0,0,state.width,state.height);photoContext.drawImage(state.image,0,0,state.width,state.height)}
+    function drawDepth(){if(!state.finalDepth)return;const image=photoContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}photoContext.putImageData(image,0,0);maskContext.clearRect(0,0,state.width,state.height)}
+    function drawMaskOverlay(){maskContext.clearRect(0,0,state.width,state.height);if(state.preview!=='card')return;const group=selected();if(!group)return;const image=maskContext.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const alpha=group.mask[index];if(alpha<5)continue;image.data[index*4]=0;image.data[index*4+1]=229;image.data[index*4+2]=255;image.data[index*4+3]=Math.round(alpha*.68)}maskContext.putImageData(image,0,0)}
+    function showCard(){state.preview='card';drawPhoto();drawMaskOverlay();$('card').classList.add('active');$('depthView').classList.remove('active')}
+
+    function renderGroups(){const root=$('groups');root.innerHTML='';state.groups.forEach(group=>{const element=document.createElement('div');element.className='group'+(group.id===state.selected?' selected':'');element.innerHTML=`<div class="grouphead"><b>${escapeHtml(group.label)}</b><button>Éditer</button></div><div class="small">${escapeHtml(group.role)} · ${group.items.length} composant(s) · masque ${maskCoverage(group.mask).percent.toFixed(2)}%</div><label>Profondeur <b class="value">${group.depth}</b><input type="range" min="0" max="255" value="${group.depth}"></label>`;element.querySelector('button').onclick=()=>{state.selected=group.id;state.history=[];renderGroups();showCard();updateUndo();$('pencilStatus').textContent=`Correction active sur « ${group.label} »`};element.querySelector('input').oninput=event=>{group.depth=Number(event.target.value);element.querySelector('.value').textContent=group.depth;compose()};root.appendChild(element)})}
+
+    function applyPreset(){const preset=createCardDepthPreset(state.groups,$('preset').value);$('zero').value=preset.zero;$('relief').value=preset.reliefPercent;$('parallax').value=preset.parallaxPercent;state.groups.forEach((group,index)=>group.depth=preset.depths[index]);updateOutputs();renderGroups();compose()}
+    function updateOutputs(){$('zeroOut').textContent=$('zero').value;$('reliefOut').textContent=$('relief').value+'%';$('parallaxOut').textContent=$('parallax').value+'%';$('backgroundOut').textContent=$('background').value+'%'}
+
+    function canvasPoint(event){const rect=mask.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*state.width,y:(event.clientY-rect.top)/rect.height*state.height}}
+    function directStroke(from,to){maskContext.save();maskContext.lineCap='round';maskContext.lineJoin='round';maskContext.lineWidth=Number($('brush').value)*2;maskContext.globalCompositeOperation=state.mode==='erase'?'destination-out':'source-over';maskContext.strokeStyle='rgba(0,229,255,.68)';maskContext.beginPath();maskContext.moveTo(from.x,from.y);maskContext.lineTo(to.x,to.y);maskContext.stroke();maskContext.restore()}
+    mask.addEventListener('pointerdown',event=>{const group=selected();if(!group||state.preview!=='card')return;event.preventDefault();state.history.push(new Uint8ClampedArray(group.mask));if(state.history.length>20)state.history.shift();state.drawing=true;state.lastPoint=canvasPoint(event);mask.setPointerCapture?.(event.pointerId);updateUndo()},{passive:false});
+    mask.addEventListener('pointermove',event=>{if(!state.drawing)return;event.preventDefault();const group=selected(),point=canvasPoint(event),value=state.mode==='erase'?0:255;paintMask(group.mask,state.width,state.height,state.lastPoint,point,Number($('brush').value),value);directStroke(state.lastPoint,point);state.lastPoint=point},{passive:false});
+    function endStroke(){if(!state.drawing)return;state.drawing=false;drawMaskOverlay();compose();renderGroups()}
+    mask.addEventListener('pointerup',endStroke);mask.addEventListener('pointercancel',endStroke);
+    function updateUndo(){$('undo').disabled=!state.history.length}
+    $('undo').onclick=()=>{const group=selected();const previous=state.history.pop();if(group&&previous){group.mask=previous;drawMaskOverlay();compose();renderGroups()}updateUndo()};
+    $('resetMask').onclick=()=>{const group=selected();if(!group)return;state.history.push(new Uint8ClampedArray(group.mask));group.mask=new Uint8ClampedArray(group.autoMask);drawMaskOverlay();compose();renderGroups();updateUndo()};
+    $('add').onclick=()=>{state.mode='add';$('add').classList.add('active');$('erase').classList.remove('active')};
+    $('erase').onclick=()=>{state.mode='erase';$('erase').classList.add('active');$('add').classList.remove('active')};
+    $('brush').oninput=()=>{$('brushOut').textContent=$('brush').value};
+    $('card').onclick=showCard;$('depthView').onclick=()=>{state.preview='depth';drawDepth();$('depthView').classList.add('active');$('card').classList.remove('active')};
+
+    function depthWorker(){if(state.worker)return state.worker;const worker=new Worker(new URL('./depthflow-v42-worker.js',import.meta.url),{type:'module'});worker.onmessage=event=>{const message=event.data||{};if(message.requestId!==state.requestId)return;if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);$('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow prêt. Le relief du fond reste volontairement limité pour protéger les textes.';$('progress').style.width='100%';compose()}if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow indisponible : '+message.message+'\nLe rendu par plans sémantiques reste utilisable.'}};state.worker=worker;return worker}
+    $('depthflow').onclick=()=>{state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='DepthFlow démarre sur l’iPad…';const guide=new Uint8ClampedArray(state.rgba);depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer])};
+
+    function renderSemanticPlaneView(position){
+      if(state.aiMaster)return renderAiMasterView(position);
+      if(!state.rigidPreview)buildRigidPreviewLayers();
+      const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      const normal=Math.max(-1,Math.min(1,position)),zero=Number($('zero').value);
+      if(Math.abs(normal)<1e-9){
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        return canvas;
+      }
+      ctx.drawImage(state.rigidPreview.base,0,0,state.width,state.height);
+      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
+      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const maxShift=state.width*(Number($('parallax').value)/100);
+      for(const layer of ordered){
+        const z=((Number(layer.depth)-dMin)/span)*2-1;
+        const dx=normal*z*maxShift;
+        // Production views: original RGBA plane only. No extrusion, scale, blur or cast shadow.
+        ctx.drawImage(layer.canvas,dx,0,state.width,state.height);
+      }
+      return canvas;
+    }
+
+    function renderAiMasterView(position){
+      const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      const normal=Math.max(-1,Math.min(1,position)),zero=Number($('zero').value);
+      if(Math.abs(normal)<1e-9){ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
+      ctx.drawImage(state.aiMaster.background,0,0,state.width,state.height);
+      const ordered=[...state.aiMaster.layers].sort((a,b)=>a.depth-b.depth);
+      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const maxShift=state.width*(Number($('parallax').value)/100);
+      for(const layer of ordered){const z=((Number(layer.depth)-dMin)/span)*2-1;ctx.drawImage(layer.image,normal*z*maxShift,0,state.width,state.height)}
+      return canvas;
+    }
+
+    function enforceExclusiveMasks(){
+      if(!state.groups.length)return {before:0,after:0};
+      const N=state.width*state.height,owner=new Int16Array(N),bestAlpha=new Uint8ClampedArray(N);owner.fill(-1);let before=0;
+      for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++){const a=state.groups[g].mask[i];if(a>=20)hits++;if(a>bestAlpha[i]){bestAlpha[i]=a;owner[i]=g}}if(hits>1)before++}
+      for(let g=0;g<state.groups.length;g++){const src=state.groups[g].mask,out=new Uint8ClampedArray(N);for(let i=0;i<N;i++)if(owner[i]===g&&src[i]>=20)out[i]=src[i];state.groups[g].mask=out}
+      let after=0;for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++)if(state.groups[g].mask[i]>=20)hits++;if(hits>1)after++}
+      return {before,after};
+    }
+    function qcMasterScene(){
+      if(!state.rigidPreview)return {ok:false,reason:'no-master'};
+      const N=state.width*state.height,overlap=new Uint8Array(N);let collisions=0,covered=0;
+      for(const group of state.groups){for(let i=0;i<N;i++)if(group.mask[i]>=20){if(overlap[i])collisions++;else{overlap[i]=1;covered++}}}
+      const active=state.rigidPreview.layers.length;
+      const ok=active>=3&&collisions===0;
+      return {ok,active,collisions,covered,coverage:Number((covered/N*100).toFixed(2))};
+    }
+    function buildClientPreview(){
+      if(!state.masterQc?.ok){$('clientGate').className='status warn';$('clientGate').textContent='Aperçu client bloqué : scène maître de production non validée.';return}
+      buildThreePlanControl();$('clientGate').className='status ok';$('clientGate').textContent='APERÇU CLIENT IA séparé de la production. Démonstration esthétique autorisée; aucune de ses images ne sera exportée vers les 9 vues ou l’impression.';
+    }
+    $('clientPreview').onclick=buildClientPreview;
+
+    function buildThreePlanControl(){
+      const src=state.aiMaster;if(!src||!src.layers?.length)return false;
+      const W=state.width,H=state.height;threePlan.width=W;threePlan.height=H;
+      const ctx=threePlan.getContext('2d');ctx.clearRect(0,0,W,H);ctx.fillStyle='#08090c';ctx.fillRect(0,0,W,H);
+      const zero=Number($('zero').value),ordered=[...src.layers].sort((a,b)=>(a.depth||zero)-(b.depth||zero));
+      const d=ordered.map(x=>Number(x.depth)||zero),min=Math.min(...d,zero),max=Math.max(...d,zero),span=Math.max(1,max-min);
+      const insetX=W*.08,insetY=H*.12,scale=.82;
+      ctx.save();ctx.translate(insetX,insetY);ctx.transform(scale,-.055,-.035,scale,0,0);
+      ctx.drawImage(src.background,0,0,W,H);
+      for(const layer of ordered){
+        const z=(Number(layer.depth)-min)/span;
+        const lift=8+z*Math.max(28,Math.min(W,H)*.10);
+        ctx.save();ctx.translate(-lift,-lift*.48);ctx.drawImage(layer.image,0,0,W,H);ctx.restore();
+      }
+      ctx.restore();$('threePlanWrap').classList.remove('hidden');return true;
+    }
+
+    function showMasterBackground(){
+      if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Fond maître indisponible : composer et valider la scène maître d’abord.';return}
+      stopAnimation();$('results').classList.remove('hidden');
+      const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);sim3d.width=w;sim3d.height=h;
+      const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.drawImage(state.aiMaster.background,0,0,w,h);
+      $('simOut').textContent='FOND MAÎTRE';$('renderStatus').className='status warn';$('renderStatus').textContent='QC anti-fantôme : cette image doit contenir uniquement le fond/décor. Aucun texte, logo ou pictogramme destiné au relief ne doit rester visible.';
+    }
+    $('masterBg').onclick=showMasterBackground;
+
+    async function generateThreeViews(){
+      if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Test 3 vues verrouillé : scène maître non validée.';return}
+      stopAnimation();const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'];state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      for(let i=0;i<3;i++){const canvas=renderSemanticPlaneView(positions[i]),blob=await toBlob(canvas);state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:'master-scene-2.5d-test'});}
+      const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
+      $('views').innerHTML=state.urls.map((url,i)=>`<div class="view"><img src="${url}" alt="${labels[i]}"><span>${labels[i]}</span></div>`).join('');
+      $('results').classList.remove('hidden');
+      const ghostOk=!!(state.masterQc&&state.masterQc.ghost&&state.masterQc.ghost.ratio<=18);
+      const threeQcOk=qc.different===0&&ghostOk&&state.views.length===3;
+      state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,ghostRatio:state.masterQc?.ghost?.ratio??null};
+      $('generate').disabled=!threeQcOk;
+      $('renderStatus').className=threeQcOk?'status ok':'status warn';
+      $('renderStatus').textContent=threeQcOk
+        ? `TEST 3 VUES VALIDÉ TECHNIQUEMENT · centre pixel parfait · anti-fantôme ${state.threeViewQc.ghostRatio}% · PRODUCTION 9 VUES DÉVERROUILLÉE.`
+        : `TEST 3 VUES REFUSÉ · centre ${qc.different===0?'pixel parfait':qc.different+' pixels différents'} · anti-fantôme ${state.threeViewQc.ghostRatio??'indisponible'}%. Les 9 vues restent bloquées.`;
+      state.simPosition=4;drawRigidPreview(4);
+    }
+    $('threeViews').onclick=generateThreeViews;
+
+    async function generateViews(){
+      if(!state.aiReady||!state.aiMaster||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='9 vues verrouillées : exécuter d’abord le TEST Gauche / Centre / Droite et obtenir un QC technique valide.';return}
+      compose();if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      for(let index=0;index<9;index++){
+        await new Promise(requestAnimationFrame);const position=(index-4)/4;
+        const canvas=renderSemanticPlaneView(position),blob=await toBlob(canvas);
+        state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,mode:'semantic-flat-planes',shadow:false,extrusion:false});
+        $('generate').textContent=`Vue ${index+1}/9…`;
+      }
+      const centre=state.views[4].getContext('2d').getImageData(0,0,state.width,state.height).data,centreQc=comparePixels(centre,state.rgba);
+      $('renderStatus').textContent=`QC vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · 9 vues issues d’une scène maîtresse · plans plats · zéro extrusion · zéro ombre ajoutée.`;
+      $('views').innerHTML=state.urls.map((url,index)=>`<div class="view"><img src="${url}" alt="Vue ${index+1}"><span>${String(index+1).padStart(2,'0')}</span></div>`).join('');
+      $('results').classList.remove('hidden');$('generate').disabled=false;$('generate').textContent='Régénérer les 9 vues';state.simPosition=4;$('simRange').value='4';drawSimulation(4);startAnimation();
+    }
+    $('generate').onclick=generateViews;
+
+    let miganSession=null;
+    async function rebuildMasterWithMigan(){
+      if(!state.rigidPreview||!state.rigidPreview.removalMask)throw Error('Masque de désocclusion absent.');
+      if(!window.ort)throw Error('ONNX Runtime indisponible.');
+      const W=state.width,H=state.height,N=W*H,rm=state.rigidPreview.removalMask;
+      // MI-GAN is deliberately isolated: it only receives original pixels + the removal mask.
+      // It can reconstruct background, but it never redraws text/logo layers and never changes OCR/grouping.
+      $('renderStatus').className='status';$('renderStatus').textContent='Reconstruction du fond maître avec MI-GAN (local navigateur)…';
+      if(!miganSession){
+        ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
+        const providers=(navigator.gpu?['webgpu','wasm']:['wasm']);
+        try{miganSession=await ort.InferenceSession.create('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx',{executionProviders:providers});}
+        catch(e){miganSession=await ort.InferenceSession.create('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx',{executionProviders:['wasm']});}
+      }
+      const rgb=new Uint8Array(3*N),mask=new Uint8Array(N);
+      for(let i=0;i<N;i++){const j=i*4;rgb[i]=state.rgba[j];rgb[N+i]=state.rgba[j+1];rgb[2*N+i]=state.rgba[j+2];mask[i]=rm[i]?255:0;}
+      const feeds={};feeds[miganSession.inputNames[0]]=new ort.Tensor('uint8',rgb,[1,3,H,W]);feeds[miganSession.inputNames[1]]=new ort.Tensor('uint8',mask,[1,1,H,W]);
+      const out=await miganSession.run(feeds),tensor=out[miganSession.outputNames[0]],data=tensor.data;
+      const img=new ImageData(W,H);
+      for(let i=0;i<N;i++){const j=i*4;img.data[j]=data[i];img.data[j+1]=data[N+i];img.data[j+2]=data[2*N+i];img.data[j+3]=255;}
+      const base=document.createElement('canvas');base.width=W;base.height=H;base.getContext('2d').putImageData(img,0,0);
+      state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN ONNX browser';
+      return base;
+    }
+    function buildRigidPreviewLayers(){
+      const source=document.createElement('canvas');source.width=state.width;source.height=state.height;
+      source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+      const N=state.width*state.height, displayUnion=new Uint8ClampedArray(N), layers=[];
+      for(const group of state.groups){
+        const rigid=!['artwork','subject','background','decor','decoration'].includes(String(group.role||'').toLowerCase());
+        if(!rigid)continue;
+        const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+        const ctx=canvas.getContext('2d'),img=ctx.createImageData(state.width,state.height);
+        for(let i=0;i<group.mask.length;i++){let a=group.mask[i];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));displayUnion[i]=Math.max(displayUnion[i],a);const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
+        ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label});
+      }
+      // LDI principle: display mask stays tight; removal mask is deliberately wider.
+      const removal=new Uint8ClampedArray(N),r=Math.max(2,Math.round(Math.min(state.width,state.height)*.006));
+      for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(displayUnion[i]<20)continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<state.width&&yy<state.height)removal[yy*state.width+xx]=255}}
+      // Deterministic local inpainting: propagate real neighbouring background inward.
+      const work=new Uint8ClampedArray(state.rgba), unknown=new Uint8Array(N);for(let i=0;i<N;i++)unknown[i]=removal[i]?1:0;
+      for(let pass=0;pass<Math.max(8,r*3);pass++){let changed=0;const next=unknown.slice();for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!unknown[i])continue;let rr=0,gg=0,bb=0,n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=state.width||yy>=state.height)continue;const q=yy*state.width+xx;if(unknown[q])continue;const j=q*4;rr+=work[j];gg+=work[j+1];bb+=work[j+2];n++}if(n>=2){const j=i*4;work[j]=rr/n;work[j+1]=gg/n;work[j+2]=bb/n;work[j+3]=255;next[i]=0;changed++}}unknown.set(next);if(!changed)break}
+      // Any unusually large unresolved hole gets a wider ring estimate, never the foreground pixel.
+      const R=Math.max(6,r*3);for(let i=0;i<N;i++)if(unknown[i]){const x=i%state.width,y=(i/state.width)|0;let rr=0,gg=0,bb=0,n=0;for(let k=0;k<24;k++){const ang=k*Math.PI/12,xx=Math.max(0,Math.min(state.width-1,Math.round(x+Math.cos(ang)*R))),yy=Math.max(0,Math.min(state.height-1,Math.round(y+Math.sin(ang)*R))),q=yy*state.width+xx;if(removal[q])continue;const j=q*4;rr+=state.rgba[j];gg+=state.rgba[j+1];bb+=state.rgba[j+2];n++}if(n){const j=i*4;work[j]=rr/n;work[j+1]=gg/n;work[j+2]=bb/n;work[j+3]=255}}
+      const base=document.createElement('canvas');base.width=state.width;base.height=state.height;base.getContext('2d').putImageData(new ImageData(work,state.width,state.height),0,0);
+      state.rigidPreview={base,layers,removalMask:removal};
+    }
+    function drawRigidPreview(position){
+      if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
+      const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);if(sim3d.width!==w||sim3d.height!==h){sim3d.width=w;sim3d.height=h}
+      const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);
+      const strength=Number($('simDepth').value),normal=(Math.max(0,Math.min(8,position))-4)/4,zero=Number($('zero').value);
+      const margin=w*.055,cardW=w-margin*2,cardH=h-margin*2;
+      // Centre is the contractual original: no inpainting, no shadow, no synthetic relief.
+      if(Math.abs(normal)<.0125){
+        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;
+        original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(original,margin,margin,cardW,cardH);
+        $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';return;
+      }
+      ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(state.rigidPreview.base,margin,margin,cardW,cardH);
+      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
+      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const maxShift=cardW*.075*strength;
+      ordered.forEach(layer=>{
+        // Normalize to the actual semantic depth range, so useful depth is not compressed around zero.
+        const z=((Number(layer.depth)-dMin)/span)*2-1;
+        const dx=normal*z*maxShift;
+        // A tiny scale change + contact shadow creates a static height cue without warping glyphs.
+        const foreground=(Number(layer.depth)-zero)/127;
+        const scale=1;
+        const dw=cardW*scale,dh=cardH*scale,ox=(dw-cardW)/2,oy=(dh-cardH)/2;
+        const shadowPx=Math.max(.15,Math.abs(foreground)*.45*strength);
+        ctx.save();ctx.globalAlpha=Math.min(.035,.008+Math.abs(foreground)*.012);ctx.filter='blur('+Math.min(.55,.15+shadowPx*.18)+'px)';
+        ctx.drawImage(layer.canvas,margin+dx-ox+Math.sign(normal)*shadowPx,margin-oy+shadowPx,dw,dh);ctx.restore();
+        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx-ox,margin-oy,dw,dh);ctx.restore();
+      });
+      $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
+    }
+    function drawReliefPhoto(){
+      if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();stopAnimation();
+      const W=1600,H=980;sim3d.width=W;sim3d.height=H;
+      const gl=sim3d.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})||sim3d.getContext('experimental-webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true});
+      if(!gl){drawReliefPhotoCanvas();return}
+      const vs='precision highp float;attribute vec2 p;uniform float z;uniform mat4 mvp;varying vec2 uv;void main(){uv=vec2(p.x,1.0-p.y);gl_Position=mvp*vec4((p.x-.5)*1.545,(p.y-.5),z,1.0);}';
+      const fs='precision highp float;varying vec2 uv;uniform sampler2D tex;uniform float alphaCut;void main(){vec4 c=texture2D(tex,uv);if(c.a<alphaCut)discard;gl_FragColor=c;}';
+      const sh=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s};
+      const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){drawReliefPhotoCanvas();return}gl.useProgram(pr);
+      const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]),gl.STATIC_DRAW);
+      const loc=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+      const mul=(a,b)=>{let o=new Float32Array(16);for(let r=0;r<4;r++)for(let q=0;q<4;q++)for(let k=0;k<4;k++)o[r*4+q]+=a[r*4+k]*b[k*4+q];return o};
+      const persp=(fov,asp,n,far)=>{const f=1/Math.tan(fov/2),o=new Float32Array(16);o[0]=f/asp;o[5]=f;o[10]=(far+n)/(n-far);o[11]=-1;o[14]=2*far*n/(n-far);return o};
+      const norm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return v.map(x=>x/l)},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+      const look=(eye,at,up)=>{const z=norm([eye[0]-at[0],eye[1]-at[1],eye[2]-at[2]]),x=norm(cross(up,z)),y=cross(z,x),o=new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,0,0,0,1]);o[12]=-(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]);o[13]=-(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]);o[14]=-(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]);return o};
+      const M=mul(persp(34*Math.PI/180,W/H,.1,20),look([-1.38,.58,3.35],[0,0,.16],[0,1,0]));
+      gl.uniformMatrix4fv(gl.getUniformLocation(pr,'mvp'),false,M);gl.uniform1i(gl.getUniformLocation(pr,'tex'),0);gl.viewport(0,0,W,H);gl.clearColor(.025,.028,.035,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+      const texture=canvas=>{const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);return t};
+      const zero=Number($('zero').value),layers=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),ds=layers.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const draw=(canvas,z,cut)=>{gl.bindTexture(gl.TEXTURE_2D,texture(canvas));gl.uniform1f(gl.getUniformLocation(pr,'z'),z);gl.uniform1f(gl.getUniformLocation(pr,'alphaCut'),cut);gl.drawArrays(gl.TRIANGLES,0,6)};
+      draw(state.rigidPreview.base,0,0);for(const layer of layers){const zn=(Number(layer.depth)-dMin)/span;draw(layer.canvas,.035+zn*.305,.035)}
+      $('simOut').textContent='Photo relief 3D';$('renderStatus').textContent='Photo relief WebGL1 iPad : plans plats flottants, caméra perspective, hauteurs issues des profondeurs V32.';$('downloadRelief').disabled=false;
+    }
+    function drawReliefPhotoCanvas(){
+      const W=1600,H=980,ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#07090c';ctx.fillRect(0,0,W,H);
+      const zero=Number($('zero').value),layers=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),ds=layers.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const x=225,y=190,w=1120,h=w/state.width*state.height,skew=-.115;
+      const plane=(canvas,z)=>{const zn=(z-dMin)/span,lift=zn*115,scale=1+zn*.035;ctx.save();ctx.setTransform(scale,skew,-.08,1,x+lift,y-lift*.35);ctx.drawImage(canvas,0,0,w,h);ctx.restore()};
+      plane(state.rigidPreview.base,dMin);for(const layer of layers)plane(layer.canvas,Number(layer.depth)||zero);
+      $('simOut').textContent='Photo relief 3D';$('renderStatus').textContent='Photo relief compatible iPad : projection de plans plats flottants, sans épaisseur ni ombre.';$('downloadRelief').disabled=false;
+    }
+
+    async function buildReliefPackage(download=true){
+      if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
+      const zip=new JSZip(),root=zip.folder('microplayer-photo-relief');
+      const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+      root.file('original-rectifie.png',await toBlob(original));root.file('background-master-local.png',await toBlob(state.rigidPreview.base));
+      const groups=[],rigidByLabel=new Map(state.rigidPreview.layers.map(l=>[String(l.label),l]));
+      for(let n=0;n<state.groups.length;n++){const g=state.groups[n],layer=rigidByLabel.get(String(g.label));if(!layer)continue;
+        const safe=String(g.label||g.role||('groupe-'+n)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||('groupe-'+n);
+        const file='layers/'+String(n+1).padStart(2,'0')+'-'+safe+'.png';root.file(file,await toBlob(layer.canvas));
+        groups.push({id:g.id,label:g.label,role:g.role,type:g.type,depth:Number(g.depth),zNormalized:Math.max(0,Math.min(1,(Number(g.depth)-Number($('zero').value))/127*.5+.5)),file,coverage:maskCoverage(g.mask).percent});
+      }
+      const manifest={format:'microplayer-photo-relief-v1',createdAt:new Date().toISOString(),source:{width:state.width,height:state.height},renderIntent:{mode:'ai-master-scene-then-deterministic-views',aiRole:'semantic-understanding-background-reconstruction-and-flat-rgba-layer-preparation',localRole:'depth-assignment-parallax-and-nine-view-rendering',noExtrusion:true,noAddedShadow:true,lockPixelsAcrossViews:true,centerViewIsOriginal:true,camera:'front-parallax',reference:'validated-flat-floating-planes'},depth:{zero:Number($('zero').value),groups},instructions:['AI stage: understand the rectified card semantically before editing pixels.','AI stage: reconstruct one clean background_master after removing every semantic foreground group.','AI stage: prepare one exact flat RGBA layer per semantic group; preserve spelling, typography, colors, dimensions and original XY placement.','Never regenerate nine independent images. The AI output is one master scene only.','Lock every accepted layer pixel-for-pixel for all views. No extrusion, bevel, thickness, blur or cast shadow.','Local MicroPlayer stage: assign Z depth and calculate views 01-09 deterministically from the same locked master layers.','View 05 must remain the original rectified card pixel-for-pixel.','Only horizontal parallax may vary between lenticular views; no AI variation between views.']};
+      root.file('manifest.json',JSON.stringify(manifest,null,2));
+      if(download){const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='microplayer-photo-relief-package.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+      $('renderStatus').textContent='Paquet scène maîtresse prêt : original + fond de travail + couches RGBA + profondeurs. Cible : reconstruction IA unique, puis 9 vues déterministes MicroPlayer.';return manifest;
+    }
+    $('reliefPack').onclick=()=>buildReliefPackage(true);
+    $('reliefGuide').onclick=async()=>{const m=await buildReliefPackage(false);$('renderStatus').textContent='Diagnostic scène maîtresse : '+m.depth.groups.length+' plans exportables · zéro '+m.depth.zero+' · IA = reconstruction unique · MicroPlayer = 9 vues déterministes · sans extrusion ni ombre.'};
+    function canvasDataUrl(canvas){return canvas.toDataURL('image/png')}
+    async function createAutomaticRelief(){
+      if(!state.rgba)return;
+      $('photoRelief').disabled=true;$('photoRelief').textContent='Traitement IA…';
+      $('renderStatus').className='status';$('renderStatus').textContent='MicroPlayer envoie la carte comprise au moteur de composition. Aucun texte ni logo ne sera réécrit.';
+      try{
+        if(!state.rigidPreview)buildRigidPreviewLayers();
+        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          image:canvasDataUrl(original),
+          mode:'relief-compose-v32',
+          background:canvasDataUrl(state.rigidPreview.base),
+          width:state.width,height:state.height,
+          zero:Number($('zero').value),parallax:Number($('parallax').value),
+          groups:state.groups.map(group=>({id:group.id,label:group.label,role:group.role,type:group.type,depth:Number(group.depth),bbox:group.bbox,items:(group.items||[]).map(item=>({id:item.id,type:item.type,role:item.role,text:item.text||'',label:item.label||'',bbox:item.bbox}))}))
+        })});
+        const data=await response.json();if(!response.ok)throw Error(data.error||('HTTP '+response.status));
+        state.autoRelief=data;
+        state.aiReady=false;state.aiMaster=null;$('generate').disabled=true;$('results').classList.add('hidden');$('aiGate').className='status warn';$('aiGate').textContent='Analyse IA reçue. Construction de la photo 3 plans de contrôle…';
+        const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
+        let changed=false;
+        state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
+        if(changed){renderGroups();compose();}
+        const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();\n        try{await rebuildMasterWithMigan();}catch(inpaintError){throw Error('Reconstruction IA du fond impossible — '+inpaintError.message);}\n        state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine||'none';
+        // V33 anti-ghost gate: quantify whether foreground ink survived inside the reconstructed background.
+        // We compare removed pixels against their original foreground colour. A high similarity ratio means
+        // the old glyph/logo is still present in background_master and MUST block parallax generation.
+        const rm=state.rigidPreview.removalMask,bgCtx=state.rigidPreview.base.getContext('2d'),bgPx=bgCtx.getImageData(0,0,state.width,state.height).data;
+        let removed=0,ghost=0,deltaSum=0;
+        for(let i=0;i<rm.length;i++){if(!rm[i])continue;removed++;const j=i*4;const d=Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]);deltaSum+=d;if(d<24)ghost++;}
+        const ghostRatio=removed?ghost/removed:0,meanDelta=removed?deltaSum/removed:255;
+        state.masterQc.ghost={removed,ghost,ratio:Number((ghostRatio*100).toFixed(2)),meanDelta:Number(meanDelta.toFixed(2))};
+        // Conservative first gate: do not manufacture 3/9 views from a demonstrably contaminated master.
+        // Threshold is intentionally lenient because flat-colour foreground can legitimately resemble background.
+        if(removed>200&&ghostRatio>.18)throw Error('QC anti-fantôme refusé · '+state.masterQc.ghost.ratio+'% de la zone supprimée ressemble encore aux pixels d’origine. Fond maître à reconstruire avant simulation.');
+        const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
+        if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
+        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'v33-master-scene-anti-ghost-gated',qc:state.masterQc};
+        const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
+        state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
+        $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
+        $('renderStatus').className='status ok';$('renderStatus').textContent='Chaîne impression séparée : scène maître → 9 vues déterministes. Aperçu client = branche indépendante, jamais injectée dans la production.';
+      }catch(error){
+        state.aiReady=false;$('generate').disabled=true;$('threePlanWrap').classList.add('hidden');
+        $('aiGate').className='status warn';$('aiGate').textContent='PRODUCTION BLOQUÉE — '+error.message;
+        $('clientGate').className='status warn';$('clientGate').textContent='Aperçu client bloqué tant que le QC de la scène maître échoue.';
+        $('renderStatus').className='status warn';$('renderStatus').textContent='Diagnostic QC : '+error.message+'\nAucun fallback vers l’ancien renderer.';
+      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Envoyer à l’IA et composer'}
+    }
+    $('photoRelief').onclick=createAutomaticRelief;
+    $('downloadRelief').onclick=()=>{};
+    function drawSimulation(position){if(!state.views.length)return;const p=Math.max(0,Math.min(8,position));$('simRange').value=String(p);$('simOut').textContent=`${(p+1).toFixed(2)} / 9`;drawRigidPreview(p)}
+    function animationLoop(time){if(!state.playing)return;if(!state.lastTime)state.lastTime=time;const dt=Math.min(50,time-state.lastTime);state.lastTime=time;state.simPosition+=state.direction*dt/760;if(state.simPosition>=8){state.simPosition=8;state.direction=-1}if(state.simPosition<=0){state.simPosition=0;state.direction=1}drawSimulation(state.simPosition);state.animation=requestAnimationFrame(animationLoop)}
+    function startAnimation(){cancelAnimationFrame(state.animation);state.playing=true;state.lastTime=0;$('toggle').textContent='Pause';state.animation=requestAnimationFrame(animationLoop)}
+    function stopAnimation(){state.playing=false;cancelAnimationFrame(state.animation);$('toggle').textContent='Lecture'}
+    $('toggle').onclick=()=>state.playing?stopAnimation():startAnimation();
+    $('simRange').oninput=event=>{stopAnimation();state.simPosition=Number(event.target.value);drawSimulation(state.simPosition)};
+    $('prev').onclick=()=>{stopAnimation();state.simPosition=Math.max(0,state.simPosition-1);drawSimulation(state.simPosition)};
+    $('next').onclick=()=>{stopAnimation();state.simPosition=Math.min(8,state.simPosition+1);drawSimulation(state.simPosition)};
+    for(const id of ['tilt','simDepth'])$(id).oninput=()=>drawRigidPreview(state.simPosition);
+
+        async function maskBlob(group){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const value=group.mask[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
+    $('zip').onclick=async()=>{if(!window.JSZip)return;$('zip').disabled=true;$('zip').textContent='ZIP…';const zip=new JSZip(),sourceResponse=await fetch(state.payload.image),sourceBlob=await sourceResponse.blob();zip.file('source-carte.png',sourceBlob);state.blobs.forEach((blob,index)=>zip.file(`vue-${String(index+1).padStart(2,'0')}.png`,blob));for(let index=0;index<state.groups.length;index++)zip.file(`masques/groupe-${String(index+1).padStart(2,'0')}.png`,await maskBlob(state.groups[index]));const depthCanvas=document.createElement('canvas');depthCanvas.width=state.width;depthCanvas.height=state.height;const depthContext=depthCanvas.getContext('2d'),depthImage=depthContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];depthImage.data[index*4]=depthImage.data[index*4+1]=depthImage.data[index*4+2]=value;depthImage.data[index*4+3]=255}depthContext.putImageData(depthImage,0,0);zip.file('depth-map.png',await toBlob(depthCanvas));const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};const groups=state.groups.map(({mask,autoMask,selected,...group},index)=>({...group,maskFile:`masques/groupe-${String(index+1).padStart(2,'0')}.png`}));zip.file('manifest.json',JSON.stringify({schema:'microplayer.card-v32',version:32,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:true,capture:state.payload.capture||null,file:'source-carte.png'},pipeline:{stage:'ocr-layout-semantics-depthflow-v32',centerViewPixelPerfect:true},ocr:state.payload.ocrLines,ocrSummary:{engine:'tesseract-local',lineCount:state.payload.ocrLines?.length||0},groups,settings,render:{engine:'depthflow-v42',viewCount:9,depthMapFile:'depth-map.png',views:state.renderStats}},null,2));const blob=await zip.generateAsync({type:'blob'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='MicroPlayer-carte-V32-9-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);$('zip').disabled=false;$('zip').textContent='ZIP complet'};
+
+    $('back').onclick=()=>location.href='./microplayer-card-v33.html';$('auto').onclick=applyPreset;$('preset').onchange=applyPreset;
+    for(const id of ['zero','relief','parallax','background'])$(id).oninput=()=>{updateOutputs();compose()};
+
+    let activityTimer=null,activityStarted=0,activityStep='Démarrage';
+    function activity(step,percent,detail=''){activityStep=step;const bar=$('activityBar'),info=$('activityInfo');if(bar)bar.style.width=Math.max(2,Math.min(100,percent))+'%';if(info)info.textContent=step+(detail?' · '+detail:'')+' · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';}
+    function startActivity(){activityStarted=Date.now();clearInterval(activityTimer);activityTimer=setInterval(()=>{const info=$('activityInfo');if(info)info.textContent=activityStep+' · activité navigateur · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';},500);}
+    function stopActivity(ok=true){clearInterval(activityTimer);activityTimer=null;const bar=$('activityBar');if(bar)bar.style.width=ok?'100%':'0%';}
+    async function initialise(){startActivity();activity('Lecture état V33',5);let raw=sessionStorage.getItem('microplayer-card-v33')||sessionStorage.getItem('microplayer-card-v32');if(!raw){$('sourceInfo').className='status warn';$('sourceInfo').innerHTML='Aucune carte transférée. <a href="./microplayer-card-v32-scanner.html" style="color:#9bd0ff">Ouvrir le scanner</a>.';$('generate').disabled=true;return}state.payload=JSON.parse(raw);activity('État V33 chargé',12,(state.payload.groups?.length||0)+' groupes');
+      let imageUrl=state.payload.image;
+      if(!imageUrl&&state.payload.imageCacheKey&&window.caches){activity('Ouverture cache image',20);$('sourceInfo').textContent='Récupération de la carte V33…';const cache=await caches.open('microplayer-v33-transfer');const response=await cache.match(state.payload.imageCacheKey);if(!response)throw Error('Image V33 absente du cache de transfert.');activity('Lecture PNG depuis cache',32);const blob=await response.blob();activity('PNG récupéré',42,Math.round(blob.size/1024)+' Ko');
+        // iPad Safari can stall decoding an object URL created from Cache Storage.
+        // Decode from bytes via FileReader first; it is slower but deterministic on Safari.
+        activity('Conversion PNG iPad',50);imageUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||Error('Lecture PNG impossible'));reader.readAsDataURL(blob)});
+      }
+      if(!imageUrl)throw Error('Image rectifiée absente du transfert.');
+      state.payload.image=imageUrl;activity('Décodage image Safari',62);$('sourceInfo').textContent='Décodage de la carte…';state.image=await Promise.race([loadImage(imageUrl),new Promise((_,reject)=>setTimeout(()=>reject(Error('Décodage image > 8 s')),8000))]);activity('Image décodée',72,state.image.naturalWidth+'×'+state.image.naturalHeight);state.width=photo.width=mask.width=state.payload.width||state.image.naturalWidth;state.height=photo.height=mask.height=state.payload.height||state.image.naturalHeight;stage.style.aspectRatio=state.width+'/'+state.height;drawPhoto();activity('Lecture pixels',80);state.rgba=photoContext.getImageData(0,0,state.width,state.height).data;state.baseDepth=new Uint8ClampedArray(state.width*state.height).fill(128);activity('Construction masques',88);state.groups=(state.payload.groups||[]).map((group,index)=>{const full={...group,id:String(group.id||group.groupId||index),depth:Number(group.depth??128)};full.autoMask=semanticMaskForGroup(full);full.mask=new Uint8ClampedArray(full.autoMask);return full});state.selected=state.groups[0]?.id||null;$('sourceInfo').className='status ok';$('sourceInfo').textContent=`${state.payload.ocrLines?.length||0} lignes OCR verrouillées · ${state.payload.layers?.length||0} composants · ${state.groups.length} groupes.`;activity('Rendu interface',96);applyPreset();showCard();updateUndo();activity('Atelier prêt',100);stopActivity(true)}
+    initialise().catch(error=>{stopActivity(false);$('sourceInfo').className='status warn';$('sourceInfo').textContent='Erreur initialisation : '+error.message;const info=$('activityInfo');if(info)info.textContent='BLOQUÉ À : '+activityStep+' · '+error.message});
+  </script>
+</body>
+</html>
