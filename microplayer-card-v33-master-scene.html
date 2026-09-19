@@ -342,14 +342,15 @@
       try{
         if(!state.rigidPreview)buildRigidPreviewLayers();
         const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-        const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-          image:canvasDataUrl(original),
-          mode:'relief-compose-v32',
-          background:canvasDataUrl(state.rigidPreview.base),
+        // V33: the server only needs semantic metadata here. Sending two full PNG data URLs
+        // made the request exceed Vercel's function body limit (HTTP 413).
+        const apiPayload={
+          mode:'relief-compose-v33-metadata',
           width:state.width,height:state.height,
           zero:Number($('zero').value),parallax:Number($('parallax').value),
           groups:state.groups.map(group=>({id:group.id,label:group.label,role:group.role,type:group.type,depth:Number(group.depth),bbox:group.bbox,items:(group.items||[]).map(item=>({id:item.id,type:item.type,role:item.role,text:item.text||'',label:item.label||'',bbox:item.bbox}))}))
-        })});
+        };
+        const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(apiPayload)});
         const responseText=await response.text();let data={};
         if(responseText.trim()){try{data=JSON.parse(responseText)}catch(parseError){throw Error('ETAPE API_JSON · HTTP '+response.status+' · réponse non JSON : '+responseText.slice(0,160));}}
         if(!response.ok)throw Error('ETAPE API_HTTP · '+(data.error||('HTTP '+response.status)));
