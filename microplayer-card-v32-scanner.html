@@ -31,7 +31,7 @@
         <div class="maskstage"><canvas id="maskview"></canvas></div>
         <div id="maskinfo" class="status"></div>
         <div class="actions" style="margin-top:8px"><button id="boxes">Boîtes</button><button id="precise" class="primary">Pixels du texte</button></div>
-        <button id="continue" class="green" style="width:100%;margin-top:8px">Continuer vers Pencil + 9 vues</button>
+        <button id="continue" class="green" style="width:100%;margin-top:8px">Continuer vers atelier V33</button>
       </section>
       <section class="panel"><div class="step">Pipeline V32</div><div class="small">Perspective ✓ → OCR local exact → compréhension sémantique → logos/pictogrammes → groupes → masque pixel → Pencil → profondeur → 9 vues → simulateur.</div></section>
     </aside>
@@ -103,7 +103,19 @@
 
     $('analyze').onclick=async()=>{if(!state.rectified)return;try{$('analyze').disabled=true;$('groups').innerHTML='';$('progress').style.width='2%';state.ocrLines=await runLocalOcr();if(state.ocrLines.length<2)throw Error(`OCR insuffisant : ${state.ocrLines.length} ligne seulement. Vérifie la netteté et le recadrage.`);$('analysis').textContent=`${state.ocrLines.length} lignes OCR détectées. Compréhension sémantique et détection des logos…`;$('progress').style.width='70%';const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:state.rectified,mode:'document-v32',ocrLines:state.ocrLines})});const data=await response.json();if(!response.ok)throw Error(data.error||`HTTP ${response.status}`);state.layers=data.layers||[];state.groups=(data.groups||[]).map((group,index)=>({...group,depth:semanticDepthForRole(group.role,group.type),selected:index===0}));renderGroups();await prepareMasks();$('maskpanel').classList.remove('hidden');$('progress').style.width='100%';$('analysis').className='status ok';$('analysis').textContent=`${data.ocr?.lineCount||state.ocrLines.length} lignes OCR conservées sans réécriture · ${state.layers.length} composants · ${state.groups.length} groupes sémantiques.`}catch(error){$('analysis').className='status warn';$('analysis').textContent='Erreur : '+error.message;$('progress').style.width='0'}finally{$('analyze').disabled=false}};
 
-    $('continue').onclick=()=>{const payload={version:32,image:state.rectified,width:dst.width,height:dst.height,capture:{originalWidth:state.image.naturalWidth,originalHeight:state.image.naturalHeight,workingWidth:state.width,workingHeight:state.height,corners:state.points.map(([x,y])=>[x/state.width,y/state.height]),rectifiedWidth:dst.width,rectifiedHeight:dst.height},ocrLines:state.ocrLines,layers:state.layers,groups:state.groups.map(({mask,...group})=>group)};sessionStorage.setItem('microplayer-card-v32',JSON.stringify(payload));location.href='./microplayer-card-v32-studio.html'};
+    $('continue').onclick=async()=>{const button=$('continue');button.disabled=true;button.textContent='Ouverture atelier…';const payload={version:33,image:state.rectified,width:dst.width,height:dst.height,capture:{originalWidth:state.image.naturalWidth,originalHeight:state.image.naturalHeight,workingWidth:state.width,workingHeight:state.height,corners:state.points.map(([x,y])=>[x/state.width,y/state.height]),rectifiedWidth:dst.width,rectifiedHeight:dst.height},ocrLines:state.ocrLines,layers:state.layers,groups:state.groups.map(({mask,...group})=>group)};
+      try{
+        // Safari/iPad: never write a large image payload immediately before navigation.
+        // Persist structured metadata only; transfer the rectified image through Cache Storage.
+        const imageResponse=await fetch(state.rectified);const imageBlob=await imageResponse.blob();
+        const cache=await caches.open('microplayer-v33-transfer');await cache.put('./v33-card-image',new Response(imageBlob,{headers:{'Content-Type':'image/png'}}));
+        const lean={...payload,image:null,imageCacheKey:'./v33-card-image'};
+        sessionStorage.setItem('microplayer-card-v33',JSON.stringify(lean));
+        sessionStorage.removeItem('microplayer-card-v32');
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        location.assign('./microplayer-card-v32-studio.html?v=33');
+      }catch(error){button.disabled=false;button.textContent='Continuer vers atelier V33';$('maskinfo').className='status warn';$('maskinfo').textContent='Transfert impossible : '+error.message;}
+    };
   </script>
 </body>
 </html>
