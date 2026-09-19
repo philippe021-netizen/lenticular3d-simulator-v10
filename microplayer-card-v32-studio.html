@@ -317,9 +317,20 @@
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
         if(changed){renderGroups();compose();}
         const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;
+        // V33 anti-ghost gate: quantify whether foreground ink survived inside the reconstructed background.
+        // We compare removed pixels against their original foreground colour. A high similarity ratio means
+        // the old glyph/logo is still present in background_master and MUST block parallax generation.
+        const rm=state.rigidPreview.removalMask,bgCtx=state.rigidPreview.base.getContext('2d'),bgPx=bgCtx.getImageData(0,0,state.width,state.height).data;
+        let removed=0,ghost=0,deltaSum=0;
+        for(let i=0;i<rm.length;i++){if(!rm[i])continue;removed++;const j=i*4;const d=Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]);deltaSum+=d;if(d<24)ghost++;}
+        const ghostRatio=removed?ghost/removed:0,meanDelta=removed?deltaSum/removed:255;
+        state.masterQc.ghost={removed,ghost,ratio:Number((ghostRatio*100).toFixed(2)),meanDelta:Number(meanDelta.toFixed(2))};
+        // Conservative first gate: do not manufacture 3/9 views from a demonstrably contaminated master.
+        // Threshold is intentionally lenient because flat-colour foreground can legitimately resemble background.
+        if(removed>200&&ghostRatio>.18)throw Error('QC anti-fantôme refusé · '+state.masterQc.ghost.ratio+'% de la zone supprimée ressemble encore aux pixels d’origine. Fond maître à reconstruire avant simulation.');
         const masterLayers=state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label}));
         if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
-        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'production-original-pixels-exclusive-mattes'};
+        state.aiMaster={background:state.rigidPreview.base,layers:masterLayers,source:'v33-master-scene-anti-ghost-gated',qc:state.masterQc};
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
         state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
         $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
