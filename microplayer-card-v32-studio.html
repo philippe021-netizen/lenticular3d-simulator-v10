@@ -167,13 +167,21 @@
       for(let i=0;i<3;i++){const canvas=renderSemanticPlaneView(positions[i]),blob=await toBlob(canvas);state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:'master-scene-2.5d-test'});}
       const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
       $('views').innerHTML=state.urls.map((url,i)=>`<div class="view"><img src="${url}" alt="${labels[i]}"><span>${labels[i]}</span></div>`).join('');
-      $('results').classList.remove('hidden');$('renderStatus').className=qc.different===0?'status ok':'status warn';$('renderStatus').textContent=`TEST 3 VUES · centre : ${qc.different===0?'copie pixel parfaite':'écart '+qc.different+' pixels'} · vérifier zéro fantôme/dédoublement avant d’autoriser les 9 vues.`;
+      $('results').classList.remove('hidden');
+      const ghostOk=!!(state.masterQc&&state.masterQc.ghost&&state.masterQc.ghost.ratio<=18);
+      const threeQcOk=qc.different===0&&ghostOk&&state.views.length===3;
+      state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,ghostRatio:state.masterQc?.ghost?.ratio??null};
+      $('generate').disabled=!threeQcOk;
+      $('renderStatus').className=threeQcOk?'status ok':'status warn';
+      $('renderStatus').textContent=threeQcOk
+        ? `TEST 3 VUES VALIDÉ TECHNIQUEMENT · centre pixel parfait · anti-fantôme ${state.threeViewQc.ghostRatio}% · PRODUCTION 9 VUES DÉVERROUILLÉE.`
+        : `TEST 3 VUES REFUSÉ · centre ${qc.different===0?'pixel parfait':qc.different+' pixels différents'} · anti-fantôme ${state.threeViewQc.ghostRatio??'indisponible'}%. Les 9 vues restent bloquées.`;
       state.simPosition=4;drawRigidPreview(4);
     }
     $('threeViews').onclick=generateThreeViews;
 
     async function generateViews(){
-      if(!state.aiReady||!state.aiMaster){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
+      if(!state.aiReady||!state.aiMaster||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='9 vues verrouillées : exécuter d’abord le TEST Gauche / Centre / Droite et obtenir un QC technique valide.';return}
       compose();if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
       for(let index=0;index<9;index++){
         await new Promise(requestAnimationFrame);const position=(index-4)/4;
