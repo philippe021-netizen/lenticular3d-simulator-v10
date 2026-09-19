@@ -155,16 +155,38 @@
     }
 
     async function generateViews(){
-      if(!state.aiReady){$('aiGate').textContent='Production locale : préparation de la scène maîtresse…';state.aiReady=true}
-      compose();if(!state.rigidPreview)buildRigidPreviewLayers();if(!state.aiMaster)state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master'};$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
-      for(let index=0;index<9;index++){
-        await new Promise(requestAnimationFrame);const position=(index-4)/4;
-        const canvas=renderSemanticPlaneView(position),blob=await toBlob(canvas);
-        state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,mode:'semantic-flat-planes',shadow:false,extrusion:false});
-        $('generate').textContent=`Vue ${index+1}/9…`;
+      if(!state.rgba||!state.groups.length){$('renderStatus').className='status warn';$('renderStatus').textContent='Production impossible : carte ou groupes absents.';return}
+      $('generate').disabled=true;$('generate').textContent='Préparation 9 vues…';
+      $('renderStatus').className='status';$('renderStatus').textContent='Production directe depuis la carte et les masques validés…';
+      state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      // Production must never depend on AI state, client preview, or the expensive background inpainting path.
+      // Build lightweight RGBA planes once; keep the untouched original as view 05.
+      const W=state.width,H=state.height,N=W*H,zero=Number($('zero').value);
+      const layers=[];
+      for(const group of state.groups){
+        const role=String(group.role||'').toLowerCase();
+        if(['background','decor','decoration'].includes(role))continue;
+        const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+        const ctx=canvas.getContext('2d'),img=ctx.createImageData(W,H);
+        for(let p=0;p<N;p++){const a=group.mask[p];if(a<12)continue;const k=p*4;img.data[k]=state.rgba[k];img.data[k+1]=state.rgba[k+1];img.data[k+2]=state.rgba[k+2];img.data[k+3]=a}
+        ctx.putImageData(img,0,0);layers.push({canvas,depth:Number(group.depth)||zero,label:group.label});
       }
-      const centre=state.views[4].getContext('2d').getImageData(0,0,state.width,state.height).data,centreQc=comparePixels(centre,state.rgba);
-      $('renderStatus').textContent=`QC vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · 9 vues issues d’une scène maîtresse · plans plats · zéro extrusion · zéro ombre ajoutée.`;
+      const ds=layers.map(l=>l.depth),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const maxShift=W*(Number($('parallax').value)/100);
+      const original=document.createElement('canvas');original.width=W;original.height=H;
+      original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
+      for(let index=0;index<9;index++){
+        $('generate').textContent=`Vue ${index+1}/9…`;await new Promise(resolve=>setTimeout(resolve,0));
+        const position=(index-4)/4,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+        const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+        // Temporary deterministic base: original card. This guarantees responsiveness; clean background reconstruction is a separate explicit stage.
+        ctx.drawImage(original,0,0);
+        if(index!==4)for(const layer of layers){const z=((layer.depth-dMin)/span)*2-1;ctx.drawImage(layer.canvas,position*z*maxShift,0,W,H)}
+        const blob=await toBlob(canvas);if(!blob)throw Error('Échec encodage PNG vue '+(index+1));
+        state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,mode:'direct-semantic-v32',shadow:false,extrusion:false});
+      }
+      const centre=state.views[4].getContext('2d').getImageData(0,0,W,H).data,centreQc=comparePixels(centre,state.rgba);
+      $('renderStatus').className='status ok';$('renderStatus').textContent=`9 vues terminées · vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · production indépendante de l’IA.`;
       $('views').innerHTML=state.urls.map((url,index)=>`<div class="view"><img src="${url}" alt="Vue ${index+1}"><span>${String(index+1).padStart(2,'0')}</span></div>`).join('');
       $('results').classList.remove('hidden');$('generate').disabled=false;$('generate').textContent='Régénérer les 9 vues';state.simPosition=4;$('simRange').value='4';drawSimulation(4);startAnimation();
     }
