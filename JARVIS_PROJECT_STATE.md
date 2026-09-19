@@ -60,3 +60,9 @@ AUTOMATISATION : veille récurrente technologies/prix/opportunités.
 « Jarvis, reprends MicroPlayer » → même préflight, puis choisir Chat/Outils/Work selon l'ampleur.
 « Jarvis, valide cette étape » → enregistrer la validation explicite avec commit/date/preuve.
 « Jarvis, qu'est-ce qui a changé ? » → comparer le registre au dépôt/déploiement actuel.
+
+
+## Redeploy marker — 2026-09-19
+- V32 branch deliberately restored to stable turntable baseline f5fe804768.
+- This metadata-only commit exists to trigger a clean Vercel deployment from the restored tree.
+- Do not reintroduce the later Pencil/IndexedDB/9-view hotfix stack until the baseline is revalidated on iPad.
