@@ -155,7 +155,7 @@
     }
 
     async function generateViews(){
-      if(!state.aiReady||!state.aiMaster){$('aiGate').textContent='Simulateur verrouillé : le retour IA doit être composé et validé avant les 9 vues.';return}
+      if(!state.aiReady){$('aiGate').textContent='Production locale : préparation de la scène maîtresse…';state.aiReady=true}
       compose();if(!state.rigidPreview)buildRigidPreviewLayers();if(!state.aiMaster)state.aiMaster={background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label})),source:'local-production-master'};$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
       for(let index=0;index<9;index++){
         await new Promise(requestAnimationFrame);const position=(index-4)/4;
