@@ -207,13 +207,14 @@
       $('renderStatus').className='status';$('renderStatus').textContent='Reconstruction du fond maître avec MI-GAN (local navigateur)…';
       if(!miganSession){
         ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
-        const providers=(navigator.gpu?['webgpu','wasm']:['wasm']);
-        const modelUrl=new URL('https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx');
-        try{miganSession=await ort.InferenceSession.create(modelUrl.href,{executionProviders:providers});}
-        catch(e){
-          try{miganSession=await ort.InferenceSession.create(modelUrl.href,{executionProviders:['wasm']});}
-          catch(e2){throw Error('MI-GAN modèle/ONNX non chargeable sur Safari : '+(e2?.message||e2));}
-        }
+        const modelUrl='https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx';
+        try{
+          const modelResponse=await fetch(modelUrl,{mode:'cors',cache:'force-cache'});
+          if(!modelResponse.ok)throw Error('HTTP modèle '+modelResponse.status);
+          const modelBytes=await modelResponse.arrayBuffer();
+          if(modelBytes.byteLength<1000000)throw Error('modèle MI-GAN incomplet ('+modelBytes.byteLength+' octets)');
+          miganSession=await ort.InferenceSession.create(new Uint8Array(modelBytes),{executionProviders:['wasm']});
+        }catch(e){throw Error('MI-GAN chargement binaire Safari : '+(e?.message||e));}
       }
       const rgb=new Uint8Array(3*N),mask=new Uint8Array(N);
       for(let i=0;i<N;i++){const j=i*4;rgb[i]=state.rgba[j];rgb[N+i]=state.rgba[j+1];rgb[2*N+i]=state.rgba[j+2];mask[i]=rm[i]?255:0;}
@@ -348,13 +349,15 @@
         })});
         const data=await response.json();if(!response.ok)throw Error(data.error||('HTTP '+response.status));
         state.autoRelief=data;
-        state.aiReady=false;state.aiMaster=null;$('generate').disabled=true;$('results').classList.add('hidden');$('aiGate').className='status warn';$('aiGate').textContent='Analyse IA reçue. Construction de la photo 3 plans de contrôle…';
+        state.aiReady=false;state.aiMaster=null;$('generate').disabled=true;$('results').classList.add('hidden');$('aiGate').className='status warn';$('aiGate').textContent='Analyse IA reçue · étape 1/5 : préparation des masques…';
         const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
         let changed=false;
         state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
         if(changed){renderGroups();compose();}
         const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();
+        $('aiGate').textContent='Analyse IA reçue · étape 2/5 : reconstruction MI-GAN du fond…';
         try{await rebuildMasterWithMigan();}catch(inpaintError){throw Error('Reconstruction IA du fond impossible — '+inpaintError.message);}
+        $('aiGate').textContent='Analyse IA reçue · étape 3/5 : contrôle anti-fantôme…';
         state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine||'none';
         // V33 anti-ghost gate: quantify whether foreground ink survived inside the reconstructed background.
         // We compare removed pixels against their original foreground colour. A high similarity ratio means
