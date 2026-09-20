@@ -276,9 +276,25 @@
           if(structural&&diff>(extreme?2.5:3.5)){active[y*W+x]=1;rawPixels++}
         }
       }
-      const radius=Math.max(3,Math.min(12,Math.round(Math.abs(maxShift*normal)/5))),dilated=dilateHybridMask(active,W,H,radius),alpha=featherHybridMask(dilated,W,H,2);
-      let hybridPixels=0;for(let n=0;n<N;n++)if(alpha[n]>.05)hybridPixels++;
-      return {alpha,rawPixels,hybridPixels,hybridMaskPercent:Number((hybridPixels/N*100).toFixed(2)),radius};
+      const radius=Math.max(3,Math.min(12,Math.round(Math.abs(maxShift*normal)/5))),dilated=dilateHybridMask(active,W,H,radius);
+      // The active mask is dilated to cover a structural edge, but that dilation must never
+      // authorize blending where the inverse renderer has no real pixel. Otherwise transparent
+      // inverse pixels (RGB 0,0,0) create black fringes around hair and thin silhouettes.
+      const inverseValid=new Uint8Array(N);
+      for(let n=0;n<N;n++)if(i[n*4+3]>=250)inverseValid[n]=1;
+      const inverseValidExpanded=dilateHybridMask(inverseValid,W,H,2),constrained=new Uint8Array(N);
+      for(let n=0;n<N;n++)if(dilated[n]&&inverseValidExpanded[n])constrained[n]=1;
+      const alpha=featherHybridMask(constrained,W,H,2);
+      let hybridPixels=0,invalidBlendPrevented=0;
+      for(let n=0;n<N;n++){
+        if(!inverseValid[n]){
+          if(alpha[n]>.001)invalidBlendPrevented++;
+          alpha[n]=0;
+          continue;
+        }
+        if(alpha[n]>.05)hybridPixels++;
+      }
+      return {alpha,rawPixels,hybridPixels,invalidBlendPrevented,hybridMaskPercent:Number((hybridPixels/N*100).toFixed(2)),radius};
     }
     function renderHybridProductionView(position,options={}){
       const normal=Math.max(-1,Math.min(1,Number(position)||0));
@@ -286,11 +302,13 @@
       const forward=renderContinuousDepthView(normal,options),inverse=renderInverseRowInterpView(normal,options),mask=buildHybridEdgeMask(forward.canvas,inverse.canvas,normal,options),W=forward.canvas.width,H=forward.canvas.height,N=W*H;
       const fctx=forward.canvas.getContext('2d',{willReadFrequently:true}),idata=inverse.canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H),fdata=fctx.getImageData(0,0,W,H);
       for(let n=0;n<N;n++){
-        const a=mask.alpha[n];if(a<=0)continue;const p=n*4,ia=1-a;
+        const p=n*4,invAlpha=idata.data[p+3]/255;
+        if(invAlpha<=0)continue;
+        const a=mask.alpha[n]*invAlpha;if(a<=0)continue;const ia=1-a;
         fdata.data[p]=Math.round(fdata.data[p]*ia+idata.data[p]*a);fdata.data[p+1]=Math.round(fdata.data[p+1]*ia+idata.data[p+1]*a);fdata.data[p+2]=Math.round(fdata.data[p+2]*ia+idata.data[p+2]*a);fdata.data[p+3]=255;
       }
       fctx.putImageData(fdata,0,0);
-      return {canvas:forward.canvas,stats:{...forward.stats,mode:'hybrid-forward-plus-inverse-edges',baseMode:forward.stats.mode,inverseMode:inverse.stats.mode,inverseUsed:mask.hybridPixels>0,hybridMaskPercent:mask.hybridMaskPercent,hybridEdgePixels:mask.hybridPixels,hybridRawEdgePixels:mask.rawPixels,hybridRadius:mask.radius,inverseCoveragePercent:inverse.stats.inverseCoveragePercent,inverseDepthJump:inverse.stats.depthJump}};
+      return {canvas:forward.canvas,stats:{...forward.stats,mode:'hybrid-forward-plus-inverse-edges',baseMode:forward.stats.mode,inverseMode:inverse.stats.mode,inverseUsed:mask.hybridPixels>0,hybridMaskPercent:mask.hybridMaskPercent,hybridEdgePixels:mask.hybridPixels,hybridRawEdgePixels:mask.rawPixels,hybridInvalidBlendPrevented:mask.invalidBlendPrevented,hybridRadius:mask.radius,inverseCoveragePercent:inverse.stats.inverseCoveragePercent,inverseDepthJump:inverse.stats.depthJump}};
     }
     function continuousFrame(index){
       const i=Math.max(0,Math.min(8,Math.round(index)));if(state.continuousCache[i])return state.continuousCache[i];
