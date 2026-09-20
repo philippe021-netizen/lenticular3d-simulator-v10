@@ -206,61 +206,37 @@
 
     let miganSession=null;
     async function rebuildMasterWithMigan(){
-      if(!state.rigidPreview||!state.rigidPreview.removalMask)throw Error('Masque de désocclusion absent.');
+      if(!state.rigidPreview?.removalMask)throw Error('Masque de désocclusion absent.');
       if(!window.ort)throw Error('ONNX Runtime indisponible.');
-      const W=state.width,H=state.height,N=W*H,rm=state.rigidPreview.removalMask,S=512,SN=S*S;
-      $('renderStatus').className='status';$('renderStatus').textContent='Reconstruction du fond maître avec MI-GAN 512×512 (local navigateur)…';
+      const W=state.width,H=state.height,N=W*H,rm=state.rigidPreview.removalMask;
+      $('renderStatus').className='status';$('renderStatus').textContent='Reconstruction fond maître — MI-GAN pipeline V2 natif '+W+'×'+H+'…';
+      // IMPORTANT: use the model actually selected by current inpaint-web. The old lxfater/migan.onnx
+      // is a fixed 512 float pipeline and is not the model used by their current adapter.
       if(!miganSession){
         ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
-        const modelUrl='https://huggingface.co/lxfater/inpaint-web/resolve/main/migan.onnx';
+        const modelUrl='https://huggingface.co/andraniksargsyan/migan/resolve/main/migan_pipeline_v2.onnx';
         try{
-          $('aiGate').textContent='Analyse IA reçue · étape 2A/5 : téléchargement binaire MI-GAN…';
-          const modelResponse=await fetch(modelUrl,{mode:'cors',cache:'no-store'});
-          if(!modelResponse.ok)throw Error('HTTP modèle '+modelResponse.status);
-          const modelBytes=await modelResponse.arrayBuffer();
-          if(modelBytes.byteLength<1000000)throw Error('modèle MI-GAN incomplet ('+modelBytes.byteLength+' octets)');
-          $('aiGate').textContent='Analyse IA reçue · étape 2B/5 : initialisation ONNX WASM ('+Math.round(modelBytes.byteLength/1048576)+' Mo)…';
-          miganSession=await ort.InferenceSession.create(new Uint8Array(modelBytes),{executionProviders:['wasm']});
-        }catch(e){throw Error('ETAPE MI_GAN_LOAD · '+(e?.name||'Error')+' · '+(e?.message||e));}
+          $('aiGate').textContent='Étape 2A/5 : téléchargement MI-GAN pipeline V2…';
+          const r=await fetch(modelUrl,{mode:'cors',cache:'force-cache'});if(!r.ok)throw Error('HTTP modèle '+r.status);
+          const bytes=await r.arrayBuffer();if(bytes.byteLength<1000000)throw Error('modèle incomplet '+bytes.byteLength);
+          $('aiGate').textContent='Étape 2B/5 : initialisation ONNX ('+Math.round(bytes.byteLength/1048576)+' Mo)…';
+          miganSession=await ort.InferenceSession.create(new Uint8Array(bytes),{executionProviders:['wasm']});
+        }catch(e){throw Error('ETAPE MI_GAN_LOAD · '+(e?.message||e));}
       }
-      const inputNames=Array.isArray(miganSession.inputNames)?miganSession.inputNames.filter(Boolean):[];
-      const outputNames=Array.isArray(miganSession.outputNames)?miganSession.outputNames.filter(Boolean):[];
-      if(inputNames.length<1||outputNames.length<1)throw Error('ETAPE MI_GAN_IO · entrées='+JSON.stringify(inputNames)+' · sorties='+JSON.stringify(outputNames));
-      if(inputNames.length!==1)throw Error('ETAPE MI_GAN_IO · export inattendu : '+JSON.stringify(inputNames));
-
-      // The downloaded export is fixed to [1,4,512,512]. Resize image + removal mask together,
-      // run MI-GAN at its native size, then composite only reconstructed pixels back at card resolution.
-      $('aiGate').textContent='Analyse IA reçue · étape 2C/5 : préparation MI-GAN 512×512…';
-      const src=document.createElement('canvas');src.width=W;src.height=H;
-      src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
-      const work=document.createElement('canvas');work.width=S;work.height=S;
-      const wctx=work.getContext('2d',{willReadFrequently:true});wctx.imageSmoothingEnabled=true;wctx.imageSmoothingQuality='high';wctx.drawImage(src,0,0,S,S);
-      const pix=wctx.getImageData(0,0,S,S).data;
-      const maskSrc=document.createElement('canvas');maskSrc.width=W;maskSrc.height=H;
-      const mctx=maskSrc.getContext('2d'),mid=mctx.createImageData(W,H);
-      for(let i=0;i<N;i++){const v=rm[i]?255:0,j=i*4;mid.data[j]=mid.data[j+1]=mid.data[j+2]=v;mid.data[j+3]=255}mctx.putImageData(mid,0,0);
-      const mask512=document.createElement('canvas');mask512.width=S;mask512.height=S;
-      const mc=mask512.getContext('2d',{willReadFrequently:true});mc.imageSmoothingEnabled=false;mc.drawImage(maskSrc,0,0,S,S);
-      const md=mc.getImageData(0,0,S,S).data;
-      const packed=new Float32Array(4*SN);
-      for(let i=0;i<SN;i++){const j=i*4;packed[i]=pix[j]/255;packed[SN+i]=pix[j+1]/255;packed[2*SN+i]=pix[j+2]/255;packed[3*SN+i]=md[j]>127?0:1}
-      const feeds={};feeds[inputNames[0]]=new ort.Tensor('float32',packed,[1,4,S,S]);
-      $('aiGate').textContent='Analyse IA reçue · étape 2D/5 : inférence MI-GAN 512×512…';
-      let out;try{out=await miganSession.run(feeds)}catch(e){throw Error('ETAPE MI_GAN_RUN · inputs='+JSON.stringify(inputNames)+' · outputs='+JSON.stringify(outputNames)+' · '+(e?.name||'Error')+' · '+(e?.message||e));}
-      const tensor=out[outputNames[0]];if(!tensor)throw Error('ETAPE MI_GAN_OUTPUT · sortie '+outputNames[0]+' absente');const data=tensor.data;
-      const outImg=new ImageData(S,S);
-      for(let i=0;i<SN;i++){const j=i*4;const cv=v=>Math.max(0,Math.min(255,Math.round((Number(v)<=1.5?Number(v)*255:Number(v)))));outImg.data[j]=cv(data[i]);outImg.data[j+1]=cv(data[SN+i]);outImg.data[j+2]=cv(data[2*SN+i]);outImg.data[j+3]=255}
-      const out512=document.createElement('canvas');out512.width=S;out512.height=S;out512.getContext('2d').putImageData(outImg,0,0);
-      const reconstructed=document.createElement('canvas');reconstructed.width=W;reconstructed.height=H;const rc=reconstructed.getContext('2d');rc.imageSmoothingEnabled=true;rc.imageSmoothingQuality='high';rc.drawImage(out512,0,0,W,H);
-      const recon=rc.getImageData(0,0,W,H).data,finalData=new Uint8ClampedArray(state.rgba);
-      // Core comes from MI-GAN. Feather only a narrow inner boundary so resampling cannot leave a hard halo.
-      const edgeR=Math.max(2,Math.round(Math.min(W,H)*.004));
-      for(let i=0;i<N;i++)if(rm[i]){const x=i%W,y=(i/W)|0,j=i*4;let boundary=0;
-        for(let k=0;k<8;k++){const a=k*Math.PI/4,xx=Math.max(0,Math.min(W-1,Math.round(x+Math.cos(a)*edgeR))),yy=Math.max(0,Math.min(H-1,Math.round(y+Math.sin(a)*edgeR)));if(!rm[yy*W+xx])boundary++}
-        const alpha=boundary?Math.max(.72,1-boundary*.035):1;
-        finalData[j]=Math.round(recon[j]*alpha+state.rgba[j]*(1-alpha));finalData[j+1]=Math.round(recon[j+1]*alpha+state.rgba[j+1]*(1-alpha));finalData[j+2]=Math.round(recon[j+2]*alpha+state.rgba[j+2]*(1-alpha));finalData[j+3]=255}
+      const ins=miganSession.inputNames||[],outs=miganSession.outputNames||[];
+      if(ins.length!==2||!outs.length)throw Error('ETAPE MI_GAN_IO · pipeline V2 attendu 2 entrées · reçues='+JSON.stringify(ins));
+      // Match inpaint-web exactly: uint8 CHW RGB + uint8 binary mask, at ORIGINAL resolution.
+      const rgb=new Uint8Array(3*N),maskData=new Uint8Array(N);
+      for(let i=0;i<N;i++){const j=i*4;rgb[i]=state.rgba[j];rgb[N+i]=state.rgba[j+1];rgb[2*N+i]=state.rgba[j+2];maskData[i]=rm[i]?255:0}
+      const feeds={};feeds[ins[0]]=new ort.Tensor('uint8',rgb,[1,3,H,W]);feeds[ins[1]]=new ort.Tensor('uint8',maskData,[1,1,H,W]);
+      $('aiGate').textContent='Étape 2C/5 : inférence MI-GAN native '+W+'×'+H+'…';
+      let out;try{out=await miganSession.run(feeds)}catch(e){throw Error('ETAPE MI_GAN_RUN · '+(e?.message||e))}
+      const tensor=out[outs[0]];if(!tensor)throw Error('ETAPE MI_GAN_OUTPUT · sortie absente');const data=tensor.data;
+      const finalData=new Uint8ClampedArray(state.rgba);
+      // Only replace the dilated removal region. Everything else remains byte-identical to source.
+      for(let i=0;i<N;i++)if(rm[i]){const j=i*4;finalData[j]=Math.max(0,Math.min(255,Number(data[i])));finalData[j+1]=Math.max(0,Math.min(255,Number(data[N+i])));finalData[j+2]=Math.max(0,Math.min(255,Number(data[2*N+i])));finalData[j+3]=255}
       const base=document.createElement('canvas');base.width=W;base.height=H;base.getContext('2d').putImageData(new ImageData(finalData,W,H),0,0);
-      state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN ONNX 512 browser';
+      state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN pipeline V2 native uint8';
       return base;
     }
     function buildRigidPreviewLayers(){
