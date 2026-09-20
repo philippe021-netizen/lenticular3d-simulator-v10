@@ -42,3 +42,21 @@ test("V33 ne rajoute pas d'ombre aux plans dans le simulateur", async () => {
   assert.doesNotMatch(html, /contact shadow creates a static height cue/);
   assert.doesNotMatch(html, /ctx\.filter='blur\('/);
 });
+
+
+test("V33 respecte la polarité du masque MI-GAN : 0 trou, 255 connu", async () => {
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
+  assert.match(html, /maskData\[i\]=rm\[i\]\?0:255/);
+  assert.doesNotMatch(html, /maskData\[i\]=rm\[i\]\?255:0/);
+});
+
+test("V33 refuse un fond maître qui conserve les pixels de premier plan", async () => {
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
+  assert.match(html, /coreUnchangedRatio>.25/);
+  assert.match(html, /QC anti-fantôme source refusé/);
+});
+
+test("V33 n'embarque pas productionMask dans le manifest JSON", async () => {
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
+  assert.match(html, /\(\{mask,autoMask,productionMask,selected,\.\.\.group\}/);
+});
