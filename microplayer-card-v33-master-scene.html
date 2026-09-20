@@ -169,7 +169,7 @@
     async function generateThreeViews(){
       if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Test 3 vues verrouillé : scène maître non validée.';return}
       stopAnimation();const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'];state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
-      for(let i=0;i<3;i++){const canvas=renderSemanticPlaneView(positions[i]),blob=await toBlob(canvas);state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:'master-scene-2.5d-test'});}
+      for(let i=0;i<3;i++){const result=renderRigidScene(positions[i],state.width,state.height,{exactCenter:true});if(!result)throw Error('Rendu 3D de contrôle indisponible.');const canvas=result.canvas,blob=await toBlob(canvas);state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],angleDeg:result.angleDeg,mode:'card-rig-true-z-preview'});}
       const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
       $('views').innerHTML=state.urls.map((url,i)=>`<div class="view"><img src="${url}" alt="${labels[i]}"><span>${labels[i]}</span></div>`).join('');
       $('results').classList.remove('hidden');
@@ -331,45 +331,44 @@
       drawProjectedTriangle(ctx,image,[0,0],[W,0],[0,H],corners[0],corners[1],corners[3]);
       drawProjectedTriangle(ctx,image,[W,0],[W,H],[0,H],corners[1],corners[2],corners[3]);
     }
-    function drawRigidPreview(position){
-      if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
-      const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);if(sim3d.width!==w||sim3d.height!==h){sim3d.width=w;sim3d.height=h}
-      const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);
-      const p=Math.max(0,Math.min(8,position)),normal=(p-4)/4,strength=Number($('simDepth').value),zero=Number($('zero').value);
-      // Rotation asymetrique du rig complet: profil negatif plus ample, positif plus doux.
-      // Aucune couche ne recoit de translation X independante.
-      const angleDeg=normal<0?normal*35:normal*22,angle=angleDeg*Math.PI/180;
+    function renderRigidScene(normal,w,h,{exactCenter=false}={}){
+      if(!state.rgba)return null;if(!state.rigidPreview)buildRigidPreviewLayers();
+      const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+      const ctx=canvas.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);
+      const n=Math.max(-1,Math.min(1,normal)),strength=Number($('simDepth').value),zero=Number($('zero').value);
+      if(exactCenter&&Math.abs(n)<1e-9&&w===state.width&&h===state.height){
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        return {canvas,angleDeg:0};
+      }
+      ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);
+      const angleDeg=n<0?n*35:n*22,angle=angleDeg*Math.PI/180;
       const source=state.aiMaster||{background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label,groupId:layer.groupId}))};
       const layers=(source.layers||[]).map(layer=>({...layer,depth:Number(layer.depth)})).filter(layer=>layer.image&&Number.isFinite(layer.depth));
-      const depthValues=layers.map(layer=>layer.depth);depthValues.push(zero);
-      const minDepth=Math.min(...depthValues),maxDepth=Math.max(...depthValues),depthSpan=Math.max(1,maxDepth-minDepth);
-      const aspect=state.width/state.height,cam=4.4,maxLift=.22*Math.max(0,strength),baseScale=Math.min(w/(aspect*1.16),h/1.16),cx=w*.5,cy=h*.5;
+      const aspect=state.width/state.height,cam=4.4,maxLift=.24*Math.max(0,strength),baseScale=Math.min(w/(aspect*1.18),h/1.18),cx=w*.5,cy=h*.5;
       const projectPlane=z=>{
-        // Compensation de convergence: a 0 degre tous les plans retombent exactement
-        // sur leur XY d'origine. La rotation commune revele ensuite leur distance Z.
+        // Same CardRig rotation for the card and every semantic plane.
+        // Convergence compensation keeps X/Y aligned when angle = 0; only Z separates planes.
         const convergence=(cam-z)/cam;
         const pts=[[-aspect*.5*convergence,-.5*convergence],[aspect*.5*convergence,-.5*convergence],[aspect*.5*convergence,.5*convergence],[-aspect*.5*convergence,.5*convergence]];
         const cos=Math.cos(angle),sin=Math.sin(angle);
         return pts.map(([x,y])=>{const xr=x*cos+z*sin,zr=-x*sin+z*cos,den=Math.max(.5,cam-zr),persp=cam/den;return{x:cx+xr*baseScale*persp,y:cy+y*baseScale*persp,z:zr}});
       };
-      // La carte physique est le plan Z=0 et pivote elle aussi.
-      drawProjectedPlane(ctx,source.background,projectPlane(0));
-      const ordered=layers.map(layer=>{
-        const t=(layer.depth-minDepth)/depthSpan;
-        // Tous les groupes restent au-dessus de la carte; les profondeurs reglees
-        // determinent uniquement leur ecart relatif.
-        const z=.012+t*maxLift;
-        return {...layer,z};
-      }).sort((a,b)=>a.z-b.z);
-      for(const layer of ordered)drawProjectedPlane(ctx,layer.image,projectPlane(layer.z));
-      // Centre contractuel pixel parfait.
-      if(Math.abs(angleDeg)<.001){
-        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-        ctx.clearRect(0,0,w,h);ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);drawProjectedPlane(ctx,original,projectPlane(0));
-      }
-      $('tiltOut').textContent=(angleDeg>0?'+':'')+angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
+      const frontScale=Math.max(1,255-zero);
+      const scene=[
+        {image:source.background,z:0,order:-1,label:'Carte'},
+        ...layers.map(layer=>({...layer,z:Math.max(0,(layer.depth-zero)/frontScale)*maxLift,order:layer.depth}))
+      ].sort((a,b)=>a.z-b.z||a.order-b.order);
+      for(const item of scene)drawProjectedPlane(ctx,item.image,projectPlane(item.z));
+      return {canvas,angleDeg};
     }
-    function drawReliefPhoto(){
+    function drawRigidPreview(position){
+      if(!state.rgba)return;
+      const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);if(sim3d.width!==w||sim3d.height!==h){sim3d.width=w;sim3d.height=h}
+      const p=Math.max(0,Math.min(8,position)),normal=(p-4)/4,result=renderRigidScene(normal,w,h,{exactCenter:false});if(!result)return;
+      const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.drawImage(result.canvas,0,0);
+      $('tiltOut').textContent=(result.angleDeg>0?'+':'')+result.angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=Number($('simDepth').value).toFixed(2)+'×';
+    }
+        function drawReliefPhoto(){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();stopAnimation();
       const W=1600,H=980;sim3d.width=W;sim3d.height=H;
       const gl=sim3d.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})||sim3d.getContext('experimental-webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true});
@@ -510,7 +509,7 @@
     for(const id of ['tilt','simDepth'])$(id).oninput=()=>drawRigidPreview(state.simPosition);
 
         async function maskBlob(group){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const value=group.mask[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
-    $('zip').onclick=async()=>{if(!window.JSZip)return;$('zip').disabled=true;$('zip').textContent='ZIP…';const zip=new JSZip(),sourceResponse=await fetch(state.payload.image),sourceBlob=await sourceResponse.blob();zip.file('source-carte.png',sourceBlob);state.blobs.forEach((blob,index)=>zip.file(`vue-${String(index+1).padStart(2,'0')}.png`,blob));for(let index=0;index<state.groups.length;index++)zip.file(`masques/groupe-${String(index+1).padStart(2,'0')}.png`,await maskBlob(state.groups[index]));const depthCanvas=document.createElement('canvas');depthCanvas.width=state.width;depthCanvas.height=state.height;const depthContext=depthCanvas.getContext('2d'),depthImage=depthContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];depthImage.data[index*4]=depthImage.data[index*4+1]=depthImage.data[index*4+2]=value;depthImage.data[index*4+3]=255}depthContext.putImageData(depthImage,0,0);zip.file('depth-map.png',await toBlob(depthCanvas));const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};const groups=state.groups.map(({mask,autoMask,productionMask,selected,...group},index)=>({...group,maskFile:`masques/groupe-${String(index+1).padStart(2,'0')}.png`}));zip.file('manifest.json',JSON.stringify({schema:'microplayer.card-v33',version:33,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:true,capture:state.payload.capture||null,file:'source-carte.png'},pipeline:{stage:'master-scene-semantic-v33',centerViewPixelPerfect:true},ocr:state.payload.ocrLines,ocrSummary:{engine:'tesseract-local',lineCount:state.payload.ocrLines?.length||0},groups,settings,render:{engine:'depthflow-v42',viewCount:9,depthMapFile:'depth-map.png',views:state.renderStats}},null,2));const blob=await zip.generateAsync({type:'blob'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='MicroPlayer-carte-V33-9-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);$('zip').disabled=false;$('zip').textContent='ZIP complet'};
+    $('zip').onclick=async()=>{if(!window.JSZip)return;$('zip').disabled=true;$('zip').textContent='ZIP…';const zip=new JSZip(),sourceResponse=await fetch(state.payload.image),sourceBlob=await sourceResponse.blob();zip.file('source-carte.png',sourceBlob);state.blobs.forEach((blob,index)=>zip.file(`vue-${String(index+1).padStart(2,'0')}.png`,blob));for(let index=0;index<state.groups.length;index++)zip.file(`masques/groupe-${String(index+1).padStart(2,'0')}.png`,await maskBlob(state.groups[index]));const depthCanvas=document.createElement('canvas');depthCanvas.width=state.width;depthCanvas.height=state.height;const depthContext=depthCanvas.getContext('2d'),depthImage=depthContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];depthImage.data[index*4]=depthImage.data[index*4+1]=depthImage.data[index*4+2]=value;depthImage.data[index*4+3]=255}depthContext.putImageData(depthImage,0,0);zip.file('depth-map.png',await toBlob(depthCanvas));const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};const groups=state.groups.map(({mask,autoMask,productionMask,selected,...group},index)=>({...group,maskFile:`masques/groupe-${String(index+1).padStart(2,'0')}.png`}));zip.file('manifest.json',JSON.stringify({schema:'microplayer.card-v33',version:33,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:true,capture:state.payload.capture||null,file:'source-carte.png'},pipeline:{stage:'master-scene-semantic-v33',centerViewPixelPerfect:true},ocr:state.payload.ocrLines,ocrSummary:{engine:'tesseract-local',lineCount:state.payload.ocrLines?.length||0},groups,settings,render:{engine:state.views.length===3?'card-rig-true-z-preview':'depthflow-v42',viewCount:state.views.length,depthMapFile:'depth-map.png',views:state.renderStats}},null,2));const blob=await zip.generateAsync({type:'blob'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=state.views.length===3?'MicroPlayer-carte-V33-test-3-vues.zip':'MicroPlayer-carte-V33-9-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);$('zip').disabled=false;$('zip').textContent='ZIP complet'};
 
     $('back').onclick=()=>location.href='./microplayer-card-v33.html';$('auto').onclick=applyPreset;$('preset').onchange=applyPreset;
     for(const id of ['zero','relief','parallax','background'])$(id).oninput=()=>{updateOutputs();compose()};
