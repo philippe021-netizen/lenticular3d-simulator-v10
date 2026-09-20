@@ -196,6 +196,110 @@
       ctx.putImageData(new ImageData(out,W,H),0,0);
       return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),holesBeforeFill:holes,holeRatioBeforeFill:Number((holes/N*100).toFixed(2)),filled:fill.filled,backgroundFilled:fill.backgroundFilled,fallbackFilled:fill.fallbackFilled,interiorFallbackFilled:fill.interiorFallbackFilled,backgroundFillPercent:Number(fill.backgroundFillPercent.toFixed(2)),fallbackFillPercent:Number(fill.fallbackFillPercent.toFixed(2)),interiorFallbackFillPercent:Number(fill.interiorFallbackFillPercent.toFixed(2)),maxFillDistance:fill.maxFillDistance,fillRadius:fill.fillRadius,borderGuard:fill.borderGuard,mode:'continuous-depth-zbuffer-depth-aware-2d-fill',scale}};
     }
+
+    function renderInverseRowInterpView(position,options={}){
+      const SW=state.width,SH=state.height,depth=continuousDepth();
+      if(!state.rgba||!depth?.length)throw Error('Profondeur continue indisponible pour le rendu inverse.');
+      const maxEdge=Number(options.maxEdge)||Math.max(SW,SH),scale=Math.min(1,maxEdge/Math.max(SW,SH)),W=Math.max(1,Math.round(SW*scale)),H=Math.max(1,Math.round(SH*scale)),N=W*H;
+      const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d',{willReadFrequently:true});
+      const normal=Math.max(-1,Math.min(1,Number(position)||0));
+      if(Math.abs(normal)<1e-9){
+        if(scale===1)ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);
+        else {const src=document.createElement('canvas');src.width=SW;src.height=SH;src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);ctx.drawImage(src,0,0,W,H)}
+        return {canvas,stats:{position:0,maxShift:0,pullErrorPercent:0,interiorPullErrorPercent:0,mode:'inverse-row-center-exact',scale}};
+      }
+      const reliefScale=Math.max(.25,Number($('relief').value)/185),maxShift=W*(Number($('parallax').value)/100)*reliefScale;
+      const out=new Uint8ClampedArray(N*4),projected=new Float32Array(W),sortedFx=new Float32Array(W),sortedSx=new Float32Array(W),order=new Array(W);
+      const borderGuard=Math.min(Math.floor(Math.min(W,H)*.22),Math.max(24,Math.ceil(Math.abs(maxShift*normal)*2+12)));
+      let pullErrors=0,interiorPullErrors=0;
+      for(let y=0;y<H;y++){
+        const sy=Math.min(SH-1,Math.max(0,Math.round(y/scale)));
+        for(let x=0;x<W;x++){
+          const sx=Math.min(SW-1,Math.max(0,Math.round(x/scale))),d=depth[sy*SW+sx];
+          projected[x]=x+normal*depthRelative(d)*maxShift;order[x]=x;
+        }
+        order.sort((a,b)=>projected[a]-projected[b]||a-b);
+        let count=0;
+        for(let k=0;k<W;k++){
+          const ox=order[k],fx=projected[ox];
+          if(count&&Math.abs(fx-sortedFx[count-1])<.001){
+            const prevX=Math.min(SW-1,Math.max(0,Math.round(sortedSx[count-1]/scale))),curX=Math.min(SW-1,Math.max(0,Math.round(ox/scale)));
+            if(depth[sy*SW+curX]>depth[sy*SW+prevX])sortedSx[count-1]=ox;
+          }else{sortedFx[count]=fx;sortedSx[count]=ox;count++}
+        }
+        let p=0;
+        for(let tx=0;tx<W;tx++){
+          while(p+1<count&&sortedFx[p+1]<tx)p++;
+          let mappedX;
+          if(count<=1)mappedX=count?sortedSx[0]:tx;
+          else if(tx<=sortedFx[0])mappedX=sortedSx[0];
+          else if(tx>=sortedFx[count-1])mappedX=sortedSx[count-1];
+          else{
+            const q=Math.min(count-1,p+1),f0=sortedFx[p],f1=sortedFx[q],s0=sortedSx[p],s1=sortedSx[q],t=f1===f0?0:(tx-f0)/(f1-f0);
+            mappedX=s0+(s1-s0)*Math.max(0,Math.min(1,t));
+          }
+          const ox=Math.min(W-1,Math.max(0,Math.round(mappedX))),sx=Math.min(SW-1,Math.max(0,Math.round(ox/scale))),si=(sy*SW+sx)*4,ti=(y*W+tx)*4;
+          out[ti]=state.rgba[si];out[ti+1]=state.rgba[si+1];out[ti+2]=state.rgba[si+2];out[ti+3]=255;
+          const d=depth[sy*SW+sx],err=Math.abs((ox+normal*depthRelative(d)*maxShift)-tx);
+          if(err>2.25){pullErrors++;if(tx>=borderGuard&&tx<W-borderGuard&&y>=borderGuard&&y<H-borderGuard)interiorPullErrors++}
+        }
+      }
+      ctx.putImageData(new ImageData(out,W,H),0,0);
+      return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),pullErrorPercent:Number((pullErrors/N*100).toFixed(2)),interiorPullErrorPercent:Number((interiorPullErrors/N*100).toFixed(2)),borderGuard,mode:'inverse-row-interp-pull',scale}};
+    }
+    function dilateHybridMask(mask,W,H,radius){
+      if(radius<=0)return mask;
+      const horizontal=new Uint8Array(W*H),out=new Uint8Array(W*H);
+      for(let y=0;y<H;y++){
+        let sum=0;for(let x=0;x<W;x++){const add=x+radius;if(add<W)sum+=mask[y*W+add];const sub=x-radius-1;if(sub>=0)sum-=mask[y*W+sub];horizontal[y*W+x]=sum>0?1:0}
+      }
+      for(let x=0;x<W;x++){
+        let sum=0;for(let y=0;y<H;y++){const add=y+radius;if(add<H)sum+=horizontal[add*W+x];const sub=y-radius-1;if(sub>=0)sum-=horizontal[sub*W+x];out[y*W+x]=sum>0?1:0}
+      }
+      return out;
+    }
+    function featherHybridMask(mask,W,H,radius=2){
+      const tmp=new Float32Array(W*H),out=new Float32Array(W*H),span=radius*2+1;
+      for(let y=0;y<H;y++){
+        let sum=0;for(let x=0;x<W;x++){const add=x+radius;if(add<W)sum+=mask[y*W+add];const sub=x-radius-1;if(sub>=0)sum-=mask[y*W+sub];tmp[y*W+x]=sum/span}
+      }
+      for(let x=0;x<W;x++){
+        let sum=0;for(let y=0;y<H;y++){const add=y+radius;if(add<H)sum+=tmp[add*W+x];const sub=y-radius-1;if(sub>=0)sum-=tmp[sub*W+x];out[y*W+x]=Math.max(0,Math.min(1,sum/span))}
+      }
+      return out;
+    }
+    function buildHybridEdgeMask(forwardCanvas,inverseCanvas,position,options={}){
+      const W=forwardCanvas.width,H=forwardCanvas.height,N=W*H,depth=continuousDepth(),SW=state.width,SH=state.height,scale=W/SW,normal=Math.max(-1,Math.min(1,Number(position)||0));
+      const f=forwardCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data,i=inverseCanvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;
+      const zero=Number($('zero').value),reliefScale=Math.max(.25,Number($('relief').value)/185),maxShift=W*(Number($('parallax').value)/100)*reliefScale,extreme=Math.abs(normal)>=.9,active=new Uint8Array(N);
+      let rawPixels=0;
+      for(let y=0;y<H;y++){
+        const sy=Math.min(SH-1,Math.max(0,Math.round(y/scale))),yu=Math.max(0,sy-1),yd=Math.min(SH-1,sy+1);
+        for(let x=0;x<W;x++){
+          const sx=Math.min(SW-1,Math.max(0,Math.round(x/scale))),xl=Math.max(0,sx-1),xr=Math.min(SW-1,sx+1),q=sy*SW+sx,d=depth[q];
+          const grad=Math.max(Math.abs(d-depth[sy*SW+xl]),Math.abs(d-depth[sy*SW+xr]),Math.abs(d-depth[yu*SW+sx]),Math.abs(d-depth[yd*SW+sx]));
+          if(d<zero-20||grad<7)continue;
+          const p=(y*W+x)*4,diff=(Math.abs(f[p]-i[p])+Math.abs(f[p+1]-i[p+1])+Math.abs(f[p+2]-i[p+2]))/3;
+          const structural=(d>=zero-8&&grad>=12)||(d>=zero-20&&grad>=7);
+          if(structural&&diff>(extreme?2.5:3.5)){active[y*W+x]=1;rawPixels++}
+        }
+      }
+      const radius=Math.max(3,Math.min(12,Math.round(Math.abs(maxShift*normal)/5))),dilated=dilateHybridMask(active,W,H,radius),alpha=featherHybridMask(dilated,W,H,2);
+      let hybridPixels=0;for(let n=0;n<N;n++)if(alpha[n]>.05)hybridPixels++;
+      return {alpha,rawPixels,hybridPixels,hybridMaskPercent:Number((hybridPixels/N*100).toFixed(2)),radius};
+    }
+    function renderHybridProductionView(position,options={}){
+      const normal=Math.max(-1,Math.min(1,Number(position)||0));
+      if(Math.abs(normal)<1e-9)return {canvas:sourceCanvasExact(),stats:{position:0,maxShift:0,holesBeforeFill:0,holeRatioBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,interiorFallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,interiorFallbackFillPercent:0,maxFillDistance:0,fillRadius:0,borderGuard:0,hybridMaskPercent:0,hybridEdgePixels:0,inverseUsed:false,mode:'source-exact-png',fullFrame:true}};
+      const forward=renderContinuousDepthView(normal,options),inverse=renderInverseRowInterpView(normal,options),mask=buildHybridEdgeMask(forward.canvas,inverse.canvas,normal,options),W=forward.canvas.width,H=forward.canvas.height,N=W*H;
+      const fctx=forward.canvas.getContext('2d',{willReadFrequently:true}),idata=inverse.canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H),fdata=fctx.getImageData(0,0,W,H);
+      for(let n=0;n<N;n++){
+        const a=mask.alpha[n];if(a<=0)continue;const p=n*4,ia=1-a;
+        fdata.data[p]=Math.round(fdata.data[p]*ia+idata.data[p]*a);fdata.data[p+1]=Math.round(fdata.data[p+1]*ia+idata.data[p+1]*a);fdata.data[p+2]=Math.round(fdata.data[p+2]*ia+idata.data[p+2]*a);fdata.data[p+3]=255;
+      }
+      fctx.putImageData(fdata,0,0);
+      return {canvas:forward.canvas,stats:{...forward.stats,mode:'hybrid-forward-plus-inverse-edges',baseMode:forward.stats.mode,inverseMode:inverse.stats.mode,inverseUsed:mask.hybridPixels>0,hybridMaskPercent:mask.hybridMaskPercent,hybridEdgePixels:mask.hybridPixels,hybridRawEdgePixels:mask.rawPixels,hybridRadius:mask.radius,inversePullErrorPercent:inverse.stats.pullErrorPercent,interiorInversePullErrorPercent:inverse.stats.interiorPullErrorPercent}};
+    }
     function continuousFrame(index){
       const i=Math.max(0,Math.min(8,Math.round(index)));if(state.continuousCache[i])return state.continuousCache[i];
       const r=renderContinuousDepthView((i-4)/4);state.continuousCache[i]=r.canvas;state.continuousStats[i]=r.stats;return r.canvas;
@@ -521,7 +625,7 @@
           // Production is always full resolution. View 05 bypasses every renderer and is copied byte-for-byte from state.rgba.
           let canvas,stats;
           if(index===4){canvas=sourceCanvasExact();stats={position:0,maxShift:0,holesBeforeFill:0,holeRatioBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,interiorFallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,interiorFallbackFillPercent:0,maxFillDistance:0,fillRadius:0,borderGuard:0,mode:'source-exact-png',fullFrame:true}}
-          else {const r=renderContinuousDepthView(position,{maxEdge:Math.max(state.width,state.height)});canvas=r.canvas;stats={...r.stats,fullFrame:true}}
+          else {const r=renderHybridProductionView(position,{maxEdge:Math.max(state.width,state.height)});canvas=r.canvas;stats={...r.stats,fullFrame:true}}
           const blob=await toBlob(canvas),url=URL.createObjectURL(blob);
           state.productionViews.push(canvas);state.productionBlobs.push(blob);state.productionUrls.push(url);state.productionStats.push({view:index+1,position,width:canvas.width,height:canvas.height,...stats});
           btn.textContent='PRODUCTION '+(index+1)+'/9…';$('productionStatus').className='status';$('productionStatus').textContent='Calcul pleine résolution '+(index+1)+'/9 · '+canvas.width+'×'+canvas.height;
@@ -530,9 +634,9 @@
         const q=state.productionQc;
         $('productionViews').innerHTML=state.productionUrls.map((url,index)=>'<div class="view"><img src="'+url+'" alt="Production '+(index+1)+'"><span>P'+String(index+1).padStart(2,'0')+'</span></div>').join('');
         $('productionStatus').className=q.ok?'status ok':'status warn';
-        $('productionStatus').textContent=(q.ok?'PRODUCTION VALIDÉE':'PRODUCTION REFUSÉE')+' · dimensions '+(q.dimsOk?'OK':'ERREUR')+' · vue 05 '+(q.centreDifferent===0?'pixel parfaite':q.centreDifferent+' pixels différents')+' · trous max '+q.worstHole+'% · fond 2D min '+q.minBackgroundFillPercent+'% · secours source max '+q.worstFallbackFillPercent+'% · shift max '+q.maxShift+' px · pas max '+q.maxStepShift+' px'+(q.warnings.length?' · attention : '+q.warnings.join(', '):'');
+        const maxHybrid=Math.max(0,...state.productionStats.map(x=>Number(x.hybridMaskPercent)||0));$('productionStatus').textContent=(q.ok?'PRODUCTION VALIDÉE':'PRODUCTION REFUSÉE')+' · moteur hybride natif · masque max '+maxHybrid.toFixed(2)+'% · dimensions '+(q.dimsOk?'OK':'ERREUR')+' · vue 05 '+(q.centreDifferent===0?'pixel parfaite':q.centreDifferent+' pixels différents')+' · trous max '+q.worstHole+'% · fond 2D min '+q.minBackgroundFillPercent+'% · secours source max '+q.worstFallbackFillPercent+'% · shift max '+q.maxShift+' px · pas max '+q.maxStepShift+' px'+(q.warnings.length?' · attention : '+q.warnings.join(', '):'');
         $('productionZip').disabled=!q.ok;
-        $('aiGate').className=q.ok?'status ok':'status warn';$('aiGate').textContent=q.ok?'Production 9 vues pleine résolution validée. ZIP production disponible.':'Production calculée mais QC lenticulaire refusé : corriger relief/parallaxe puis recalculer.';
+        $('aiGate').className=q.ok?'status ok':'status warn';$('aiGate').textContent=q.ok?'Production 9 vues pleine résolution validée · moteur hybride V02.3 natif. ZIP production disponible.':'Production calculée mais QC lenticulaire refusé : corriger relief/parallaxe puis recalculer.';
       }catch(error){
         clearProduction();$('productionStatus').className='status warn';$('productionStatus').textContent='PRODUCTION BLOQUÉE — '+(error?.message||error);
       }finally{btn.disabled=false;btn.textContent='PRODUCTION — 9 vues'}
@@ -825,7 +929,7 @@
         $('masterBg').disabled=true;$('masterBg').textContent='Fond global non utilisé en V02';
         $('clientPreview').disabled=true;$('clientGate').className='status ok';$('clientGate').textContent='V02 : profondeur continue + désocclusion 2D guidée par la profondeur. Aucun gros fond maître à reconstruire.';
         $('aiGate').className='status ok';$('aiGate').textContent='RENDU V02 PRÊT · profondeur continue 0–255 · z-buffer · vue centrale verrouillée · lancer TEST Gauche / Centre / Droite.';
-        $('renderStatus').className='status ok';$('renderStatus').textContent='Production photo V02 : plein cadre, aucune rotation de carte, trous reconstruits depuis le fond stable 2D après projection.';
+        $('renderStatus').className='status ok';$('renderStatus').textContent='Production photo V02.3 : plein cadre · rendu forward + désocclusion 2D · correction inverse locale sur ruptures de profondeur · vue 05 strictement source.';
       }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Préparer rendu V02'}
     }
     $('photoRelief').onclick=createAutomaticRelief;
@@ -896,9 +1000,9 @@
         zip.file('depth-map.png',await depthBlob());
         const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};
         const groups=state.groups.map(({mask,autoMask,productionMask,selected,...group},index)=>({...group,maskFile:'masques/groupe-'+String(index+1).padStart(2,'0')+'.png'}));
-        const manifest={schema:production?'microplayer.photo-v02.production':'microplayer.photo-v02.simulation',version:2,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:false,capture:state.payload.capture||null,file:'source-photo.png',pngExactFromRgba:true},pipeline:{stage:production?'photo-continuous-depth-production-v02':'photo-continuous-depth-simulation-v02',centerViewPixelPerfect:true,simulationSeparatedFromProduction:true},groups,settings,render:{engine:'continuous-depth-zbuffer-depth-aware-2d-fill',viewCount:views.length,depthMapFile:'depth-map.png',views:stats},qc:production?state.productionQc:state.threeViewQc};
+        const manifest={schema:production?'microplayer.photo-v02.production':'microplayer.photo-v02.simulation',version:production?'2.3-native-hybrid':2,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:false,capture:state.payload.capture||null,file:'source-photo.png',pngExactFromRgba:true},pipeline:{stage:production?'photo-continuous-depth-production-v02.3':'photo-continuous-depth-simulation-v02',centerViewPixelPerfect:true,simulationSeparatedFromProduction:true,nativeHybridProduction:production},groups,settings,render:{engine:production?'hybrid-forward-plus-inverse-edges':'continuous-depth-zbuffer-depth-aware-2d-fill',viewCount:views.length,depthMapFile:'depth-map.png',views:stats},qc:production?state.productionQc:state.threeViewQc};
         zip.file('manifest.json',JSON.stringify(manifest,null,2));
-        const blob=await zip.generateAsync({type:'blob'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=production?'MicroPlayer-photo-V02-PRODUCTION-9-vues.zip':'MicroPlayer-photo-V02-SIMULATION-3-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);
+        const blob=await zip.generateAsync({type:'blob'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=production?'MicroPlayer-photo-V02.3-PRODUCTION-9-vues-hybride.zip':'MicroPlayer-photo-V02-SIMULATION-3-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);
       }finally{button.disabled=production?!state.productionQc?.ok:false;button.textContent=old}
     }
     $('zip').onclick=()=>buildZip('simulation');
