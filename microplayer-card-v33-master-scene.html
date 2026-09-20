@@ -313,27 +313,61 @@
       const work=fastLocalBackground(removal),base=document.createElement('canvas');base.width=state.width;base.height=state.height;base.getContext('2d').putImageData(new ImageData(work,state.width,state.height),0,0);
       state.rigidPreview={base,layers,removalMask:removal,productionGroupIds:groups.map(g=>g.id),weakGroupIds:groups.filter(maskIsWeak).map(g=>g.id),structuralGroupIds:state.groups.filter(isStructuralGroup).map(g=>g.id),duplicateGroupIds:state.groups.filter(isLogoTextDuplicate).map(g=>g.id)};
     }
+    function drawProjectedTriangle(ctx,image,s0,s1,s2,d0,d1,d2){
+      const sx0=s0[0],sy0=s0[1],sx1=s1[0],sy1=s1[1],sx2=s2[0],sy2=s2[1];
+      const dx0=d0.x,dy0=d0.y,dx1=d1.x,dy1=d1.y,dx2=d2.x,dy2=d2.y;
+      const det=sx0*(sy1-sy2)+sx1*(sy2-sy0)+sx2*(sy0-sy1);
+      if(Math.abs(det)<1e-8)return;
+      const a=(dx0*(sy1-sy2)+dx1*(sy2-sy0)+dx2*(sy0-sy1))/det;
+      const cc=(dx0*(sx2-sx1)+dx1*(sx0-sx2)+dx2*(sx1-sx0))/det;
+      const e=(dx0*(sx1*sy2-sx2*sy1)+dx1*(sx2*sy0-sx0*sy2)+dx2*(sx0*sy1-sx1*sy0))/det;
+      const b=(dy0*(sy1-sy2)+dy1*(sy2-sy0)+dy2*(sy0-sy1))/det;
+      const d=(dy0*(sx2-sx1)+dy1*(sx0-sx2)+dy2*(sx1-sx0))/det;
+      const ff=(dy0*(sx1*sy2-sx2*sy1)+dy1*(sx2*sy0-sx0*sy2)+dy2*(sx0*sy1-sx1*sy0))/det;
+      ctx.save();ctx.beginPath();ctx.moveTo(dx0,dy0);ctx.lineTo(dx1,dy1);ctx.lineTo(dx2,dy2);ctx.closePath();ctx.clip();ctx.setTransform(a,b,cc,d,e,ff);ctx.drawImage(image,0,0);ctx.restore();
+    }
+    function drawProjectedPlane(ctx,image,corners){
+      const W=image.width,H=image.height;
+      drawProjectedTriangle(ctx,image,[0,0],[W,0],[0,H],corners[0],corners[1],corners[3]);
+      drawProjectedTriangle(ctx,image,[W,0],[W,H],[0,H],corners[1],corners[2],corners[3]);
+    }
     function drawRigidPreview(position){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
       const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);if(sim3d.width!==w||sim3d.height!==h){sim3d.width=w;sim3d.height=h}
       const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);
-      const strength=Number($('simDepth').value),normal=(Math.max(0,Math.min(8,position))-4)/4,zero=Number($('zero').value);
-      const margin=w*.055,cardW=w-margin*2,cardH=h-margin*2;
-      // Centre is the contractual original: no inpainting, no shadow, no synthetic relief.
-      if(Math.abs(normal)<.0125){
-        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;
-        original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(original,margin,margin,cardW,cardH);
-        $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';return;
+      const p=Math.max(0,Math.min(8,position)),normal=(p-4)/4,strength=Number($('simDepth').value),zero=Number($('zero').value);
+      // Rotation asymetrique du rig complet: profil negatif plus ample, positif plus doux.
+      // Aucune couche ne recoit de translation X independante.
+      const angleDeg=normal<0?normal*35:normal*22,angle=angleDeg*Math.PI/180;
+      const source=state.aiMaster||{background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label,groupId:layer.groupId}))};
+      const layers=(source.layers||[]).map(layer=>({...layer,depth:Number(layer.depth)})).filter(layer=>layer.image&&Number.isFinite(layer.depth));
+      const depthValues=layers.map(layer=>layer.depth);depthValues.push(zero);
+      const minDepth=Math.min(...depthValues),maxDepth=Math.max(...depthValues),depthSpan=Math.max(1,maxDepth-minDepth);
+      const aspect=state.width/state.height,cam=4.4,maxLift=.22*Math.max(0,strength),baseScale=Math.min(w/(aspect*1.16),h/1.16),cx=w*.5,cy=h*.5;
+      const projectPlane=z=>{
+        // Compensation de convergence: a 0 degre tous les plans retombent exactement
+        // sur leur XY d'origine. La rotation commune revele ensuite leur distance Z.
+        const convergence=(cam-z)/cam;
+        const pts=[[-aspect*.5*convergence,-.5*convergence],[aspect*.5*convergence,-.5*convergence],[aspect*.5*convergence,.5*convergence],[-aspect*.5*convergence,.5*convergence]];
+        const cos=Math.cos(angle),sin=Math.sin(angle);
+        return pts.map(([x,y])=>{const xr=x*cos+z*sin,zr=-x*sin+z*cos,den=Math.max(.5,cam-zr),persp=cam/den;return{x:cx+xr*baseScale*persp,y:cy+y*baseScale*persp,z:zr}});
+      };
+      // La carte physique est le plan Z=0 et pivote elle aussi.
+      drawProjectedPlane(ctx,source.background,projectPlane(0));
+      const ordered=layers.map(layer=>{
+        const t=(layer.depth-minDepth)/depthSpan;
+        // Tous les groupes restent au-dessus de la carte; les profondeurs reglees
+        // determinent uniquement leur ecart relatif.
+        const z=.012+t*maxLift;
+        return {...layer,z};
+      }).sort((a,b)=>a.z-b.z);
+      for(const layer of ordered)drawProjectedPlane(ctx,layer.image,projectPlane(layer.z));
+      // Centre contractuel pixel parfait.
+      if(Math.abs(angleDeg)<.001){
+        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        ctx.clearRect(0,0,w,h);ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);drawProjectedPlane(ctx,original,projectPlane(0));
       }
-      ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(state.rigidPreview.base,margin,margin,cardW,cardH);
-      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),denom=Math.max(1,zero,255-zero);
-      const maxShift=cardW*.075*strength;
-      ordered.forEach(layer=>{
-        const z=(Number(layer.depth)-zero)/denom,dx=normal*z*maxShift;
-        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx,margin,cardW,cardH);ctx.restore();
-      });
-      $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
+      $('tiltOut').textContent=(angleDeg>0?'+':'')+angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
     }
     function drawReliefPhoto(){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();stopAnimation();
