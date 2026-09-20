@@ -479,10 +479,18 @@
         }
         const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
         $('views').innerHTML=state.urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('');$('results').classList.remove('hidden');
-        const worstFallback=Math.max(0,...state.renderStats.map(x=>Number(x.fallbackFillPercent)||0)),worstInteriorFallback=Math.max(0,...state.renderStats.map(x=>Number(x.interiorFallbackFillPercent)||0));const threeQcOk=qc.different===0&&worstHole<=14&&worstInteriorFallback<=3;state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2)),worstInteriorFallbackFillPercent:Number(worstInteriorFallback.toFixed(2))};$('generate').disabled=!threeQcOk;
-        $('renderStatus').className=threeQcOk?'status ok':'status warn';$('renderStatus').textContent=threeQcOk?'SIMULATION VALIDÉE · centre pixel parfait · trous aperçu max '+state.threeViewQc.worstHoleRatio+'% · secours source max '+state.threeViewQc.worstFallbackFillPercent+'% · production 9 vues déverrouillée.':'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'% · secours source '+state.threeViewQc.worstFallbackFillPercent+'%.';
+        const worstFallback=Math.max(0,...state.renderStats.map(x=>Number(x.fallbackFillPercent)||0)),worstInteriorFallback=Math.max(0,...state.renderStats.map(x=>Number(x.interiorFallbackFillPercent)||0));
+        // Le TEST est un aperçu réduit (760 px) : il vérifie l'intégrité de la chaîne, pas la qualité finale de désocclusion.
+        // Le QC strict de désocclusion est réservé aux 9 vues pleine résolution dans qcProductionLenticular().
+        const previewIntegrityOk=qc.different===0&&worstHole<=14;
+        state.threeViewQc={ok:previewIntegrityOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2)),worstInteriorFallbackFillPercent:Number(worstInteriorFallback.toFixed(2)),qualityGate:'preview-integrity-only'};
+        $('generate').disabled=!previewIntegrityOk;
+        $('renderStatus').className=previewIntegrityOk?'status ok':'status warn';
+        $('renderStatus').textContent=previewIntegrityOk
+          ?'SIMULATION VALIDÉE · centre pixel parfait · trous aperçu max '+state.threeViewQc.worstHoleRatio+'% · désocclusion intérieure aperçu '+state.threeViewQc.worstInteriorFallbackFillPercent+'% (informatif) · production 9 vues déverrouillée.'
+          :'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous aperçu '+state.threeViewQc.worstHoleRatio+'% (limite 14%).';
         state.continuousCache[0]=state.views[0];state.continuousCache[4]=state.views[1];state.continuousCache[8]=state.views[2];state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
-        $('aiGate').className=threeQcOk?'status ok':'status warn';$('aiGate').textContent=threeQcOk?'Simulation validée. Production 9 vues pleine résolution disponible.':'TEST V02 calculé mais QC refusé.';
+        $('aiGate').className=previewIntegrityOk?'status ok':'status warn';$('aiGate').textContent=previewIntegrityOk?'Simulation validée. Production 9 vues pleine résolution disponible · QC strict appliqué après calcul des 9 vues.':'TEST V02 calculé mais intégrité refusée.';
       }catch(error){
         $('aiGate').className='status warn';$('aiGate').textContent='TEST V02 BLOQUÉ — '+(error?.message||error);$('renderStatus').className='status warn';$('renderStatus').textContent='Erreur test : '+(error?.stack||error);
       }finally{btn.disabled=false;btn.textContent='TEST — Gauche / Centre / Droite'}
