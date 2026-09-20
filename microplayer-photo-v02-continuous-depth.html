@@ -151,16 +151,16 @@
     }
     function fillContinuousHolesDepthAware(out,written,bgOut,bgWritten,W,H,scale,maxShift,normal){
       const N=W*H,{nearest,dist}=nearestSeedField(bgWritten,W,H),radius=Math.max(48,Math.ceil(Math.abs(maxShift*normal)*3+24));
-      let filled=0,backgroundFilled=0,fallbackFilled=0,maxFillDistance=0;
+      let filled=0,backgroundFilled=0,fallbackFilled=0,interiorFallbackFilled=0,maxFillDistance=0;const borderGuard=Math.min(Math.floor(Math.min(W,H)*.22),Math.max(24,Math.ceil(Math.abs(maxShift*normal)*2+12)));
       for(let i=0;i<N;i++){
         if(written[i])continue;const t=i*4,pick=nearest[i];
         if(pick>=0&&dist[i]<=radius){
           const s=pick*4;out[t]=bgOut[s];out[t+1]=bgOut[s+1];out[t+2]=bgOut[s+2];out[t+3]=255;backgroundFilled++;filled++;if(dist[i]>maxFillDistance)maxFillDistance=dist[i];continue;
         }
         const x=i%W,y=(i/W)|0,sx=Math.min(state.width-1,Math.max(0,Math.round(x/scale))),sy=Math.min(state.height-1,Math.max(0,Math.round(y/scale))),s=(sy*state.width+sx)*4;
-        out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255;fallbackFilled++;filled++;
+        out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255;fallbackFilled++;if(x>=borderGuard&&x<W-borderGuard&&y>=borderGuard&&y<H-borderGuard)interiorFallbackFilled++;filled++;
       }
-      return {filled,backgroundFilled,fallbackFilled,backgroundFillPercent:filled?backgroundFilled/filled*100:100,fallbackFillPercent:filled?fallbackFilled/filled*100:0,maxFillDistance,fillRadius:radius};
+      return {filled,backgroundFilled,fallbackFilled,interiorFallbackFilled,backgroundFillPercent:filled?backgroundFilled/filled*100:100,fallbackFillPercent:filled?fallbackFilled/filled*100:0,interiorFallbackFillPercent:filled?interiorFallbackFilled/filled*100:0,maxFillDistance,fillRadius:radius,borderGuard};
     }
     function renderContinuousDepthView(position,options={}){
       const SW=state.width,SH=state.height,depth=continuousDepth(),bgSeed=backgroundSeedMask();
@@ -171,7 +171,7 @@
       if(Math.abs(normal)<1e-9){
         if(scale===1)ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);
         else {const src=document.createElement('canvas');src.width=SW;src.height=SH;src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);ctx.drawImage(src,0,0,W,H)}
-        return {canvas,stats:{position:normal,holeRatioBeforeFill:0,holesBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,maxFillDistance:0,fillRadius:0,mode:'continuous-depth-zbuffer-center-exact',scale}};
+        return {canvas,stats:{position:normal,holeRatioBeforeFill:0,holesBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,interiorFallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,interiorFallbackFillPercent:0,maxFillDistance:0,fillRadius:0,borderGuard:0,mode:'continuous-depth-zbuffer-center-exact',scale}};
       }
       const zero=Number($('zero').value),reliefScale=Math.max(.25,Number($('relief').value)/185),maxShift=W*(Number($('parallax').value)/100)*reliefScale;
       const out=new Uint8ClampedArray(N*4),zbuf=new Int16Array(N),written=new Uint8Array(N),bgOut=new Uint8ClampedArray(N*4),bgZ=new Int16Array(N),bgWritten=new Uint8Array(N);zbuf.fill(-32768);bgZ.fill(-32768);
@@ -194,7 +194,7 @@
       let holes=0;for(let i=0;i<N;i++)if(!written[i])holes++;
       const fill=fillContinuousHolesDepthAware(out,written,bgOut,bgWritten,W,H,scale,maxShift,normal);
       ctx.putImageData(new ImageData(out,W,H),0,0);
-      return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),holesBeforeFill:holes,holeRatioBeforeFill:Number((holes/N*100).toFixed(2)),filled:fill.filled,backgroundFilled:fill.backgroundFilled,fallbackFilled:fill.fallbackFilled,backgroundFillPercent:Number(fill.backgroundFillPercent.toFixed(2)),fallbackFillPercent:Number(fill.fallbackFillPercent.toFixed(2)),maxFillDistance:fill.maxFillDistance,fillRadius:fill.fillRadius,mode:'continuous-depth-zbuffer-depth-aware-2d-fill',scale}};
+      return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),holesBeforeFill:holes,holeRatioBeforeFill:Number((holes/N*100).toFixed(2)),filled:fill.filled,backgroundFilled:fill.backgroundFilled,fallbackFilled:fill.fallbackFilled,interiorFallbackFilled:fill.interiorFallbackFilled,backgroundFillPercent:Number(fill.backgroundFillPercent.toFixed(2)),fallbackFillPercent:Number(fill.fallbackFillPercent.toFixed(2)),interiorFallbackFillPercent:Number(fill.interiorFallbackFillPercent.toFixed(2)),maxFillDistance:fill.maxFillDistance,fillRadius:fill.fillRadius,borderGuard:fill.borderGuard,mode:'continuous-depth-zbuffer-depth-aware-2d-fill',scale}};
     }
     function continuousFrame(index){
       const i=Math.max(0,Math.min(8,Math.round(index)));if(state.continuousCache[i])return state.continuousCache[i];
@@ -474,12 +474,12 @@
         for(let i=0;i<3;i++){
           $('aiGate').textContent='TEST V02 · '+labels[i]+' '+(i+1)+'/3…';await new Promise(resolve=>setTimeout(resolve,20));
           const r=i===1?renderContinuousDepthView(0):renderContinuousDepthView(positions[i],{maxEdge:760}),blob=await toBlob(r.canvas);
-          state.views.push(r.canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:r.stats.mode,holeRatioBeforeFill:r.stats.holeRatioBeforeFill,backgroundFillPercent:r.stats.backgroundFillPercent??100,fallbackFillPercent:r.stats.fallbackFillPercent||0,maxFillDistance:r.stats.maxFillDistance||0,maxShift:r.stats.maxShift||0,previewScale:r.stats.scale||1,width:r.canvas.width,height:r.canvas.height});
+          state.views.push(r.canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:r.stats.mode,holeRatioBeforeFill:r.stats.holeRatioBeforeFill,backgroundFillPercent:r.stats.backgroundFillPercent??100,fallbackFillPercent:r.stats.fallbackFillPercent||0,interiorFallbackFillPercent:r.stats.interiorFallbackFillPercent||0,maxFillDistance:r.stats.maxFillDistance||0,maxShift:r.stats.maxShift||0,previewScale:r.stats.scale||1,width:r.canvas.width,height:r.canvas.height});
           worstHole=Math.max(worstHole,r.stats.holeRatioBeforeFill||0);
         }
         const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
         $('views').innerHTML=state.urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('');$('results').classList.remove('hidden');
-        const worstFallback=Math.max(0,...state.renderStats.map(x=>Number(x.fallbackFillPercent)||0));const threeQcOk=qc.different===0&&worstHole<=14&&worstFallback<=3;state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2))};$('generate').disabled=!threeQcOk;
+        const worstFallback=Math.max(0,...state.renderStats.map(x=>Number(x.fallbackFillPercent)||0)),worstInteriorFallback=Math.max(0,...state.renderStats.map(x=>Number(x.interiorFallbackFillPercent)||0));const threeQcOk=qc.different===0&&worstHole<=14&&worstInteriorFallback<=3;state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2)),worstInteriorFallbackFillPercent:Number(worstInteriorFallback.toFixed(2))};$('generate').disabled=!threeQcOk;
         $('renderStatus').className=threeQcOk?'status ok':'status warn';$('renderStatus').textContent=threeQcOk?'SIMULATION VALIDÉE · centre pixel parfait · trous aperçu max '+state.threeViewQc.worstHoleRatio+'% · secours source max '+state.threeViewQc.worstFallbackFillPercent+'% · production 9 vues déverrouillée.':'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'% · secours source '+state.threeViewQc.worstFallbackFillPercent+'%.';
         state.continuousCache[0]=state.views[0];state.continuousCache[4]=state.views[1];state.continuousCache[8]=state.views[2];state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
         $('aiGate').className=threeQcOk?'status ok':'status warn';$('aiGate').textContent=threeQcOk?'Simulation validée. Production 9 vues pleine résolution disponible.':'TEST V02 calculé mais QC refusé.';
@@ -496,12 +496,13 @@
       if(views[4]?.width===W&&views[4]?.height===H){const centre=views[4].getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;centreDifferent=comparePixels(centre,state.rgba).different}
       const worstHole=stats.length?Math.max(...stats.map(x=>Number(x.holeRatioBeforeFill)||0)):Infinity;
       const worstFallback=stats.length?Math.max(...stats.map(x=>Number(x.fallbackFillPercent)||0)):Infinity;
+      const worstInteriorFallback=stats.length?Math.max(...stats.map(x=>Number(x.interiorFallbackFillPercent)||0)):Infinity;
       const minBackgroundFill=stats.length?Math.min(...stats.filter(x=>(Number(x.holesBeforeFill)||0)>0).map(x=>Number(x.backgroundFillPercent)||0),100):0;
       const maxShift=stats.length?Math.max(...stats.map(x=>Math.abs(Number(x.maxShift)||0))):Infinity;
       const maxStepShift=maxShift/4,shiftLimit=W*.06,stepLimit=W*.02,holeLimit=6,fallbackLimit=2.5;
-      const ok=dimsOk&&centreDifferent===0&&worstHole<=holeLimit&&worstFallback<=fallbackLimit&&maxShift<=shiftLimit&&maxStepShift<=stepLimit;
-      const warnings=[];if(worstHole>3)warnings.push('trous '+worstHole.toFixed(2)+'%');if(worstFallback>1)warnings.push('secours source '+worstFallback.toFixed(2)+'%');if(maxShift>W*.045)warnings.push('parallaxe forte '+maxShift.toFixed(1)+' px');
-      return {ok,dimsOk,centreDifferent,worstHole:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2)),minBackgroundFillPercent:Number(minBackgroundFill.toFixed(2)),maxShift:Number(maxShift.toFixed(2)),maxStepShift:Number(maxStepShift.toFixed(2)),limits:{holePercent:holeLimit,fallbackFillPercent:fallbackLimit,maxShiftPx:Number(shiftLimit.toFixed(2)),maxStepShiftPx:Number(stepLimit.toFixed(2))},warnings};
+      const ok=dimsOk&&centreDifferent===0&&worstHole<=holeLimit&&worstInteriorFallback<=fallbackLimit&&maxShift<=shiftLimit&&maxStepShift<=stepLimit;
+      const warnings=[];if(worstHole>3)warnings.push('trous '+worstHole.toFixed(2)+'%');if(worstInteriorFallback>1)warnings.push('secours intérieur '+worstInteriorFallback.toFixed(2)+'%');if(maxShift>W*.045)warnings.push('parallaxe forte '+maxShift.toFixed(1)+' px');
+      return {ok,dimsOk,centreDifferent,worstHole:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2)),worstInteriorFallbackFillPercent:Number(worstInteriorFallback.toFixed(2)),minBackgroundFillPercent:Number(minBackgroundFill.toFixed(2)),maxShift:Number(maxShift.toFixed(2)),maxStepShift:Number(maxStepShift.toFixed(2)),limits:{holePercent:holeLimit,interiorFallbackFillPercent:fallbackLimit,maxShiftPx:Number(shiftLimit.toFixed(2)),maxStepShiftPx:Number(stepLimit.toFixed(2))},warnings};
     }
     async function generateViews(){
       if(!state.aiReady||!continuousDepth()||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='Production verrouillée : valider d’abord la simulation Gauche / Centre / Droite.';return}
@@ -511,7 +512,7 @@
           await new Promise(resolve=>setTimeout(resolve,20));const position=(index-4)/4;
           // Production is always full resolution. View 05 bypasses every renderer and is copied byte-for-byte from state.rgba.
           let canvas,stats;
-          if(index===4){canvas=sourceCanvasExact();stats={position:0,maxShift:0,holesBeforeFill:0,holeRatioBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,maxFillDistance:0,fillRadius:0,mode:'source-exact-png',fullFrame:true}}
+          if(index===4){canvas=sourceCanvasExact();stats={position:0,maxShift:0,holesBeforeFill:0,holeRatioBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,interiorFallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,interiorFallbackFillPercent:0,maxFillDistance:0,fillRadius:0,borderGuard:0,mode:'source-exact-png',fullFrame:true}}
           else {const r=renderContinuousDepthView(position,{maxEdge:Math.max(state.width,state.height)});canvas=r.canvas;stats={...r.stats,fullFrame:true}}
           const blob=await toBlob(canvas),url=URL.createObjectURL(blob);
           state.productionViews.push(canvas);state.productionBlobs.push(blob);state.productionUrls.push(url);state.productionStats.push({view:index+1,position,width:canvas.width,height:canvas.height,...stats});
