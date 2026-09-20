@@ -251,9 +251,13 @@
         for(let i=0;i<group.mask.length;i++){let a=group.mask[i];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));displayUnion[i]=Math.max(displayUnion[i],a);const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
         ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label});
       }
-      // LDI principle: display mask stays tight; removal mask is deliberately wider.
-      const removal=new Uint8ClampedArray(N),r=Math.max(2,Math.round(Math.min(state.width,state.height)*.006));
-      for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(displayUnion[i]<20)continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<state.width&&yy<state.height)removal[yy*state.width+xx]=255}}
+      // Production removal mask must cover anti-aliased glyph/logo fringes, not only the opaque core.
+      // Build it from every non-background semantic mask at a very low alpha threshold, then dilate
+      // more generously than the display mask. Display layers themselves remain tight/original.
+      const removalSeed=new Uint8Array(N);
+      for(const group of state.groups){const role=String(group.role||'').toLowerCase();if(['artwork','subject','background','decor','decoration'].includes(role))continue;for(let i=0;i<N;i++)if(group.mask[i]>=3)removalSeed[i]=1}
+      const removal=new Uint8ClampedArray(N),r=Math.max(5,Math.round(Math.min(state.width,state.height)*.012));
+      for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!removalSeed[i])continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<state.width&&yy<state.height)removal[yy*state.width+xx]=255}}
       // Deterministic local inpainting: propagate real neighbouring background inward.
       const work=new Uint8ClampedArray(state.rgba), unknown=new Uint8Array(N);for(let i=0;i<N;i++)unknown[i]=removal[i]?1:0;
       for(let pass=0;pass<Math.max(8,r*3);pass++){let changed=0;const next=unknown.slice();for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!unknown[i])continue;let rr=0,gg=0,bb=0,n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=state.width||yy>=state.height)continue;const q=yy*state.width+xx;if(unknown[q])continue;const j=q*4;rr+=work[j];gg+=work[j+1];bb+=work[j+2];n++}if(n>=2){const j=i*4;work[j]=rr/n;work[j+1]=gg/n;work[j+2]=bb/n;work[j+3]=255;next[i]=0;changed++}}unknown.set(next);if(!changed)break}
@@ -392,7 +396,7 @@
         // Do not unlock 3/9 views while reconstructed foreground-shaped residue remains.
         // Residual similarity is the foreground-ghost metric. Local discontinuity is diagnostic only:
         // legitimate card artwork/gradients can be discontinuous and must not be mislabeled as surviving text.
-        if(removed>200&&residualRatio>.035)throw Error('QC anti-fantôme strict refusé · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'% (diagnostic). Le fond maître contient encore des traces probables de texte/logo.');
+        if(removed>200&&residualRatio>.035)throw Error('QC anti-fantôme strict refusé · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'% (diagnostic). Masque de retrait insuffisant ou reconstruction contaminée.');
         // Rebuild production layers from the ORIGINAL pixels after exclusivity/QC.
         // Their alpha is clipped by the removal mask so no source glyph can remain simultaneously
         // in background_master and in a moving foreground plane.
