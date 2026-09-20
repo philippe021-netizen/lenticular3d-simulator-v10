@@ -24,7 +24,7 @@
     <section>
       <section class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
-      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="generate" class="primary" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
+      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Contrôle IA des profondeurs</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="generate" class="primary" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
       <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">-30°</b><input id="tilt" type="range" min="-30" max="15" step="1" value="-30"></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="downloadRelief" disabled>Résultat automatique</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
   </div></main>
@@ -89,10 +89,9 @@
       }
       ctx.drawImage(state.rigidPreview.base,0,0,state.width,state.height);
       const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
-      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
-      const maxShift=state.width*(Number($('parallax').value)/100);
+      const maxShift=state.width*(Number($('parallax').value)/100),denom=Math.max(1,zero,255-zero);
       for(const layer of ordered){
-        const z=((Number(layer.depth)-dMin)/span)*2-1;
+        const z=(Number(layer.depth)-zero)/denom;
         const dx=normal*z*maxShift;
         // Production views: original RGBA plane only. No extrusion, scale, blur or cast shadow.
         ctx.drawImage(layer.canvas,dx,0,state.width,state.height);
@@ -107,9 +106,8 @@
       if(Math.abs(normal)<1e-9){ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
       ctx.drawImage(state.aiMaster.background,0,0,state.width,state.height);
       const ordered=[...state.aiMaster.layers].sort((a,b)=>a.depth-b.depth);
-      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
-      const maxShift=state.width*(Number($('parallax').value)/100);
-      for(const layer of ordered){const z=((Number(layer.depth)-dMin)/span)*2-1;ctx.drawImage(layer.image,normal*z*maxShift,0,state.width,state.height)}
+      const maxShift=state.width*(Number($('parallax').value)/100),denom=Math.max(1,zero,255-zero);
+      for(const layer of ordered){const z=(Number(layer.depth)-zero)/denom;ctx.drawImage(layer.image,normal*z*maxShift,0,state.width,state.height)}
       return canvas;
     }
 
@@ -154,39 +152,101 @@
       ctx.restore();$('threePlanWrap').classList.remove('hidden');return true;
     }
 
+    function boxArea(box){return Array.isArray(box)&&box.length>=4?Math.max(0,Number(box[2])||0)*Math.max(0,Number(box[3])||0):0}
+    function boxIntersectionRatio(inner,outer){
+      if(!Array.isArray(inner)||!Array.isArray(outer))return 0;
+      const ax0=Number(inner[0])||0,ay0=Number(inner[1])||0,ax1=ax0+(Number(inner[2])||0),ay1=ay0+(Number(inner[3])||0);
+      const bx0=Number(outer[0])||0,by0=Number(outer[1])||0,bx1=bx0+(Number(outer[2])||0),by1=by0+(Number(outer[3])||0);
+      const w=Math.max(0,Math.min(ax1,bx1)-Math.max(ax0,bx0)),h=Math.max(0,Math.min(ay1,by1)-Math.max(ay0,by0)),area=Math.max(1e-9,(ax1-ax0)*(ay1-ay0));
+      return w*h/area;
+    }
+    function isStructuralGroup(group){
+      const role=String(group?.role||'').toLowerCase(),type=String(group?.type||'').toLowerCase(),coverage=maskCoverage(group?.mask||new Uint8ClampedArray()).percent,area=boxArea(group?.bbox);
+      return ['background','decor','decoration'].includes(role)||(role==='artwork'&&(coverage>18||area>0.18))||(type==='artwork'&&(coverage>18||area>0.18));
+    }
+    function isLogoTextDuplicate(group){
+      const role=String(group?.role||'').toLowerCase();
+      if(!['company'].includes(role)||!Array.isArray(group?.bbox))return false;
+      return state.groups.some(other=>other!==group&&String(other?.role||'').toLowerCase()==='logo'&&boxIntersectionRatio(group.bbox,other.bbox)>=0.82);
+    }
+    function productionGroups(){
+      return state.groups.filter(group=>!isStructuralGroup(group)&&!isLogoTextDuplicate(group));
+    }
+    function maskIsWeak(group){
+      const coverage=maskCoverage(group?.mask||new Uint8ClampedArray()).percent,areaPct=boxArea(group?.bbox)*100;
+      if(areaPct<=0)return true;
+      const role=String(group?.role||'').toLowerCase();
+      const ratio=coverage/areaPct;
+      const minRatio=['name','company','title','phone','email','address','website','social','slogan','service','logo'].includes(role)?0.035:0.02;
+      return coverage<0.015||ratio<minRatio;
+    }
+    function addBoxToMask(target,box,padding=.003){
+      if(!Array.isArray(box)||box.length<4)return;
+      const x0=Math.max(0,Math.floor((Number(box[0])-padding)*state.width)),y0=Math.max(0,Math.floor((Number(box[1])-padding)*state.height));
+      const x1=Math.min(state.width,Math.ceil((Number(box[0])+Number(box[2])+padding)*state.width)),y1=Math.min(state.height,Math.ceil((Number(box[1])+Number(box[3])+padding)*state.height));
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)target[y*state.width+x]=255;
+    }
+    function deriveLayerMask(group,backgroundRgba){
+      const N=state.width*state.height,out=new Uint8ClampedArray(group.mask||N),weak=maskIsWeak(group);
+      if(!weak)return out;
+      const box=group.bbox;if(!Array.isArray(box)||box.length<4)return out;
+      const x0=Math.max(0,Math.floor(Number(box[0])*state.width)),y0=Math.max(0,Math.floor(Number(box[1])*state.height));
+      const x1=Math.min(state.width,Math.ceil((Number(box[0])+Number(box[2]))*state.width)),y1=Math.min(state.height,Math.ceil((Number(box[1])+Number(box[3]))*state.height));
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+        const p=y*state.width+x,k=p*4;
+        const d=(Math.abs(state.rgba[k]-backgroundRgba[k])+Math.abs(state.rgba[k+1]-backgroundRgba[k+1])+Math.abs(state.rgba[k+2]-backgroundRgba[k+2]))/3;
+        const a=Math.max(0,Math.min(255,Math.round((d-5)/24*255)));
+        if(a>out[p])out[p]=a;
+      }
+      return out;
+    }
+    function validateProductionScene(){
+      const issues=[],groups=productionGroups();
+      for(const group of groups){
+        const coverage=maskCoverage(group.productionMask||group.mask).percent;
+        if(coverage<0.01)issues.push('Calque inexploitable : '+group.label);
+      }
+      if(groups.length<3)issues.push('Moins de 3 plans exploitables.');
+      return issues;
+    }
+
     async function generateViews(){
       if(!state.rgba||!state.groups.length){$('renderStatus').className='status warn';$('renderStatus').textContent='Production impossible : carte ou groupes absents.';return}
       $('generate').disabled=true;$('generate').textContent='Préparation 9 vues…';
-      $('renderStatus').className='status';$('renderStatus').textContent='Production directe depuis la carte et les masques validés…';
+      $('renderStatus').className='status';$('renderStatus').textContent='Construction du fond maître sans texte/logo fantôme…';
       state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
-      // Production must never depend on AI state, client preview, or the expensive background inpainting path.
-      // Build lightweight RGBA planes once; keep the untouched original as view 05.
-      const W=state.width,H=state.height,N=W*H,zero=Number($('zero').value);
-      const layers=[];
-      for(const group of state.groups){
-        const role=String(group.role||'').toLowerCase();
-        if(['background','decor','decoration'].includes(role))continue;
-        const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-        const ctx=canvas.getContext('2d'),img=ctx.createImageData(W,H);
-        for(let p=0;p<N;p++){const a=group.mask[p];if(a<12)continue;const k=p*4;img.data[k]=state.rgba[k];img.data[k+1]=state.rgba[k+1];img.data[k+2]=state.rgba[k+2];img.data[k+3]=a}
-        ctx.putImageData(img,0,0);layers.push({canvas,depth:Number(group.depth)||zero,label:group.label});
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+      state.rigidPreview=null;buildRigidPreviewLayers();
+      const issues=validateProductionScene();
+      if(issues.length){
+        $('renderStatus').className='status warn';$('renderStatus').textContent='Production bloquée :\n'+issues.join('\n');
+        $('generate').disabled=false;$('generate').textContent='PRODUCTION — 9 vues';return;
       }
-      const ds=layers.map(l=>l.depth),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
-      const maxShift=W*(Number($('parallax').value)/100);
+      const W=state.width,H=state.height,zero=Number($('zero').value),maxShift=W*(Number($('parallax').value)/100),denom=Math.max(1,zero,255-zero);
       const original=document.createElement('canvas');original.width=W;original.height=H;
       original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
+      const layers=[...state.rigidPreview.layers];
       for(let index=0;index<9;index++){
         $('generate').textContent=`Vue ${index+1}/9…`;await new Promise(resolve=>setTimeout(resolve,0));
         const position=(index-4)/4,canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
         const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-        // Temporary deterministic base: original card. This guarantees responsiveness; clean background reconstruction is a separate explicit stage.
-        ctx.drawImage(original,0,0);
-        if(index!==4)for(const layer of layers){const z=((layer.depth-dMin)/span)*2-1;ctx.drawImage(layer.canvas,position*z*maxShift,0,W,H)}
+        if(index===4){
+          ctx.drawImage(original,0,0);
+        }else{
+          ctx.drawImage(state.rigidPreview.base,0,0,W,H);
+          for(const layer of layers){
+            const relative=(Number(layer.depth)-zero)/denom;
+            const dx=position*relative*maxShift;
+            ctx.drawImage(layer.canvas,dx,0,W,H);
+          }
+        }
         const blob=await toBlob(canvas);if(!blob)throw Error('Échec encodage PNG vue '+(index+1));
-        state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,mode:'direct-semantic-v32',shadow:false,extrusion:false});
+        state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,mode:'clean-master-semantic-v32',zero,shadow:false,extrusion:false});
       }
       const centre=state.views[4].getContext('2d').getImageData(0,0,W,H).data,centreQc=comparePixels(centre,state.rgba);
-      $('renderStatus').className='status ok';$('renderStatus').textContent=`9 vues terminées · vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · production indépendante de l’IA.`;
+      const q=state.rigidPreview.backgroundQc||{};
+      $('renderStatus').className=centreQc.different===0?'status ok':'status warn';
+      $('renderStatus').textContent=`9 vues terminées · vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · fond maître propre · résidus ${Number((q.residualRatio||0)*100).toFixed(2)}%.`;
       $('views').innerHTML=state.urls.map((url,index)=>`<div class="view"><img src="${url}" alt="Vue ${index+1}"><span>${String(index+1).padStart(2,'0')}</span></div>`).join('');
       $('results').classList.remove('hidden');$('generate').disabled=false;$('generate').textContent='Régénérer les 9 vues';state.simPosition=4;$('simRange').value='4';drawSimulation(4);startAnimation();
     }
@@ -199,23 +259,27 @@
     }
     function reconstructBackgroundHybrid(removal){
       const W=state.width,H=state.height,N=W*H,src=state.rgba,work=new Uint8ClampedArray(src),unknown=new Uint8Array(N);
-      for(let i=0;i<N;i++)unknown[i]=removal[i]>=20?1:0;
-      // Edge-directed deterministic fill. Opposite known samples preserve gradients/lines better than isotropic blur.
-      const dirs=[[1,0],[0,1],[1,1],[1,-1]];
-      for(let pass=0;pass<Math.max(W,H);pass++){
-        let changed=0;const next=unknown.slice(),updates=[];
-        for(let y=0;y<H;y++)for(let x=0;x<W;x++){const p=y*W+x;if(!unknown[p])continue;let best=null,bestScore=1e9;
-          for(const [dx,dy] of dirs){let a=null,b=null;for(let d=1;d<=8;d++){const x1=x-dx*d,y1=y-dy*d,q1=y1*W+x1;if(a===null&&x1>=0&&y1>=0&&x1<W&&y1<H&&!unknown[q1])a=q1;const x2=x+dx*d,y2=y+dy*d,q2=y2*W+x2;if(b===null&&x2>=0&&y2>=0&&x2<W&&y2<H&&!unknown[q2])b=q2;if(a!==null&&b!==null)break}
-            if(a!==null&&b!==null){const ja=a*4,jb=b*4,score=Math.abs(src[ja]-src[jb])+Math.abs(src[ja+1]-src[jb+1])+Math.abs(src[ja+2]-src[jb+2]);if(score<bestScore){bestScore=score;best=[(work[ja]+work[jb])*.5,(work[ja+1]+work[jb+1])*.5,(work[ja+2]+work[jb+2])*.5]}}
-          }
-          if(!best){let rr=0,gg=0,bb=0,n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=H)continue;const q=yy*W+xx;if(unknown[q])continue;const k=q*4;rr+=work[k];gg+=work[k+1];bb+=work[k+2];n++}if(n>=2)best=[rr/n,gg/n,bb/n]}
-          if(best){updates.push([p,best]);next[p]=0;changed++}
-        }
-        for(const [p,v] of updates){const k=p*4;work[k]=v[0];work[k+1]=v[1];work[k+2]=v[2];work[k+3]=255}unknown.set(next);if(!changed)break;
+      let unresolved=0;for(let p=0;p<N;p++){unknown[p]=removal[p]>=20?1:0;if(unknown[p])unresolved++}
+      const hLeft=new Int32Array(W),hRight=new Int32Array(W),vTop=new Int32Array(H),vBottom=new Int32Array(H);
+      const setPixel=(p,a,b,t)=>{const k=p*4,ka=a*4,kb=b*4;work[k]=src[ka]*(1-t)+src[kb]*t;work[k+1]=src[ka+1]*(1-t)+src[kb+1]*t;work[k+2]=src[ka+2]*(1-t)+src[kb+2]*t;work[k+3]=255};
+      // O(N) edge-directed interpolation. Unlike the former whole-image iterative fill,
+      // this is fast enough for iPad and never loops max(width,height) times over every pixel.
+      for(let y=0;y<H;y++){
+        let last=-1;for(let x=0;x<W;x++){const p=y*W+x;if(!unknown[p])last=x;hLeft[x]=last}
+        last=-1;for(let x=W-1;x>=0;x--){const p=y*W+x;if(!unknown[p])last=x;hRight[x]=last}
+        for(let x=0;x<W;x++){const p=y*W+x;if(!unknown[p])continue;const l=hLeft[x],r=hRight[x];if(l>=0&&r>=0&&r>l)setPixel(p,y*W+l,y*W+r,(x-l)/(r-l));else if(l>=0){const q=y*W+l,k=p*4,j=q*4;work[k]=src[j];work[k+1]=src[j+1];work[k+2]=src[j+2];work[k+3]=255}else if(r>=0){const q=y*W+r,k=p*4,j=q*4;work[k]=src[j];work[k+1]=src[j+1];work[k+2]=src[j+2];work[k+3]=255}}
       }
-      // Never leave original foreground pixels in unresolved holes.
-      let unresolved=0;for(let p=0;p<N;p++)if(unknown[p]){unresolved++;const x=p%W,y=(p/W)|0;let rr=0,gg=0,bb=0,n=0;for(let rad=4;rad<=48&&!n;rad+=4)for(let k=0;k<32;k++){const a=k*Math.PI/16,xx=Math.round(x+Math.cos(a)*rad),yy=Math.round(y+Math.sin(a)*rad);if(xx<0||yy<0||xx>=W||yy>=H)continue;const q=yy*W+xx;if(removal[q]>=20)continue;const z=q*4;rr+=src[z];gg+=src[z+1];bb+=src[z+2];n++}const z=p*4;if(n){work[z]=rr/n;work[z+1]=gg/n;work[z+2]=bb/n;work[z+3]=255}else{work[z]=work[z+1]=work[z+2]=128;work[z+3]=255}}
-      return {rgba:work,unresolved};
+      // Vertical estimate is blended in when it follows the local card gradient better.
+      for(let x=0;x<W;x++){
+        let last=-1;for(let y=0;y<H;y++){const p=y*W+x;if(!unknown[p])last=y;vTop[y]=last}
+        last=-1;for(let y=H-1;y>=0;y--){const p=y*W+x;if(!unknown[p])last=y;vBottom[y]=last}
+        for(let y=0;y<H;y++){const p=y*W+x;if(!unknown[p])continue;const t=vTop[y],b=vBottom[y];if(t<0&&b<0)continue;
+          let vr,vg,vb;if(t>=0&&b>=0&&b>t){const u=(y-t)/(b-t),kt=(t*W+x)*4,kb=(b*W+x)*4;vr=src[kt]*(1-u)+src[kb]*u;vg=src[kt+1]*(1-u)+src[kb+1]*u;vb=src[kt+2]*(1-u)+src[kb+2]*u}else{const q=(t>=0?t:b)*W+x,k=q*4;vr=src[k];vg=src[k+1];vb=src[k+2]}
+          const k=p*4,hd=Math.abs(work[k]-vr)+Math.abs(work[k+1]-vg)+Math.abs(work[k+2]-vb);
+          if(hd<96){work[k]=(work[k]+vr)*.5;work[k+1]=(work[k+1]+vg)*.5;work[k+2]=(work[k+2]+vb)*.5;work[k+3]=255}
+        }
+      }
+      return {rgba:work,unresolved:0};
     }
     function backgroundResidualQc(background,removal){
       const src=state.rgba,N=state.width*state.height;let count=0,nearOriginal=0,deltaSum=0;
@@ -224,17 +288,25 @@
       return {pixels:count,residualRatio:Number(residualRatio.toFixed(4)),meanDelta:Number(meanDelta.toFixed(2)),ok:count>0&&residualRatio<0.18};
     }
     function buildRigidPreviewLayers(){
-      const N=state.width*state.height,displayUnion=new Uint8ClampedArray(N),layers=[];
-      for(const group of state.groups){const rigid=!['background','decor','decoration'].includes(String(group.role||'').toLowerCase());if(!rigid)continue;
-        const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const ctx=canvas.getContext('2d'),img=ctx.createImageData(state.width,state.height);
-        for(let p=0;p<group.mask.length;p++){let a=group.mask[p];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));displayUnion[p]=Math.max(displayUnion[p],a);const k=p*4;img.data[k]=state.rgba[k];img.data[k+1]=state.rgba[k+1];img.data[k+2]=state.rgba[k+2];img.data[k+3]=a}
-        ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label});
+      const N=state.width*state.height,removalSeed=new Uint8ClampedArray(N),groups=productionGroups();
+      // Strong masks are preserved. Weak OCR/vision masks get a conservative semantic-box
+      // removal region only for background reconstruction; their visible alpha is recovered
+      // afterwards from the difference between original pixels and the clean background.
+      for(const group of groups){
+        if(maskIsWeak(group))addBoxToMask(removalSeed,group.bbox,.004);
+        else for(let p=0;p<N;p++)if(group.mask[p]>removalSeed[p])removalSeed[p]=group.mask[p];
       }
-      // Removal matte is deliberately wider than the visible layer to remove antialiasing and original shadows.
-      const r=Math.max(3,Math.round(Math.min(state.width,state.height)*.009)),removal=dilateBinaryMask(displayUnion,r);
+      const r=Math.max(2,Math.round(Math.min(state.width,state.height)*.0045)),removal=dilateBinaryMask(removalSeed,r);
       const rebuilt=reconstructBackgroundHybrid(removal),base=document.createElement('canvas');base.width=state.width;base.height=state.height;base.getContext('2d').putImageData(new ImageData(rebuilt.rgba,state.width,state.height),0,0);
+      const layers=[],displayUnion=new Uint8ClampedArray(N);
+      for(const group of groups){
+        const productionMask=deriveLayerMask(group,rebuilt.rgba);group.productionMask=productionMask;
+        const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const ctx=canvas.getContext('2d'),img=ctx.createImageData(state.width,state.height);
+        for(let p=0;p<N;p++){let a=productionMask[p];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));displayUnion[p]=Math.max(displayUnion[p],a);const k=p*4;img.data[k]=state.rgba[k];img.data[k+1]=state.rgba[k+1];img.data[k+2]=state.rgba[k+2];img.data[k+3]=a}
+        ctx.putImageData(img,0,0);if(maskCoverage(productionMask).percent>=.01)layers.push({canvas,depth:group.depth,label:group.label,id:group.id,mask:productionMask});
+      }
       const qc=backgroundResidualQc(rebuilt.rgba,displayUnion);
-      state.rigidPreview={base,layers,removalMask:removal,backgroundRgba:rebuilt.rgba,backgroundQc:{...qc,unresolved:rebuilt.unresolved,method:'hybrid-edge-directed-v1'}};
+      state.rigidPreview={base,layers,removalMask:removal,backgroundRgba:rebuilt.rgba,backgroundQc:{...qc,unresolved:rebuilt.unresolved,method:'semantic-roi-edge-directed-v2'},structural:state.groups.filter(isStructuralGroup).map(g=>g.id),duplicates:state.groups.filter(isLogoTextDuplicate).map(g=>g.id)};
     }
     function drawRigidPreview(position){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
@@ -250,7 +322,7 @@
         $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';return;
       }
       const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
-      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const denom=Math.max(1,zero,255-zero);
       // Turntable 2.5D: the card rotates; semantic planes keep their own Z height.
       // A single projective transform is used for every plane, then each Z gets only the
       // perspective/parallax displacement caused by its distance from the card.
@@ -270,7 +342,7 @@
       ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
       drawPlane(state.rigidPreview.base,0);
       ordered.forEach(layer=>{
-        const zNorm=Math.max(0,(Number(layer.depth)-dMin)/span);
+        const zNorm=(Number(layer.depth)-zero)/denom;
         drawPlane(layer.canvas,zNorm);
       });
       $('tiltOut').textContent=angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
@@ -352,14 +424,14 @@
         // Unlock immediately. Heavy master reconstruction is deferred until preview/9-view generation.
         state.aiReady=true;state.aiMaster=null;state.rigidPreview=null;$('generate').disabled=false;
         $('aiGate').className='status ok';$('aiGate').textContent='IA reçue · PRODUCTION 9 vues autorisée.';
-        $('renderStatus').className='status ok';$('renderStatus').textContent='Contrôle IA terminé. Le fond maître sera construit uniquement au lancement des 9 vues.';
+        $('renderStatus').className='status ok';$('renderStatus').textContent='Contrôle IA terminé. La production reconstruira un fond maître propre puis composera les 9 vues.';
       }catch(error){
         if(timer)clearTimeout(timer);
         state.aiReady=true;state.aiMaster=null;state.rigidPreview=null;$('generate').disabled=false;
         const reason=error?.name==='AbortError'?'délai IA dépassé (45 s)':(error?.message||'erreur inconnue');
         $('aiGate').className='status warn';$('aiGate').textContent='IA non disponible : '+reason+' · PRODUCTION locale 9 vues autorisée.';
         $('renderStatus').className='status warn';$('renderStatus').textContent='Mode local prêt. Aucun blocage IA.';
-      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Relancer contrôle IA'}
+      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Relancer contrôle IA des profondeurs'}
     }
     // iPad/Safari: attach both pointer and click activation and show feedback before any heavy work.
     let reliefLaunchLock=false;
