@@ -52,6 +52,44 @@
       return combined;
     }
 
+
+    function quantile(values,q){if(!values.length)return 128;const a=[...values].sort((x,y)=>x-y),i=Math.max(0,Math.min(a.length-1,Math.round((a.length-1)*q)));return a[i]}
+    function buildPhotoGroupsFromDepth(){
+      const depth=state.baseDepth;if(!depth?.length)return;
+      const sample=[],step=Math.max(1,Math.floor(depth.length/18000));for(let i=0;i<depth.length;i+=step)sample.push(depth[i]);
+      const cuts=[quantile(sample,.22),quantile(sample,.43),quantile(sample,.64),quantile(sample,.82)];
+      for(let i=1;i<cuts.length;i++)if(cuts[i]<=cuts[i-1]+4)cuts[i]=Math.min(251,cuts[i-1]+5);
+      const labels=['Fond lointain','Arrière-plan','Plan moyen','Sujet proche','Avant-plan'];
+      const roles=['background','rear','middle','subject-main','foreground'];
+      const ranges=[[0,cuts[0]],[cuts[0]+1,cuts[1]],[cuts[1]+1,cuts[2]],[cuts[2]+1,cuts[3]],[cuts[3]+1,255]],presetDepths=[42,84,128,184,232];
+      state.groups=ranges.map((range,index)=>{
+        const m=new Uint8ClampedArray(depth.length),lo=range[0],hi=range[1],soft=5;
+        for(let i=0;i<depth.length;i++){const d=depth[i];if(d<lo-soft||d>hi+soft)continue;let a=255;if(d<lo)a=Math.round((d-(lo-soft))/soft*255);else if(d>hi)a=Math.round(((hi+soft)-d)/soft*255);m[i]=Math.max(0,Math.min(255,a))}
+        return {id:'photo-plane-'+index,label:labels[index],role:roles[index],type:'photo',depth:presetDepths[index],bbox:[0,0,1,1],items:[{id:'depth-band-'+index,type:'photo',role:roles[index],bbox:[0,0,1,1]}],staticBase:index<2,autoMask:new Uint8ClampedArray(m),mask:m};
+      });
+      state.selected=state.groups[2]?.id||state.groups[0]?.id||null;
+      $('auto').disabled=false;$('photoRelief').disabled=false;
+      renderGroups();applyPreset();showCard();updateUndo();
+      $('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow prêt · 5 plans photo automatiques · 2 plans statiques + 3 plans dynamiques.';
+    }
+    async function loadPhotoFile(file){
+      if(!file)return;
+      startActivity();activity('Lecture photo',8,file.name||'image');
+      const rawUrl=URL.createObjectURL(file);
+      try{
+        const img=await loadImage(rawUrl);activity('Photo décodée',22,img.naturalWidth+'×'+img.naturalHeight);
+        const maxEdge=1600,scale=Math.min(1,maxEdge/Math.max(img.naturalWidth,img.naturalHeight)),W=Math.max(1,Math.round(img.naturalWidth*scale)),H=Math.max(1,Math.round(img.naturalHeight*scale));
+        state.width=photo.width=mask.width=W;state.height=photo.height=mask.height=H;stage.style.aspectRatio=W+'/'+H;document.documentElement.style.setProperty('--source-aspect',String(W/H));
+        photoContext.clearRect(0,0,W,H);photoContext.drawImage(img,0,0,W,H);state.rgba=photoContext.getImageData(0,0,W,H).data;
+        const prepared=document.createElement('canvas');prepared.width=W;prepared.height=H;prepared.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
+        const imageUrl=prepared.toDataURL('image/jpeg',.94);state.payload={image:imageUrl,width:W,height:H,capture:{source:'photo-upload',name:file.name||'photo'}};
+        state.image=await loadImage(imageUrl);state.baseDepth=new Uint8ClampedArray(W*H).fill(128);state.groups=[];state.selected=null;state.aiReady=false;state.aiMaster=null;state.rigidPreview=null;state.masterOriginal=null;state.masterHistory=[];state.masterQc=null;state.threeViewQc=null;
+        drawPhoto();maskContext.clearRect(0,0,W,H);$('groups').innerHTML='';$('depthflow').disabled=false;$('auto').disabled=true;$('photoRelief').disabled=true;$('threeViews').disabled=true;$('generate').disabled=true;$('results').classList.add('hidden');
+        $('sourceInfo').className='status ok';$('sourceInfo').textContent='Photo chargée '+W+'×'+H+' · lance « Analyser profondeur ».';
+        activity('Photo prête',100,W+'×'+H);stopActivity(true);
+      }finally{URL.revokeObjectURL(rawUrl)}
+    }
+
     function compose(){state.rigidPreview=null;const layers=state.groups.map(group=>({mask:group.mask,depth:group.depth,enabled:true,internalRelief:['artwork','subject'].includes(group.role)?.18:0}));state.finalDepth=composeSemanticDepth(state.baseDepth,layers,{zero:Number($('zero').value),backgroundRelief:Number($('background').value)/100});if(state.preview==='depth')drawDepth();report()}
     function report(){const spread=cardDepthSpread(state.groups,Number($('zero').value));const masks=state.groups.filter(group=>maskCoverage(group.mask).percent>.005).length;$('report').textContent=`${state.groups.length} groupes · ${masks} masques actifs · amplitude ${spread.span}/255 · fond ${$('background').value}% · vue 05 verrouillée.`;$('report').className='status '+(spread.span>=100&&masks===state.groups.length?'ok':'warn')}
 
@@ -206,8 +244,23 @@
     $('targetMaster').onclick=editMasterBackground;
     $('card').onclick=showCard;$('depthView').onclick=()=>{state.editTarget='group';state.preview='depth';drawDepth();$('depthView').classList.add('active');$('card').classList.remove('active');updatePencilUi()};
 
-    function depthWorker(){if(state.worker)return state.worker;const worker=new Worker(new URL('./depthflow-v42-worker.js',import.meta.url),{type:'module'});worker.onmessage=event=>{const message=event.data||{};if(message.requestId!==state.requestId)return;if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);$('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow prêt. Le relief du fond reste volontairement limité pour protéger les textes.';$('progress').style.width='100%';compose()}if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow indisponible : '+message.message+'\nLe rendu par plans sémantiques reste utilisable.'}};state.worker=worker;return worker}
-    $('depthflow').onclick=()=>{state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='DepthFlow démarre sur l’iPad…';const guide=new Uint8ClampedArray(state.rgba);depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer])};
+    function depthWorker(){
+      if(state.worker)return state.worker;
+      const worker=new Worker(new URL('./depthflow-v42-worker.js',import.meta.url),{type:'module'});
+      worker.onmessage=event=>{
+        const message=event.data||{};if(message.requestId!==state.requestId)return;
+        if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}
+        if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);$('progress').style.width='100%';buildPhotoGroupsFromDepth()}
+        if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow photo indisponible : '+message.message}
+      };
+      state.worker=worker;return worker;
+    }
+    $('depthflow').onclick=()=>{
+      if(!state.rgba||!state.payload?.image)return;
+      state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='Analyse de profondeur photo en cours…';
+      const guide=new Uint8ClampedArray(state.rgba);
+      depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer]);
+    };
 
     function renderSemanticPlaneView(position){
       if(state.aiMaster)return renderAiMasterView(position);
@@ -623,33 +676,17 @@
     function canvasDataUrl(canvas){return canvas.toDataURL('image/png')}
     async function createAutomaticRelief(){
       if(!state.rgba)return;
-      $('photoRelief').disabled=true;$('photoRelief').textContent='Traitement IA…';
+      $('photoRelief').disabled=true;$('photoRelief').textContent='Construction photo…';
       $('renderStatus').className='status';$('renderStatus').textContent='MicroPlayer envoie la photo chargée au moteur de composition. La photo source reste inchangée dans la vue centrale.';
       try{
-        if(!state.rigidPreview)buildRigidPreviewLayers();
-        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-        // V33: the server only needs semantic metadata here. Sending two full PNG data URLs
-        // made the request exceed Vercel's function body limit (HTTP 413).
-        const apiPayload={
-          mode:'relief-compose-v33-metadata',
-          width:state.width,height:state.height,
-          zero:Number($('zero').value),parallax:Number($('parallax').value),
-          groups:state.groups.map(group=>({id:group.id,label:group.label,role:group.role,type:group.type,depth:Number(group.depth),bbox:group.bbox,items:(group.items||[]).map(item=>({id:item.id,type:item.type,role:item.role,text:item.text||'',label:item.label||'',bbox:item.bbox}))}))
-        };
-        const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(apiPayload)});
-        const responseText=await response.text();let data={};
-        if(responseText.trim()){try{data=JSON.parse(responseText)}catch(parseError){throw Error('ETAPE API_JSON · HTTP '+response.status+' · réponse non JSON : '+responseText.slice(0,160));}}
-        if(!response.ok)throw Error('ETAPE API_HTTP · '+(data.error||('HTTP '+response.status)));
-        state.autoRelief=data;
-        state.aiReady=false;state.aiMaster=null;state.masterOriginal=null;state.masterHistory=[];$('targetMaster').disabled=true;invalidateRig();$('generate').disabled=true;$('results').classList.add('hidden');$('aiGate').className='status warn';$('aiGate').textContent='Analyse IA reçue · étape 1/5 : préparation des masques…';
-        const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
-        let changed=false;
-        state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
-        if(changed){renderGroups();compose();}
+        if(state.groups.length<3)throw Error('Analyse de profondeur requise avant la scène 3D.');
+        state.autoRelief={mode:'photo-v01-depth-bands',groups:state.groups.map(g=>({id:g.id,depth:g.depth,role:g.role}))};
+        state.aiReady=false;state.aiMaster=null;state.masterOriginal=null;state.masterHistory=[];$('targetMaster').disabled=true;invalidateRig();$('generate').disabled=true;$('results').classList.add('hidden');
+        $('aiGate').className='status warn';$('aiGate').textContent='Photo V01 · étape 1/4 : préparation des plans de profondeur…';
         const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();
-        $('aiGate').textContent='Analyse IA reçue · étape 2/5 : reconstruction MI-GAN du fond…';
+        $('aiGate').textContent='Photo V01 · étape 2/4 : reconstruction MI-GAN du fond derrière les plans proches…';
         try{await rebuildMasterWithMigan();}catch(inpaintError){throw Error('Reconstruction IA du fond impossible — '+inpaintError.message);}
-        $('aiGate').textContent='Analyse IA reçue · étape 3/5 : contrôle anti-fantôme…';
+        $('aiGate').textContent='Photo V01 · étape 3/4 : contrôle du fond maître…';
         state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine||'none';
         const rm=state.rigidPreview.removalMask,W=state.width,H=state.height,N=W*H;
         let bgCtx=state.rigidPreview.base.getContext('2d'),bgPx=bgCtx.getImageData(0,0,W,H).data;
@@ -689,14 +726,14 @@
         state.masterOriginal=document.createElement('canvas');state.masterOriginal.width=state.width;state.masterOriginal.height=state.height;state.masterOriginal.getContext('2d').drawImage(frozenBg,0,0);state.masterHistory=[];state.masterTool='heal';state.cloneSource=null;state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;$('targetMaster').disabled=false;invalidateRig();syncAiMasterDepths();
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
         state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
-        $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
+        $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE PHOTO PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
         $('renderStatus').className='status ok';$('renderStatus').textContent='Chaîne impression séparée : scène maître → 9 vues déterministes. Aperçu client = branche indépendante, jamais injectée dans la production.';
       }catch(error){
         state.aiReady=false;$('generate').disabled=true;$('threePlanWrap').classList.add('hidden');
         $('aiGate').className='status warn';$('aiGate').textContent='PRODUCTION BLOQUÉE — '+(error.name?error.name+' · ':'')+error.message+'\n'+(error.stack||'').split('\n').slice(0,3).join(' ← ');
         $('clientGate').className='status warn';$('clientGate').textContent='Aperçu client bloqué tant que le QC de la scène maître échoue.';
         $('renderStatus').className='status warn';$('renderStatus').textContent='Diagnostic QC : '+error.message+'\nAucun fallback vers l’ancien renderer.';
-      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Envoyer à l’IA et composer'}
+      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Construire scène photo 3D'}
     }
     $('photoRelief').onclick=createAutomaticRelief;
     $('downloadRelief').onclick=()=>{};
@@ -760,34 +797,13 @@
     function activity(step,percent,detail=''){activityStep=step;const bar=$('activityBar'),info=$('activityInfo');if(bar)bar.style.width=Math.max(2,Math.min(100,percent))+'%';if(info)info.textContent=step+(detail?' · '+detail:'')+' · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';}
     function startActivity(){activityStarted=Date.now();clearInterval(activityTimer);activityTimer=setInterval(()=>{const info=$('activityInfo');if(info)info.textContent=activityStep+' · activité navigateur · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';},500);}
     function stopActivity(ok=true){clearInterval(activityTimer);activityTimer=null;const bar=$('activityBar');if(bar)bar.style.width=ok?'100%':'0%';}
-    function readTransferredPayload(){
-      const candidates=[['microplayer-card-v33','V33'],['microplayer-card-v32','V32']];
-      const errors=[];
-      for(const [key,label] of candidates){
-        const raw=sessionStorage.getItem(key);if(!raw)continue;
-        try{
-          const parsed=JSON.parse(raw);
-          if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('racine JSON invalide');
-          return {payload:parsed,label,key};
-        }catch(error){
-          errors.push(label+' : '+error.message);
-          // Preserve the corrupt value for diagnosis, but stop selecting it on the next reload.
-          try{sessionStorage.setItem(key+'-corrupt-backup',raw);sessionStorage.removeItem(key)}catch(_){}
-        }
-      }
-      if(errors.length)throw Error('Transfert carte illisible · '+errors.join(' · ')+' · Retourne au scanner puis relance Continuer vers Pencil.');
-      return null;
+    async function initialise(){
+      $('generate').disabled=true;$('threeViews').disabled=true;$('photoRelief').disabled=true;$('depthflow').disabled=true;$('auto').disabled=true;
+      $('sourceInfo').className='status';$('sourceInfo').textContent='Choisis une photo pour démarrer Photo V01.';
+      $('activityInfo').textContent='Version photo séparée · V33 carte figée sur sa branche validée.';
     }
-    async function initialise(){startActivity();activity('Lecture état V33',5);const transfer=readTransferredPayload();if(!transfer){$('sourceInfo').className='status warn';$('sourceInfo').innerHTML='Aucune carte transférée. <a href="./microplayer-card-v32-scanner.html" style="color:#9bd0ff">Ouvrir le scanner</a>.';$('generate').disabled=true;return}state.payload=transfer.payload;activity('État '+transfer.label+' chargé',12,(state.payload.groups?.length||0)+' groupes');
-      let imageUrl=state.payload.image;
-      if(!imageUrl&&state.payload.imageCacheKey&&window.caches){activity('Ouverture cache image',20);$('sourceInfo').textContent='Récupération de la carte V33…';const cache=await caches.open('microplayer-v33-transfer');const response=await cache.match(state.payload.imageCacheKey);if(!response)throw Error('Image V33 absente du cache de transfert.');activity('Lecture PNG depuis cache',32);const blob=await response.blob();activity('PNG récupéré',42,Math.round(blob.size/1024)+' Ko');
-        // iPad Safari can stall decoding an object URL created from Cache Storage.
-        // Decode from bytes via FileReader first; it is slower but deterministic on Safari.
-        activity('Conversion PNG iPad',50);imageUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||Error('Lecture PNG impossible'));reader.readAsDataURL(blob)});
-      }
-      if(!imageUrl)throw Error('Image rectifiée absente du transfert.');
-      state.payload.image=imageUrl;activity('Décodage image Safari',62);$('sourceInfo').textContent='Décodage de la carte…';state.image=await Promise.race([loadImage(imageUrl),new Promise((_,reject)=>setTimeout(()=>reject(Error('Décodage image > 8 s')),8000))]);activity('Image décodée',72,state.image.naturalWidth+'×'+state.image.naturalHeight);state.width=photo.width=mask.width=state.payload.width||state.image.naturalWidth;state.height=photo.height=mask.height=state.payload.height||state.image.naturalHeight;stage.style.aspectRatio=state.width+'/'+state.height;drawPhoto();activity('Lecture pixels',80);state.rgba=photoContext.getImageData(0,0,state.width,state.height).data;state.baseDepth=new Uint8ClampedArray(state.width*state.height).fill(128);activity('Construction masques',88);state.groups=(state.payload.groups||[]).map((group,index)=>{const full={...group,id:String(group.id||group.groupId||index),depth:Number(group.depth??128)};full.autoMask=semanticMaskForGroup(full);full.mask=new Uint8ClampedArray(full.autoMask);return full});state.selected=state.groups[0]?.id||null;$('sourceInfo').className='status ok';$('sourceInfo').textContent=`${state.payload.ocrLines?.length||0} lignes OCR verrouillées · ${state.payload.layers?.length||0} composants · ${state.groups.length} groupes.`;activity('Rendu interface',96);applyPreset();showCard();updateUndo();activity('Atelier prêt',100);stopActivity(true)}
-    initialise().catch(error=>{stopActivity(false);$('sourceInfo').className='status warn';$('sourceInfo').textContent='Erreur initialisation : '+error.message;const info=$('activityInfo');if(info)info.textContent='BLOQUÉ À : '+activityStep+' · '+error.message});
+    $('photoFile').addEventListener('change',event=>loadPhotoFile(event.target.files?.[0]).catch(error=>{stopActivity(false);$('sourceInfo').className='status warn';$('sourceInfo').textContent='Chargement photo impossible : '+error.message}));
+    initialise();
   </script>
 </body>
 </html>
