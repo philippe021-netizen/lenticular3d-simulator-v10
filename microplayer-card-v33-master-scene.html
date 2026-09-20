@@ -26,7 +26,7 @@
       <section id="editPanel" class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Masque groupe</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
-      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="downloadRelief" disabled>Résultat automatique</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
+      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
   </div></main>
   <script type="module">
@@ -35,7 +35,7 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),editPanel=$('editPanel'),sim3d=$('sim3d'),simRig=$('simRig'),threePlan=$('threePlan'),sidebar=$('sidebar'),workspace=$('workspace');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     const selected=()=>state.groups.find(group=>group.id===state.selected);
@@ -194,7 +194,7 @@
       $('renderStatus').textContent=threeQcOk
         ? `TEST 3 VUES VALIDÉ TECHNIQUEMENT · centre pixel parfait · anti-fantôme ${state.threeViewQc.ghostRatio}% · PRODUCTION 9 VUES DÉVERROUILLÉE.`
         : `TEST 3 VUES REFUSÉ · centre ${qc.different===0?'pixel parfait':qc.different+' pixels différents'} · anti-fantôme ${state.threeViewQc.ghostRatio??'indisponible'}%. Les 9 vues restent bloquées.`;
-      state.simPosition=4;drawRigidPreview(4);
+      state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
     }
     $('threeViews').onclick=generateThreeViews;
 
@@ -530,14 +530,54 @@
     }
     $('photoRelief').onclick=createAutomaticRelief;
     $('downloadRelief').onclick=()=>{};
-    function drawSimulation(position){if(!state.views.length)return;const p=Math.max(0,Math.min(8,position));$('simRange').value=String(p);$('simOut').textContent=`${(p+1).toFixed(2)} / 9`;drawRigidPreview(p)}
-    function animationLoop(time){if(!state.playing)return;if(!state.lastTime)state.lastTime=time;const dt=Math.min(50,time-state.lastTime);state.lastTime=time;state.simPosition+=state.direction*dt/760;if(state.simPosition>=8){state.simPosition=8;state.direction=-1}if(state.simPosition<=0){state.simPosition=0;state.direction=1}drawSimulation(state.simPosition);state.animation=requestAnimationFrame(animationLoop)}
-    function startAnimation(){cancelAnimationFrame(state.animation);state.playing=true;state.lastTime=0;$('toggle').textContent='Pause';state.animation=requestAnimationFrame(animationLoop)}
-    function stopAnimation(){state.playing=false;cancelAnimationFrame(state.animation);$('toggle').textContent='Lecture'}
+    function drawSimulation(position){
+      const p=Math.max(0,Math.min(8,Number(position)||0));
+      state.simPosition=p;
+      $('simRange').value=String(p);
+      $('simOut').textContent=(p+1).toFixed(2)+' / 9';
+      drawRigidPreview(p);
+    }
+    function updatePlaybackUi(){
+      $('toggle').textContent=state.playing?'Pause':'Lecture';
+      $('loopMode').textContent=state.playbackMode==='pingpong'?'Boucle ↔':'Boucle →';
+      $('loopMode').classList.toggle('active',true);
+      $('playbackSpeedOut').textContent=Number(state.playbackSpeed).toFixed(2)+'×';
+      $('playbackSpeed').value=String(state.playbackSpeed);
+    }
+    function animationLoop(time){
+      if(!state.playing)return;
+      if(!state.lastTime)state.lastTime=time;
+      const dt=Math.min(60,time-state.lastTime);state.lastTime=time;
+      const speed=Math.max(.1,Number(state.playbackSpeed)||1);
+      const advance=dt/760*speed;
+      if(state.playbackMode==='forward'){
+        state.simPosition+=advance;
+        if(state.simPosition>8)state.simPosition=0;
+      }else{
+        state.simPosition+=state.direction*advance;
+        if(state.simPosition>=8){state.simPosition=8;state.direction=-1}
+        if(state.simPosition<=0){state.simPosition=0;state.direction=1}
+      }
+      drawSimulation(state.simPosition);
+      state.animation=requestAnimationFrame(animationLoop);
+    }
+    function startAnimation(){
+      cancelAnimationFrame(state.animation);
+      state.playing=true;state.lastTime=0;
+      updatePlaybackUi();
+      state.animation=requestAnimationFrame(animationLoop);
+    }
+    function stopAnimation(){
+      state.playing=false;cancelAnimationFrame(state.animation);state.animation=0;
+      updatePlaybackUi();
+    }
     $('toggle').onclick=()=>state.playing?stopAnimation():startAnimation();
-    $('simRange').oninput=event=>{stopAnimation();state.simPosition=Number(event.target.value);drawSimulation(state.simPosition)};
-    $('prev').onclick=()=>{stopAnimation();state.simPosition=Math.max(0,state.simPosition-1);drawSimulation(state.simPosition)};
-    $('next').onclick=()=>{stopAnimation();state.simPosition=Math.min(8,state.simPosition+1);drawSimulation(state.simPosition)};
+    $('loopMode').onclick=()=>{state.playbackMode=state.playbackMode==='pingpong'?'forward':'pingpong';state.direction=1;updatePlaybackUi();if(!state.playing)startAnimation()};
+    $('playbackSpeed').oninput=event=>{state.playbackSpeed=Number(event.target.value)||1;updatePlaybackUi()};
+    $('restartLoop').onclick=()=>{state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation()};
+    $('simRange').oninput=event=>{stopAnimation();drawSimulation(Number(event.target.value))};
+    $('prev').onclick=()=>{stopAnimation();drawSimulation(Math.max(0,state.simPosition-1))};
+    $('next').onclick=()=>{stopAnimation();drawSimulation(Math.min(8,state.simPosition+1))};
     for(const id of ['tilt','simDepth'])$(id).oninput=()=>{drawRigidPreview(state.simPosition);if(id==='simDepth')refreshLiveThumbnails().catch(()=>{})};
 
         async function maskBlob(group){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const value=group.mask[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
