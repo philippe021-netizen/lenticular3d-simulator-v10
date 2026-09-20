@@ -306,7 +306,7 @@
         for(let i=0;i<N;i++){let a=group.mask[i];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
         ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label,groupId:group.id,weakMask:weak});
       }
-      const removal=new Uint8ClampedArray(N),r=Math.max(4,Math.round(Math.min(state.width,state.height)*.007));
+      const removal=new Uint8ClampedArray(N),r=Math.max(6,Math.round(Math.min(state.width,state.height)*.011));
       for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!removalSeed[i])continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<state.width&&yy<state.height)removal[yy*state.width+xx]=255}}
       // Lightweight local base only keeps the UI responsive before MI-GAN. Production background
       // is replaced by rebuildMasterWithMigan(); no expensive whole-image iterative propagation here.
