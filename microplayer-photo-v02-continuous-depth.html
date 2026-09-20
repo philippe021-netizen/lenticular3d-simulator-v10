@@ -25,7 +25,7 @@
     </aside>
     <section id="workspace" class="workspace">
       <section id="editPanel" class="panel"><h2>Photo / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Photo</button><button id="depthView">Profondeur</button></div></section>
-      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Masque groupe</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
+      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Profondeur</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Rapprocher +</button><button id="erase">Éloigner −</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">DepthFlow initial</button></div><div id="pencilStatus" class="status ok">Peins directement sur la profondeur : Rapprocher + ou Éloigner −.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Préparer rendu V02</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler / modifier fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU PHOTO : contrôle esthétique uniquement · production issue de la scène maître.</div></section>
       <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Position lenticulaire <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief V02 <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim" disabled>Fond global non utilisé</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim" disabled>Désocclusion locale V02</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
@@ -36,7 +36,7 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),editPanel=$('editPanel'),sim3d=$('sim3d'),simRig=$('simRig'),threePlan=$('threePlan'),sidebar=$('sidebar'),workspace=$('workspace');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,continuousCache:[],continuousStats:[]};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,photoDepthOriginal:null,depthHistory:[],continuousCache:[],continuousStats:[]};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     const selected=()=>state.groups.find(group=>group.id===state.selected);
@@ -67,10 +67,10 @@
         for(let i=0;i<depth.length;i++){const d=depth[i];if(d<lo-soft||d>hi+soft)continue;let a=255;if(d<lo)a=Math.round((d-(lo-soft))/soft*255);else if(d>hi)a=Math.round(((hi+soft)-d)/soft*255);m[i]=Math.max(0,Math.min(255,a))}
         return {id:'photo-plane-'+index,label:labels[index],role:roles[index],type:'photo',depth:presetDepths[index],bbox:[0,0,1,1],items:[{id:'depth-band-'+index,type:'photo',role:roles[index],bbox:[0,0,1,1]}],staticBase:index<2,autoMask:new Uint8ClampedArray(m),mask:m};
       });
-      state.selected=state.groups[2]?.id||state.groups[0]?.id||null;
+      state.selected=null;
       $('auto').disabled=false;$('photoRelief').disabled=false;
       renderGroups();applyPreset();showCard();updateUndo();
-      $('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow V02 prêt · profondeur continue active · 5 zones affichées uniquement pour diagnostic.';
+      $('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow V02 prêt · profondeur continue active · Pencil modifie directement la depth map. Les 5 zones restent informatives.';
     }
     async function loadPhotoFile(file){
       if(!file)return;
@@ -83,7 +83,7 @@
         photoContext.clearRect(0,0,W,H);photoContext.drawImage(img,0,0,W,H);state.rgba=photoContext.getImageData(0,0,W,H).data;
         const prepared=document.createElement('canvas');prepared.width=W;prepared.height=H;prepared.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
         const imageUrl=prepared.toDataURL('image/jpeg',.94);state.payload={image:imageUrl,width:W,height:H,capture:{source:'photo-upload',name:file.name||'photo'}};
-        state.image=await loadImage(imageUrl);state.baseDepth=new Uint8ClampedArray(W*H).fill(128);state.photoDepth=null;clearContinuousCache();state.groups=[];state.selected=null;state.aiReady=false;state.aiMaster=null;state.rigidPreview=null;state.masterOriginal=null;state.masterHistory=[];state.masterQc=null;state.threeViewQc=null;
+        state.image=await loadImage(imageUrl);state.baseDepth=new Uint8ClampedArray(W*H).fill(128);state.photoDepth=null;state.photoDepthOriginal=null;state.depthHistory=[];clearContinuousCache();state.groups=[];state.selected=null;state.aiReady=false;state.aiMaster=null;state.rigidPreview=null;state.masterOriginal=null;state.masterHistory=[];state.masterQc=null;state.threeViewQc=null;
         drawPhoto();maskContext.clearRect(0,0,W,H);$('groups').innerHTML='';$('depthflow').disabled=false;$('auto').disabled=true;$('photoRelief').disabled=true;$('threeViews').disabled=true;$('generate').disabled=true;$('results').classList.add('hidden');
         $('sourceInfo').className='status ok';$('sourceInfo').textContent='Photo chargée '+W+'×'+H+' · lance « Analyser profondeur ».';
         activity('Photo prête',100,W+'×'+H);stopActivity(true);
@@ -137,26 +137,35 @@
       if(remaining){for(let i=0;i<written.length;i++){const j=i*4;if(out[j+3])continue;out[j]=state.rgba[j];out[j+1]=state.rgba[j+1];out[j+2]=state.rgba[j+2];out[j+3]=255;filled++;}}
       return filled;
     }
-    function renderContinuousDepthView(position){
-      const W=state.width,H=state.height,N=W*H,depth=continuousDepth();
+    function renderContinuousDepthView(position,options={}){
+      const SW=state.width,SH=state.height,depth=continuousDepth();
       if(!state.rgba||!depth?.length)throw Error('Profondeur continue indisponible.');
-      const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H,ctx=canvas.getContext('2d',{willReadFrequently:true});
+      const maxEdge=Number(options.maxEdge)||Math.max(SW,SH),scale=Math.min(1,maxEdge/Math.max(SW,SH)),W=Math.max(1,Math.round(SW*scale)),H=Math.max(1,Math.round(SH*scale)),N=W*H;
+      const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d',{willReadFrequently:true});
       const normal=Math.max(-1,Math.min(1,Number(position)||0));
       if(Math.abs(normal)<1e-9){
-        ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
-        return {canvas,stats:{position:normal,holeRatioBeforeFill:0,holesBeforeFill:0,filled:0,mode:'continuous-depth-zbuffer-center-exact'}};
+        if(scale===1)ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);
+        else {const src=document.createElement('canvas');src.width=SW;src.height=SH;src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);ctx.drawImage(src,0,0,W,H)}
+        return {canvas,stats:{position:normal,holeRatioBeforeFill:0,holesBeforeFill:0,filled:0,mode:'continuous-depth-zbuffer-center-exact',scale}};
       }
       const reliefScale=Math.max(.25,Number($('relief').value)/185),maxShift=W*(Number($('parallax').value)/100)*reliefScale;
       const out=new Uint8ClampedArray(N*4),zbuf=new Int16Array(N);zbuf.fill(-32768);const written=new Uint8Array(N);
-      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-        const i=y*W+x,d=depth[i],shift=normal*depthRelative(d)*maxShift,fx=x+shift,x0=Math.floor(fx),frac=fx-x0;
-        const put=xx=>{if(xx<0||xx>=W)return;const q=y*W+xx;if(d<zbuf[q])return;const s=i*4,t=q*4;zbuf[q]=d;written[q]=1;out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255};
-        put(x0);if(frac>.18)put(x0+1);
+      for(let y=0;y<H;y++){
+        const sy=Math.min(SH-1,Math.round(y/scale));
+        for(let x=0;x<W;x++){
+          const sx=Math.min(SW-1,Math.round(x/scale)),si=sy*SW+sx,d=depth[si],shift=normal*depthRelative(d)*maxShift,fx=x+shift,x0=Math.floor(fx),frac=fx-x0;
+          const put=xx=>{if(xx<0||xx>=W)return;const q=y*W+xx;if(d<zbuf[q])return;const s=si*4,t=q*4;zbuf[q]=d;written[q]=1;out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255};
+          put(x0);if(frac>.18)put(x0+1);
+        }
       }
       let holes=0;for(let i=0;i<N;i++)if(!written[i])holes++;
-      const filled=fillContinuousHoles(out,zbuf,written);
+      const saveW=state.width,saveH=state.height;state.width=W;state.height=H;
+      // local fill uses output dimensions only; source fallback is handled below.
+      const left=new Int32Array(W),right=new Int32Array(W);let filled=0;
+      for(let y=0;y<H;y++){const row=y*W;let last=-1;for(let x=0;x<W;x++){const i=row+x;if(written[i])last=x;left[x]=last}last=-1;for(let x=W-1;x>=0;x--){const i=row+x;if(written[i])last=x;right[x]=last}for(let x=0;x<W;x++){const i=row+x;if(written[i])continue;const lx=left[x],rx=right[x];let pick=-1;if(lx>=0&&rx>=0){const li=row+lx,ri=row+rx;pick=(x-lx)<= (rx-x)?li:ri}else if(lx>=0)pick=row+lx;else if(rx>=0)pick=row+rx;if(pick>=0){const s=pick*4,t=i*4;out[t]=out[s];out[t+1]=out[s+1];out[t+2]=out[s+2];out[t+3]=255;filled++}else{const sx=Math.min(SW-1,Math.round(x/scale)),sy=Math.min(SH-1,Math.round(y/scale)),s=(sy*SW+sx)*4,t=i*4;out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255;filled++}}}
+      state.width=saveW;state.height=saveH;
       ctx.putImageData(new ImageData(out,W,H),0,0);
-      return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),holesBeforeFill:holes,holeRatioBeforeFill:Number((holes/N*100).toFixed(2)),filled,mode:'continuous-depth-zbuffer-local-fill'}};
+      return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),holesBeforeFill:holes,holeRatioBeforeFill:Number((holes/N*100).toFixed(2)),filled,mode:'continuous-depth-zbuffer-local-fill',scale}};
     }
     function continuousFrame(index){
       const i=Math.max(0,Math.min(8,Math.round(index)));if(state.continuousCache[i])return state.continuousCache[i];
@@ -176,8 +185,8 @@
 
     function drawPhoto(){photoContext.clearRect(0,0,state.width,state.height);photoContext.drawImage(state.image,0,0,state.width,state.height)}
     function drawDepth(){const depth=continuousDepth();if(!depth)return;const image=photoContext.createImageData(state.width,state.height);for(let index=0;index<depth.length;index++){const value=depth[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}photoContext.putImageData(image,0,0);maskContext.clearRect(0,0,state.width,state.height)}
-    function drawMaskOverlay(){maskContext.clearRect(0,0,state.width,state.height);if(state.preview!=='card'||state.editTarget!=='group')return;const group=selected();if(!group)return;const image=maskContext.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const alpha=group.mask[index];if(alpha<5)continue;image.data[index*4]=0;image.data[index*4+1]=229;image.data[index*4+2]=255;image.data[index*4+3]=Math.round(alpha*.68)}maskContext.putImageData(image,0,0)}
-    function showCard(){state.editTarget='group';state.preview='card';drawPhoto();drawMaskOverlay();$('card').classList.add('active');$('depthView').classList.remove('active');updatePencilUi()}
+    function drawMaskOverlay(){drawDepthEditOverlay()}
+    function showCard(){state.editTarget='group';state.preview='card';drawPhoto();drawDepthEditOverlay();$('card').classList.add('active');$('depthView').classList.remove('active');updatePencilUi()}
     function drawCloneSourceOverlay(){
       if(state.editTarget!=='master'||!state.cloneSource)return;
       const x=state.cloneSource.x,y=state.cloneSource.y,r=Math.max(10,Number($('brush').value));
@@ -208,17 +217,14 @@
       const master=state.editTarget==='master';
       $('targetGroup').classList.toggle('active',!master);$('targetMaster').classList.toggle('active',master);
       $('masterTools').classList.toggle('hidden',!master);
-      $('add').textContent=master?'Restaurer fond':'Pencil +';$('erase').textContent=master?'Gommer résidu':'Gomme';$('resetMask').textContent=master?'Fond IA initial':'Masque auto';
       if(master){
-        $('add').classList.toggle('active',state.masterTool==='restore');
-        $('erase').classList.toggle('active',state.masterTool==='heal');
-        $('pickCloneSource').classList.toggle('active',state.masterTool==='pick');
-        $('cloneBrush').classList.toggle('active',state.masterTool==='clone');
-        const source=state.cloneSource?' · source fixée ✚':' · aucune source choisie';
-        $('pencilStatus').textContent='Fond maître : Gommer résidu pour petites corrections, ou Choisir source ✚ puis Tampon clone pour copier une zone saine'+source+'.';
+        $('add').textContent='Restaurer fond';$('erase').textContent='Gommer résidu';$('resetMask').textContent='Fond IA initial';
+        $('add').classList.toggle('active',state.masterTool==='restore');$('erase').classList.toggle('active',state.masterTool==='heal');
+        $('pickCloneSource').classList.toggle('active',state.masterTool==='pick');$('cloneBrush').classList.toggle('active',state.masterTool==='clone');
       }else{
+        $('add').textContent='Rapprocher +';$('erase').textContent='Éloigner −';$('resetMask').textContent='DepthFlow initial';
         $('add').classList.toggle('active',state.mode==='add');$('erase').classList.toggle('active',state.mode==='erase');
-        $('pencilStatus').textContent=selected()?'Correction active sur « '+selected().label+' »':'Sélectionne un groupe puis corrige son masque.';
+        $('pencilStatus').className='status ok';$('pencilStatus').textContent='Correction profondeur active : '+(state.mode==='add'?'Rapprocher +':'Éloigner −')+' · le Pencil modifie directement la depth map V02.';
       }
       updateUndo();
     }
@@ -269,67 +275,70 @@
     }
     function updateOutputs(){$('zeroOut').textContent=$('zero').value;$('reliefOut').textContent=$('relief').value+'%';$('parallaxOut').textContent=$('parallax').value+'%';$('backgroundOut').textContent=$('background').value+'%'}
 
+
+    function snapshotDepth(){
+      if(!state.photoDepth)return;
+      state.depthHistory.push(new Uint8ClampedArray(state.photoDepth));
+      if(state.depthHistory.length>6)state.depthHistory.shift();
+    }
+    function depthBrushAt(cx,cy,r,delta){
+      const depth=state.photoDepth;if(!depth)return;
+      const W=state.width,H=state.height,rr=Math.max(2,Number(r));
+      const x0=Math.max(0,Math.floor(cx-rr)),y0=Math.max(0,Math.floor(cy-rr)),x1=Math.min(W-1,Math.ceil(cx+rr)),y1=Math.min(H-1,Math.ceil(cy+rr));
+      for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
+        const dx=x-cx,dy=y-cy,dist=Math.hypot(dx,dy);if(dist>rr)continue;
+        const n=dist/rr,falloff=n<.65?1:Math.max(0,(1-n)/.35),i=y*W+x;
+        depth[i]=Math.max(0,Math.min(255,Math.round(depth[i]+delta*falloff)));
+      }
+    }
+    function depthBrushSegment(from,to){
+      const r=Number($('brush').value),delta=state.mode==='erase'?-7:7,dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.32)));
+      for(let s=0;s<=steps;s++){const t=s/steps;depthBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r,delta)}
+    }
+    function drawDepthEditOverlay(){
+      maskContext.clearRect(0,0,state.width,state.height);
+      if(state.preview!=='card'||!state.photoDepth)return;
+      // Light depth tint: near = cyan, far = violet. Keeps the original photo readable.
+      const image=maskContext.createImageData(state.width,state.height),depth=state.photoDepth;
+      for(let i=0;i<depth.length;i+=2){
+        const d=depth[i],a=28,j=i*4;
+        image.data[j]=d<128?120:0;image.data[j+1]=d>=128?210:80;image.data[j+2]=255;image.data[j+3]=a;
+      }
+      maskContext.putImageData(image,0,0);
+    }
     function canvasPoint(event){const rect=mask.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*state.width,y:(event.clientY-rect.top)/rect.height*state.height}}
     function directStroke(from,to){maskContext.save();maskContext.lineCap='round';maskContext.lineJoin='round';maskContext.lineWidth=Number($('brush').value)*2;maskContext.globalCompositeOperation=state.mode==='erase'?'destination-out':'source-over';maskContext.strokeStyle='rgba(0,229,255,.68)';maskContext.beginPath();maskContext.moveTo(from.x,from.y);maskContext.lineTo(to.x,to.y);maskContext.stroke();maskContext.restore()}
     mask.addEventListener('pointerdown',event=>{
       event.preventDefault();const point=canvasPoint(event);
-      if(state.editTarget==='master'){
-        if(!state.aiMaster?.background)return;
-        if(state.masterTool==='pick'){
-          state.cloneSource={x:point.x,y:point.y};state.cloneCurrentSource=null;state.drawing=false;drawMasterForEdit();updatePencilUi();
-          $('pencilStatus').className='status ok';$('pencilStatus').textContent='Source clone fixée ✚. Choisis maintenant « Tampon clone » puis peins au Pencil sur la zone à remplacer.';return;
-        }
-        if(state.masterTool==='clone'&&!state.cloneSource){
-          state.drawing=false;$('pencilStatus').className='status warn';$('pencilStatus').textContent='Choisis d’abord une zone saine avec « ✚ Choisir source ».';return;
-        }
-        snapshotMaster();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);
-        if(state.masterTool==='clone'){
-          const ctx=state.aiMaster.background.getContext('2d',{willReadFrequently:true});
-          state.cloneSnapshot=ctx.getImageData(0,0,state.width,state.height);
-          state.cloneStroke={srcStart:{x:state.cloneSource.x,y:state.cloneSource.y},dstStart:{x:point.x,y:point.y}};
-          cloneBrushSegment(point,point);
-        }else masterBrushSegment(point,point,state.masterTool==='restore');
-        drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);updateUndo();return;
-      }
-      const group=selected();if(!group||state.preview!=='card')return;
-      state.history.push(new Uint8ClampedArray(group.mask));if(state.history.length>20)state.history.shift();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);updateUndo();
+      if(state.editTarget==='master')return;
+      if(!state.photoDepth||state.preview!=='card')return;
+      snapshotDepth();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);depthBrushSegment(point,point);drawPhoto();drawDepthEditOverlay();updateUndo();
     },{passive:false});
     mask.addEventListener('pointermove',event=>{
-      if(!state.drawing)return;event.preventDefault();const point=canvasPoint(event);
-      if(state.editTarget==='master'){
-        if(state.masterTool==='clone')cloneBrushSegment(state.lastPoint,point);else masterBrushSegment(state.lastPoint,point,state.masterTool==='restore');
-        state.lastPoint=point;drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);return;
-      }
-      const group=selected(),value=state.mode==='erase'?0:255;paintMask(group.mask,state.width,state.height,state.lastPoint,point,Number($('brush').value),value);directStroke(state.lastPoint,point);state.lastPoint=point;
+      if(!state.drawing||state.editTarget==='master')return;event.preventDefault();const point=canvasPoint(event);
+      depthBrushSegment(state.lastPoint,point);state.lastPoint=point;drawPhoto();drawDepthEditOverlay();
     },{passive:false});
     function endStroke(){
       if(!state.drawing)return;state.drawing=false;
-      if(state.editTarget==='master'){
-        state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();evaluateManualMaster();markSceneDirty(state.masterTool==='clone'?'Fond maître cloné au Pencil':'Fond maître retouché au Pencil');scheduleLivePreview(false,true);updateUndo();return;
-      }
-      drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque modifié au Pencil');scheduleLivePreview(true,true);
+      clearContinuousCache();compose();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+      $('aiGate').className='status warn';$('aiGate').textContent='Depth map modifiée au Pencil · relancer TEST Gauche / Centre / Droite.';
+      updateUndo();
     }
     mask.addEventListener('pointerup',endStroke);mask.addEventListener('pointercancel',endStroke);
-    function updateUndo(){$('undo').disabled=state.editTarget==='master'?!state.masterHistory.length:!state.history.length}
+    function updateUndo(){$('undo').disabled=state.editTarget==='master'?true:!state.depthHistory.length}
     $('undo').onclick=()=>{
-      if(state.editTarget==='master'){
-        const previous=state.masterHistory.pop();if(previous&&state.aiMaster?.background){state.aiMaster.background.getContext('2d').putImageData(previous,0,0);state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Annulation retouche fond');scheduleLivePreview(false,true)}updateUndo();return;
-      }
-      const group=selected(),previous=state.history.pop();if(group&&previous){group.mask=previous;drawMaskOverlay();compose();renderGroups();markSceneDirty('Annulation masque');scheduleLivePreview(true,true)}updateUndo();
+      if(state.editTarget==='master')return;
+      const previous=state.depthHistory.pop();if(previous){state.photoDepth=previous;clearContinuousCache();compose();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;$('aiGate').className='status warn';$('aiGate').textContent='Correction profondeur annulée · relancer TEST 3 vues.'}updateUndo();
     };
     $('resetMask').onclick=()=>{
-      if(state.editTarget==='master'){
-        if(!state.masterOriginal||!state.aiMaster?.background)return;snapshotMaster();const ctx=state.aiMaster.background.getContext('2d');ctx.clearRect(0,0,state.width,state.height);ctx.drawImage(state.masterOriginal,0,0);state.cloneSource=null;state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Fond IA restauré');scheduleLivePreview(false,true);updatePencilUi();updateUndo();return;
-      }
-      const group=selected();if(!group)return;state.history.push(new Uint8ClampedArray(group.mask));group.mask=new Uint8ClampedArray(group.autoMask);drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque auto restauré');scheduleLivePreview(true,true);updateUndo();
+      if(state.editTarget==='master')return;
+      if(!state.photoDepthOriginal)return;snapshotDepth();state.photoDepth=new Uint8ClampedArray(state.photoDepthOriginal);clearContinuousCache();compose();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;$('aiGate').className='status warn';$('aiGate').textContent='DepthFlow initial restauré · relancer TEST 3 vues.';updateUndo();
     };
-    $('add').onclick=()=>{if(state.editTarget==='master'){state.masterTool='restore';updatePencilUi();return}state.mode='add';updatePencilUi()};
-    $('erase').onclick=()=>{if(state.editTarget==='master'){state.masterTool='heal';updatePencilUi();return}state.mode='erase';updatePencilUi()};
-    $('pickCloneSource').onclick=()=>{if(state.editTarget!=='master')return;state.masterTool='pick';updatePencilUi();$('pencilStatus').className='status ok';$('pencilStatus').textContent='Touchez maintenant une zone saine du fond : une croix ✚ y sera fixée comme source.'};
-    $('cloneBrush').onclick=()=>{if(state.editTarget!=='master')return;state.masterTool='clone';updatePencilUi();$('pencilStatus').className=state.cloneSource?'status ok':'status warn';$('pencilStatus').textContent=state.cloneSource?'Tampon clone actif : peins au Pencil sur la zone abîmée. La croix indique la source.':'Aucune source : utilise d’abord « ✚ Choisir source ». '};
-    $('brush').oninput=()=>{$('brushOut').textContent=$('brush').value;if(state.editTarget==='master')drawMasterForEdit()};
-    $('targetGroup').onclick=()=>{state.editTarget='group';state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;showCard();updatePencilUi()};
-    $('targetMaster').onclick=editMasterBackground;
+    $('add').onclick=()=>{state.mode='add';updatePencilUi()};
+    $('erase').onclick=()=>{state.mode='erase';updatePencilUi()};
+    $('brush').oninput=()=>{$('brushOut').textContent=$('brush').value};
+    $('targetGroup').onclick=()=>{state.editTarget='group';showCard();updatePencilUi()};
+    $('targetMaster').onclick=()=>{};
     $('card').onclick=showCard;$('depthView').onclick=()=>{state.editTarget='group';state.preview='depth';drawDepth();$('depthView').classList.add('active');$('card').classList.remove('active');updatePencilUi()};
 
     function depthWorker(){
@@ -338,7 +347,7 @@
       worker.onmessage=event=>{
         const message=event.data||{};if(message.requestId!==state.requestId)return;
         if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}
-        if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);state.photoDepth=prepareContinuousPhotoDepth(state.baseDepth);clearContinuousCache();$('progress').style.width='100%';buildPhotoGroupsFromDepth();compose()}
+        if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);state.photoDepth=prepareContinuousPhotoDepth(state.baseDepth);state.photoDepthOriginal=new Uint8ClampedArray(state.photoDepth);state.depthHistory=[];clearContinuousCache();$('progress').style.width='100%';buildPhotoGroupsFromDepth();compose();updateUndo()}
         if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow photo indisponible : '+message.message}
       };
       state.worker=worker;return worker;
@@ -416,25 +425,24 @@
 
     async function generateThreeViews(){
       if(!state.aiReady||!continuousDepth()){$('aiGate').className='status warn';$('aiGate').textContent='Prépare d’abord le rendu V02.';return}
-      stopAnimation();clearContinuousCache();const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'];state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
-      let worstHole=0;
-      for(let i=0;i<3;i++){
-        await new Promise(requestAnimationFrame);const r=renderContinuousDepthView(positions[i]),blob=await toBlob(r.canvas);
-        state.views.push(r.canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:r.stats.mode,holeRatioBeforeFill:r.stats.holeRatioBeforeFill,maxShift:r.stats.maxShift||0});
-        worstHole=Math.max(worstHole,r.stats.holeRatioBeforeFill||0);
-      }
-      const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
-      $('views').innerHTML=state.urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('');
-      $('results').classList.remove('hidden');
-      const threeQcOk=qc.different===0&&worstHole<=14;
-      state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2))};
-      $('generate').disabled=!threeQcOk;$('renderStatus').className=threeQcOk?'status ok':'status warn';
-      $('renderStatus').textContent=threeQcOk
-        ? 'TEST V02 VALIDÉ · centre pixel parfait · trous avant remplissage max '+state.threeViewQc.worstHoleRatio+'% · aucune bordure noire · 9 vues déverrouillées.'
-        : 'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'%.';
-      // Seed the continuous simulator cache with the validated left/centre/right frames.
-      state.continuousCache[0]=state.views[0];state.continuousCache[4]=state.views[1];state.continuousCache[8]=state.views[2];
-      state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
+      const btn=$('threeViews');btn.disabled=true;btn.textContent='TEST en cours…';$('aiGate').className='status';$('aiGate').textContent='TEST V02 · calcul gauche…';
+      try{
+        stopAnimation();clearContinuousCache();const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'];state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];let worstHole=0;
+        for(let i=0;i<3;i++){
+          $('aiGate').textContent='TEST V02 · '+labels[i]+' '+(i+1)+'/3…';await new Promise(resolve=>setTimeout(resolve,20));
+          const r=i===1?renderContinuousDepthView(0):renderContinuousDepthView(positions[i],{maxEdge:760}),blob=await toBlob(r.canvas);
+          state.views.push(r.canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:r.stats.mode,holeRatioBeforeFill:r.stats.holeRatioBeforeFill,maxShift:r.stats.maxShift||0,previewScale:r.stats.scale||1});
+          worstHole=Math.max(worstHole,r.stats.holeRatioBeforeFill||0);
+        }
+        const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
+        $('views').innerHTML=state.urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('');$('results').classList.remove('hidden');
+        const threeQcOk=qc.different===0&&worstHole<=14;state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2))};$('generate').disabled=!threeQcOk;
+        $('renderStatus').className=threeQcOk?'status ok':'status warn';$('renderStatus').textContent=threeQcOk?'TEST V02 VALIDÉ · centre pixel parfait · trous max '+state.threeViewQc.worstHoleRatio+'% · 9 vues déverrouillées.':'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'%.';
+        state.continuousCache[0]=state.views[0];state.continuousCache[4]=state.views[1];state.continuousCache[8]=state.views[2];state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
+        $('aiGate').className=threeQcOk?'status ok':'status warn';$('aiGate').textContent=threeQcOk?'TEST V02 validé. Production 9 vues disponible.':'TEST V02 calculé mais QC refusé.';
+      }catch(error){
+        $('aiGate').className='status warn';$('aiGate').textContent='TEST V02 BLOQUÉ — '+(error?.message||error);$('renderStatus').className='status warn';$('renderStatus').textContent='Erreur test : '+(error?.stack||error);
+      }finally{btn.disabled=false;btn.textContent='TEST — Gauche / Centre / Droite'}
     }
     $('threeViews').onclick=generateThreeViews;
 
