@@ -21,11 +21,11 @@
         <div class="actions" style="margin-top:8px"><button id="back">Nouvelle photo</button><button id="depthflow" disabled>Analyser profondeur</button></div>
         <div class="progress"><i id="progress"></i></div>
       </section>
-      <section class="panel"><h2>2. Zones DepthFlow — diagnostic</h2><select id="preset"><option value="natural">Naturel</option><option value="portrait">Portrait</option><option value="strong">Relief fort</option></select><button id="auto" style="width:100%;margin-top:8px" disabled>Répartir les profondeurs</button><div id="groups"></div></section>
+      <section class="panel"><h2>2. Zones DepthFlow — éditables</h2><select id="preset"><option value="natural">Naturel</option><option value="portrait">Portrait</option><option value="strong">Relief fort</option></select><button id="auto" style="width:100%;margin-top:8px" disabled>Répartir les profondeurs</button><div id="groups"></div></section>
     </aside>
     <section id="workspace" class="workspace">
       <section id="editPanel" class="panel"><h2>Photo / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Photo</button><button id="depthView">Profondeur</button></div></section>
-      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Profondeur</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Rapprocher +</button><button id="erase">Éloigner −</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">DepthFlow initial</button></div><div id="pencilStatus" class="status ok">Peins directement sur la profondeur : Rapprocher + ou Éloigner −.</div></section>
+      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Sélection</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Sélection auto</button></div><div id="pencilStatus" class="status ok">Choisis une zone puis corrige sa sélection avec Pencil + / Gomme.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Préparer rendu V02</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler / modifier fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU PHOTO : contrôle esthétique uniquement · production issue de la scène maître.</div></section>
       <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Position lenticulaire <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief V02 <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim" disabled>Fond global non utilisé</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim" disabled>Désocclusion locale V02</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
@@ -67,10 +67,10 @@
         for(let i=0;i<depth.length;i++){const d=depth[i];if(d<lo-soft||d>hi+soft)continue;let a=255;if(d<lo)a=Math.round((d-(lo-soft))/soft*255);else if(d>hi)a=Math.round(((hi+soft)-d)/soft*255);m[i]=Math.max(0,Math.min(255,a))}
         return {id:'photo-plane-'+index,label:labels[index],role:roles[index],type:'photo',depth:presetDepths[index],bbox:[0,0,1,1],items:[{id:'depth-band-'+index,type:'photo',role:roles[index],bbox:[0,0,1,1]}],staticBase:index<2,autoMask:new Uint8ClampedArray(m),mask:m};
       });
-      state.selected=null;
+      state.selected=state.groups[2]?.id||state.groups[0]?.id||null;
       $('auto').disabled=false;$('photoRelief').disabled=false;
       renderGroups();applyPreset();showCard();updateUndo();
-      $('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow V02 prêt · profondeur continue active · Pencil modifie directement la depth map. Les 5 zones restent informatives.';
+      $('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow V02 prêt · profondeur continue active · les 5 zones sont éditables au Pencil et guident la profondeur continue.';
     }
     async function loadPhotoFile(file){
       if(!file)return;
@@ -185,8 +185,15 @@
 
     function drawPhoto(){photoContext.clearRect(0,0,state.width,state.height);photoContext.drawImage(state.image,0,0,state.width,state.height)}
     function drawDepth(){const depth=continuousDepth();if(!depth)return;const image=photoContext.createImageData(state.width,state.height);for(let index=0;index<depth.length;index++){const value=depth[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}photoContext.putImageData(image,0,0);maskContext.clearRect(0,0,state.width,state.height)}
-    function drawMaskOverlay(){drawDepthEditOverlay()}
-    function showCard(){state.editTarget='group';state.preview='card';drawPhoto();drawDepthEditOverlay();$('card').classList.add('active');$('depthView').classList.remove('active');updatePencilUi()}
+    function drawMaskOverlay(){
+      maskContext.clearRect(0,0,state.width,state.height);
+      if(state.preview!=='card'||state.editTarget!=='group')return;
+      const group=selected();if(!group)return;
+      const image=maskContext.createImageData(state.width,state.height);
+      for(let i=0;i<group.mask.length;i++){const a=group.mask[i];if(a<5)continue;const j=i*4;image.data[j]=0;image.data[j+1]=229;image.data[j+2]=255;image.data[j+3]=Math.round(a*.62)}
+      maskContext.putImageData(image,0,0);
+    }
+    function showCard(){state.editTarget='group';state.preview='card';drawPhoto();drawMaskOverlay();$('card').classList.add('active');$('depthView').classList.remove('active');updatePencilUi()}
     function drawCloneSourceOverlay(){
       if(state.editTarget!=='master'||!state.cloneSource)return;
       const x=state.cloneSource.x,y=state.cloneSource.y,r=Math.max(10,Number($('brush').value));
@@ -214,18 +221,14 @@
       $('card').classList.remove('active');$('depthView').classList.remove('active');
     }
     function updatePencilUi(){
-      const master=state.editTarget==='master';
-      $('targetGroup').classList.toggle('active',!master);$('targetMaster').classList.toggle('active',master);
-      $('masterTools').classList.toggle('hidden',!master);
-      if(master){
-        $('add').textContent='Restaurer fond';$('erase').textContent='Gommer résidu';$('resetMask').textContent='Fond IA initial';
-        $('add').classList.toggle('active',state.masterTool==='restore');$('erase').classList.toggle('active',state.masterTool==='heal');
-        $('pickCloneSource').classList.toggle('active',state.masterTool==='pick');$('cloneBrush').classList.toggle('active',state.masterTool==='clone');
-      }else{
-        $('add').textContent='Rapprocher +';$('erase').textContent='Éloigner −';$('resetMask').textContent='DepthFlow initial';
-        $('add').classList.toggle('active',state.mode==='add');$('erase').classList.toggle('active',state.mode==='erase');
-        $('pencilStatus').className='status ok';$('pencilStatus').textContent='Correction profondeur active : '+(state.mode==='add'?'Rapprocher +':'Éloigner −')+' · le Pencil modifie directement la depth map V02.';
-      }
+      const group=selected();
+      $('targetGroup').classList.add('active');$('targetMaster').classList.remove('active');$('masterTools').classList.add('hidden');
+      $('add').textContent='Pencil +';$('erase').textContent='Gomme';$('resetMask').textContent='Sélection auto';
+      $('add').classList.toggle('active',state.mode==='add');$('erase').classList.toggle('active',state.mode==='erase');
+      $('pencilStatus').className='status '+(group?'ok':'warn');
+      $('pencilStatus').textContent=group
+        ? 'Sélection « '+group.label+' » : '+(state.mode==='add'?'Pencil + ajoute des pixels et les rapproche de la profondeur cible '+group.depth+'.':'Gomme retire des pixels et restaure leur profondeur DepthFlow.')
+        : 'Choisis d’abord une zone avec le bouton « Éditer ».';
       updateUndo();
     }
     function snapshotMaster(){if(!state.aiMaster?.background)return;const ctx=state.aiMaster.background.getContext('2d');state.masterHistory.push(ctx.getImageData(0,0,state.width,state.height));if(state.masterHistory.length>8)state.masterHistory.shift()}
@@ -258,7 +261,19 @@
       const root=$('groups');root.innerHTML='';
       state.groups.forEach(group=>{
         const element=document.createElement('div');element.className='group'+(group.id===state.selected?' selected':'');
-        element.innerHTML='<div class="grouphead"><b>'+escapeHtml(group.label)+'</b></div><div class="small">zone DepthFlow d’aide · couverture '+maskCoverage(group.mask).percent.toFixed(2)+'% · le moteur V02 utilise la profondeur continue, pas ce plan.</div>';
+        element.innerHTML='<div class="grouphead"><b>'+escapeHtml(group.label)+'</b><button>Éditer</button></div>'
+          +'<div class="small">couverture '+maskCoverage(group.mask).percent.toFixed(2)+'% · correction guidée de la profondeur continue</div>'
+          +'<label>Profondeur cible <b class="value">'+group.depth+'</b><input type="range" min="0" max="255" value="'+group.depth+'"></label>';
+        element.querySelector('button').onclick=()=>{
+          state.selected=group.id;state.history=[];renderGroups();showCard();focusEditor();updatePencilUi();
+          $('pencilStatus').className='status ok';$('pencilStatus').textContent='Sélection « '+group.label+' » active : Pencil + ajoute à la zone, Gomme la retire.';
+        };
+        element.querySelector('input').oninput=event=>{
+          group.depth=Number(event.target.value);element.querySelector('.value').textContent=group.depth;
+          const depth=state.photoDepth;if(depth){for(let i=0;i<depth.length;i++)if(group.mask[i]>=128)depth[i]=group.depth}
+          clearContinuousCache();compose();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+          $('aiGate').className='status warn';$('aiGate').textContent='Profondeur de « '+group.label+' » modifiée · relancer TEST 3 vues.';
+        };
         root.appendChild(element);
       });
     }
@@ -277,62 +292,61 @@
 
 
     function snapshotDepth(){
-      if(!state.photoDepth)return;
-      state.depthHistory.push(new Uint8ClampedArray(state.photoDepth));
-      if(state.depthHistory.length>6)state.depthHistory.shift();
+      const group=selected();if(!state.photoDepth||!group)return;
+      state.depthHistory.push({depth:new Uint8ClampedArray(state.photoDepth),groupId:group.id,mask:new Uint8ClampedArray(group.mask)});
+      if(state.depthHistory.length>8)state.depthHistory.shift();
     }
-    function depthBrushAt(cx,cy,r,delta){
-      const depth=state.photoDepth;if(!depth)return;
-      const W=state.width,H=state.height,rr=Math.max(2,Number(r));
+    function selectionBrushAt(cx,cy,r){
+      const group=selected(),depth=state.photoDepth,original=state.photoDepthOriginal;if(!group||!depth||!original)return;
+      const W=state.width,H=state.height,rr=Math.max(2,Number(r)),target=Number(group.depth);
       const x0=Math.max(0,Math.floor(cx-rr)),y0=Math.max(0,Math.floor(cy-rr)),x1=Math.min(W-1,Math.ceil(cx+rr)),y1=Math.min(H-1,Math.ceil(cy+rr));
       for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
         const dx=x-cx,dy=y-cy,dist=Math.hypot(dx,dy);if(dist>rr)continue;
         const n=dist/rr,falloff=n<.65?1:Math.max(0,(1-n)/.35),i=y*W+x;
-        depth[i]=Math.max(0,Math.min(255,Math.round(depth[i]+delta*falloff)));
+        if(state.mode==='add'){
+          group.mask[i]=Math.max(group.mask[i],Math.round(255*falloff));
+          const mix=.45*falloff;depth[i]=Math.round(depth[i]*(1-mix)+target*mix);
+        }else{
+          group.mask[i]=Math.max(0,Math.round(group.mask[i]-255*falloff));
+          const mix=.6*falloff;depth[i]=Math.round(depth[i]*(1-mix)+original[i]*mix);
+        }
       }
     }
-    function depthBrushSegment(from,to){
-      const r=Number($('brush').value),delta=state.mode==='erase'?-7:7,dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.32)));
-      for(let s=0;s<=steps;s++){const t=s/steps;depthBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r,delta)}
-    }
-    function drawDepthEditOverlay(){
-      maskContext.clearRect(0,0,state.width,state.height);
-      if(state.preview!=='card'||!state.photoDepth)return;
-      // Light depth tint: near = cyan, far = violet. Keeps the original photo readable.
-      const image=maskContext.createImageData(state.width,state.height),depth=state.photoDepth;
-      for(let i=0;i<depth.length;i+=2){
-        const d=depth[i],a=28,j=i*4;
-        image.data[j]=d<128?120:0;image.data[j+1]=d>=128?210:80;image.data[j+2]=255;image.data[j+3]=a;
-      }
-      maskContext.putImageData(image,0,0);
+    function selectionBrushSegment(from,to){
+      const r=Number($('brush').value),dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.30)));
+      for(let s=0;s<=steps;s++){const t=s/steps;selectionBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r)}
     }
     function canvasPoint(event){const rect=mask.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*state.width,y:(event.clientY-rect.top)/rect.height*state.height}}
     function directStroke(from,to){maskContext.save();maskContext.lineCap='round';maskContext.lineJoin='round';maskContext.lineWidth=Number($('brush').value)*2;maskContext.globalCompositeOperation=state.mode==='erase'?'destination-out':'source-over';maskContext.strokeStyle='rgba(0,229,255,.68)';maskContext.beginPath();maskContext.moveTo(from.x,from.y);maskContext.lineTo(to.x,to.y);maskContext.stroke();maskContext.restore()}
     mask.addEventListener('pointerdown',event=>{
-      event.preventDefault();const point=canvasPoint(event);
-      if(state.editTarget==='master')return;
-      if(!state.photoDepth||state.preview!=='card')return;
-      snapshotDepth();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);depthBrushSegment(point,point);drawPhoto();drawDepthEditOverlay();updateUndo();
+      event.preventDefault();const point=canvasPoint(event),group=selected();
+      if(!group||!state.photoDepth||state.preview!=='card')return;
+      snapshotDepth();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);selectionBrushSegment(point,point);drawPhoto();drawMaskOverlay();updateUndo();
     },{passive:false});
     mask.addEventListener('pointermove',event=>{
-      if(!state.drawing||state.editTarget==='master')return;event.preventDefault();const point=canvasPoint(event);
-      depthBrushSegment(state.lastPoint,point);state.lastPoint=point;drawPhoto();drawDepthEditOverlay();
+      if(!state.drawing)return;event.preventDefault();const point=canvasPoint(event);
+      selectionBrushSegment(state.lastPoint,point);state.lastPoint=point;drawPhoto();drawMaskOverlay();
     },{passive:false});
     function endStroke(){
       if(!state.drawing)return;state.drawing=false;
-      clearContinuousCache();compose();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
-      $('aiGate').className='status warn';$('aiGate').textContent='Depth map modifiée au Pencil · relancer TEST Gauche / Centre / Droite.';
+      clearContinuousCache();compose();renderGroups();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+      $('aiGate').className='status warn';$('aiGate').textContent='Sélection et profondeur modifiées · relancer TEST Gauche / Centre / Droite.';
       updateUndo();
     }
     mask.addEventListener('pointerup',endStroke);mask.addEventListener('pointercancel',endStroke);
-    function updateUndo(){$('undo').disabled=state.editTarget==='master'?true:!state.depthHistory.length}
+    function updateUndo(){$('undo').disabled=!state.depthHistory.length}
     $('undo').onclick=()=>{
-      if(state.editTarget==='master')return;
-      const previous=state.depthHistory.pop();if(previous){state.photoDepth=previous;clearContinuousCache();compose();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;$('aiGate').className='status warn';$('aiGate').textContent='Correction profondeur annulée · relancer TEST 3 vues.'}updateUndo();
+      const previous=state.depthHistory.pop();if(!previous)return;
+      state.photoDepth=previous.depth;const group=state.groups.find(g=>g.id===previous.groupId);if(group)group.mask=previous.mask;
+      clearContinuousCache();compose();renderGroups();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+      $('aiGate').className='status warn';$('aiGate').textContent='Dernière correction de sélection annulée · relancer TEST 3 vues.';updateUndo();
     };
     $('resetMask').onclick=()=>{
-      if(state.editTarget==='master')return;
-      if(!state.photoDepthOriginal)return;snapshotDepth();state.photoDepth=new Uint8ClampedArray(state.photoDepthOriginal);clearContinuousCache();compose();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;$('aiGate').className='status warn';$('aiGate').textContent='DepthFlow initial restauré · relancer TEST 3 vues.';updateUndo();
+      const group=selected();if(!group||!group.autoMask||!state.photoDepthOriginal)return;
+      snapshotDepth();group.mask=new Uint8ClampedArray(group.autoMask);
+      for(let i=0;i<group.mask.length;i++)if(group.mask[i]>=128)state.photoDepth[i]=group.depth;else if(state.photoDepth[i]===group.depth)state.photoDepth[i]=state.photoDepthOriginal[i];
+      clearContinuousCache();compose();renderGroups();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+      $('aiGate').className='status warn';$('aiGate').textContent='Sélection automatique restaurée pour « '+group.label+' » · relancer TEST 3 vues.';updateUndo();
     };
     $('add').onclick=()=>{state.mode='add';updatePencilUi()};
     $('erase').onclick=()=>{state.mode='erase';updatePencilUi()};
