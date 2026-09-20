@@ -11,7 +11,7 @@
   </style>
 </head>
 <body>
-  <header class="top"><b>MicroPlayer Photo V02 — Profondeur continue</b><span>DepthFlow continu · z-buffer · désocclusion locale · vue 05 verrouillée · 3 vues · 9 vues</span></header>
+  <header class="top"><b>MicroPlayer Photo V02 — Profondeur continue</b><span>DepthFlow continu · z-buffer · désocclusion 2D profondeur · vue 05 verrouillée · 3 vues · 9 vues</span></header>
   <main class="wrap"><div class="grid">
     <aside id="sidebar" class="sidebar"><button id="toggleSidebar" class="sidebarToggle">◀ Replier les réglages</button>
       <section class="panel">
@@ -36,7 +36,7 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),editPanel=$('editPanel'),sim3d=$('sim3d'),simRig=$('simRig'),threePlan=$('threePlan'),sidebar=$('sidebar'),workspace=$('workspace');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,photoDepthOriginal:null,depthHistory:[],continuousCache:[],continuousStats:[],productionViews:[],productionBlobs:[],productionUrls:[],productionStats:[],productionQc:null};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,photoDepthOriginal:null,depthHistory:[],continuousCache:[],continuousStats:[],backgroundSeed:null,backgroundSeedKey:'',productionViews:[],productionBlobs:[],productionUrls:[],productionStats:[],productionQc:null};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     function sourceCanvasExact(){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
@@ -111,36 +111,59 @@
       }
       return cur;
     }
-    function clearContinuousCache(){state.continuousCache=[];state.continuousStats=[]}
+    function clearContinuousCache(){state.continuousCache=[];state.continuousStats=[];state.backgroundSeed=null;state.backgroundSeedKey=''}
     function continuousDepth(){return state.photoDepth||state.baseDepth}
     function depthRelative(d){
       const zero=Number($('zero').value),bgScale=Math.max(0,Number($('background').value))/12;
       if(d>=zero)return (d-zero)/Math.max(1,255-zero);
       return -((zero-d)/Math.max(1,zero))*bgScale;
     }
-    function fillContinuousHoles(out,zbuf,written){
-      const W=state.width,H=state.height,left=new Int32Array(W),right=new Int32Array(W);let filled=0,remaining=0;
-      for(let y=0;y<H;y++){
-        const row=y*W;let last=-1;
-        for(let x=0;x<W;x++){const i=row+x;if(written[i])last=x;left[x]=last}
-        last=-1;for(let x=W-1;x>=0;x--){const i=row+x;if(written[i])last=x;right[x]=last}
-        for(let x=0;x<W;x++){
-          const i=row+x;if(written[i])continue;
-          const lx=left[x],rx=right[x];let pick=-1;
-          if(lx>=0&&rx>=0){
-            const li=row+lx,ri=row+rx,ld=x-lx,rd=rx-x;
-            const ls=zbuf[li]+ld*2,rs=zbuf[ri]+rd*2;pick=ls<=rs?li:ri;
-          }else if(lx>=0)pick=row+lx;else if(rx>=0)pick=row+rx;
-          if(pick>=0){const s=pick*4,d=i*4;out[d]=out[s];out[d+1]=out[s+1];out[d+2]=out[s+2];out[d+3]=255;filled++}
-          else remaining++;
-        }
+    function backgroundSeedMask(){
+      const depth=continuousDepth(),W=state.width,H=state.height;if(!depth?.length)return null;
+      const zero=Number($('zero').value),limit=Math.max(24,Math.min(220,zero-6)),key=W+'x'+H+':'+limit+':'+(depth===state.photoDepth?'photo':'base');
+      if(state.backgroundSeed&&state.backgroundSeedKey===key)return state.backgroundSeed;
+      const mask=new Uint8Array(W*H),r=2,tol=4;
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+        const i=y*W+x,d=depth[i];if(d>limit)continue;
+        const x0=Math.max(0,x-r),x1=Math.min(W-1,x+r),y0=Math.max(0,y-r),y1=Math.min(H-1,y+r);
+        const probes=[y*W+x0,y*W+x1,y0*W+x,y1*W+x,y0*W+x0,y0*W+x1,y1*W+x0,y1*W+x1];
+        let stable=true;for(const q of probes)if(depth[q]>limit+tol){stable=false;break}
+        if(stable)mask[i]=1;
       }
-      // Extremely rare empty rows: fall back to source at the same coordinate, never black.
-      if(remaining){for(let i=0;i<written.length;i++){const j=i*4;if(out[j+3])continue;out[j]=state.rgba[j];out[j+1]=state.rgba[j+1];out[j+2]=state.rgba[j+2];out[j+3]=255;filled++;}}
-      return filled;
+      state.backgroundSeed=mask;state.backgroundSeedKey=key;return mask;
+    }
+    function nearestSeedField(seed,W,H){
+      const N=W*H,nearest=new Int32Array(N),dist=new Uint16Array(N);nearest.fill(-1);dist.fill(65535);
+      for(let i=0;i<N;i++)if(seed[i]){nearest[i]=i;dist[i]=0}
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+        const i=y*W+x;if(dist[i]===0)continue;let best=dist[i],pick=nearest[i];
+        if(x>0&&dist[i-1]<65535&&dist[i-1]+1<best){best=dist[i-1]+1;pick=nearest[i-1]}
+        if(y>0&&dist[i-W]<65535&&dist[i-W]+1<best){best=dist[i-W]+1;pick=nearest[i-W]}
+        dist[i]=best;nearest[i]=pick;
+      }
+      for(let y=H-1;y>=0;y--)for(let x=W-1;x>=0;x--){
+        const i=y*W+x;if(dist[i]===0)continue;let best=dist[i],pick=nearest[i];
+        if(x+1<W&&dist[i+1]<65535&&dist[i+1]+1<best){best=dist[i+1]+1;pick=nearest[i+1]}
+        if(y+1<H&&dist[i+W]<65535&&dist[i+W]+1<best){best=dist[i+W]+1;pick=nearest[i+W]}
+        dist[i]=best;nearest[i]=pick;
+      }
+      return {nearest,dist};
+    }
+    function fillContinuousHolesDepthAware(out,written,bgOut,bgWritten,W,H,scale,maxShift,normal){
+      const N=W*H,{nearest,dist}=nearestSeedField(bgWritten,W,H),radius=Math.max(48,Math.ceil(Math.abs(maxShift*normal)*3+24));
+      let filled=0,backgroundFilled=0,fallbackFilled=0,maxFillDistance=0;
+      for(let i=0;i<N;i++){
+        if(written[i])continue;const t=i*4,pick=nearest[i];
+        if(pick>=0&&dist[i]<=radius){
+          const s=pick*4;out[t]=bgOut[s];out[t+1]=bgOut[s+1];out[t+2]=bgOut[s+2];out[t+3]=255;backgroundFilled++;filled++;if(dist[i]>maxFillDistance)maxFillDistance=dist[i];continue;
+        }
+        const x=i%W,y=(i/W)|0,sx=Math.min(state.width-1,Math.max(0,Math.round(x/scale))),sy=Math.min(state.height-1,Math.max(0,Math.round(y/scale))),s=(sy*state.width+sx)*4;
+        out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255;fallbackFilled++;filled++;
+      }
+      return {filled,backgroundFilled,fallbackFilled,backgroundFillPercent:filled?backgroundFilled/filled*100:100,fallbackFillPercent:filled?fallbackFilled/filled*100:0,maxFillDistance,fillRadius:radius};
     }
     function renderContinuousDepthView(position,options={}){
-      const SW=state.width,SH=state.height,depth=continuousDepth();
+      const SW=state.width,SH=state.height,depth=continuousDepth(),bgSeed=backgroundSeedMask();
       if(!state.rgba||!depth?.length)throw Error('Profondeur continue indisponible.');
       const maxEdge=Number(options.maxEdge)||Math.max(SW,SH),scale=Math.min(1,maxEdge/Math.max(SW,SH)),W=Math.max(1,Math.round(SW*scale)),H=Math.max(1,Math.round(SH*scale)),N=W*H;
       const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d',{willReadFrequently:true});
@@ -148,26 +171,30 @@
       if(Math.abs(normal)<1e-9){
         if(scale===1)ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);
         else {const src=document.createElement('canvas');src.width=SW;src.height=SH;src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),SW,SH),0,0);ctx.drawImage(src,0,0,W,H)}
-        return {canvas,stats:{position:normal,holeRatioBeforeFill:0,holesBeforeFill:0,filled:0,mode:'continuous-depth-zbuffer-center-exact',scale}};
+        return {canvas,stats:{position:normal,holeRatioBeforeFill:0,holesBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,maxFillDistance:0,fillRadius:0,mode:'continuous-depth-zbuffer-center-exact',scale}};
       }
-      const reliefScale=Math.max(.25,Number($('relief').value)/185),maxShift=W*(Number($('parallax').value)/100)*reliefScale;
-      const out=new Uint8ClampedArray(N*4),zbuf=new Int16Array(N);zbuf.fill(-32768);const written=new Uint8Array(N);
+      const zero=Number($('zero').value),reliefScale=Math.max(.25,Number($('relief').value)/185),maxShift=W*(Number($('parallax').value)/100)*reliefScale;
+      const out=new Uint8ClampedArray(N*4),zbuf=new Int16Array(N),written=new Uint8Array(N),bgOut=new Uint8ClampedArray(N*4),bgZ=new Int16Array(N),bgWritten=new Uint8Array(N);zbuf.fill(-32768);bgZ.fill(-32768);
       for(let y=0;y<H;y++){
         const sy=Math.min(SH-1,Math.round(y/scale));
         for(let x=0;x<W;x++){
           const sx=Math.min(SW-1,Math.round(x/scale)),si=sy*SW+sx,d=depth[si],shift=normal*depthRelative(d)*maxShift,fx=x+shift,x0=Math.floor(fx),frac=fx-x0;
           const put=xx=>{if(xx<0||xx>=W)return;const q=y*W+xx;if(d<zbuf[q])return;const s=si*4,t=q*4;zbuf[q]=d;written[q]=1;out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255};
           put(x0);if(frac>.18)put(x0+1);
+          if(d>=zero+12){
+            const dl=sx>0?depth[si-1]:d,dr=sx+1<SW?depth[si+1]:d,edge=Math.max(Math.abs(d-dl),Math.abs(d-dr))>=14;
+            if(edge){put(x0-1);put(x0+2)}
+          }
+          if(bgSeed?.[si]){
+            const putBg=xx=>{if(xx<0||xx>=W)return;const q=y*W+xx;if(d<bgZ[q])return;const s=si*4,t=q*4;bgZ[q]=d;bgWritten[q]=1;bgOut[t]=state.rgba[s];bgOut[t+1]=state.rgba[s+1];bgOut[t+2]=state.rgba[s+2];bgOut[t+3]=255};
+            for(let off=-2;off<=2;off++)putBg(x0+off);
+          }
         }
       }
       let holes=0;for(let i=0;i<N;i++)if(!written[i])holes++;
-      const saveW=state.width,saveH=state.height;state.width=W;state.height=H;
-      // local fill uses output dimensions only; source fallback is handled below.
-      const left=new Int32Array(W),right=new Int32Array(W);let filled=0;
-      for(let y=0;y<H;y++){const row=y*W;let last=-1;for(let x=0;x<W;x++){const i=row+x;if(written[i])last=x;left[x]=last}last=-1;for(let x=W-1;x>=0;x--){const i=row+x;if(written[i])last=x;right[x]=last}for(let x=0;x<W;x++){const i=row+x;if(written[i])continue;const lx=left[x],rx=right[x];let pick=-1;if(lx>=0&&rx>=0){const li=row+lx,ri=row+rx;pick=(x-lx)<= (rx-x)?li:ri}else if(lx>=0)pick=row+lx;else if(rx>=0)pick=row+rx;if(pick>=0){const s=pick*4,t=i*4;out[t]=out[s];out[t+1]=out[s+1];out[t+2]=out[s+2];out[t+3]=255;filled++}else{const sx=Math.min(SW-1,Math.round(x/scale)),sy=Math.min(SH-1,Math.round(y/scale)),s=(sy*SW+sx)*4,t=i*4;out[t]=state.rgba[s];out[t+1]=state.rgba[s+1];out[t+2]=state.rgba[s+2];out[t+3]=255;filled++}}}
-      state.width=saveW;state.height=saveH;
+      const fill=fillContinuousHolesDepthAware(out,written,bgOut,bgWritten,W,H,scale,maxShift,normal);
       ctx.putImageData(new ImageData(out,W,H),0,0);
-      return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),holesBeforeFill:holes,holeRatioBeforeFill:Number((holes/N*100).toFixed(2)),filled,mode:'continuous-depth-zbuffer-local-fill',scale}};
+      return {canvas,stats:{position:normal,maxShift:Number(maxShift.toFixed(2)),holesBeforeFill:holes,holeRatioBeforeFill:Number((holes/N*100).toFixed(2)),filled:fill.filled,backgroundFilled:fill.backgroundFilled,fallbackFilled:fill.fallbackFilled,backgroundFillPercent:Number(fill.backgroundFillPercent.toFixed(2)),fallbackFillPercent:Number(fill.fallbackFillPercent.toFixed(2)),maxFillDistance:fill.maxFillDistance,fillRadius:fill.fillRadius,mode:'continuous-depth-zbuffer-depth-aware-2d-fill',scale}};
     }
     function continuousFrame(index){
       const i=Math.max(0,Math.min(8,Math.round(index)));if(state.continuousCache[i])return state.continuousCache[i];
@@ -447,13 +474,13 @@
         for(let i=0;i<3;i++){
           $('aiGate').textContent='TEST V02 · '+labels[i]+' '+(i+1)+'/3…';await new Promise(resolve=>setTimeout(resolve,20));
           const r=i===1?renderContinuousDepthView(0):renderContinuousDepthView(positions[i],{maxEdge:760}),blob=await toBlob(r.canvas);
-          state.views.push(r.canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:r.stats.mode,holeRatioBeforeFill:r.stats.holeRatioBeforeFill,maxShift:r.stats.maxShift||0,previewScale:r.stats.scale||1,width:r.canvas.width,height:r.canvas.height});
+          state.views.push(r.canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],mode:r.stats.mode,holeRatioBeforeFill:r.stats.holeRatioBeforeFill,backgroundFillPercent:r.stats.backgroundFillPercent??100,fallbackFillPercent:r.stats.fallbackFillPercent||0,maxFillDistance:r.stats.maxFillDistance||0,maxShift:r.stats.maxShift||0,previewScale:r.stats.scale||1,width:r.canvas.width,height:r.canvas.height});
           worstHole=Math.max(worstHole,r.stats.holeRatioBeforeFill||0);
         }
         const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
         $('views').innerHTML=state.urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('');$('results').classList.remove('hidden');
-        const threeQcOk=qc.different===0&&worstHole<=14;state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2))};$('generate').disabled=!threeQcOk;
-        $('renderStatus').className=threeQcOk?'status ok':'status warn';$('renderStatus').textContent=threeQcOk?'SIMULATION VALIDÉE · centre pixel parfait · trous aperçu max '+state.threeViewQc.worstHoleRatio+'% · production 9 vues déverrouillée.':'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'%.';
+        const worstFallback=Math.max(0,...state.renderStats.map(x=>Number(x.fallbackFillPercent)||0));const threeQcOk=qc.different===0&&worstHole<=14&&worstFallback<=3;state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2))};$('generate').disabled=!threeQcOk;
+        $('renderStatus').className=threeQcOk?'status ok':'status warn';$('renderStatus').textContent=threeQcOk?'SIMULATION VALIDÉE · centre pixel parfait · trous aperçu max '+state.threeViewQc.worstHoleRatio+'% · secours source max '+state.threeViewQc.worstFallbackFillPercent+'% · production 9 vues déverrouillée.':'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'% · secours source '+state.threeViewQc.worstFallbackFillPercent+'%.';
         state.continuousCache[0]=state.views[0];state.continuousCache[4]=state.views[1];state.continuousCache[8]=state.views[2];state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
         $('aiGate').className=threeQcOk?'status ok':'status warn';$('aiGate').textContent=threeQcOk?'Simulation validée. Production 9 vues pleine résolution disponible.':'TEST V02 calculé mais QC refusé.';
       }catch(error){
@@ -468,11 +495,13 @@
       let centreDifferent=Infinity;
       if(views[4]?.width===W&&views[4]?.height===H){const centre=views[4].getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;centreDifferent=comparePixels(centre,state.rgba).different}
       const worstHole=stats.length?Math.max(...stats.map(x=>Number(x.holeRatioBeforeFill)||0)):Infinity;
+      const worstFallback=stats.length?Math.max(...stats.map(x=>Number(x.fallbackFillPercent)||0)):Infinity;
+      const minBackgroundFill=stats.length?Math.min(...stats.filter(x=>(Number(x.holesBeforeFill)||0)>0).map(x=>Number(x.backgroundFillPercent)||0),100):0;
       const maxShift=stats.length?Math.max(...stats.map(x=>Math.abs(Number(x.maxShift)||0))):Infinity;
-      const maxStepShift=maxShift/4,shiftLimit=W*.06,stepLimit=W*.02,holeLimit=6;
-      const ok=dimsOk&&centreDifferent===0&&worstHole<=holeLimit&&maxShift<=shiftLimit&&maxStepShift<=stepLimit;
-      const warnings=[];if(worstHole>3)warnings.push('trous '+worstHole.toFixed(2)+'%');if(maxShift>W*.045)warnings.push('parallaxe forte '+maxShift.toFixed(1)+' px');
-      return {ok,dimsOk,centreDifferent,worstHole:Number(worstHole.toFixed(2)),maxShift:Number(maxShift.toFixed(2)),maxStepShift:Number(maxStepShift.toFixed(2)),limits:{holePercent:holeLimit,maxShiftPx:Number(shiftLimit.toFixed(2)),maxStepShiftPx:Number(stepLimit.toFixed(2))},warnings};
+      const maxStepShift=maxShift/4,shiftLimit=W*.06,stepLimit=W*.02,holeLimit=6,fallbackLimit=2.5;
+      const ok=dimsOk&&centreDifferent===0&&worstHole<=holeLimit&&worstFallback<=fallbackLimit&&maxShift<=shiftLimit&&maxStepShift<=stepLimit;
+      const warnings=[];if(worstHole>3)warnings.push('trous '+worstHole.toFixed(2)+'%');if(worstFallback>1)warnings.push('secours source '+worstFallback.toFixed(2)+'%');if(maxShift>W*.045)warnings.push('parallaxe forte '+maxShift.toFixed(1)+' px');
+      return {ok,dimsOk,centreDifferent,worstHole:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2)),minBackgroundFillPercent:Number(minBackgroundFill.toFixed(2)),maxShift:Number(maxShift.toFixed(2)),maxStepShift:Number(maxStepShift.toFixed(2)),limits:{holePercent:holeLimit,fallbackFillPercent:fallbackLimit,maxShiftPx:Number(shiftLimit.toFixed(2)),maxStepShiftPx:Number(stepLimit.toFixed(2))},warnings};
     }
     async function generateViews(){
       if(!state.aiReady||!continuousDepth()||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='Production verrouillée : valider d’abord la simulation Gauche / Centre / Droite.';return}
@@ -482,7 +511,7 @@
           await new Promise(resolve=>setTimeout(resolve,20));const position=(index-4)/4;
           // Production is always full resolution. View 05 bypasses every renderer and is copied byte-for-byte from state.rgba.
           let canvas,stats;
-          if(index===4){canvas=sourceCanvasExact();stats={position:0,maxShift:0,holesBeforeFill:0,holeRatioBeforeFill:0,filled:0,mode:'source-exact-png',fullFrame:true}}
+          if(index===4){canvas=sourceCanvasExact();stats={position:0,maxShift:0,holesBeforeFill:0,holeRatioBeforeFill:0,filled:0,backgroundFilled:0,fallbackFilled:0,backgroundFillPercent:100,fallbackFillPercent:0,maxFillDistance:0,fillRadius:0,mode:'source-exact-png',fullFrame:true}}
           else {const r=renderContinuousDepthView(position,{maxEdge:Math.max(state.width,state.height)});canvas=r.canvas;stats={...r.stats,fullFrame:true}}
           const blob=await toBlob(canvas),url=URL.createObjectURL(blob);
           state.productionViews.push(canvas);state.productionBlobs.push(blob);state.productionUrls.push(url);state.productionStats.push({view:index+1,position,width:canvas.width,height:canvas.height,...stats});
@@ -492,7 +521,7 @@
         const q=state.productionQc;
         $('productionViews').innerHTML=state.productionUrls.map((url,index)=>'<div class="view"><img src="'+url+'" alt="Production '+(index+1)+'"><span>P'+String(index+1).padStart(2,'0')+'</span></div>').join('');
         $('productionStatus').className=q.ok?'status ok':'status warn';
-        $('productionStatus').textContent=(q.ok?'PRODUCTION VALIDÉE':'PRODUCTION REFUSÉE')+' · dimensions '+(q.dimsOk?'OK':'ERREUR')+' · vue 05 '+(q.centreDifferent===0?'pixel parfaite':q.centreDifferent+' pixels différents')+' · trous max '+q.worstHole+'% · shift max '+q.maxShift+' px · pas max '+q.maxStepShift+' px'+(q.warnings.length?' · attention : '+q.warnings.join(', '):'');
+        $('productionStatus').textContent=(q.ok?'PRODUCTION VALIDÉE':'PRODUCTION REFUSÉE')+' · dimensions '+(q.dimsOk?'OK':'ERREUR')+' · vue 05 '+(q.centreDifferent===0?'pixel parfaite':q.centreDifferent+' pixels différents')+' · trous max '+q.worstHole+'% · fond 2D min '+q.minBackgroundFillPercent+'% · secours source max '+q.worstFallbackFillPercent+'% · shift max '+q.maxShift+' px · pas max '+q.maxStepShift+' px'+(q.warnings.length?' · attention : '+q.warnings.join(', '):'');
         $('productionZip').disabled=!q.ok;
         $('aiGate').className=q.ok?'status ok':'status warn';$('aiGate').textContent=q.ok?'Production 9 vues pleine résolution validée. ZIP production disponible.':'Production calculée mais QC lenticulaire refusé : corriger relief/parallaxe puis recalculer.';
       }catch(error){
@@ -785,9 +814,9 @@
         state.aiReady=true;state.aiMaster=null;state.masterQc={ok:true,mode:'continuous-depth-v02'};state.threeViewQc=null;
         $('targetMaster').disabled=true;$('threeViews').disabled=false;$('generate').disabled=true;
         $('masterBg').disabled=true;$('masterBg').textContent='Fond global non utilisé en V02';
-        $('clientPreview').disabled=true;$('clientGate').className='status ok';$('clientGate').textContent='V02 : profondeur continue + désocclusion locale par vue. Aucun gros fond maître à reconstruire.';
+        $('clientPreview').disabled=true;$('clientGate').className='status ok';$('clientGate').textContent='V02 : profondeur continue + désocclusion 2D guidée par la profondeur. Aucun gros fond maître à reconstruire.';
         $('aiGate').className='status ok';$('aiGate').textContent='RENDU V02 PRÊT · profondeur continue 0–255 · z-buffer · vue centrale verrouillée · lancer TEST Gauche / Centre / Droite.';
-        $('renderStatus').className='status ok';$('renderStatus').textContent='Production photo V02 : plein cadre, aucune rotation de carte, trous remplis localement après projection.';
+        $('renderStatus').className='status ok';$('renderStatus').textContent='Production photo V02 : plein cadre, aucune rotation de carte, trous reconstruits depuis le fond stable 2D après projection.';
       }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Préparer rendu V02'}
     }
     $('photoRelief').onclick=createAutomaticRelief;
@@ -858,7 +887,7 @@
         zip.file('depth-map.png',await depthBlob());
         const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};
         const groups=state.groups.map(({mask,autoMask,productionMask,selected,...group},index)=>({...group,maskFile:'masques/groupe-'+String(index+1).padStart(2,'0')+'.png'}));
-        const manifest={schema:production?'microplayer.photo-v02.production':'microplayer.photo-v02.simulation',version:2,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:false,capture:state.payload.capture||null,file:'source-photo.png',pngExactFromRgba:true},pipeline:{stage:production?'photo-continuous-depth-production-v02':'photo-continuous-depth-simulation-v02',centerViewPixelPerfect:true,simulationSeparatedFromProduction:true},groups,settings,render:{engine:'continuous-depth-zbuffer-local-fill',viewCount:views.length,depthMapFile:'depth-map.png',views:stats},qc:production?state.productionQc:state.threeViewQc};
+        const manifest={schema:production?'microplayer.photo-v02.production':'microplayer.photo-v02.simulation',version:2,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:false,capture:state.payload.capture||null,file:'source-photo.png',pngExactFromRgba:true},pipeline:{stage:production?'photo-continuous-depth-production-v02':'photo-continuous-depth-simulation-v02',centerViewPixelPerfect:true,simulationSeparatedFromProduction:true},groups,settings,render:{engine:'continuous-depth-zbuffer-depth-aware-2d-fill',viewCount:views.length,depthMapFile:'depth-map.png',views:stats},qc:production?state.productionQc:state.threeViewQc};
         zip.file('manifest.json',JSON.stringify(manifest,null,2));
         const blob=await zip.generateAsync({type:'blob'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=production?'MicroPlayer-photo-V02-PRODUCTION-9-vues.zip':'MicroPlayer-photo-V02-SIMULATION-3-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);
       }finally{button.disabled=production?!state.productionQc?.ok:false;button.textContent=old}
