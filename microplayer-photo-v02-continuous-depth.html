@@ -608,9 +608,20 @@
       const warnings=[];if(worstHole>3)warnings.push('trous '+worstHole.toFixed(2)+'%');if(worstInteriorFallback>1)warnings.push('secours intérieur '+worstInteriorFallback.toFixed(2)+'%');if(maxShift>W*.045)warnings.push('parallaxe forte '+maxShift.toFixed(1)+' px');
       return {ok,dimsOk,centreDifferent,worstHole:Number(worstHole.toFixed(2)),worstFallbackFillPercent:Number(worstFallback.toFixed(2)),worstInteriorFallbackFillPercent:Number(worstInteriorFallback.toFixed(2)),minBackgroundFillPercent:Number(minBackgroundFill.toFixed(2)),maxShift:Number(maxShift.toFixed(2)),maxStepShift:Number(maxStepShift.toFixed(2)),limits:{holePercent:holeLimit,interiorFallbackFillPercent:fallbackLimit,maxShiftPx:Number(shiftLimit.toFixed(2)),maxStepShiftPx:Number(stepLimit.toFixed(2))},warnings};
     }
+    function qcFailureReasons(q){
+      if(!q)return ['QC indisponible'];
+      const reasons=[];
+      if(!q.dimsOk)reasons.push('dimensions incorrectes');
+      if(q.centreDifferent!==0)reasons.push('vue 05 modifiée ('+q.centreDifferent+' px)');
+      if(q.worstHole>q.limits.holePercent)reasons.push('trous '+q.worstHole+'% > '+q.limits.holePercent+'%');
+      if(q.worstInteriorFallbackFillPercent>q.limits.interiorFallbackFillPercent)reasons.push('secours intérieur '+q.worstInteriorFallbackFillPercent+'% > '+q.limits.interiorFallbackFillPercent+'%');
+      if(q.maxShift>q.limits.maxShiftPx)reasons.push('parallaxe '+q.maxShift+' px > '+q.limits.maxShiftPx+' px');
+      if(q.maxStepShift>q.limits.maxStepShiftPx)reasons.push('pas inter-vues '+q.maxStepShift+' px > '+q.limits.maxStepShiftPx+' px');
+      return reasons.length?reasons:['critère QC non identifié'];
+    }
     async function generateViews(){
       if(!state.aiReady||!continuousDepth()||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='Production verrouillée : valider d’abord la simulation Gauche / Centre / Droite.';return}
-      const btn=$('generate');btn.disabled=true;btn.textContent='PRODUCTION 1/9…';clearProduction();
+      const btn=$('generate');btn.disabled=true;btn.textContent='PRODUCTION 1/9…';clearProduction();$('aiGate').className='status';$('aiGate').textContent='PRODUCTION V02.3 · calcul pleine résolution 0/9…';
       try{
         for(let index=0;index<9;index++){
           await new Promise(resolve=>setTimeout(resolve,20));const position=(index-4)/4;
@@ -620,7 +631,7 @@
           else {const r=renderHybridProductionView(position,{maxEdge:Math.max(state.width,state.height)});canvas=r.canvas;stats={...r.stats,fullFrame:true}}
           const blob=await toBlob(canvas),url=URL.createObjectURL(blob);
           state.productionViews.push(canvas);state.productionBlobs.push(blob);state.productionUrls.push(url);state.productionStats.push({view:index+1,position,width:canvas.width,height:canvas.height,...stats});
-          btn.textContent='PRODUCTION '+(index+1)+'/9…';$('productionStatus').className='status';$('productionStatus').textContent='Calcul pleine résolution '+(index+1)+'/9 · '+canvas.width+'×'+canvas.height;
+          btn.textContent='PRODUCTION '+(index+1)+'/9…';$('productionStatus').className='status';$('productionStatus').textContent='Calcul pleine résolution '+(index+1)+'/9 · '+canvas.width+'×'+canvas.height;$('aiGate').className='status';$('aiGate').textContent='PRODUCTION V02.3 · '+(index+1)+'/9 calculée'+(index<8?' · QC après la vue 09':' · contrôle QC…');
         }
         state.productionQc=qcProductionLenticular();
         const q=state.productionQc;
@@ -628,7 +639,7 @@
         $('productionStatus').className=q.ok?'status ok':'status warn';
         const maxHybrid=Math.max(0,...state.productionStats.map(x=>Number(x.hybridMaskPercent)||0));$('productionStatus').textContent=(q.ok?'PRODUCTION VALIDÉE':'PRODUCTION REFUSÉE')+' · moteur hybride natif · masque max '+maxHybrid.toFixed(2)+'% · dimensions '+(q.dimsOk?'OK':'ERREUR')+' · vue 05 '+(q.centreDifferent===0?'pixel parfaite':q.centreDifferent+' pixels différents')+' · trous max '+q.worstHole+'% · fond 2D min '+q.minBackgroundFillPercent+'% · secours source max '+q.worstFallbackFillPercent+'% · shift max '+q.maxShift+' px · pas max '+q.maxStepShift+' px'+(q.warnings.length?' · attention : '+q.warnings.join(', '):'');
         $('productionZip').disabled=!q.ok;
-        $('aiGate').className=q.ok?'status ok':'status warn';$('aiGate').textContent=q.ok?'Production 9 vues pleine résolution validée · moteur hybride V02.3 natif. ZIP production disponible.':'Production calculée mais QC lenticulaire refusé : corriger relief/parallaxe puis recalculer.';
+        $('aiGate').className=q.ok?'status ok':'status warn';$('aiGate').textContent=q.ok?'Production 9 vues pleine résolution validée · moteur hybride V02.3 natif. ZIP production disponible.':'PRODUCTION REFUSÉE · '+qcFailureReasons(q).join(' · ');
       }catch(error){
         clearProduction();$('productionStatus').className='status warn';$('productionStatus').textContent='PRODUCTION BLOQUÉE — '+(error?.message||error);
       }finally{btn.disabled=false;btn.textContent='PRODUCTION — 9 vues'}
