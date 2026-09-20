@@ -170,7 +170,7 @@
 
     function showMasterBackground(){
       if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Fond maître indisponible : composer et valider la scène maître d’abord.';return}
-      stopAnimation();$('results').classList.remove('hidden');
+      stopAnimation();$('results').classList.remove('hidden');setSimulationMode('canvas');
       const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);sim3d.width=w;sim3d.height=h;
       const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.drawImage(state.aiMaster.background,0,0,w,h);
       $('simOut').textContent='FOND MAÎTRE';$('renderStatus').className='status warn';$('renderStatus').textContent='QC anti-fantôme : cette image doit contenir uniquement le fond/décor. Aucun texte, logo ou pictogramme destiné au relief ne doit rester visible.';
@@ -265,6 +265,19 @@
       if(role!=='company'||!Array.isArray(group?.bbox))return false;
       return state.groups.some(other=>other!==group&&String(other?.role||'').toLowerCase()==='logo'&&boxIntersectionRatio(group.bbox,other.bbox)>=0.82);
     }
+
+    function invalidateRig(){state.rigVersion++;if(simRig)simRig.dataset.version=''}
+    function syncAiMasterDepths(){if(!state.aiMaster?.layers)return;const byId=new Map(state.groups.map(g=>[String(g.id),Number(g.depth)]));for(const layer of state.aiMaster.layers){const v=byId.get(String(layer.groupId));if(Number.isFinite(v))layer.depth=v}}
+    function rebuildAiMasterLayersFromCurrentMasks(){if(!state.aiMaster?.background)return;const bg=state.aiMaster.background.getContext('2d').getImageData(0,0,state.width,state.height).data,N=state.width*state.height,layers=[];for(const group of productionGroups()){const pm=deriveLayerMask(group,bg);group.productionMask=pm;const layer=document.createElement('canvas');layer.width=state.width;layer.height=state.height;const ctx=layer.getContext('2d'),id=ctx.createImageData(state.width,state.height);for(let i=0;i<N;i++){const a=pm[i];if(a<12)continue;const j=i*4;id.data[j]=state.rgba[j];id.data[j+1]=state.rgba[j+1];id.data[j+2]=state.rgba[j+2];id.data[j+3]=a}ctx.putImageData(id,0,0);if(maskCoverage(pm).percent>=.01)layers.push({image:layer,depth:Number(group.depth),label:group.label,groupId:group.id})}state.aiMaster.layers=layers;invalidateRig()}
+    function markSceneDirty(reason){if(!state.aiReady)return;state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;$('aiGate').className='status warn';$('aiGate').textContent='SCÈNE MODIFIÉE — '+reason+' · simulation mise à jour en direct · relancer TEST Gauche / Centre / Droite avant les 9 vues.'}
+    async function refreshLiveThumbnails(){if(!state.aiMaster||state.views.length!==3)return;const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'],urls=[];for(let i=0;i<3;i++){const r=renderRigidScene(positions[i],state.width,state.height,{exactCenter:true});if(!r)return;const blob=await toBlob(r.canvas);urls.push(URL.createObjectURL(blob))}state.urls.forEach(URL.revokeObjectURL);state.urls=urls;$('views').innerHTML=urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('')}
+    function scheduleLivePreview(rebuildLayers=false,refreshThumbs=false){if(rebuildLayers)state.liveRebuildLayers=true;if(state.liveFrame)return;state.liveFrame=requestAnimationFrame(()=>{state.liveFrame=0;if(state.liveRebuildLayers){state.liveRebuildLayers=false;rebuildAiMasterLayersFromCurrentMasks()}syncAiMasterDepths();if(state.aiMaster){drawRigidPreview(state.simPosition);if(refreshThumbs)refreshLiveThumbnails().catch(()=>{})}})}
+    function setSimulationMode(mode){if(mode==='rig'){simRig.classList.remove('hidden');sim3d.style.display='none'}else{simRig.classList.add('hidden');sim3d.style.display='block'}}
+    function copyCanvas(source){const out=document.createElement('canvas');out.width=state.width;out.height=state.height;out.getContext('2d').drawImage(source,0,0,state.width,state.height);return out}
+    function ensureDomRig(){if(!state.rgba)return false;if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();const source=state.aiMaster||{background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(x=>({image:x.canvas,depth:x.depth,label:x.label,groupId:x.groupId}))};if(simRig.dataset.version===String(state.rigVersion))return true;simRig.innerHTML='';const bg=copyCanvas(source.background);bg.dataset.kind='background';bg.style.transform='translateZ(0px)';simRig.appendChild(bg);for(const layer of source.layers||[]){const cv=copyCanvas(layer.image);cv.dataset.kind='layer';cv.dataset.groupId=String(layer.groupId||'');cv.dataset.depth=String(Number(layer.depth)||128);simRig.appendChild(cv)}simRig.dataset.version=String(state.rigVersion);return true}
+    function updateRigBackground(){const bg=simRig.querySelector('canvas[data-kind="background"]');if(!bg||!state.aiMaster?.background)return;const ctx=bg.getContext('2d');ctx.clearRect(0,0,bg.width,bg.height);ctx.drawImage(state.aiMaster.background,0,0,bg.width,bg.height)}
+    function applyDomRigDepths(){const zero=Number($('zero').value),strength=Number($('simDepth').value),front=Math.max(1,255-zero),maxZ=26*Math.max(0,strength),byId=new Map((state.aiMaster?.layers||[]).map(x=>[String(x.groupId),Number(x.depth)]));for(const cv of simRig.querySelectorAll('canvas[data-kind="layer"]')){const depth=byId.get(cv.dataset.groupId)??Number(cv.dataset.depth)||zero;cv.dataset.depth=String(depth);const z=Math.max(0,(depth-zero)/front)*maxZ;cv.style.transform='translateZ('+z.toFixed(2)+'px)'}}
+
     function productionGroups(){return state.groups.filter(group=>!isStructuralGroup(group)&&!isLogoTextDuplicate(group))}
     function maskIsWeak(group){
       const coverage=maskCoverage(group?.mask||new Uint8ClampedArray()).percent,areaPct=boxArea(group?.bbox)*100;
@@ -377,11 +390,10 @@
       return {canvas,angleDeg};
     }
     function drawRigidPreview(position){
-      if(!state.rgba)return;
-      const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);if(sim3d.width!==w||sim3d.height!==h){sim3d.width=w;sim3d.height=h}
-      const p=Math.max(0,Math.min(8,position)),normal=(p-4)/4,result=renderRigidScene(normal,w,h,{exactCenter:false});if(!result)return;
-      const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.drawImage(result.canvas,0,0);
-      $('tiltOut').textContent=(result.angleDeg>0?'+':'')+result.angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=Number($('simDepth').value).toFixed(2)+'×';
+      if(!state.rgba||!ensureDomRig())return;setSimulationMode('rig');applyDomRigDepths();
+      const p=Math.max(0,Math.min(8,position)),normal=(p-4)/4,angleDeg=normal<0?normal*35:normal*22;
+      simRig.style.transform='rotateY('+angleDeg.toFixed(3)+'deg)';
+      $('tiltOut').textContent=(angleDeg>0?'+':'')+angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=Number($('simDepth').value).toFixed(2)+'×';
     }
         function drawReliefPhoto(){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();stopAnimation();
