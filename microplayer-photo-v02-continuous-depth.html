@@ -27,7 +27,7 @@
       <section id="editPanel" class="panel"><h2>Photo / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Photo</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Sélection</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Sélection auto</button></div><div id="pencilStatus" class="status ok">Choisis une zone puis corrige sa sélection avec Pencil + / Gomme.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Préparer rendu V02</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler / modifier fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU PHOTO : contrôle esthétique uniquement · production issue de la scène maître.</div></section>
-      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Position lenticulaire <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief V02 <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim" disabled>Fond global non utilisé</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim" disabled>Désocclusion locale V02</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
+      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Position lenticulaire <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief V02 <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim" disabled>Fond global non utilisé</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim" disabled>Désocclusion locale V02</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP simulation</button><button id="productionZip" class="green" disabled>ZIP production</button></div><div id="renderStatus" class="status ok"></div><div id="productionStatus" class="status warn">Production 9 vues non calculée.</div><div id="productionViews" class="views"></div></section>
     </section>
   </div></main>
   <script type="module">
@@ -36,9 +36,11 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),editPanel=$('editPanel'),sim3d=$('sim3d'),simRig=$('simRig'),threePlan=$('threePlan'),sidebar=$('sidebar'),workspace=$('workspace');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,photoDepthOriginal:null,depthHistory:[],continuousCache:[],continuousStats:[]};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,photoDepthOriginal:null,depthHistory:[],continuousCache:[],continuousStats:[],productionViews:[],productionBlobs:[],productionUrls:[],productionStats:[],productionQc:null};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    function sourceCanvasExact(){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
+    function clearProduction(){state.productionUrls.forEach(URL.revokeObjectURL);state.productionViews=[];state.productionBlobs=[];state.productionUrls=[];state.productionStats=[];state.productionQc=null;const root=$('productionViews');if(root)root.innerHTML='';$('productionZip').disabled=true;$('productionStatus').className='status warn';$('productionStatus').textContent='Production 9 vues à recalculer.'}
     const selected=()=>state.groups.find(group=>group.id===state.selected);
     const escapeHtml=value=>String(value).replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
     $('toggleSidebar').onclick=()=>{const collapsed=sidebar.classList.toggle('collapsed');document.querySelector('.grid')?.classList.toggle('sidebar-collapsed',collapsed);$('toggleSidebar').textContent=collapsed?'▶ Réglages':'◀ Replier les réglages';};
@@ -82,8 +84,8 @@
         state.width=photo.width=mask.width=W;state.height=photo.height=mask.height=H;stage.style.aspectRatio=W+'/'+H;document.documentElement.style.setProperty('--source-aspect',String(W/H));
         photoContext.clearRect(0,0,W,H);photoContext.drawImage(img,0,0,W,H);state.rgba=photoContext.getImageData(0,0,W,H).data;
         const prepared=document.createElement('canvas');prepared.width=W;prepared.height=H;prepared.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
-        const imageUrl=prepared.toDataURL('image/jpeg',.94);state.payload={image:imageUrl,width:W,height:H,capture:{source:'photo-upload',name:file.name||'photo'}};
-        state.image=await loadImage(imageUrl);state.baseDepth=new Uint8ClampedArray(W*H).fill(128);state.photoDepth=null;state.photoDepthOriginal=null;state.depthHistory=[];clearContinuousCache();state.groups=[];state.selected=null;state.aiReady=false;state.aiMaster=null;state.rigidPreview=null;state.masterOriginal=null;state.masterHistory=[];state.masterQc=null;state.threeViewQc=null;
+        const imageUrl=prepared.toDataURL('image/png');state.payload={image:imageUrl,width:W,height:H,capture:{source:'photo-upload',name:file.name||'photo'}};
+        state.image=await loadImage(imageUrl);state.baseDepth=new Uint8ClampedArray(W*H).fill(128);state.photoDepth=null;state.photoDepthOriginal=null;state.depthHistory=[];clearContinuousCache();clearProduction();state.groups=[];state.selected=null;state.aiReady=false;state.aiMaster=null;state.rigidPreview=null;state.masterOriginal=null;state.masterHistory=[];state.masterQc=null;state.threeViewQc=null;
         drawPhoto();maskContext.clearRect(0,0,W,H);$('groups').innerHTML='';$('depthflow').disabled=false;$('auto').disabled=true;$('photoRelief').disabled=true;$('threeViews').disabled=true;$('generate').disabled=true;$('results').classList.add('hidden');
         $('sourceInfo').className='status ok';$('sourceInfo').textContent='Photo chargée '+W+'×'+H+' · lance « Analyser profondeur ».';
         activity('Photo prête',100,W+'×'+H);stopActivity(true);
@@ -271,7 +273,7 @@
         element.querySelector('input').oninput=event=>{
           group.depth=Number(event.target.value);element.querySelector('.value').textContent=group.depth;
           const depth=state.photoDepth;if(depth){for(let i=0;i<depth.length;i++)if(group.mask[i]>=128)depth[i]=group.depth}
-          clearContinuousCache();compose();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+          clearContinuousCache();clearProduction();compose();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
           $('aiGate').className='status warn';$('aiGate').textContent='Profondeur de « '+group.label+' » modifiée · relancer TEST 3 vues.';
         };
         root.appendChild(element);
@@ -329,7 +331,7 @@
     },{passive:false});
     function endStroke(){
       if(!state.drawing)return;state.drawing=false;
-      clearContinuousCache();compose();renderGroups();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+      clearContinuousCache();clearProduction();compose();renderGroups();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
       $('aiGate').className='status warn';$('aiGate').textContent='Sélection et profondeur modifiées · relancer TEST Gauche / Centre / Droite.';
       updateUndo();
     }
@@ -338,14 +340,14 @@
     $('undo').onclick=()=>{
       const previous=state.depthHistory.pop();if(!previous)return;
       state.photoDepth=previous.depth;const group=state.groups.find(g=>g.id===previous.groupId);if(group)group.mask=previous.mask;
-      clearContinuousCache();compose();renderGroups();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+      clearContinuousCache();clearProduction();compose();renderGroups();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
       $('aiGate').className='status warn';$('aiGate').textContent='Dernière correction de sélection annulée · relancer TEST 3 vues.';updateUndo();
     };
     $('resetMask').onclick=()=>{
       const group=selected();if(!group||!group.autoMask||!state.photoDepthOriginal)return;
       snapshotDepth();group.mask=new Uint8ClampedArray(group.autoMask);
       for(let i=0;i<group.mask.length;i++)if(group.mask[i]>=128)state.photoDepth[i]=group.depth;else if(state.photoDepth[i]===group.depth)state.photoDepth[i]=state.photoDepthOriginal[i];
-      clearContinuousCache();compose();renderGroups();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
+      clearContinuousCache();clearProduction();compose();renderGroups();showCard();state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;
       $('aiGate').className='status warn';$('aiGate').textContent='Sélection automatique restaurée pour « '+group.label+' » · relancer TEST 3 vues.';updateUndo();
     };
     $('add').onclick=()=>{state.mode='add';updatePencilUi()};
@@ -451,30 +453,51 @@
         const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
         $('views').innerHTML=state.urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('');$('results').classList.remove('hidden');
         const threeQcOk=qc.different===0&&worstHole<=14;state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,worstHoleRatio:Number(worstHole.toFixed(2))};$('generate').disabled=!threeQcOk;
-        $('renderStatus').className=threeQcOk?'status ok':'status warn';$('renderStatus').textContent=threeQcOk?'TEST V02 VALIDÉ · centre pixel parfait · trous max '+state.threeViewQc.worstHoleRatio+'% · 9 vues déverrouillées.':'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'%.';
+        $('renderStatus').className=threeQcOk?'status ok':'status warn';$('renderStatus').textContent=threeQcOk?'SIMULATION VALIDÉE · centre pixel parfait · trous aperçu max '+state.threeViewQc.worstHoleRatio+'% · production 9 vues déverrouillée.':'TEST V02 REFUSÉ · centre '+(qc.different===0?'pixel parfait':qc.different+' pixels différents')+' · trous '+state.threeViewQc.worstHoleRatio+'%.';
         state.continuousCache[0]=state.views[0];state.continuousCache[4]=state.views[1];state.continuousCache[8]=state.views[2];state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
-        $('aiGate').className=threeQcOk?'status ok':'status warn';$('aiGate').textContent=threeQcOk?'TEST V02 validé. Production 9 vues disponible.':'TEST V02 calculé mais QC refusé.';
+        $('aiGate').className=threeQcOk?'status ok':'status warn';$('aiGate').textContent=threeQcOk?'Simulation validée. Production 9 vues pleine résolution disponible.':'TEST V02 calculé mais QC refusé.';
       }catch(error){
         $('aiGate').className='status warn';$('aiGate').textContent='TEST V02 BLOQUÉ — '+(error?.message||error);$('renderStatus').className='status warn';$('renderStatus').textContent='Erreur test : '+(error?.stack||error);
       }finally{btn.disabled=false;btn.textContent='TEST — Gauche / Centre / Droite'}
     }
     $('threeViews').onclick=generateThreeViews;
 
+    function qcProductionLenticular(){
+      const W=state.width,H=state.height,views=state.productionViews,stats=state.productionStats;
+      const dimsOk=views.length===9&&views.every(v=>v.width===W&&v.height===H);
+      let centreDifferent=Infinity;
+      if(views[4]?.width===W&&views[4]?.height===H){const centre=views[4].getContext('2d',{willReadFrequently:true}).getImageData(0,0,W,H).data;centreDifferent=comparePixels(centre,state.rgba).different}
+      const worstHole=stats.length?Math.max(...stats.map(x=>Number(x.holeRatioBeforeFill)||0)):Infinity;
+      const maxShift=stats.length?Math.max(...stats.map(x=>Math.abs(Number(x.maxShift)||0))):Infinity;
+      const maxStepShift=maxShift/4,shiftLimit=W*.06,stepLimit=W*.02,holeLimit=6;
+      const ok=dimsOk&&centreDifferent===0&&worstHole<=holeLimit&&maxShift<=shiftLimit&&maxStepShift<=stepLimit;
+      const warnings=[];if(worstHole>3)warnings.push('trous '+worstHole.toFixed(2)+'%');if(maxShift>W*.045)warnings.push('parallaxe forte '+maxShift.toFixed(1)+' px');
+      return {ok,dimsOk,centreDifferent,worstHole:Number(worstHole.toFixed(2)),maxShift:Number(maxShift.toFixed(2)),maxStepShift:Number(maxStepShift.toFixed(2)),limits:{holePercent:holeLimit,maxShiftPx:Number(shiftLimit.toFixed(2)),maxStepShiftPx:Number(stepLimit.toFixed(2))},warnings};
+    }
     async function generateViews(){
-      if(!state.aiReady||!continuousDepth()||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='9 vues verrouillées : valider d’abord le TEST V02 Gauche / Centre / Droite.';return}
-      $('generate').disabled=true;$('generate').textContent='Calcul V02 1/9…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];clearContinuousCache();
-      for(let index=0;index<9;index++){
-        await new Promise(requestAnimationFrame);const position=(index-4)/4,r=renderContinuousDepthView(position),blob=await toBlob(r.canvas);
-        state.views.push(r.canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.continuousCache[index]=r.canvas;state.continuousStats[index]=r.stats;
-        state.renderStats.push({view:index+1,position,mode:r.stats.mode,holeRatioBeforeFill:r.stats.holeRatioBeforeFill,maxShift:r.stats.maxShift||0,fullFrame:true});
-        $('generate').textContent='Calcul V02 '+(index+1)+'/9…';
-      }
-      const centre=state.views[4].getContext('2d').getImageData(0,0,state.width,state.height).data,centreQc=comparePixels(centre,state.rgba);
-      const worst=Math.max(...state.renderStats.map(x=>x.holeRatioBeforeFill||0));
-      $('renderStatus').className=centreQc.different===0?'status ok':'status warn';
-      $('renderStatus').textContent='QC V02 vue 05 : '+(centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels')+' · plein cadre · z-buffer · trous avant remplissage max '+worst.toFixed(2)+'%.';
-      $('views').innerHTML=state.urls.map((url,index)=>'<div class="view"><img src="'+url+'" alt="Vue '+(index+1)+'"><span>'+String(index+1).padStart(2,'0')+'</span></div>').join('');
-      $('results').classList.remove('hidden');$('generate').disabled=false;$('generate').textContent='Régénérer les 9 vues V02';state.simPosition=4;$('simRange').value='4';drawSimulation(4);startAnimation();
+      if(!state.aiReady||!continuousDepth()||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='Production verrouillée : valider d’abord la simulation Gauche / Centre / Droite.';return}
+      const btn=$('generate');btn.disabled=true;btn.textContent='PRODUCTION 1/9…';clearProduction();
+      try{
+        for(let index=0;index<9;index++){
+          await new Promise(resolve=>setTimeout(resolve,20));const position=(index-4)/4;
+          // Production is always full resolution. View 05 bypasses every renderer and is copied byte-for-byte from state.rgba.
+          let canvas,stats;
+          if(index===4){canvas=sourceCanvasExact();stats={position:0,maxShift:0,holesBeforeFill:0,holeRatioBeforeFill:0,filled:0,mode:'source-exact-png',fullFrame:true}}
+          else {const r=renderContinuousDepthView(position,{maxEdge:Math.max(state.width,state.height)});canvas=r.canvas;stats={...r.stats,fullFrame:true}}
+          const blob=await toBlob(canvas),url=URL.createObjectURL(blob);
+          state.productionViews.push(canvas);state.productionBlobs.push(blob);state.productionUrls.push(url);state.productionStats.push({view:index+1,position,...stats});
+          btn.textContent='PRODUCTION '+(index+1)+'/9…';$('productionStatus').className='status';$('productionStatus').textContent='Calcul pleine résolution '+(index+1)+'/9 · '+canvas.width+'×'+canvas.height;
+        }
+        state.productionQc=qcProductionLenticular();
+        const q=state.productionQc;
+        $('productionViews').innerHTML=state.productionUrls.map((url,index)=>'<div class="view"><img src="'+url+'" alt="Production '+(index+1)+'"><span>P'+String(index+1).padStart(2,'0')+'</span></div>').join('');
+        $('productionStatus').className=q.ok?'status ok':'status warn';
+        $('productionStatus').textContent=(q.ok?'PRODUCTION VALIDÉE':'PRODUCTION REFUSÉE')+' · dimensions '+(q.dimsOk?'OK':'ERREUR')+' · vue 05 '+(q.centreDifferent===0?'pixel parfaite':q.centreDifferent+' pixels différents')+' · trous max '+q.worstHole+'% · shift max '+q.maxShift+' px · pas max '+q.maxStepShift+' px'+(q.warnings.length?' · attention : '+q.warnings.join(', '):'');
+        $('productionZip').disabled=!q.ok;
+        $('aiGate').className=q.ok?'status ok':'status warn';$('aiGate').textContent=q.ok?'Production 9 vues pleine résolution validée. ZIP production disponible.':'Production calculée mais QC lenticulaire refusé : corriger relief/parallaxe puis recalculer.';
+      }catch(error){
+        clearProduction();$('productionStatus').className='status warn';$('productionStatus').textContent='PRODUCTION BLOQUÉE — '+(error?.message||error);
+      }finally{btn.disabled=false;btn.textContent='PRODUCTION — 9 vues'}
     }
     $('generate').onclick=generateViews;
 
@@ -820,10 +843,32 @@
     for(const id of ['tilt','simDepth'])$(id).oninput=()=>{drawRigidPreview(state.simPosition);if(id==='simDepth')refreshLiveThumbnails().catch(()=>{})};
 
         async function maskBlob(group){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const value=group.mask[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
-    $('zip').onclick=async()=>{if(!window.JSZip)return;$('zip').disabled=true;$('zip').textContent='ZIP…';const zip=new JSZip(),sourceResponse=await fetch(state.payload.image),sourceBlob=await sourceResponse.blob();zip.file('source-photo.png',sourceBlob);state.blobs.forEach((blob,index)=>zip.file(`vue-${String(index+1).padStart(2,'0')}.png`,blob));for(let index=0;index<state.groups.length;index++)zip.file(`masques/groupe-${String(index+1).padStart(2,'0')}.png`,await maskBlob(state.groups[index]));const depthCanvas=document.createElement('canvas');depthCanvas.width=state.width;depthCanvas.height=state.height;const depthContext=depthCanvas.getContext('2d'),depthImage=depthContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];depthImage.data[index*4]=depthImage.data[index*4+1]=depthImage.data[index*4+2]=value;depthImage.data[index*4+3]=255}depthContext.putImageData(depthImage,0,0);zip.file('depth-map.png',await toBlob(depthCanvas));const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};const groups=state.groups.map(({mask,autoMask,productionMask,selected,...group},index)=>({...group,maskFile:`masques/groupe-${String(index+1).padStart(2,'0')}.png`}));zip.file('manifest.json',JSON.stringify({schema:'microplayer.photo-v02',version:2,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:false,capture:state.payload.capture||null,file:'source-photo.png'},pipeline:{stage:'photo-continuous-depth-v02',centerViewPixelPerfect:true},groups,settings,render:{engine:'continuous-depth-zbuffer-local-fill',viewCount:state.views.length,depthMapFile:'depth-map.png',views:state.renderStats}},null,2));const blob=await zip.generateAsync({type:'blob'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=state.views.length===3?'MicroPlayer-photo-V02-test-3-vues.zip':'MicroPlayer-photo-V02-9-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);$('zip').disabled=false;$('zip').textContent='ZIP complet'};
+    async function maskBlob(group){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const value=group.mask[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
+    async function depthBlob(){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height),depth=continuousDepth();for(let i=0;i<depth.length;i++){const value=depth[i],j=i*4;image.data[j]=image.data[j+1]=image.data[j+2]=value;image.data[j+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
+    async function buildZip(kind){
+      if(!window.JSZip)return;
+      const production=kind==='production';
+      if(production&&!state.productionQc?.ok){$('productionStatus').className='status warn';$('productionStatus').textContent='ZIP production refusé : QC production non valide.';return}
+      const views=production?state.productionBlobs:state.blobs,stats=production?state.productionStats:state.renderStats;
+      if(!views.length){$('renderStatus').className='status warn';$('renderStatus').textContent='Aucune vue '+(production?'production':'simulation')+' à exporter.';return}
+      const button=production?$('productionZip'):$('zip');button.disabled=true;const old=button.textContent;button.textContent='ZIP…';
+      try{
+        const zip=new JSZip(),sourceBlob=await toBlob(sourceCanvasExact());zip.file('source-photo.png',sourceBlob);
+        views.forEach((blob,index)=>zip.file('vue-'+String(index+1).padStart(2,'0')+'.png',blob));
+        for(let index=0;index<state.groups.length;index++)zip.file('masques/groupe-'+String(index+1).padStart(2,'0')+'.png',await maskBlob(state.groups[index]));
+        zip.file('depth-map.png',await depthBlob());
+        const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};
+        const groups=state.groups.map(({mask,autoMask,productionMask,selected,...group},index)=>({...group,maskFile:'masques/groupe-'+String(index+1).padStart(2,'0')+'.png'}));
+        const manifest={schema:production?'microplayer.photo-v02.production':'microplayer.photo-v02.simulation',version:2,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:false,capture:state.payload.capture||null,file:'source-photo.png',pngExactFromRgba:true},pipeline:{stage:production?'photo-continuous-depth-production-v02':'photo-continuous-depth-simulation-v02',centerViewPixelPerfect:true,simulationSeparatedFromProduction:true},groups,settings,render:{engine:'continuous-depth-zbuffer-local-fill',viewCount:views.length,depthMapFile:'depth-map.png',views:stats},qc:production?state.productionQc:state.threeViewQc};
+        zip.file('manifest.json',JSON.stringify(manifest,null,2));
+        const blob=await zip.generateAsync({type:'blob'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=production?'MicroPlayer-photo-V02-PRODUCTION-9-vues.zip':'MicroPlayer-photo-V02-SIMULATION-3-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);
+      }finally{button.disabled=production?!state.productionQc?.ok:false;button.textContent=old}
+    }
+    $('zip').onclick=()=>buildZip('simulation');
+    $('productionZip').onclick=()=>buildZip('production');
 
     $('back').onclick=()=>location.reload();$('auto').onclick=applyPreset;$('preset').onchange=applyPreset;
-    for(const id of ['zero','relief','parallax','background'])$(id).oninput=()=>{updateOutputs();compose();clearContinuousCache();if(state.aiReady){state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;drawSimulation(state.simPosition);$('aiGate').className='status warn';$('aiGate').textContent='Paramètres V02 modifiés · relancer TEST Gauche / Centre / Droite avant les 9 vues.'}};
+    for(const id of ['zero','relief','parallax','background'])$(id).oninput=()=>{updateOutputs();compose();clearContinuousCache();clearProduction();if(state.aiReady){state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;drawSimulation(state.simPosition);$('aiGate').className='status warn';$('aiGate').textContent='Paramètres V02 modifiés · relancer la simulation avant la production 9 vues.'}};
 
     let activityTimer=null,activityStarted=0,activityStep='Démarrage';
     function activity(step,percent,detail=''){activityStep=step;const bar=$('activityBar'),info=$('activityInfo');if(bar)bar.style.width=Math.max(2,Math.min(100,percent))+'%';if(info)info.textContent=step+(detail?' · '+detail:'')+' · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';}
