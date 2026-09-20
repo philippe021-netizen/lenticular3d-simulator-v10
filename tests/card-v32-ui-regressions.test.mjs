@@ -16,10 +16,28 @@ test("le manifeste ZIP conserve les dimensions et les diagnostics de rendu", asy
 });
 
 
-test("le bouton relief autonome appelle le serveur puis applique les profondeurs avant les 9 vues", async () => {
+test("le contrôle IA ajuste les profondeurs sans fabriquer les vues", async () => {
   const html = await readFile(new URL("../microplayer-card-v32-studio.html", import.meta.url), "utf8");
-  assert.match(html, /Créer le relief automatiquement/);
+  assert.match(html, /Contrôle IA des profondeurs/);
   assert.match(html, /fetch\('\/api\/card-layer-analyze'/);
   assert.match(html, /corrected\.get\(String\(group\.id\)\)/);
-  assert.match(html, /await generateViews\(\)/);
+});
+
+test("les vues latérales utilisent le fond maître nettoyé et la vue 05 reste originale", async () => {
+  const html = await readFile(new URL("../microplayer-card-v32-studio.html", import.meta.url), "utf8");
+  assert.match(html, /if\(index===4\)\{\s*ctx\.drawImage\(original,0,0\)/);
+  assert.match(html, /ctx\.drawImage\(state\.rigidPreview\.base,0,0,W,H\)/);
+  assert.match(html, /mode:'clean-master-semantic-v32'/);
+});
+
+test("la parallaxe est calculée autour du vrai plan zéro", async () => {
+  const html = await readFile(new URL("../microplayer-card-v32-studio.html", import.meta.url), "utf8");
+  assert.match(html, /const relative=\(Number\(layer\.depth\)-zero\)\/denom/);
+  assert.doesNotMatch(html, /const z=\(\(layer\.depth-dMin\)\/span\)\*2-1/);
+});
+
+test("les grands artworks structurels restent dans le fond", async () => {
+  const html = await readFile(new URL("../microplayer-card-v32-studio.html", import.meta.url), "utf8");
+  assert.match(html, /role==='artwork'.*coverage>18\|\|area>0\.18/);
+  assert.match(html, /productionGroups\(\)/);
 });
