@@ -90,10 +90,9 @@
       }
       ctx.drawImage(state.rigidPreview.base,0,0,state.width,state.height);
       const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
-      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
-      const maxShift=state.width*(Number($('parallax').value)/100);
+      const maxShift=state.width*(Number($('parallax').value)/100),denom=Math.max(1,zero,255-zero);
       for(const layer of ordered){
-        const z=((Number(layer.depth)-dMin)/span)*2-1;
+        const z=(Number(layer.depth)-zero)/denom;
         const dx=normal*z*maxShift;
         // Production views: original RGBA plane only. No extrusion, scale, blur or cast shadow.
         ctx.drawImage(layer.canvas,dx,0,state.width,state.height);
@@ -108,13 +107,11 @@
       if(Math.abs(normal)<1e-9){ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
       ctx.drawImage(state.aiMaster.background,0,0,state.width,state.height);
       const ordered=[...state.aiMaster.layers].sort((a,b)=>a.depth-b.depth);
-      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
-      const maxShift=state.width*(Number($('parallax').value)/100);
-      // Per-view LDI disocclusion: the master background is authoritative. Each foreground plane is
-      // translated once from its original RGBA pixels; vacated source pixels are therefore revealed
-      // from background_master, never from another copy of the original card.
+      const maxShift=state.width*(Number($('parallax').value)/100),denom=Math.max(1,zero,255-zero);
+      // Per-view LDI disocclusion: background_master is authoritative and the convergence
+      // plane is exactly "zero". A layer at depth===zero never moves.
       for(const layer of ordered){
-        const z=((Number(layer.depth)-dMin)/span)*2-1,dx=normal*z*maxShift;
+        const z=(Number(layer.depth)-zero)/denom,dx=normal*z*maxShift;
         ctx.save();ctx.beginPath();ctx.rect(0,0,state.width,state.height);ctx.clip();
         ctx.drawImage(layer.image,dx,0,state.width,state.height);ctx.restore();
       }
@@ -239,32 +236,81 @@
       state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN pipeline V2 native uint8';
       return base;
     }
+    function boxArea(box){return Array.isArray(box)&&box.length>=4?Math.max(0,Number(box[2])||0)*Math.max(0,Number(box[3])||0):0}
+    function boxIntersectionRatio(inner,outer){
+      if(!Array.isArray(inner)||!Array.isArray(outer))return 0;
+      const ax0=Number(inner[0])||0,ay0=Number(inner[1])||0,ax1=ax0+(Number(inner[2])||0),ay1=ay0+(Number(inner[3])||0);
+      const bx0=Number(outer[0])||0,by0=Number(outer[1])||0,bx1=bx0+(Number(outer[2])||0),by1=by0+(Number(outer[3])||0);
+      const w=Math.max(0,Math.min(ax1,bx1)-Math.max(ax0,bx0)),h=Math.max(0,Math.min(ay1,by1)-Math.max(ay0,by0)),a=Math.max(1e-9,(ax1-ax0)*(ay1-ay0));
+      return w*h/a;
+    }
+    function isStructuralGroup(group){
+      const role=String(group?.role||'').toLowerCase(),type=String(group?.type||'').toLowerCase(),coverage=maskCoverage(group?.mask||new Uint8ClampedArray()).percent,area=boxArea(group?.bbox);
+      return ['artwork','subject','background','decor','decoration'].includes(role)||(type==='artwork'&&(coverage>18||area>0.18));
+    }
+    function isLogoTextDuplicate(group){
+      const role=String(group?.role||'').toLowerCase();
+      if(role!=='company'||!Array.isArray(group?.bbox))return false;
+      return state.groups.some(other=>other!==group&&String(other?.role||'').toLowerCase()==='logo'&&boxIntersectionRatio(group.bbox,other.bbox)>=0.82);
+    }
+    function productionGroups(){return state.groups.filter(group=>!isStructuralGroup(group)&&!isLogoTextDuplicate(group))}
+    function maskIsWeak(group){
+      const coverage=maskCoverage(group?.mask||new Uint8ClampedArray()).percent,areaPct=boxArea(group?.bbox)*100;
+      if(areaPct<=0)return true;
+      const role=String(group?.role||'').toLowerCase(),ratio=coverage/areaPct;
+      const minRatio=['name','company','title','phone','email','address','website','social','slogan','service','logo'].includes(role)?0.035:0.02;
+      return coverage<0.015||ratio<minRatio;
+    }
+    function addBoxToMask(target,box,padding=.004){
+      if(!Array.isArray(box)||box.length<4)return;
+      const x0=Math.max(0,Math.floor((Number(box[0])-padding)*state.width)),y0=Math.max(0,Math.floor((Number(box[1])-padding)*state.height));
+      const x1=Math.min(state.width,Math.ceil((Number(box[0])+Number(box[2])+padding)*state.width)),y1=Math.min(state.height,Math.ceil((Number(box[1])+Number(box[3])+padding)*state.height));
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)target[y*state.width+x]=255;
+    }
+    function deriveLayerMask(group,backgroundRgba){
+      const N=state.width*state.height,out=new Uint8ClampedArray(group.mask||N);
+      if(!maskIsWeak(group))return out;
+      const box=group.bbox;if(!Array.isArray(box)||box.length<4)return out;
+      const x0=Math.max(0,Math.floor(Number(box[0])*state.width)),y0=Math.max(0,Math.floor(Number(box[1])*state.height));
+      const x1=Math.min(state.width,Math.ceil((Number(box[0])+Number(box[2]))*state.width)),y1=Math.min(state.height,Math.ceil((Number(box[1])+Number(box[3]))*state.height));
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const p=y*state.width+x,k=p*4;
+        const d=(Math.abs(state.rgba[k]-backgroundRgba[k])+Math.abs(state.rgba[k+1]-backgroundRgba[k+1])+Math.abs(state.rgba[k+2]-backgroundRgba[k+2]))/3;
+        const a=Math.max(0,Math.min(255,Math.round((d-5)/24*255)));if(a>out[p])out[p]=a;
+      }
+      return out;
+    }
+    function fastLocalBackground(removal){
+      const W=state.width,H=state.height,N=W*H,src=state.rgba,work=new Uint8ClampedArray(src),unknown=new Uint8Array(N);
+      for(let i=0;i<N;i++)unknown[i]=removal[i]?1:0;
+      const left=new Int32Array(W),right=new Int32Array(W);
+      for(let y=0;y<H;y++){
+        let last=-1;for(let x=0;x<W;x++){const p=y*W+x;if(!unknown[p])last=x;left[x]=last}
+        last=-1;for(let x=W-1;x>=0;x--){const p=y*W+x;if(!unknown[p])last=x;right[x]=last}
+        for(let x=0;x<W;x++){const p=y*W+x;if(!unknown[p])continue;const l=left[x],r=right[x],k=p*4;
+          if(l>=0&&r>=0&&r>l){const u=(x-l)/(r-l),a=(y*W+l)*4,b=(y*W+r)*4;work[k]=src[a]*(1-u)+src[b]*u;work[k+1]=src[a+1]*(1-u)+src[b+1]*u;work[k+2]=src[a+2]*(1-u)+src[b+2]*u;work[k+3]=255}
+          else{const q=l>=0?y*W+l:(r>=0?y*W+r:-1);if(q>=0){const j=q*4;work[k]=src[j];work[k+1]=src[j+1];work[k+2]=src[j+2];work[k+3]=255}}
+        }
+      }
+      return work;
+    }
+
     function buildRigidPreviewLayers(){
-      const source=document.createElement('canvas');source.width=state.width;source.height=state.height;
-      source.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
-      const N=state.width*state.height, displayUnion=new Uint8ClampedArray(N), layers=[];
-      for(const group of state.groups){
-        const rigid=!['artwork','subject','background','decor','decoration'].includes(String(group.role||'').toLowerCase());
-        if(!rigid)continue;
+      const N=state.width*state.height,groups=productionGroups(),removalSeed=new Uint8ClampedArray(N),layers=[];
+      for(const group of groups){
+        const weak=maskIsWeak(group);
+        if(weak)addBoxToMask(removalSeed,group.bbox,.004);
+        else for(let i=0;i<N;i++)if(group.mask[i]>=3)removalSeed[i]=255;
         const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
         const ctx=canvas.getContext('2d'),img=ctx.createImageData(state.width,state.height);
-        for(let i=0;i<group.mask.length;i++){let a=group.mask[i];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));displayUnion[i]=Math.max(displayUnion[i],a);const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
-        ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label});
+        for(let i=0;i<N;i++){let a=group.mask[i];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
+        ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label,groupId:group.id,weakMask:weak});
       }
-      // Production removal mask must cover anti-aliased glyph/logo fringes, not only the opaque core.
-      // Build it from every non-background semantic mask at a very low alpha threshold, then dilate
-      // more generously than the display mask. Display layers themselves remain tight/original.
-      const removalSeed=new Uint8Array(N);
-      for(const group of state.groups){const role=String(group.role||'').toLowerCase();if(['artwork','subject','background','decor','decoration'].includes(role))continue;for(let i=0;i<N;i++)if(group.mask[i]>=3)removalSeed[i]=1}
-      const removal=new Uint8ClampedArray(N),r=Math.max(5,Math.round(Math.min(state.width,state.height)*.012));
+      const removal=new Uint8ClampedArray(N),r=Math.max(4,Math.round(Math.min(state.width,state.height)*.007));
       for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!removalSeed[i])continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<state.width&&yy<state.height)removal[yy*state.width+xx]=255}}
-      // Deterministic local inpainting: propagate real neighbouring background inward.
-      const work=new Uint8ClampedArray(state.rgba), unknown=new Uint8Array(N);for(let i=0;i<N;i++)unknown[i]=removal[i]?1:0;
-      for(let pass=0;pass<Math.max(8,r*3);pass++){let changed=0;const next=unknown.slice();for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!unknown[i])continue;let rr=0,gg=0,bb=0,n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=state.width||yy>=state.height)continue;const q=yy*state.width+xx;if(unknown[q])continue;const j=q*4;rr+=work[j];gg+=work[j+1];bb+=work[j+2];n++}if(n>=2){const j=i*4;work[j]=rr/n;work[j+1]=gg/n;work[j+2]=bb/n;work[j+3]=255;next[i]=0;changed++}}unknown.set(next);if(!changed)break}
-      // Any unusually large unresolved hole gets a wider ring estimate, never the foreground pixel.
-      const R=Math.max(6,r*3);for(let i=0;i<N;i++)if(unknown[i]){const x=i%state.width,y=(i/state.width)|0;let rr=0,gg=0,bb=0,n=0;for(let k=0;k<24;k++){const ang=k*Math.PI/12,xx=Math.max(0,Math.min(state.width-1,Math.round(x+Math.cos(ang)*R))),yy=Math.max(0,Math.min(state.height-1,Math.round(y+Math.sin(ang)*R))),q=yy*state.width+xx;if(removal[q])continue;const j=q*4;rr+=state.rgba[j];gg+=state.rgba[j+1];bb+=state.rgba[j+2];n++}if(n){const j=i*4;work[j]=rr/n;work[j+1]=gg/n;work[j+2]=bb/n;work[j+3]=255}}
-      const base=document.createElement('canvas');base.width=state.width;base.height=state.height;base.getContext('2d').putImageData(new ImageData(work,state.width,state.height),0,0);
-      state.rigidPreview={base,layers,removalMask:removal};
+      // Lightweight local base only keeps the UI responsive before MI-GAN. Production background
+      // is replaced by rebuildMasterWithMigan(); no expensive whole-image iterative propagation here.
+      const work=fastLocalBackground(removal),base=document.createElement('canvas');base.width=state.width;base.height=state.height;base.getContext('2d').putImageData(new ImageData(work,state.width,state.height),0,0);
+      state.rigidPreview={base,layers,removalMask:removal,productionGroupIds:groups.map(g=>g.id),weakGroupIds:groups.filter(maskIsWeak).map(g=>g.id),structuralGroupIds:state.groups.filter(isStructuralGroup).map(g=>g.id),duplicateGroupIds:state.groups.filter(isLogoTextDuplicate).map(g=>g.id)};
     }
     function drawRigidPreview(position){
       if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
@@ -280,21 +326,11 @@
         $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';return;
       }
       ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(state.rigidPreview.base,margin,margin,cardW,cardH);
-      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
-      const ds=ordered.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),denom=Math.max(1,zero,255-zero);
       const maxShift=cardW*.075*strength;
       ordered.forEach(layer=>{
-        // Normalize to the actual semantic depth range, so useful depth is not compressed around zero.
-        const z=((Number(layer.depth)-dMin)/span)*2-1;
-        const dx=normal*z*maxShift;
-        // A tiny scale change + contact shadow creates a static height cue without warping glyphs.
-        const foreground=(Number(layer.depth)-zero)/127;
-        const scale=1;
-        const dw=cardW*scale,dh=cardH*scale,ox=(dw-cardW)/2,oy=(dh-cardH)/2;
-        const shadowPx=Math.max(.15,Math.abs(foreground)*.45*strength);
-        ctx.save();ctx.globalAlpha=Math.min(.035,.008+Math.abs(foreground)*.012);ctx.filter='blur('+Math.min(.55,.15+shadowPx*.18)+'px)';
-        ctx.drawImage(layer.canvas,margin+dx-ox+Math.sign(normal)*shadowPx,margin-oy+shadowPx,dw,dh);ctx.restore();
-        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx-ox,margin-oy,dw,dh);ctx.restore();
+        const z=(Number(layer.depth)-zero)/denom,dx=normal*z*maxShift;
+        ctx.save();ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(layer.canvas,margin+dx,margin,cardW,cardH);ctx.restore();
       });
       $('tiltOut').textContent='0°';$('simDepthOut').textContent=strength.toFixed(2)+'×';
     }
@@ -396,16 +432,17 @@
         // Do not unlock 3/9 views while reconstructed foreground-shaped residue remains.
         // Residual similarity is the foreground-ghost metric. Local discontinuity is diagnostic only:
         // legitimate card artwork/gradients can be discontinuous and must not be mislabeled as surviving text.
-        if(removed>200&&residualRatio>.035)throw Error('QC anti-fantôme strict refusé · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'% (diagnostic). Masque de retrait insuffisant ou reconstruction contaminée.');
+        if(removed>200&&residualRatio>.035)throw Error('QC anti-fantôme strict refusé · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'% (diagnostic). Masque/reconstruction encore contaminé après récupération des zones sémantiques faibles.');
         // Rebuild production layers from the ORIGINAL pixels after exclusivity/QC.
         // Their alpha is clipped by the removal mask so no source glyph can remain simultaneously
         // in background_master and in a moving foreground plane.
         const rmProd=state.rigidPreview.removalMask,NProd=state.width*state.height,masterLayers=[];
-        for(const group of state.groups){
-          const role=String(group.role||'').toLowerCase();if(['artwork','subject','background','decor','decoration'].includes(role))continue;
+        const cleanPx=state.rigidPreview.base.getContext('2d').getImageData(0,0,state.width,state.height).data;
+        for(const group of productionGroups()){
+          const productionMask=deriveLayerMask(group,cleanPx);group.productionMask=productionMask;
           const layer=document.createElement('canvas');layer.width=state.width;layer.height=state.height;const lctx=layer.getContext('2d'),lid=lctx.createImageData(state.width,state.height);
-          for(let i=0;i<NProd;i++){const a=group.mask[i];if(a<12||!rmProd[i])continue;const j=i*4;lid.data[j]=state.rgba[j];lid.data[j+1]=state.rgba[j+1];lid.data[j+2]=state.rgba[j+2];lid.data[j+3]=a}
-          lctx.putImageData(lid,0,0);masterLayers.push({image:layer,depth:group.depth,label:group.label,groupId:group.id});
+          for(let i=0;i<NProd;i++){const a=productionMask[i];if(a<12||!rmProd[i])continue;const j=i*4;lid.data[j]=state.rgba[j];lid.data[j+1]=state.rgba[j+1];lid.data[j+2]=state.rgba[j+2];lid.data[j+3]=a}
+          lctx.putImageData(lid,0,0);if(maskCoverage(productionMask).percent>=.01)masterLayers.push({image:layer,depth:group.depth,label:group.label,groupId:group.id});
         }
         if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
         // Freeze an immutable production background; later preview/simulator operations must not mutate it.
@@ -435,7 +472,7 @@
     for(const id of ['tilt','simDepth'])$(id).oninput=()=>drawRigidPreview(state.simPosition);
 
         async function maskBlob(group){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const value=group.mask[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
-    $('zip').onclick=async()=>{if(!window.JSZip)return;$('zip').disabled=true;$('zip').textContent='ZIP…';const zip=new JSZip(),sourceResponse=await fetch(state.payload.image),sourceBlob=await sourceResponse.blob();zip.file('source-carte.png',sourceBlob);state.blobs.forEach((blob,index)=>zip.file(`vue-${String(index+1).padStart(2,'0')}.png`,blob));for(let index=0;index<state.groups.length;index++)zip.file(`masques/groupe-${String(index+1).padStart(2,'0')}.png`,await maskBlob(state.groups[index]));const depthCanvas=document.createElement('canvas');depthCanvas.width=state.width;depthCanvas.height=state.height;const depthContext=depthCanvas.getContext('2d'),depthImage=depthContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];depthImage.data[index*4]=depthImage.data[index*4+1]=depthImage.data[index*4+2]=value;depthImage.data[index*4+3]=255}depthContext.putImageData(depthImage,0,0);zip.file('depth-map.png',await toBlob(depthCanvas));const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};const groups=state.groups.map(({mask,autoMask,selected,...group},index)=>({...group,maskFile:`masques/groupe-${String(index+1).padStart(2,'0')}.png`}));zip.file('manifest.json',JSON.stringify({schema:'microplayer.card-v32',version:32,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:true,capture:state.payload.capture||null,file:'source-carte.png'},pipeline:{stage:'ocr-layout-semantics-depthflow-v32',centerViewPixelPerfect:true},ocr:state.payload.ocrLines,ocrSummary:{engine:'tesseract-local',lineCount:state.payload.ocrLines?.length||0},groups,settings,render:{engine:'depthflow-v42',viewCount:9,depthMapFile:'depth-map.png',views:state.renderStats}},null,2));const blob=await zip.generateAsync({type:'blob'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='MicroPlayer-carte-V32-9-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);$('zip').disabled=false;$('zip').textContent='ZIP complet'};
+    $('zip').onclick=async()=>{if(!window.JSZip)return;$('zip').disabled=true;$('zip').textContent='ZIP…';const zip=new JSZip(),sourceResponse=await fetch(state.payload.image),sourceBlob=await sourceResponse.blob();zip.file('source-carte.png',sourceBlob);state.blobs.forEach((blob,index)=>zip.file(`vue-${String(index+1).padStart(2,'0')}.png`,blob));for(let index=0;index<state.groups.length;index++)zip.file(`masques/groupe-${String(index+1).padStart(2,'0')}.png`,await maskBlob(state.groups[index]));const depthCanvas=document.createElement('canvas');depthCanvas.width=state.width;depthCanvas.height=state.height;const depthContext=depthCanvas.getContext('2d'),depthImage=depthContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];depthImage.data[index*4]=depthImage.data[index*4+1]=depthImage.data[index*4+2]=value;depthImage.data[index*4+3]=255}depthContext.putImageData(depthImage,0,0);zip.file('depth-map.png',await toBlob(depthCanvas));const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};const groups=state.groups.map(({mask,autoMask,selected,...group},index)=>({...group,maskFile:`masques/groupe-${String(index+1).padStart(2,'0')}.png`}));zip.file('manifest.json',JSON.stringify({schema:'microplayer.card-v33',version:33,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:true,capture:state.payload.capture||null,file:'source-carte.png'},pipeline:{stage:'master-scene-semantic-v33',centerViewPixelPerfect:true},ocr:state.payload.ocrLines,ocrSummary:{engine:'tesseract-local',lineCount:state.payload.ocrLines?.length||0},groups,settings,render:{engine:'depthflow-v42',viewCount:9,depthMapFile:'depth-map.png',views:state.renderStats}},null,2));const blob=await zip.generateAsync({type:'blob'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='MicroPlayer-carte-V33-9-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);$('zip').disabled=false;$('zip').textContent='ZIP complet'};
 
     $('back').onclick=()=>location.href='./microplayer-card-v33.html';$('auto').onclick=applyPreset;$('preset').onchange=applyPreset;
     for(const id of ['zero','relief','parallax','background'])$(id).oninput=()=>{updateOutputs();compose()};
