@@ -262,6 +262,46 @@
       state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN pipeline V2 native uint8';
       return base;
     }
+
+    function dilateBinaryMask(seed,radius){
+      const W=state.width,H=state.height,N=W*H,out=new Uint8ClampedArray(N),r=Math.max(1,Math.round(radius));
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!seed[i])continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<W&&yy<H)out[yy*W+xx]=255}}
+      return out;
+    }
+    function measureMasterGhost(bgPx,rm){
+      const W=state.width,H=state.height,N=W*H,ringR=Math.max(3,Math.round(Math.min(W,H)*.008));
+      let removed=0,suspect=0,residual=0,errSum=0;
+      for(let i=0;i<N;i++){if(!rm[i])continue;removed++;const x=i%W,y=(i/W)|0,j=i*4;let rr=0,gg=0,bb=0,n=0;
+        for(let k=0;k<16;k++){const a=k*Math.PI/8,xx=Math.max(0,Math.min(W-1,Math.round(x+Math.cos(a)*ringR))),yy=Math.max(0,Math.min(H-1,Math.round(y+Math.sin(a)*ringR))),q=yy*W+xx;if(rm[q])continue;const p=q*4;rr+=bgPx[p];gg+=bgPx[p+1];bb+=bgPx[p+2];n++}
+        if(!n)continue;rr/=n;gg/=n;bb/=n;const localErr=(Math.abs(bgPx[j]-rr)+Math.abs(bgPx[j+1]-gg)+Math.abs(bgPx[j+2]-bb))/3;errSum+=localErr;
+        const originalDelta=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;
+        if(localErr>38)suspect++;if(localErr>28&&originalDelta<35)residual++;
+      }
+      // Only the opaque core of semantic masks is meaningful for source-survival QC.
+      // Soft antialias fringes (alpha 20..95) may legitimately remain close to the background colour.
+      let core=0,coreUnchanged=0;
+      for(const group of productionGroups())for(let i=0;i<N;i++){if((group.mask?.[i]||0)<96)continue;core++;const j=i*4,d=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;if(d<8)coreUnchanged++}
+      const residualRatio=removed?residual/removed:0,suspectRatio=removed?suspect/removed:0,coreUnchangedRatio=core?coreUnchanged/core:0;
+      return {removed,suspect,residual,residualRatio,suspectRatio,meanLocalError:removed?errSum/removed:0,core,coreUnchanged,coreUnchangedRatio};
+    }
+    function buildResidualCleanupMask(bgPx){
+      const W=state.width,H=state.height,N=W*H,seed=new Uint8ClampedArray(N);
+      for(const group of productionGroups())for(let i=0;i<N;i++){if((group.mask?.[i]||0)<96)continue;const j=i*4,d=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;if(d<10)seed[i]=255}
+      const r=Math.max(2,Math.round(Math.min(W,H)*.0045));
+      return dilateBinaryMask(seed,r);
+    }
+    async function runMiganCleanupPass(inputRgba,holeMask){
+      if(!miganSession)throw Error('MI-GAN non initialisé pour la passe de nettoyage.');
+      const W=state.width,H=state.height,N=W*H,ins=miganSession.inputNames||[],outs=miganSession.outputNames||[];
+      const rgb=new Uint8Array(3*N),maskData=new Uint8Array(N);
+      for(let i=0;i<N;i++){const j=i*4;rgb[i]=inputRgba[j];rgb[N+i]=inputRgba[j+1];rgb[2*N+i]=inputRgba[j+2];maskData[i]=holeMask[i]?0:255}
+      const feeds={};feeds[ins[0]]=new ort.Tensor('uint8',rgb,[1,3,H,W]);feeds[ins[1]]=new ort.Tensor('uint8',maskData,[1,1,H,W]);
+      $('aiGate').textContent='Étape 2D/5 : seconde passe MI-GAN ciblée sur les résidus…';
+      let out;try{out=await miganSession.run(feeds)}catch(e){throw Error('ETAPE MI_GAN_CLEANUP · '+(e?.message||e))}
+      const tensor=out[outs[0]];if(!tensor)throw Error('ETAPE MI_GAN_CLEANUP_OUTPUT · sortie absente');const data=tensor.data,finalData=new Uint8ClampedArray(inputRgba);
+      for(let i=0;i<N;i++)if(holeMask[i]){const j=i*4;finalData[j]=Math.max(0,Math.min(255,Number(data[i])));finalData[j+1]=Math.max(0,Math.min(255,Number(data[N+i])));finalData[j+2]=Math.max(0,Math.min(255,Number(data[2*N+i])));finalData[j+3]=255}
+      return finalData;
+    }
     function boxArea(box){return Array.isArray(box)&&box.length>=4?Math.max(0,Number(box[2])||0)*Math.max(0,Number(box[3])||0):0}
     function boxIntersectionRatio(inner,outer){
       if(!Array.isArray(inner)||!Array.isArray(outer))return 0;
@@ -492,27 +532,26 @@
         try{await rebuildMasterWithMigan();}catch(inpaintError){throw Error('Reconstruction IA du fond impossible — '+inpaintError.message);}
         $('aiGate').textContent='Analyse IA reçue · étape 3/5 : contrôle anti-fantôme…';
         state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine||'none';
-        // V33 strict anti-ghost gate. The previous colour-difference test could pass a master that still
-        // contained readable glyphs. Compare each reconstructed removal pixel with its local clean-background
-        // ring: a good master must be locally continuous, not merely different from the original foreground.
-        const rm=state.rigidPreview.removalMask,bgCtx=state.rigidPreview.base.getContext('2d'),bgPx=bgCtx.getImageData(0,0,state.width,state.height).data;
-        const W=state.width,H=state.height,N=W*H,ringR=Math.max(3,Math.round(Math.min(W,H)*.008));
-        let removed=0,suspect=0,residual=0,errSum=0;
-        for(let i=0;i<N;i++){if(!rm[i])continue;removed++;const x=i%W,y=(i/W)|0,j=i*4;let rr=0,gg=0,bb=0,n=0;
-          for(let k=0;k<16;k++){const a=k*Math.PI/8,xx=Math.max(0,Math.min(W-1,Math.round(x+Math.cos(a)*ringR))),yy=Math.max(0,Math.min(H-1,Math.round(y+Math.sin(a)*ringR))),q=yy*W+xx;if(rm[q])continue;const p=q*4;rr+=bgPx[p];gg+=bgPx[p+1];bb+=bgPx[p+2];n++}
-          if(!n)continue;rr/=n;gg/=n;bb/=n;const localErr=(Math.abs(bgPx[j]-rr)+Math.abs(bgPx[j+1]-gg)+Math.abs(bgPx[j+2]-bb))/3;errSum+=localErr;
-          const originalDelta=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;
-          if(localErr>38)suspect++;if(localErr>28&&originalDelta<35)residual++;
+        const rm=state.rigidPreview.removalMask,W=state.width,H=state.height,N=W*H;
+        let bgCtx=state.rigidPreview.base.getContext('2d'),bgPx=bgCtx.getImageData(0,0,W,H).data;
+        let ghost=measureMasterGhost(bgPx,rm);
+        state.masterQc.ghost={removed:ghost.removed,suspect:ghost.suspect,residual:ghost.residual,ratio:Number((ghost.residualRatio*100).toFixed(2)),suspectRatio:Number((ghost.suspectRatio*100).toFixed(2)),meanLocalError:Number(ghost.meanLocalError.toFixed(2)),corePixels:ghost.core,coreUnchanged:ghost.coreUnchanged,coreUnchangedRatio:Number((ghost.coreUnchangedRatio*100).toFixed(2)),cleanupPass:false};
+
+        // Automatic recovery instead of blocking immediately: if either the strict local ghost metric
+        // or the strong-core source-survival metric is too high, rebuild only the suspicious foreground core.
+        if((ghost.removed>200&&ghost.residualRatio>.035)||(ghost.core>200&&ghost.coreUnchangedRatio>.12)){
+          const cleanupMask=buildResidualCleanupMask(bgPx),cleanupPixels=cleanupMask.reduce((n,v)=>n+(v?1:0),0);
+          if(cleanupPixels>20){
+            const cleaned=await runMiganCleanupPass(bgPx,cleanupMask);
+            const base=document.createElement('canvas');base.width=W;base.height=H;base.getContext('2d').putImageData(new ImageData(cleaned,W,H),0,0);
+            state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN pipeline V2 native uint8 + residual cleanup';
+            bgCtx=base.getContext('2d');bgPx=bgCtx.getImageData(0,0,W,H).data;ghost=measureMasterGhost(bgPx,rm);
+            state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine;
+            state.masterQc.ghost={removed:ghost.removed,suspect:ghost.suspect,residual:ghost.residual,ratio:Number((ghost.residualRatio*100).toFixed(2)),suspectRatio:Number((ghost.suspectRatio*100).toFixed(2)),meanLocalError:Number(ghost.meanLocalError.toFixed(2)),corePixels:ghost.core,coreUnchanged:ghost.coreUnchanged,coreUnchangedRatio:Number((ghost.coreUnchangedRatio*100).toFixed(2)),cleanupPass:true,cleanupPixels};
+          }
         }
-        const suspectRatio=removed?suspect/removed:0,residualRatio=removed?residual/removed:0,meanLocalError=removed?errSum/removed:0;
-        let core=0,coreUnchanged=0;for(const group of productionGroups()){for(let i=0;i<N;i++){if(group.mask[i]<20)continue;core++;const j=i*4,d=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;if(d<8)coreUnchanged++;}}
-        const coreUnchangedRatio=core?coreUnchanged/core:0;
-        state.masterQc.ghost={removed,suspect,residual,ratio:Number((residualRatio*100).toFixed(2)),suspectRatio:Number((suspectRatio*100).toFixed(2)),meanLocalError:Number(meanLocalError.toFixed(2)),corePixels:core,coreUnchanged,coreUnchangedRatio:Number((coreUnchangedRatio*100).toFixed(2))};
-        // Do not unlock 3/9 views while reconstructed foreground-shaped residue remains.
-        // Residual similarity is the foreground-ghost metric. Local discontinuity is diagnostic only:
-        // legitimate card artwork/gradients can be discontinuous and must not be mislabeled as surviving text.
-        if(removed>200&&residualRatio>.035)throw Error('QC anti-fantôme strict refusé · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'% (diagnostic). Masque/reconstruction encore contaminé après récupération des zones sémantiques faibles.');
-        if(core>200&&coreUnchangedRatio>.25)throw Error('QC anti-fantôme source refusé · '+state.masterQc.ghost.coreUnchangedRatio+'% des pixels de premier plan sont encore identiques à la source. Vérifier la polarité du masque ou la reconstruction.');
+        if(ghost.removed>200&&ghost.residualRatio>.035)throw Error('QC anti-fantôme strict refusé après seconde passe · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'%.');
+        if(ghost.core>200&&ghost.coreUnchangedRatio>.25)throw Error('QC anti-fantôme source refusé après seconde passe · '+state.masterQc.ghost.coreUnchangedRatio+'% du cœur réel du premier plan reste identique à la source.');
         // Rebuild production layers from the ORIGINAL pixels after exclusivity/QC.
         // Their alpha is clipped by the removal mask so no source glyph can remain simultaneously
         // in background_master and in a moving foreground plane.
