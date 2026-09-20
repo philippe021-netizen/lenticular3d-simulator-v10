@@ -23,3 +23,22 @@ test("le bouton relief autonome appelle le serveur puis applique les profondeurs
   assert.match(html, /corrected\.get\(String\(group\.id\)\)/);
   assert.match(html, /await generateViews\(\)/);
 });
+
+
+test("V33 master scene élargit le retrait quand un masque sémantique est faible", async () => {
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
+  assert.match(html, /maskIsWeak\(group\).*addBoxToMask\(removalSeed,group\.bbox/);
+  assert.match(html, /productionMask=deriveLayerMask\(group,cleanPx\)/);
+});
+
+test("V33 conserve un vrai plan zéro pour la parallaxe", async () => {
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
+  assert.match(html, /const z=\(Number\(layer\.depth\)-zero\)\/denom/);
+  assert.doesNotMatch(html, /const z=\(\(Number\(layer\.depth\)-dMin\)\/span\)\*2-1,dx/);
+});
+
+test("V33 ne rajoute pas d'ombre aux plans dans le simulateur", async () => {
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /contact shadow creates a static height cue/);
+  assert.doesNotMatch(html, /ctx\.filter='blur\('/);
+});
