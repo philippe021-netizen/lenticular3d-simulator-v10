@@ -24,7 +24,7 @@
     </aside>
     <section id="workspace" class="workspace">
       <section id="editPanel" class="panel"><h2>Carte / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Carte</button><button id="depthView">Profondeur</button></div></section>
-      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Masque groupe</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
+      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Masque groupe</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Envoyer à l’IA et composer</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler / modifier fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU CLIENT IA : démonstration esthétique uniquement · jamais utilisée pour l'impression.</div></section>
       <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim">✏️ Modifier le fond</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim">Voir fond maître</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
     </section>
@@ -35,7 +35,7 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),editPanel=$('editPanel'),sim3d=$('sim3d'),simRig=$('simRig'),threePlan=$('threePlan'),sidebar=$('sidebar'),workspace=$('workspace');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     const selected=()=>state.groups.find(group=>group.id===state.selected);
@@ -58,15 +58,76 @@
     function drawDepth(){if(!state.finalDepth)return;const image=photoContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}photoContext.putImageData(image,0,0);maskContext.clearRect(0,0,state.width,state.height)}
     function drawMaskOverlay(){maskContext.clearRect(0,0,state.width,state.height);if(state.preview!=='card'||state.editTarget!=='group')return;const group=selected();if(!group)return;const image=maskContext.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const alpha=group.mask[index];if(alpha<5)continue;image.data[index*4]=0;image.data[index*4+1]=229;image.data[index*4+2]=255;image.data[index*4+3]=Math.round(alpha*.68)}maskContext.putImageData(image,0,0)}
     function showCard(){state.editTarget='group';state.preview='card';drawPhoto();drawMaskOverlay();$('card').classList.add('active');$('depthView').classList.remove('active');updatePencilUi()}
-    function drawMasterForEdit(){if(!state.aiMaster?.background)return;state.preview='master';photoContext.clearRect(0,0,state.width,state.height);photoContext.drawImage(state.aiMaster.background,0,0,state.width,state.height);maskContext.clearRect(0,0,state.width,state.height);$('card').classList.remove('active');$('depthView').classList.remove('active')}
-    function updatePencilUi(){const master=state.editTarget==='master';$('targetGroup').classList.toggle('active',!master);$('targetMaster').classList.toggle('active',master);$('add').textContent=master?'Restaurer fond':'Pencil +';$('erase').textContent=master?'Gommer résidu':'Gomme';$('resetMask').textContent=master?'Fond IA initial':'Masque auto';$('pencilStatus').textContent=master?'Retouche du fond maître : Gommer résidu reconstruit localement le fond; Restaurer fond reprend la version IA initiale.':(selected()?'Correction active sur « '+selected().label+' »':'Sélectionne un groupe puis corrige son masque.');updateUndo()}
-    function snapshotMaster(){if(!state.aiMaster?.background)return;const ctx=state.aiMaster.background.getContext('2d');state.masterHistory.push(ctx.getImageData(0,0,state.width,state.height));if(state.masterHistory.length>6)state.masterHistory.shift()}
+    function drawCloneSourceOverlay(){
+      if(state.editTarget!=='master'||!state.cloneSource)return;
+      const x=state.cloneSource.x,y=state.cloneSource.y,r=Math.max(10,Number($('brush').value));
+      maskContext.save();
+      maskContext.lineWidth=Math.max(2,state.width/700);
+      maskContext.strokeStyle='rgba(0,0,0,.78)';
+      maskContext.beginPath();maskContext.arc(x,y,r,0,Math.PI*2);maskContext.moveTo(x-r*.65,y);maskContext.lineTo(x+r*.65,y);maskContext.moveTo(x,y-r*.65);maskContext.lineTo(x,y+r*.65);maskContext.stroke();
+      maskContext.lineWidth=Math.max(1,state.width/1100);
+      maskContext.strokeStyle='#ff4d8d';
+      maskContext.beginPath();maskContext.arc(x,y,r,0,Math.PI*2);maskContext.moveTo(x-r*.65,y);maskContext.lineTo(x+r*.65,y);maskContext.moveTo(x,y-r*.65);maskContext.lineTo(x,y+r*.65);maskContext.stroke();
+      if(state.cloneCurrentSource){
+        const sx=state.cloneCurrentSource.x,sy=state.cloneCurrentSource.y;
+        maskContext.setLineDash([7,6]);maskContext.strokeStyle='rgba(255,255,255,.82)';
+        maskContext.beginPath();maskContext.moveTo(sx-8,sy);maskContext.lineTo(sx+8,sy);maskContext.moveTo(sx,sy-8);maskContext.lineTo(sx,sy+8);maskContext.stroke();
+      }
+      maskContext.restore();
+    }
+    function drawMasterForEdit(){
+      if(!state.aiMaster?.background)return;
+      state.preview='master';
+      photoContext.clearRect(0,0,state.width,state.height);
+      photoContext.drawImage(state.aiMaster.background,0,0,state.width,state.height);
+      maskContext.clearRect(0,0,state.width,state.height);
+      drawCloneSourceOverlay();
+      $('card').classList.remove('active');$('depthView').classList.remove('active');
+    }
+    function updatePencilUi(){
+      const master=state.editTarget==='master';
+      $('targetGroup').classList.toggle('active',!master);$('targetMaster').classList.toggle('active',master);
+      $('masterTools').classList.toggle('hidden',!master);
+      $('add').textContent=master?'Restaurer fond':'Pencil +';$('erase').textContent=master?'Gommer résidu':'Gomme';$('resetMask').textContent=master?'Fond IA initial':'Masque auto';
+      if(master){
+        $('add').classList.toggle('active',state.masterTool==='restore');
+        $('erase').classList.toggle('active',state.masterTool==='heal');
+        $('pickCloneSource').classList.toggle('active',state.masterTool==='pick');
+        $('cloneBrush').classList.toggle('active',state.masterTool==='clone');
+        const source=state.cloneSource?' · source fixée ✚':' · aucune source choisie';
+        $('pencilStatus').textContent='Fond maître : Gommer résidu pour petites corrections, ou Choisir source ✚ puis Tampon clone pour copier une zone saine'+source+'.';
+      }else{
+        $('add').classList.toggle('active',state.mode==='add');$('erase').classList.toggle('active',state.mode==='erase');
+        $('pencilStatus').textContent=selected()?'Correction active sur « '+selected().label+' »':'Sélectionne un groupe puis corrige son masque.';
+      }
+      updateUndo();
+    }
+    function snapshotMaster(){if(!state.aiMaster?.background)return;const ctx=state.aiMaster.background.getContext('2d');state.masterHistory.push(ctx.getImageData(0,0,state.width,state.height));if(state.masterHistory.length>8)state.masterHistory.shift()}
     function masterBrushAt(cx,cy,r,restore=false){if(!state.aiMaster?.background)return;const ctx=state.aiMaster.background.getContext('2d',{willReadFrequently:true}),rr=Math.max(2,Math.round(r)),pad=Math.ceil(rr*1.7),x0=Math.max(0,Math.floor(cx-pad)),y0=Math.max(0,Math.floor(cy-pad)),x1=Math.min(state.width,Math.ceil(cx+pad)),y1=Math.min(state.height,Math.ceil(cy+pad)),w=x1-x0,h=y1-y0;if(w<=0||h<=0)return;
-      if(restore&&state.masterOriginal){const src=state.masterOriginal.getContext('2d').getImageData(x0,y0,w,h),dst=ctx.getImageData(x0,y0,w,h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const gx=x+x0,gy=y+y0,dx=gx-cx,dy=gy-cy;if(dx*dx+dy*dy>rr*rr)continue;const i=(y*w+x)*4;dst.data[i]=src.data[i];dst.data[i+1]=src.data[i+1];dst.data[i+2]=src.data[i+2];dst.data[i+3]=255}ctx.putImageData(dst,x0,y0);return}
+      if(restore&&state.masterOriginal){const src=state.masterOriginal.getContext('2d').getImageData(x0,y0,w,h),dst=ctx.getImageData(x0,y0,w,h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const gx=x+x0,gy=y+y0,dx=gx-cx,dy=gy-cy;if(dx*dx+dy*dy>rr*rr)continue;const i=(y*w+x)*4,dist=Math.hypot(dx,dy)/rr,blend=dist<=.72?1:Math.max(0,(1-dist)/.28);for(let k=0;k<3;k++)dst.data[i+k]=dst.data[i+k]*(1-blend)+src.data[i+k]*blend;dst.data[i+3]=255}ctx.putImageData(dst,x0,y0);return}
       const src=ctx.getImageData(x0,y0,w,h),dst=new ImageData(new Uint8ClampedArray(src.data),w,h);
       for(let y=0;y<h;y++)for(let x=0;x<w;x++){const gx=x+x0,gy=y+y0,dx=gx-cx,dy=gy-cy,d=Math.hypot(dx,dy);if(d>rr)continue;const a=Math.atan2(dy,dx),sd=rr*1.35,sx=Math.max(0,Math.min(w-1,Math.round(cx+Math.cos(a)*sd-x0))),sy=Math.max(0,Math.min(h-1,Math.round(cy+Math.sin(a)*sd-y0))),si=(sy*w+sx)*4,di=(y*w+x)*4,blend=Math.min(1,(rr-d)/Math.max(1,rr*.55));for(let k=0;k<3;k++)dst.data[di+k]=src.data[di+k]*(1-blend)+src.data[si+k]*blend;dst.data[di+3]=255}
       ctx.putImageData(dst,x0,y0)}
-    function masterBrushSegment(from,to){const r=Number($('brush').value),dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.32)));for(let s=0;s<=steps;s++){const t=s/steps;masterBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r,state.mode==='add')}}
+    function masterBrushSegment(from,to,restore=false){const r=Number($('brush').value),dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.32)));for(let s=0;s<=steps;s++){const t=s/steps;masterBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r,restore)}}
+    function cloneBrushAt(dstX,dstY,radius){
+      if(!state.aiMaster?.background||!state.cloneSnapshot||!state.cloneStroke)return;
+      const W=state.width,H=state.height,ctx=state.aiMaster.background.getContext('2d',{willReadFrequently:true}),rr=Math.max(2,Math.round(radius));
+      const sxCenter=state.cloneStroke.srcStart.x+(dstX-state.cloneStroke.dstStart.x),syCenter=state.cloneStroke.srcStart.y+(dstY-state.cloneStroke.dstStart.y);
+      state.cloneCurrentSource={x:sxCenter,y:syCenter};
+      const x0=Math.max(0,Math.floor(dstX-rr)),y0=Math.max(0,Math.floor(dstY-rr)),x1=Math.min(W,Math.ceil(dstX+rr+1)),y1=Math.min(H,Math.ceil(dstY+rr+1)),w=x1-x0,h=y1-y0;if(w<=0||h<=0)return;
+      const dst=ctx.getImageData(x0,y0,w,h),src=state.cloneSnapshot.data;
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const gx=x0+x,gy=y0+y,ox=gx-dstX,oy=gy-dstY,dist=Math.hypot(ox,oy);if(dist>rr)continue;
+        const sx=Math.round(sxCenter+ox),sy=Math.round(syCenter+oy);if(sx<0||sy<0||sx>=W||sy>=H)continue;
+        const si=(sy*W+sx)*4,di=(y*w+x)*4,n=dist/rr,blend=n<=.72?1:Math.max(0,(1-n)/.28);
+        dst.data[di]=dst.data[di]*(1-blend)+src[si]*blend;dst.data[di+1]=dst.data[di+1]*(1-blend)+src[si+1]*blend;dst.data[di+2]=dst.data[di+2]*(1-blend)+src[si+2]*blend;dst.data[di+3]=255;
+      }
+      ctx.putImageData(dst,x0,y0);
+    }
+    function cloneBrushSegment(from,to){
+      const r=Number($('brush').value),dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.28)));
+      for(let s=0;s<=steps;s++){const t=s/steps;cloneBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r)}
+    }
     function renderGroups(){const root=$('groups');root.innerHTML='';state.groups.forEach(group=>{const element=document.createElement('div');element.className='group'+(group.id===state.selected?' selected':'');element.innerHTML=`<div class="grouphead"><b>${escapeHtml(group.label)}</b><button>Éditer</button></div><div class="small">${escapeHtml(group.role)} · ${group.items.length} composant(s) · masque ${maskCoverage(group.mask).percent.toFixed(2)}%</div><label>Profondeur <b class="value">${group.depth}</b><input type="range" min="0" max="255" value="${group.depth}"></label>`;element.querySelector('button').onclick=()=>{state.selected=group.id;state.history=[];renderGroups();showCard();focusEditor();updateUndo();$('pencilStatus').textContent=`Correction active sur « ${group.label} »`};element.querySelector('input').oninput=event=>{group.depth=Number(event.target.value);element.querySelector('.value').textContent=group.depth;syncAiMasterDepths();compose();markSceneDirty('Profondeur modifiée');scheduleLivePreview(false)};root.appendChild(element)})}
 
     function applyPreset(){const preset=createCardDepthPreset(state.groups,$('preset').value);$('zero').value=preset.zero;$('relief').value=preset.reliefPercent;$('parallax').value=preset.parallaxPercent;state.groups.forEach((group,index)=>group.depth=preset.depths[index]);updateOutputs();renderGroups();compose()}
@@ -74,17 +135,64 @@
 
     function canvasPoint(event){const rect=mask.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*state.width,y:(event.clientY-rect.top)/rect.height*state.height}}
     function directStroke(from,to){maskContext.save();maskContext.lineCap='round';maskContext.lineJoin='round';maskContext.lineWidth=Number($('brush').value)*2;maskContext.globalCompositeOperation=state.mode==='erase'?'destination-out':'source-over';maskContext.strokeStyle='rgba(0,229,255,.68)';maskContext.beginPath();maskContext.moveTo(from.x,from.y);maskContext.lineTo(to.x,to.y);maskContext.stroke();maskContext.restore()}
-    mask.addEventListener('pointerdown',event=>{event.preventDefault();const point=canvasPoint(event);if(state.editTarget==='master'){if(!state.aiMaster?.background)return;snapshotMaster();state.drawing=true;state.lastPoint=point;masterBrushSegment(point,point);drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);mask.setPointerCapture?.(event.pointerId);updateUndo();return}const group=selected();if(!group||state.preview!=='card')return;state.history.push(new Uint8ClampedArray(group.mask));if(state.history.length>20)state.history.shift();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);updateUndo()},{passive:false});
-    mask.addEventListener('pointermove',event=>{if(!state.drawing)return;event.preventDefault();const point=canvasPoint(event);if(state.editTarget==='master'){masterBrushSegment(state.lastPoint,point);state.lastPoint=point;drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);return}const group=selected(),value=state.mode==='erase'?0:255;paintMask(group.mask,state.width,state.height,state.lastPoint,point,Number($('brush').value),value);directStroke(state.lastPoint,point);state.lastPoint=point},{passive:false});
-    function endStroke(){if(!state.drawing)return;state.drawing=false;if(state.editTarget==='master'){drawMasterForEdit();evaluateManualMaster();markSceneDirty('Fond maître retouché au Pencil');scheduleLivePreview(false,true);updateUndo();return}drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque modifié au Pencil');scheduleLivePreview(true,true)}
+    mask.addEventListener('pointerdown',event=>{
+      event.preventDefault();const point=canvasPoint(event);
+      if(state.editTarget==='master'){
+        if(!state.aiMaster?.background)return;
+        if(state.masterTool==='pick'){
+          state.cloneSource={x:point.x,y:point.y};state.cloneCurrentSource=null;state.drawing=false;drawMasterForEdit();updatePencilUi();
+          $('pencilStatus').className='status ok';$('pencilStatus').textContent='Source clone fixée ✚. Choisis maintenant « Tampon clone » puis peins au Pencil sur la zone à remplacer.';return;
+        }
+        if(state.masterTool==='clone'&&!state.cloneSource){
+          state.drawing=false;$('pencilStatus').className='status warn';$('pencilStatus').textContent='Choisis d’abord une zone saine avec « ✚ Choisir source ».';return;
+        }
+        snapshotMaster();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);
+        if(state.masterTool==='clone'){
+          const ctx=state.aiMaster.background.getContext('2d',{willReadFrequently:true});
+          state.cloneSnapshot=ctx.getImageData(0,0,state.width,state.height);
+          state.cloneStroke={srcStart:{x:state.cloneSource.x,y:state.cloneSource.y},dstStart:{x:point.x,y:point.y}};
+          cloneBrushSegment(point,point);
+        }else masterBrushSegment(point,point,state.masterTool==='restore');
+        drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);updateUndo();return;
+      }
+      const group=selected();if(!group||state.preview!=='card')return;
+      state.history.push(new Uint8ClampedArray(group.mask));if(state.history.length>20)state.history.shift();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);updateUndo();
+    },{passive:false});
+    mask.addEventListener('pointermove',event=>{
+      if(!state.drawing)return;event.preventDefault();const point=canvasPoint(event);
+      if(state.editTarget==='master'){
+        if(state.masterTool==='clone')cloneBrushSegment(state.lastPoint,point);else masterBrushSegment(state.lastPoint,point,state.masterTool==='restore');
+        state.lastPoint=point;drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);return;
+      }
+      const group=selected(),value=state.mode==='erase'?0:255;paintMask(group.mask,state.width,state.height,state.lastPoint,point,Number($('brush').value),value);directStroke(state.lastPoint,point);state.lastPoint=point;
+    },{passive:false});
+    function endStroke(){
+      if(!state.drawing)return;state.drawing=false;
+      if(state.editTarget==='master'){
+        state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();evaluateManualMaster();markSceneDirty(state.masterTool==='clone'?'Fond maître cloné au Pencil':'Fond maître retouché au Pencil');scheduleLivePreview(false,true);updateUndo();return;
+      }
+      drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque modifié au Pencil');scheduleLivePreview(true,true);
+    }
     mask.addEventListener('pointerup',endStroke);mask.addEventListener('pointercancel',endStroke);
     function updateUndo(){$('undo').disabled=state.editTarget==='master'?!state.masterHistory.length:!state.history.length}
-    $('undo').onclick=()=>{if(state.editTarget==='master'){const previous=state.masterHistory.pop();if(previous&&state.aiMaster?.background){state.aiMaster.background.getContext('2d').putImageData(previous,0,0);drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Annulation retouche fond');scheduleLivePreview(false,true)}updateUndo();return}const group=selected();const previous=state.history.pop();if(group&&previous){group.mask=previous;drawMaskOverlay();compose();renderGroups();markSceneDirty('Annulation masque');scheduleLivePreview(true,true)}updateUndo()};
-    $('resetMask').onclick=()=>{if(state.editTarget==='master'){if(!state.masterOriginal||!state.aiMaster?.background)return;snapshotMaster();const ctx=state.aiMaster.background.getContext('2d');ctx.clearRect(0,0,state.width,state.height);ctx.drawImage(state.masterOriginal,0,0);drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Fond IA restauré');scheduleLivePreview(false,true);updateUndo();return}const group=selected();if(!group)return;state.history.push(new Uint8ClampedArray(group.mask));group.mask=new Uint8ClampedArray(group.autoMask);drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque auto restauré');scheduleLivePreview(true,true);updateUndo()};
-    $('add').onclick=()=>{state.mode='add';$('add').classList.add('active');$('erase').classList.remove('active')};
-    $('erase').onclick=()=>{state.mode='erase';$('erase').classList.add('active');$('add').classList.remove('active')};
-    $('brush').oninput=()=>{$('brushOut').textContent=$('brush').value};
-    $('targetGroup').onclick=()=>{state.editTarget='group';showCard();updatePencilUi()};
+    $('undo').onclick=()=>{
+      if(state.editTarget==='master'){
+        const previous=state.masterHistory.pop();if(previous&&state.aiMaster?.background){state.aiMaster.background.getContext('2d').putImageData(previous,0,0);state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Annulation retouche fond');scheduleLivePreview(false,true)}updateUndo();return;
+      }
+      const group=selected(),previous=state.history.pop();if(group&&previous){group.mask=previous;drawMaskOverlay();compose();renderGroups();markSceneDirty('Annulation masque');scheduleLivePreview(true,true)}updateUndo();
+    };
+    $('resetMask').onclick=()=>{
+      if(state.editTarget==='master'){
+        if(!state.masterOriginal||!state.aiMaster?.background)return;snapshotMaster();const ctx=state.aiMaster.background.getContext('2d');ctx.clearRect(0,0,state.width,state.height);ctx.drawImage(state.masterOriginal,0,0);state.cloneSource=null;state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Fond IA restauré');scheduleLivePreview(false,true);updatePencilUi();updateUndo();return;
+      }
+      const group=selected();if(!group)return;state.history.push(new Uint8ClampedArray(group.mask));group.mask=new Uint8ClampedArray(group.autoMask);drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque auto restauré');scheduleLivePreview(true,true);updateUndo();
+    };
+    $('add').onclick=()=>{if(state.editTarget==='master'){state.masterTool='restore';updatePencilUi();return}state.mode='add';updatePencilUi()};
+    $('erase').onclick=()=>{if(state.editTarget==='master'){state.masterTool='heal';updatePencilUi();return}state.mode='erase';updatePencilUi()};
+    $('pickCloneSource').onclick=()=>{if(state.editTarget!=='master')return;state.masterTool='pick';updatePencilUi();$('pencilStatus').className='status ok';$('pencilStatus').textContent='Touchez maintenant une zone saine du fond : une croix ✚ y sera fixée comme source.'};
+    $('cloneBrush').onclick=()=>{if(state.editTarget!=='master')return;state.masterTool='clone';updatePencilUi();$('pencilStatus').className=state.cloneSource?'status ok':'status warn';$('pencilStatus').textContent=state.cloneSource?'Tampon clone actif : peins au Pencil sur la zone abîmée. La croix indique la source.':'Aucune source : utilise d’abord « ✚ Choisir source ». '};
+    $('brush').oninput=()=>{$('brushOut').textContent=$('brush').value;if(state.editTarget==='master')drawMasterForEdit()};
+    $('targetGroup').onclick=()=>{state.editTarget='group';state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;showCard();updatePencilUi()};
     $('targetMaster').onclick=editMasterBackground;
     $('card').onclick=showCard;$('depthView').onclick=()=>{state.editTarget='group';state.preview='depth';drawDepth();$('depthView').classList.add('active');$('card').classList.remove('active');updatePencilUi()};
 
@@ -182,11 +290,12 @@
       if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Fond maître indisponible : composer et valider la scène maître d’abord.';return}
       stopAnimation();
       state.editTarget='master';
+      if(!['heal','restore','pick','clone'].includes(state.masterTool))state.masterTool='heal';
       drawMasterForEdit();
       updatePencilUi();
       focusEditor();
       $('pencilStatus').className='status ok';
-      $('pencilStatus').textContent='FOND MAÎTRE — retouche active au Pencil. Utilise « Gommer résidu », ajuste le pinceau, puis Annuler si besoin.';
+      $('pencilStatus').textContent='FOND MAÎTRE — petites corrections : Gommer résidu. Gros défaut : ✚ Choisir source, toucher une zone saine, puis Tampon clone et peindre au Pencil.';
     }
     $('editMasterFromSim').onclick=editMasterBackground;
     $('showMasterFromSim').onclick=showMasterBackground;
@@ -567,7 +676,7 @@
         // Freeze an immutable production background; later preview/simulator operations must not mutate it.
         const frozenBg=document.createElement('canvas');frozenBg.width=state.width;frozenBg.height=state.height;frozenBg.getContext('2d').drawImage(state.rigidPreview.base,0,0);
         state.aiMaster={background:frozenBg,layers:masterLayers,source:'v33-master-scene-ldi-disocclusion',qc:state.masterQc};
-        state.masterOriginal=document.createElement('canvas');state.masterOriginal.width=state.width;state.masterOriginal.height=state.height;state.masterOriginal.getContext('2d').drawImage(frozenBg,0,0);state.masterHistory=[];$('targetMaster').disabled=false;invalidateRig();syncAiMasterDepths();
+        state.masterOriginal=document.createElement('canvas');state.masterOriginal.width=state.width;state.masterOriginal.height=state.height;state.masterOriginal.getContext('2d').drawImage(frozenBg,0,0);state.masterHistory=[];state.masterTool='heal';state.cloneSource=null;state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;$('targetMaster').disabled=false;invalidateRig();syncAiMasterDepths();
         const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
         state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
         $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
