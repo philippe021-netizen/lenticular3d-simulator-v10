@@ -105,6 +105,9 @@ async function runVision({ image, instructions, key, useGateway, maxOutputTokens
           { type: "input_image", image_url: image, detail: "high" },
         ] }],
         max_output_tokens: maxOutputTokens,
+        // Force syntactically valid JSON at the model boundary. Prompts already require JSON;
+        // this prevents iPad/client failures caused by a missing comma/bracket in free-form output.
+        text: { format: { type: "json_object" } },
       }),
       signal: controller.signal,
     });
