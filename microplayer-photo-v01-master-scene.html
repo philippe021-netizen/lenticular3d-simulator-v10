@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <title>MicroPlayer Photo V01 — Master Scene</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#fff;background:#090a0d;--panel:#15171c;--line:#303541;--blue:#1687ff;--cyan:#00e5ff}*{box-sizing:border-box}body{margin:0}.top{position:sticky;top:0;z-index:20;padding:13px 18px;background:#0d0e12f2;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}.wrap{max-width:1500px;margin:auto;padding:16px}.grid{display:grid;grid-template-columns:410px minmax(0,1fr);gap:16px;height:calc(100vh - 86px);overflow:hidden;align-items:start}.sidebar,.workspace{height:100%;overflow-y:auto;overscroll-behavior:contain;padding-bottom:40px}.sidebar{position:relative;scrollbar-gutter:stable}.sidebarToggle{position:sticky;top:0;z-index:15;width:100%;margin-bottom:10px;background:#20242d;border:1px solid var(--line)}.grid.sidebar-collapsed{grid-template-columns:72px minmax(0,1fr)}.sidebar.collapsed .panel{display:none}.sidebar.collapsed .sidebarToggle{writing-mode:vertical-rl;height:150px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}.stage,.sim{position:relative;aspect-ratio:var(--source-aspect,1.545);background:#050506;border-radius:14px;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}.stage canvas,.sim canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,select,input{font:inherit}button{border:0;border-radius:11px;min-height:44px;padding:10px;background:#2d323d;color:#fff;font-weight:800}button.active,button.primary{background:var(--blue)}button.green{background:#177052}button:disabled{opacity:.4}select,input[type=file]{width:100%}.status{padding:10px;margin-top:9px;border-radius:10px;background:#20242d;font-size:12px;white-space:pre-wrap}.ok{background:#17372c}.warn{background:#443a1b}.group{border:1px solid #373c48;border-radius:13px;padding:10px;margin:8px 0}.group.selected{border:2px solid var(--cyan)}.grouphead{display:flex;gap:7px;align-items:center}.grouphead b{flex:1}.group input[type=range]{width:100%}.small{font-size:12px;color:#aab0bd}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.view{position:relative;aspect-ratio:var(--source-aspect,1.545)}.view img{width:100%;height:100%;object-fit:contain}.view span{position:absolute;top:4px;left:4px;background:#000b;padding:3px}.simnav{display:grid;grid-template-columns:45px 1fr 45px 90px;gap:8px}.sim3d{perspective:1200px;padding:26px 22px 34px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#20242c,#08090b 70%)}.sim3d>canvas{inset:4%;width:92%;height:92%;box-shadow:0 22px 50px #000b;border:1px solid #ffffff20;border-radius:8px}.simRig{position:absolute;inset:4%;width:92%;height:92%;transform-style:preserve-3d;transform-origin:50% 50%;will-change:transform;pointer-events:none}.simRig canvas{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;transform-style:preserve-3d}.simtools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.simtools label{font-size:12px;color:#aab0bd}.simtools input{width:100%}.hidden{display:none!important}.progress{height:7px;border-radius:8px;background:#090a0d;overflow:hidden;margin-top:8px}.progress i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s}@media(max-width:980px){.grid,.grid.sidebar-collapsed{grid-template-columns:1fr;height:auto;overflow:visible}.sidebar,.workspace{height:auto;overflow:visible}.sidebar.collapsed .panel{display:block}.sidebarToggle{display:none}.controls{grid-template-columns:1fr}.top span{display:none}}
+  </style>
+</head>
+<body>
+  <header class="top"><b>MicroPlayer Photo V01 — Master Scene</b><span>DepthFlow photo · plans 3D · MI-GAN fond maître · Pencil · 3 vues · 9 vues</span></header>
+  <main class="wrap"><div class="grid">
+    <aside id="sidebar" class="sidebar"><button id="toggleSidebar" class="sidebarToggle">◀ Replier les réglages</button>
+      <section class="panel">
+        <h2>1. Photo source</h2>
+        <input id="photoFile" type="file" accept="image/*">
+        <div id="sourceInfo" class="status">Choisis une photo pour démarrer.</div><div class="progress"><i id="activityBar"></i></div><div id="activityInfo" class="small" style="margin-top:6px">Photo V01 séparée de la version carte validée.</div>
+        <div class="actions" style="margin-top:8px"><button id="back">Nouvelle photo</button><button id="depthflow" disabled>Analyser profondeur</button></div>
+        <div class="progress"><i id="progress"></i></div>
+      </section>
+      <section class="panel"><h2>2. Plans photo</h2><select id="preset"><option value="natural">Naturel</option><option value="portrait">Portrait</option><option value="strong">Relief fort</option></select><button id="auto" style="width:100%;margin-top:8px" disabled>Répartir les profondeurs</button><div id="groups"></div></section>
+    </aside>
+    <section id="workspace" class="workspace">
+      <section id="editPanel" class="panel"><h2>Photo / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Photo</button><button id="depthView">Profondeur</button></div></section>
+      <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Masque groupe</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Masque auto</button></div><div id="pencilStatus" class="status ok">Sélectionne un groupe puis corrige uniquement son masque.</div></section>
+      <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Construire scène photo 3D</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler / modifier fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU PHOTO : contrôle esthétique uniquement · production issue de la scène maître.</div></section>
+      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Angle oblique <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief visuel <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim">✏️ Modifier le fond</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim">Voir fond maître</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP complet</button></div><div id="renderStatus" class="status ok"></div></section>
+    </section>
+  </div></main>
+  <script type="module">
+    import { cardDepthSpread, composeSemanticDepth, createCardDepthPreset, createSemanticMask, maskCoverage, paintMask } from './business-card-depthflow-core.js';
+    import { comparePixels, renderNovelView } from './depthflow-v42-core.js';
+
+    const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),editPanel=$('editPanel'),sim3d=$('sim3d'),simRig=$('simRig'),threePlan=$('threePlan'),sidebar=$('sidebar'),workspace=$('workspace');
+    const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1};
+    const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
+    const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    const selected=()=>state.groups.find(group=>group.id===state.selected);
+    const escapeHtml=value=>String(value).replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[character]));
+    $('toggleSidebar').onclick=()=>{const collapsed=sidebar.classList.toggle('collapsed');document.querySelector('.grid')?.classList.toggle('sidebar-collapsed',collapsed);$('toggleSidebar').textContent=collapsed?'▶ Réglages':'◀ Replier les réglages';};
+    function focusEditor(){if(!workspace)return;workspace.scrollTo({top:0,behavior:'smooth'});setTimeout(()=>editPanel?.scrollIntoView({block:'start',behavior:'smooth'}),40)}
+
+
+    function semanticMaskForGroup(group){
+      const combined=new Uint8ClampedArray(state.width*state.height);
+      const boxes=group.items.flatMap(item=>item.type==='text'&&item.words?.length?item.words.map(word=>word.bbox):[item.bbox]).filter(Boolean);
+      for(const box of boxes){const current=createSemanticMask(state.rgba,state.width,state.height,box,{threshold:group.type==='text'?22:36,softness:group.type==='text'?9:18,close:group.type==='text'?1:(group.role==='artwork'?0:2),dilate:group.type==='text'?0:1,padding:group.type==='text'?.002:.004});for(let index=0;index<combined.length;index++)if(current[index]>combined[index])combined[index]=current[index]}
+      return combined;
+    }
+
+    function compose(){state.rigidPreview=null;const layers=state.groups.map(group=>({mask:group.mask,depth:group.depth,enabled:true,internalRelief:['artwork','subject'].includes(group.role)?.18:0}));state.finalDepth=composeSemanticDepth(state.baseDepth,layers,{zero:Number($('zero').value),backgroundRelief:Number($('background').value)/100});if(state.preview==='depth')drawDepth();report()}
+    function report(){const spread=cardDepthSpread(state.groups,Number($('zero').value));const masks=state.groups.filter(group=>maskCoverage(group.mask).percent>.005).length;$('report').textContent=`${state.groups.length} groupes · ${masks} masques actifs · amplitude ${spread.span}/255 · fond ${$('background').value}% · vue 05 verrouillée.`;$('report').className='status '+(spread.span>=100&&masks===state.groups.length?'ok':'warn')}
+
+    function drawPhoto(){photoContext.clearRect(0,0,state.width,state.height);photoContext.drawImage(state.image,0,0,state.width,state.height)}
+    function drawDepth(){if(!state.finalDepth)return;const image=photoContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}photoContext.putImageData(image,0,0);maskContext.clearRect(0,0,state.width,state.height)}
+    function drawMaskOverlay(){maskContext.clearRect(0,0,state.width,state.height);if(state.preview!=='card'||state.editTarget!=='group')return;const group=selected();if(!group)return;const image=maskContext.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const alpha=group.mask[index];if(alpha<5)continue;image.data[index*4]=0;image.data[index*4+1]=229;image.data[index*4+2]=255;image.data[index*4+3]=Math.round(alpha*.68)}maskContext.putImageData(image,0,0)}
+    function showCard(){state.editTarget='group';state.preview='card';drawPhoto();drawMaskOverlay();$('card').classList.add('active');$('depthView').classList.remove('active');updatePencilUi()}
+    function drawCloneSourceOverlay(){
+      if(state.editTarget!=='master'||!state.cloneSource)return;
+      const x=state.cloneSource.x,y=state.cloneSource.y,r=Math.max(10,Number($('brush').value));
+      maskContext.save();
+      maskContext.lineWidth=Math.max(2,state.width/700);
+      maskContext.strokeStyle='rgba(0,0,0,.78)';
+      maskContext.beginPath();maskContext.arc(x,y,r,0,Math.PI*2);maskContext.moveTo(x-r*.65,y);maskContext.lineTo(x+r*.65,y);maskContext.moveTo(x,y-r*.65);maskContext.lineTo(x,y+r*.65);maskContext.stroke();
+      maskContext.lineWidth=Math.max(1,state.width/1100);
+      maskContext.strokeStyle='#ff4d8d';
+      maskContext.beginPath();maskContext.arc(x,y,r,0,Math.PI*2);maskContext.moveTo(x-r*.65,y);maskContext.lineTo(x+r*.65,y);maskContext.moveTo(x,y-r*.65);maskContext.lineTo(x,y+r*.65);maskContext.stroke();
+      if(state.cloneCurrentSource){
+        const sx=state.cloneCurrentSource.x,sy=state.cloneCurrentSource.y;
+        maskContext.setLineDash([7,6]);maskContext.strokeStyle='rgba(255,255,255,.82)';
+        maskContext.beginPath();maskContext.moveTo(sx-8,sy);maskContext.lineTo(sx+8,sy);maskContext.moveTo(sx,sy-8);maskContext.lineTo(sx,sy+8);maskContext.stroke();
+      }
+      maskContext.restore();
+    }
+    function drawMasterForEdit(){
+      if(!state.aiMaster?.background)return;
+      state.preview='master';
+      photoContext.clearRect(0,0,state.width,state.height);
+      photoContext.drawImage(state.aiMaster.background,0,0,state.width,state.height);
+      maskContext.clearRect(0,0,state.width,state.height);
+      drawCloneSourceOverlay();
+      $('card').classList.remove('active');$('depthView').classList.remove('active');
+    }
+    function updatePencilUi(){
+      const master=state.editTarget==='master';
+      $('targetGroup').classList.toggle('active',!master);$('targetMaster').classList.toggle('active',master);
+      $('masterTools').classList.toggle('hidden',!master);
+      $('add').textContent=master?'Restaurer fond':'Pencil +';$('erase').textContent=master?'Gommer résidu':'Gomme';$('resetMask').textContent=master?'Fond IA initial':'Masque auto';
+      if(master){
+        $('add').classList.toggle('active',state.masterTool==='restore');
+        $('erase').classList.toggle('active',state.masterTool==='heal');
+        $('pickCloneSource').classList.toggle('active',state.masterTool==='pick');
+        $('cloneBrush').classList.toggle('active',state.masterTool==='clone');
+        const source=state.cloneSource?' · source fixée ✚':' · aucune source choisie';
+        $('pencilStatus').textContent='Fond maître : Gommer résidu pour petites corrections, ou Choisir source ✚ puis Tampon clone pour copier une zone saine'+source+'.';
+      }else{
+        $('add').classList.toggle('active',state.mode==='add');$('erase').classList.toggle('active',state.mode==='erase');
+        $('pencilStatus').textContent=selected()?'Correction active sur « '+selected().label+' »':'Sélectionne un groupe puis corrige son masque.';
+      }
+      updateUndo();
+    }
+    function snapshotMaster(){if(!state.aiMaster?.background)return;const ctx=state.aiMaster.background.getContext('2d');state.masterHistory.push(ctx.getImageData(0,0,state.width,state.height));if(state.masterHistory.length>8)state.masterHistory.shift()}
+    function masterBrushAt(cx,cy,r,restore=false){if(!state.aiMaster?.background)return;const ctx=state.aiMaster.background.getContext('2d',{willReadFrequently:true}),rr=Math.max(2,Math.round(r)),pad=Math.ceil(rr*1.7),x0=Math.max(0,Math.floor(cx-pad)),y0=Math.max(0,Math.floor(cy-pad)),x1=Math.min(state.width,Math.ceil(cx+pad)),y1=Math.min(state.height,Math.ceil(cy+pad)),w=x1-x0,h=y1-y0;if(w<=0||h<=0)return;
+      if(restore&&state.masterOriginal){const src=state.masterOriginal.getContext('2d').getImageData(x0,y0,w,h),dst=ctx.getImageData(x0,y0,w,h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const gx=x+x0,gy=y+y0,dx=gx-cx,dy=gy-cy;if(dx*dx+dy*dy>rr*rr)continue;const i=(y*w+x)*4,dist=Math.hypot(dx,dy)/rr,blend=dist<=.72?1:Math.max(0,(1-dist)/.28);for(let k=0;k<3;k++)dst.data[i+k]=dst.data[i+k]*(1-blend)+src.data[i+k]*blend;dst.data[i+3]=255}ctx.putImageData(dst,x0,y0);return}
+      const src=ctx.getImageData(x0,y0,w,h),dst=new ImageData(new Uint8ClampedArray(src.data),w,h);
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){const gx=x+x0,gy=y+y0,dx=gx-cx,dy=gy-cy,d=Math.hypot(dx,dy);if(d>rr)continue;const a=Math.atan2(dy,dx),sd=rr*1.35,sx=Math.max(0,Math.min(w-1,Math.round(cx+Math.cos(a)*sd-x0))),sy=Math.max(0,Math.min(h-1,Math.round(cy+Math.sin(a)*sd-y0))),si=(sy*w+sx)*4,di=(y*w+x)*4,blend=Math.min(1,(rr-d)/Math.max(1,rr*.55));for(let k=0;k<3;k++)dst.data[di+k]=src.data[di+k]*(1-blend)+src.data[si+k]*blend;dst.data[di+3]=255}
+      ctx.putImageData(dst,x0,y0)}
+    function masterBrushSegment(from,to,restore=false){const r=Number($('brush').value),dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.32)));for(let s=0;s<=steps;s++){const t=s/steps;masterBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r,restore)}}
+    function cloneBrushAt(dstX,dstY,radius){
+      if(!state.aiMaster?.background||!state.cloneSnapshot||!state.cloneStroke)return;
+      const W=state.width,H=state.height,ctx=state.aiMaster.background.getContext('2d',{willReadFrequently:true}),rr=Math.max(2,Math.round(radius));
+      const sxCenter=state.cloneStroke.srcStart.x+(dstX-state.cloneStroke.dstStart.x),syCenter=state.cloneStroke.srcStart.y+(dstY-state.cloneStroke.dstStart.y);
+      state.cloneCurrentSource={x:sxCenter,y:syCenter};
+      const x0=Math.max(0,Math.floor(dstX-rr)),y0=Math.max(0,Math.floor(dstY-rr)),x1=Math.min(W,Math.ceil(dstX+rr+1)),y1=Math.min(H,Math.ceil(dstY+rr+1)),w=x1-x0,h=y1-y0;if(w<=0||h<=0)return;
+      const dst=ctx.getImageData(x0,y0,w,h),src=state.cloneSnapshot.data;
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const gx=x0+x,gy=y0+y,ox=gx-dstX,oy=gy-dstY,dist=Math.hypot(ox,oy);if(dist>rr)continue;
+        const sx=Math.round(sxCenter+ox),sy=Math.round(syCenter+oy);if(sx<0||sy<0||sx>=W||sy>=H)continue;
+        const si=(sy*W+sx)*4,di=(y*w+x)*4,n=dist/rr,blend=n<=.72?1:Math.max(0,(1-n)/.28);
+        dst.data[di]=dst.data[di]*(1-blend)+src[si]*blend;dst.data[di+1]=dst.data[di+1]*(1-blend)+src[si+1]*blend;dst.data[di+2]=dst.data[di+2]*(1-blend)+src[si+2]*blend;dst.data[di+3]=255;
+      }
+      ctx.putImageData(dst,x0,y0);
+    }
+    function cloneBrushSegment(from,to){
+      const r=Number($('brush').value),dist=Math.hypot(to.x-from.x,to.y-from.y),steps=Math.max(1,Math.ceil(dist/Math.max(1,r*.28)));
+      for(let s=0;s<=steps;s++){const t=s/steps;cloneBrushAt(from.x+(to.x-from.x)*t,from.y+(to.y-from.y)*t,r)}
+    }
+    function renderGroups(){const root=$('groups');root.innerHTML='';state.groups.forEach(group=>{const element=document.createElement('div');element.className='group'+(group.id===state.selected?' selected':'');element.innerHTML=`<div class="grouphead"><b>${escapeHtml(group.label)}</b><button>Éditer</button></div><div class="small">${escapeHtml(group.role)} · plan photo · masque ${maskCoverage(group.mask).percent.toFixed(2)}%</div><label>Profondeur <b class="value">${group.depth}</b><input type="range" min="0" max="255" value="${group.depth}"></label>`;element.querySelector('button').onclick=()=>{state.selected=group.id;state.history=[];renderGroups();showCard();focusEditor();updateUndo();$('pencilStatus').textContent=`Correction active sur « ${group.label} »`};element.querySelector('input').oninput=event=>{group.depth=Number(event.target.value);element.querySelector('.value').textContent=group.depth;syncAiMasterDepths();compose();markSceneDirty('Profondeur modifiée');scheduleLivePreview(false)};root.appendChild(element)})}
+
+    function applyPreset(){
+      const mode=$('preset').value,profiles={
+        natural:{zero:128,relief:185,parallax:3.0,background:8,depths:[42,84,128,184,232]},
+        portrait:{zero:128,relief:200,parallax:3.5,background:6,depths:[36,76,126,198,242]},
+        strong:{zero:128,relief:220,parallax:4.2,background:10,depths:[24,68,122,204,250]}
+      },p=profiles[mode]||profiles.natural;
+      $('zero').value=p.zero;$('relief').value=p.relief;$('parallax').value=p.parallax;$('background').value=p.background;
+      state.groups.forEach((group,index)=>group.depth=p.depths[Math.min(index,p.depths.length-1)]);
+      updateOutputs();renderGroups();compose();
+    }
+    function updateOutputs(){$('zeroOut').textContent=$('zero').value;$('reliefOut').textContent=$('relief').value+'%';$('parallaxOut').textContent=$('parallax').value+'%';$('backgroundOut').textContent=$('background').value+'%'}
+
+    function canvasPoint(event){const rect=mask.getBoundingClientRect();return{x:(event.clientX-rect.left)/rect.width*state.width,y:(event.clientY-rect.top)/rect.height*state.height}}
+    function directStroke(from,to){maskContext.save();maskContext.lineCap='round';maskContext.lineJoin='round';maskContext.lineWidth=Number($('brush').value)*2;maskContext.globalCompositeOperation=state.mode==='erase'?'destination-out':'source-over';maskContext.strokeStyle='rgba(0,229,255,.68)';maskContext.beginPath();maskContext.moveTo(from.x,from.y);maskContext.lineTo(to.x,to.y);maskContext.stroke();maskContext.restore()}
+    mask.addEventListener('pointerdown',event=>{
+      event.preventDefault();const point=canvasPoint(event);
+      if(state.editTarget==='master'){
+        if(!state.aiMaster?.background)return;
+        if(state.masterTool==='pick'){
+          state.cloneSource={x:point.x,y:point.y};state.cloneCurrentSource=null;state.drawing=false;drawMasterForEdit();updatePencilUi();
+          $('pencilStatus').className='status ok';$('pencilStatus').textContent='Source clone fixée ✚. Choisis maintenant « Tampon clone » puis peins au Pencil sur la zone à remplacer.';return;
+        }
+        if(state.masterTool==='clone'&&!state.cloneSource){
+          state.drawing=false;$('pencilStatus').className='status warn';$('pencilStatus').textContent='Choisis d’abord une zone saine avec « ✚ Choisir source ».';return;
+        }
+        snapshotMaster();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);
+        if(state.masterTool==='clone'){
+          const ctx=state.aiMaster.background.getContext('2d',{willReadFrequently:true});
+          state.cloneSnapshot=ctx.getImageData(0,0,state.width,state.height);
+          state.cloneStroke={srcStart:{x:state.cloneSource.x,y:state.cloneSource.y},dstStart:{x:point.x,y:point.y}};
+          cloneBrushSegment(point,point);
+        }else masterBrushSegment(point,point,state.masterTool==='restore');
+        drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);updateUndo();return;
+      }
+      const group=selected();if(!group||state.preview!=='card')return;
+      state.history.push(new Uint8ClampedArray(group.mask));if(state.history.length>20)state.history.shift();state.drawing=true;state.lastPoint=point;mask.setPointerCapture?.(event.pointerId);updateUndo();
+    },{passive:false});
+    mask.addEventListener('pointermove',event=>{
+      if(!state.drawing)return;event.preventDefault();const point=canvasPoint(event);
+      if(state.editTarget==='master'){
+        if(state.masterTool==='clone')cloneBrushSegment(state.lastPoint,point);else masterBrushSegment(state.lastPoint,point,state.masterTool==='restore');
+        state.lastPoint=point;drawMasterForEdit();updateRigBackground();scheduleLivePreview(false);return;
+      }
+      const group=selected(),value=state.mode==='erase'?0:255;paintMask(group.mask,state.width,state.height,state.lastPoint,point,Number($('brush').value),value);directStroke(state.lastPoint,point);state.lastPoint=point;
+    },{passive:false});
+    function endStroke(){
+      if(!state.drawing)return;state.drawing=false;
+      if(state.editTarget==='master'){
+        state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();evaluateManualMaster();markSceneDirty(state.masterTool==='clone'?'Fond maître cloné au Pencil':'Fond maître retouché au Pencil');scheduleLivePreview(false,true);updateUndo();return;
+      }
+      drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque modifié au Pencil');scheduleLivePreview(true,true);
+    }
+    mask.addEventListener('pointerup',endStroke);mask.addEventListener('pointercancel',endStroke);
+    function updateUndo(){$('undo').disabled=state.editTarget==='master'?!state.masterHistory.length:!state.history.length}
+    $('undo').onclick=()=>{
+      if(state.editTarget==='master'){
+        const previous=state.masterHistory.pop();if(previous&&state.aiMaster?.background){state.aiMaster.background.getContext('2d').putImageData(previous,0,0);state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Annulation retouche fond');scheduleLivePreview(false,true)}updateUndo();return;
+      }
+      const group=selected(),previous=state.history.pop();if(group&&previous){group.mask=previous;drawMaskOverlay();compose();renderGroups();markSceneDirty('Annulation masque');scheduleLivePreview(true,true)}updateUndo();
+    };
+    $('resetMask').onclick=()=>{
+      if(state.editTarget==='master'){
+        if(!state.masterOriginal||!state.aiMaster?.background)return;snapshotMaster();const ctx=state.aiMaster.background.getContext('2d');ctx.clearRect(0,0,state.width,state.height);ctx.drawImage(state.masterOriginal,0,0);state.cloneSource=null;state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;drawMasterForEdit();updateRigBackground();evaluateManualMaster();markSceneDirty('Fond IA restauré');scheduleLivePreview(false,true);updatePencilUi();updateUndo();return;
+      }
+      const group=selected();if(!group)return;state.history.push(new Uint8ClampedArray(group.mask));group.mask=new Uint8ClampedArray(group.autoMask);drawMaskOverlay();compose();renderGroups();markSceneDirty('Masque auto restauré');scheduleLivePreview(true,true);updateUndo();
+    };
+    $('add').onclick=()=>{if(state.editTarget==='master'){state.masterTool='restore';updatePencilUi();return}state.mode='add';updatePencilUi()};
+    $('erase').onclick=()=>{if(state.editTarget==='master'){state.masterTool='heal';updatePencilUi();return}state.mode='erase';updatePencilUi()};
+    $('pickCloneSource').onclick=()=>{if(state.editTarget!=='master')return;state.masterTool='pick';updatePencilUi();$('pencilStatus').className='status ok';$('pencilStatus').textContent='Touchez maintenant une zone saine du fond : une croix ✚ y sera fixée comme source.'};
+    $('cloneBrush').onclick=()=>{if(state.editTarget!=='master')return;state.masterTool='clone';updatePencilUi();$('pencilStatus').className=state.cloneSource?'status ok':'status warn';$('pencilStatus').textContent=state.cloneSource?'Tampon clone actif : peins au Pencil sur la zone abîmée. La croix indique la source.':'Aucune source : utilise d’abord « ✚ Choisir source ». '};
+    $('brush').oninput=()=>{$('brushOut').textContent=$('brush').value;if(state.editTarget==='master')drawMasterForEdit()};
+    $('targetGroup').onclick=()=>{state.editTarget='group';state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;showCard();updatePencilUi()};
+    $('targetMaster').onclick=editMasterBackground;
+    $('card').onclick=showCard;$('depthView').onclick=()=>{state.editTarget='group';state.preview='depth';drawDepth();$('depthView').classList.add('active');$('card').classList.remove('active');updatePencilUi()};
+
+    function depthWorker(){if(state.worker)return state.worker;const worker=new Worker(new URL('./depthflow-v42-worker.js',import.meta.url),{type:'module'});worker.onmessage=event=>{const message=event.data||{};if(message.requestId!==state.requestId)return;if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);$('sourceInfo').className='status ok';$('sourceInfo').textContent='DepthFlow prêt. Le relief du fond reste volontairement limité pour protéger les textes.';$('progress').style.width='100%';compose()}if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow indisponible : '+message.message+'\nLe rendu par plans sémantiques reste utilisable.'}};state.worker=worker;return worker}
+    $('depthflow').onclick=()=>{state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='DepthFlow démarre sur l’iPad…';const guide=new Uint8ClampedArray(state.rgba);depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer])};
+
+    function renderSemanticPlaneView(position){
+      if(state.aiMaster)return renderAiMasterView(position);
+      if(!state.rigidPreview)buildRigidPreviewLayers();
+      const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      const normal=Math.max(-1,Math.min(1,position)),zero=Number($('zero').value);
+      if(Math.abs(normal)<1e-9){
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        return canvas;
+      }
+      ctx.drawImage(state.rigidPreview.base,0,0,state.width,state.height);
+      const ordered=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth);
+      const maxShift=state.width*(Number($('parallax').value)/100),denom=Math.max(1,zero,255-zero);
+      for(const layer of ordered){
+        const z=(Number(layer.depth)-zero)/denom;
+        const dx=normal*z*maxShift;
+        // Production views: original RGBA plane only. No extrusion, scale, blur or cast shadow.
+        ctx.drawImage(layer.canvas,dx,0,state.width,state.height);
+      }
+      return canvas;
+    }
+
+    function renderAiMasterView(position){
+      const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+      const normal=Math.max(-1,Math.min(1,position)),zero=Number($('zero').value);
+      if(Math.abs(normal)<1e-9){ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
+      ctx.drawImage(state.aiMaster.background,0,0,state.width,state.height);
+      const ordered=[...state.aiMaster.layers].sort((a,b)=>a.depth-b.depth);
+      const maxShift=state.width*(Number($('parallax').value)/100),denom=Math.max(1,zero,255-zero);
+      // Per-view LDI disocclusion: background_master is authoritative and the convergence
+      // plane is exactly "zero". A layer at depth===zero never moves.
+      for(const layer of ordered){
+        const z=(Number(layer.depth)-zero)/denom,dx=normal*z*maxShift;
+        ctx.save();ctx.beginPath();ctx.rect(0,0,state.width,state.height);ctx.clip();
+        ctx.drawImage(layer.image,dx,0,state.width,state.height);ctx.restore();
+      }
+      return canvas;
+    }
+
+    function enforceExclusiveMasks(){
+      if(!state.groups.length)return {before:0,after:0};
+      const N=state.width*state.height,owner=new Int16Array(N),bestAlpha=new Uint8ClampedArray(N);owner.fill(-1);let before=0;
+      for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++){const a=state.groups[g].mask[i];if(a>=20)hits++;if(a>bestAlpha[i]){bestAlpha[i]=a;owner[i]=g}}if(hits>1)before++}
+      for(let g=0;g<state.groups.length;g++){const src=state.groups[g].mask,out=new Uint8ClampedArray(N);for(let i=0;i<N;i++)if(owner[i]===g&&src[i]>=20)out[i]=src[i];state.groups[g].mask=out}
+      let after=0;for(let i=0;i<N;i++){let hits=0;for(let g=0;g<state.groups.length;g++)if(state.groups[g].mask[i]>=20)hits++;if(hits>1)after++}
+      return {before,after};
+    }
+    function qcMasterScene(){
+      if(!state.rigidPreview)return {ok:false,reason:'no-master'};
+      const N=state.width*state.height,overlap=new Uint8Array(N);let collisions=0,covered=0;
+      for(const group of state.groups){for(let i=0;i<N;i++)if(group.mask[i]>=20){if(overlap[i])collisions++;else{overlap[i]=1;covered++}}}
+      const active=state.rigidPreview.layers.length;
+      const ok=active>=3&&collisions===0;
+      return {ok,active,collisions,covered,coverage:Number((covered/N*100).toFixed(2))};
+    }
+    function buildClientPreview(){
+      if(!state.masterQc?.ok){$('clientGate').className='status warn';$('clientGate').textContent='Aperçu client bloqué : scène maître de production non validée.';return}
+      buildThreePlanControl();$('clientGate').className='status ok';$('clientGate').textContent='APERÇU CLIENT IA séparé de la production. Démonstration esthétique autorisée; aucune de ses images ne sera exportée vers les 9 vues ou l’impression.';
+    }
+    $('clientPreview').onclick=buildClientPreview;
+
+    function buildThreePlanControl(){
+      const src=state.aiMaster;if(!src||!src.layers?.length)return false;
+      const W=state.width,H=state.height;threePlan.width=W;threePlan.height=H;
+      const ctx=threePlan.getContext('2d');ctx.clearRect(0,0,W,H);ctx.fillStyle='#08090c';ctx.fillRect(0,0,W,H);
+      const zero=Number($('zero').value),ordered=[...src.layers].sort((a,b)=>(a.depth||zero)-(b.depth||zero));
+      const d=ordered.map(x=>Number(x.depth)||zero),min=Math.min(...d,zero),max=Math.max(...d,zero),span=Math.max(1,max-min);
+      const insetX=W*.08,insetY=H*.12,scale=.82;
+      ctx.save();ctx.translate(insetX,insetY);ctx.transform(scale,-.055,-.035,scale,0,0);
+      ctx.drawImage(src.background,0,0,W,H);
+      for(const layer of ordered){
+        const z=(Number(layer.depth)-min)/span;
+        const lift=8+z*Math.max(28,Math.min(W,H)*.10);
+        ctx.save();ctx.translate(-lift,-lift*.48);ctx.drawImage(layer.image,0,0,W,H);ctx.restore();
+      }
+      ctx.restore();$('threePlanWrap').classList.remove('hidden');return true;
+    }
+
+    function showMasterBackground(){
+      if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Fond maître indisponible : composer et valider la scène maître d’abord.';return}
+      stopAnimation();$('results').classList.remove('hidden');setSimulationMode('canvas');
+      const w=Math.min(1400,Math.max(700,state.width)),h=Math.round(w*state.height/state.width);sim3d.width=w;sim3d.height=h;
+      const ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);ctx.drawImage(state.aiMaster.background,0,0,w,h);
+      $('simOut').textContent='FOND MAÎTRE';$('renderStatus').className='status warn';$('renderStatus').textContent='QC anti-fantôme : cette image doit contenir uniquement le fond/décor. Aucun texte, logo ou pictogramme destiné au relief ne doit rester visible.';
+    }
+    $('masterBg').onclick=showMasterBackground;
+    function editMasterBackground(){
+      if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Fond maître indisponible : composer et valider la scène maître d’abord.';return}
+      stopAnimation();
+      state.editTarget='master';
+      if(!['heal','restore','pick','clone'].includes(state.masterTool))state.masterTool='heal';
+      drawMasterForEdit();
+      updatePencilUi();
+      focusEditor();
+      $('pencilStatus').className='status ok';
+      $('pencilStatus').textContent='FOND MAÎTRE — petites corrections : Gommer résidu. Gros défaut : ✚ Choisir source, toucher une zone saine, puis Tampon clone et peindre au Pencil.';
+    }
+    $('editMasterFromSim').onclick=editMasterBackground;
+    $('showMasterFromSim').onclick=showMasterBackground;
+
+    async function generateThreeViews(){
+      if(!state.aiReady||!state.aiMaster){$('aiGate').className='status warn';$('aiGate').textContent='Test 3 vues verrouillé : scène maître non validée.';return}
+      stopAnimation();const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'];state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      for(let i=0;i<3;i++){const result=renderRigidScene(positions[i],state.width,state.height,{exactCenter:true});if(!result)throw Error('Rendu 3D de contrôle indisponible.');const canvas=result.canvas,blob=await toBlob(canvas);state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:labels[i],position:positions[i],angleDeg:result.angleDeg,mode:'card-rig-true-z-preview'});}
+      const centre=state.views[1].getContext('2d').getImageData(0,0,state.width,state.height).data,qc=comparePixels(centre,state.rgba);
+      $('views').innerHTML=state.urls.map((url,i)=>`<div class="view"><img src="${url}" alt="${labels[i]}"><span>${labels[i]}</span></div>`).join('');
+      $('results').classList.remove('hidden');
+      const manualRatio=state.masterQc?.manualResidualRatio,ghostRatio=Number.isFinite(manualRatio)?manualRatio:(state.masterQc?.ghost?.ratio??null),ghostOk=Number.isFinite(ghostRatio)?ghostRatio<=25:true;
+      const threeQcOk=qc.different===0&&ghostOk&&state.views.length===3;
+      state.threeViewQc={ok:threeQcOk,centreDifferent:qc.different,ghostRatio};
+      $('generate').disabled=!threeQcOk;
+      $('renderStatus').className=threeQcOk?'status ok':'status warn';
+      $('renderStatus').textContent=threeQcOk
+        ? `TEST 3 VUES VALIDÉ TECHNIQUEMENT · centre pixel parfait · anti-fantôme ${state.threeViewQc.ghostRatio}% · PRODUCTION 9 VUES DÉVERROUILLÉE.`
+        : `TEST 3 VUES REFUSÉ · centre ${qc.different===0?'pixel parfait':qc.different+' pixels différents'} · anti-fantôme ${state.threeViewQc.ghostRatio??'indisponible'}%. Les 9 vues restent bloquées.`;
+      state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation();
+    }
+    $('threeViews').onclick=generateThreeViews;
+
+    async function generateViews(){
+      if(!state.aiReady||!state.aiMaster||!state.threeViewQc?.ok){$('aiGate').className='status warn';$('aiGate').textContent='9 vues verrouillées : exécuter d’abord le TEST Gauche / Centre / Droite et obtenir un QC technique valide.';return}
+      compose();if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();$('generate').disabled=true;$('generate').textContent='Calcul des 9 plans…';state.urls.forEach(URL.revokeObjectURL);state.views=[];state.blobs=[];state.urls=[];state.renderStats=[];
+      for(let index=0;index<9;index++){
+        await new Promise(requestAnimationFrame);const position=(index-4)/4;
+        const canvas=renderSemanticPlaneView(position),blob=await toBlob(canvas);
+        state.views.push(canvas);state.blobs.push(blob);state.urls.push(URL.createObjectURL(blob));state.renderStats.push({view:index+1,position,mode:'semantic-flat-planes',shadow:false,extrusion:false});
+        $('generate').textContent=`Vue ${index+1}/9…`;
+      }
+      const centre=state.views[4].getContext('2d').getImageData(0,0,state.width,state.height).data,centreQc=comparePixels(centre,state.rgba);
+      $('renderStatus').textContent=`QC vue 05 : ${centreQc.different===0?'copie pixel parfaite':'écart '+centreQc.different+' pixels'} · 9 vues issues d’une scène maîtresse · plans plats · zéro extrusion · zéro ombre ajoutée.`;
+      $('views').innerHTML=state.urls.map((url,index)=>`<div class="view"><img src="${url}" alt="Vue ${index+1}"><span>${String(index+1).padStart(2,'0')}</span></div>`).join('');
+      $('results').classList.remove('hidden');$('generate').disabled=false;$('generate').textContent='Régénérer les 9 vues';state.simPosition=4;$('simRange').value='4';drawSimulation(4);startAnimation();
+    }
+    $('generate').onclick=generateViews;
+
+    let miganSession=null;
+    async function rebuildMasterWithMigan(){
+      if(!state.rigidPreview?.removalMask)throw Error('Masque de désocclusion absent.');
+      if(!window.ort)throw Error('ONNX Runtime indisponible.');
+      const W=state.width,H=state.height,N=W*H,rm=state.rigidPreview.removalMask;
+      $('renderStatus').className='status';$('renderStatus').textContent='Reconstruction fond maître — MI-GAN pipeline V2 natif '+W+'×'+H+'…';
+      // IMPORTANT: use the model actually selected by current inpaint-web. The old lxfater/migan.onnx
+      // is a fixed 512 float pipeline and is not the model used by their current adapter.
+      if(!miganSession){
+        ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/';
+        const modelUrl='https://huggingface.co/andraniksargsyan/migan/resolve/main/migan_pipeline_v2.onnx';
+        try{
+          $('aiGate').textContent='Étape 2A/5 : téléchargement MI-GAN pipeline V2…';
+          const r=await fetch(modelUrl,{mode:'cors',cache:'force-cache'});if(!r.ok)throw Error('HTTP modèle '+r.status);
+          const bytes=await r.arrayBuffer();if(bytes.byteLength<1000000)throw Error('modèle incomplet '+bytes.byteLength);
+          $('aiGate').textContent='Étape 2B/5 : initialisation ONNX ('+Math.round(bytes.byteLength/1048576)+' Mo)…';
+          miganSession=await ort.InferenceSession.create(new Uint8Array(bytes),{executionProviders:['wasm']});
+        }catch(e){throw Error('ETAPE MI_GAN_LOAD · '+(e?.message||e));}
+      }
+      const ins=miganSession.inputNames||[],outs=miganSession.outputNames||[];
+      if(ins.length!==2||!outs.length)throw Error('ETAPE MI_GAN_IO · pipeline V2 attendu 2 entrées · reçues='+JSON.stringify(ins));
+      // MI-GAN ONNX pipeline contract: 255 = known/preserved pixel, 0 = masked hole to reconstruct.
+      // removalMask uses the opposite convention (255 = pixel to remove), so polarity MUST be inverted here.
+      const rgb=new Uint8Array(3*N),maskData=new Uint8Array(N);
+      for(let i=0;i<N;i++){const j=i*4;rgb[i]=state.rgba[j];rgb[N+i]=state.rgba[j+1];rgb[2*N+i]=state.rgba[j+2];maskData[i]=rm[i]?0:255}
+      const feeds={};feeds[ins[0]]=new ort.Tensor('uint8',rgb,[1,3,H,W]);feeds[ins[1]]=new ort.Tensor('uint8',maskData,[1,1,H,W]);
+      $('aiGate').textContent='Étape 2C/5 : inférence MI-GAN native '+W+'×'+H+'…';
+      let out;try{out=await miganSession.run(feeds)}catch(e){throw Error('ETAPE MI_GAN_RUN · '+(e?.message||e))}
+      const tensor=out[outs[0]];if(!tensor)throw Error('ETAPE MI_GAN_OUTPUT · sortie absente');const data=tensor.data;
+      const finalData=new Uint8ClampedArray(state.rgba);
+      // Only replace the dilated removal region. Everything else remains byte-identical to source.
+      for(let i=0;i<N;i++)if(rm[i]){const j=i*4;finalData[j]=Math.max(0,Math.min(255,Number(data[i])));finalData[j+1]=Math.max(0,Math.min(255,Number(data[N+i])));finalData[j+2]=Math.max(0,Math.min(255,Number(data[2*N+i])));finalData[j+3]=255}
+      const base=document.createElement('canvas');base.width=W;base.height=H;base.getContext('2d').putImageData(new ImageData(finalData,W,H),0,0);
+      state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN pipeline V2 native uint8';
+      return base;
+    }
+
+    function dilateBinaryMask(seed,radius){
+      const W=state.width,H=state.height,N=W*H,out=new Uint8ClampedArray(N),r=Math.max(1,Math.round(radius));
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(!seed[i])continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<W&&yy<H)out[yy*W+xx]=255}}
+      return out;
+    }
+    function measureMasterGhost(bgPx,rm){
+      const W=state.width,H=state.height,N=W*H,ringR=Math.max(3,Math.round(Math.min(W,H)*.008));
+      let removed=0,suspect=0,residual=0,errSum=0;
+      for(let i=0;i<N;i++){if(!rm[i])continue;removed++;const x=i%W,y=(i/W)|0,j=i*4;let rr=0,gg=0,bb=0,n=0;
+        for(let k=0;k<16;k++){const a=k*Math.PI/8,xx=Math.max(0,Math.min(W-1,Math.round(x+Math.cos(a)*ringR))),yy=Math.max(0,Math.min(H-1,Math.round(y+Math.sin(a)*ringR))),q=yy*W+xx;if(rm[q])continue;const p=q*4;rr+=bgPx[p];gg+=bgPx[p+1];bb+=bgPx[p+2];n++}
+        if(!n)continue;rr/=n;gg/=n;bb/=n;const localErr=(Math.abs(bgPx[j]-rr)+Math.abs(bgPx[j+1]-gg)+Math.abs(bgPx[j+2]-bb))/3;errSum+=localErr;
+        const originalDelta=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;
+        if(localErr>38)suspect++;if(localErr>28&&originalDelta<35)residual++;
+      }
+      // Only the opaque core of semantic masks is meaningful for source-survival QC.
+      // Soft antialias fringes (alpha 20..95) may legitimately remain close to the background colour.
+      let core=0,coreUnchanged=0;
+      for(const group of productionGroups())for(let i=0;i<N;i++){if((group.mask?.[i]||0)<96)continue;core++;const j=i*4,d=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;if(d<8)coreUnchanged++}
+      const residualRatio=removed?residual/removed:0,suspectRatio=removed?suspect/removed:0,coreUnchangedRatio=core?coreUnchanged/core:0;
+      return {removed,suspect,residual,residualRatio,suspectRatio,meanLocalError:removed?errSum/removed:0,core,coreUnchanged,coreUnchangedRatio};
+    }
+    function buildResidualCleanupMask(bgPx){
+      const W=state.width,H=state.height,N=W*H,seed=new Uint8ClampedArray(N);
+      for(const group of productionGroups())for(let i=0;i<N;i++){if((group.mask?.[i]||0)<96)continue;const j=i*4,d=(Math.abs(bgPx[j]-state.rgba[j])+Math.abs(bgPx[j+1]-state.rgba[j+1])+Math.abs(bgPx[j+2]-state.rgba[j+2]))/3;if(d<10)seed[i]=255}
+      const r=Math.max(2,Math.round(Math.min(W,H)*.0045));
+      return dilateBinaryMask(seed,r);
+    }
+    async function runMiganCleanupPass(inputRgba,holeMask){
+      if(!miganSession)throw Error('MI-GAN non initialisé pour la passe de nettoyage.');
+      const W=state.width,H=state.height,N=W*H,ins=miganSession.inputNames||[],outs=miganSession.outputNames||[];
+      const rgb=new Uint8Array(3*N),maskData=new Uint8Array(N);
+      for(let i=0;i<N;i++){const j=i*4;rgb[i]=inputRgba[j];rgb[N+i]=inputRgba[j+1];rgb[2*N+i]=inputRgba[j+2];maskData[i]=holeMask[i]?0:255}
+      const feeds={};feeds[ins[0]]=new ort.Tensor('uint8',rgb,[1,3,H,W]);feeds[ins[1]]=new ort.Tensor('uint8',maskData,[1,1,H,W]);
+      $('aiGate').textContent='Étape 2D/5 : seconde passe MI-GAN ciblée sur les résidus…';
+      let out;try{out=await miganSession.run(feeds)}catch(e){throw Error('ETAPE MI_GAN_CLEANUP · '+(e?.message||e))}
+      const tensor=out[outs[0]];if(!tensor)throw Error('ETAPE MI_GAN_CLEANUP_OUTPUT · sortie absente');const data=tensor.data,finalData=new Uint8ClampedArray(inputRgba);
+      for(let i=0;i<N;i++)if(holeMask[i]){const j=i*4;finalData[j]=Math.max(0,Math.min(255,Number(data[i])));finalData[j+1]=Math.max(0,Math.min(255,Number(data[N+i])));finalData[j+2]=Math.max(0,Math.min(255,Number(data[2*N+i])));finalData[j+3]=255}
+      return finalData;
+    }
+    function boxArea(box){return Array.isArray(box)&&box.length>=4?Math.max(0,Number(box[2])||0)*Math.max(0,Number(box[3])||0):0}
+    function boxIntersectionRatio(inner,outer){
+      if(!Array.isArray(inner)||!Array.isArray(outer))return 0;
+      const ax0=Number(inner[0])||0,ay0=Number(inner[1])||0,ax1=ax0+(Number(inner[2])||0),ay1=ay0+(Number(inner[3])||0);
+      const bx0=Number(outer[0])||0,by0=Number(outer[1])||0,bx1=bx0+(Number(outer[2])||0),by1=by0+(Number(outer[3])||0);
+      const w=Math.max(0,Math.min(ax1,bx1)-Math.max(ax0,bx0)),h=Math.max(0,Math.min(ay1,by1)-Math.max(ay0,by0)),a=Math.max(1e-9,(ax1-ax0)*(ay1-ay0));
+      return w*h/a;
+    }
+    function isStructuralGroup(group){
+      const role=String(group?.role||'').toLowerCase(),type=String(group?.type||'').toLowerCase(),coverage=maskCoverage(group?.mask||new Uint8ClampedArray()).percent,area=boxArea(group?.bbox);
+      return ['artwork','subject','background','decor','decoration'].includes(role)||(type==='artwork'&&(coverage>18||area>0.18));
+    }
+    function isLogoTextDuplicate(group){
+      const role=String(group?.role||'').toLowerCase();
+      if(role!=='company'||!Array.isArray(group?.bbox))return false;
+      return state.groups.some(other=>other!==group&&String(other?.role||'').toLowerCase()==='logo'&&boxIntersectionRatio(group.bbox,other.bbox)>=0.82);
+    }
+
+    function invalidateRig(){state.rigVersion++;if(simRig)simRig.dataset.version=''}
+    function syncAiMasterDepths(){if(!state.aiMaster?.layers)return;const byId=new Map(state.groups.map(g=>[String(g.id),Number(g.depth)]));for(const layer of state.aiMaster.layers){const v=byId.get(String(layer.groupId));if(Number.isFinite(v))layer.depth=v}}
+    function rebuildAiMasterLayersFromCurrentMasks(){if(!state.aiMaster?.background)return;const bg=state.aiMaster.background.getContext('2d').getImageData(0,0,state.width,state.height).data,N=state.width*state.height,layers=[];for(const group of productionGroups()){const pm=deriveLayerMask(group,bg);group.productionMask=pm;const layer=document.createElement('canvas');layer.width=state.width;layer.height=state.height;const ctx=layer.getContext('2d'),id=ctx.createImageData(state.width,state.height);for(let i=0;i<N;i++){const a=pm[i];if(a<12)continue;const j=i*4;id.data[j]=state.rgba[j];id.data[j+1]=state.rgba[j+1];id.data[j+2]=state.rgba[j+2];id.data[j+3]=a}ctx.putImageData(id,0,0);if(maskCoverage(pm).percent>=.01)layers.push({image:layer,depth:Number(group.depth),label:group.label,groupId:group.id})}state.aiMaster.layers=layers;invalidateRig()}
+    function markSceneDirty(reason){if(!state.aiReady)return;state.threeViewQc=null;$('generate').disabled=true;$('threeViews').disabled=false;$('aiGate').className='status warn';$('aiGate').textContent='SCÈNE MODIFIÉE — '+reason+' · simulation mise à jour en direct · relancer TEST Gauche / Centre / Droite avant les 9 vues.'}
+    function evaluateManualMaster(){if(!state.aiMaster?.background)return null;const bg=state.aiMaster.background.getContext('2d').getImageData(0,0,state.width,state.height).data,N=state.width*state.height;let core=0,unchanged=0;for(const group of productionGroups()){const m=group.productionMask||group.mask;for(let i=0;i<N;i++){if((m?.[i]||0)<20)continue;core++;const j=i*4,d=(Math.abs(bg[j]-state.rgba[j])+Math.abs(bg[j+1]-state.rgba[j+1])+Math.abs(bg[j+2]-state.rgba[j+2]))/3;if(d<8)unchanged++}}const ratio=core?unchanged/core*100:0;if(state.masterQc){state.masterQc.manualResidualRatio=Number(ratio.toFixed(2));state.masterQc.manualEdited=true}return ratio}
+
+    async function refreshLiveThumbnails(){if(!state.aiMaster||state.views.length!==3)return;const positions=[-1,0,1],labels=['GAUCHE','CENTRE','DROITE'],urls=[],views=[],blobs=[];for(let i=0;i<3;i++){const r=renderRigidScene(positions[i],state.width,state.height,{exactCenter:true});if(!r)return;const blob=await toBlob(r.canvas);views.push(r.canvas);blobs.push(blob);urls.push(URL.createObjectURL(blob))}state.urls.forEach(URL.revokeObjectURL);state.views=views;state.blobs=blobs;state.urls=urls;state.renderStats=labels.map((label,i)=>({view:label,position:positions[i],mode:'card-rig-live-edited'}));$('views').innerHTML=urls.map((url,i)=>'<div class="view"><img src="'+url+'" alt="'+labels[i]+'"><span>'+labels[i]+'</span></div>').join('')}
+    function scheduleLivePreview(rebuildLayers=false,refreshThumbs=false){if(rebuildLayers)state.liveRebuildLayers=true;if(state.liveFrame)return;state.liveFrame=requestAnimationFrame(()=>{state.liveFrame=0;if(state.liveRebuildLayers){state.liveRebuildLayers=false;rebuildAiMasterLayersFromCurrentMasks()}syncAiMasterDepths();if(state.aiMaster){drawRigidPreview(state.simPosition);if(refreshThumbs)refreshLiveThumbnails().catch(()=>{})}})}
+    function setSimulationMode(mode){if(mode==='rig'){simRig.classList.remove('hidden');sim3d.style.display='none'}else{simRig.classList.add('hidden');sim3d.style.display='block'}}
+    function copyCanvas(source){const out=document.createElement('canvas');out.width=state.width;out.height=state.height;out.getContext('2d').drawImage(source,0,0,state.width,state.height);return out}
+    function ensureDomRig(){if(!state.rgba)return false;if(!state.aiMaster&&!state.rigidPreview)buildRigidPreviewLayers();const source=state.aiMaster||{background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(x=>({image:x.canvas,depth:x.depth,label:x.label,groupId:x.groupId}))};if(simRig.dataset.version===String(state.rigVersion))return true;simRig.innerHTML='';const bg=copyCanvas(source.background);bg.dataset.kind='background';bg.style.transform='translateZ(0px)';simRig.appendChild(bg);for(const layer of source.layers||[]){const cv=copyCanvas(layer.image);cv.dataset.kind='layer';cv.dataset.groupId=String(layer.groupId||'');cv.dataset.depth=String(Number(layer.depth)||128);simRig.appendChild(cv)}simRig.dataset.version=String(state.rigVersion);return true}
+    function updateRigBackground(){const bg=simRig.querySelector('canvas[data-kind="background"]');if(!bg||!state.aiMaster?.background)return;const ctx=bg.getContext('2d');ctx.clearRect(0,0,bg.width,bg.height);ctx.drawImage(state.aiMaster.background,0,0,bg.width,bg.height)}
+    function applyDomRigDepths(){const zero=Number($('zero').value),strength=Number($('simDepth').value),front=Math.max(1,255-zero),maxZ=26*Math.max(0,strength),byId=new Map((state.aiMaster?.layers||[]).map(x=>[String(x.groupId),Number(x.depth)]));for(const cv of simRig.querySelectorAll('canvas[data-kind="layer"]')){const mapped=byId.get(cv.dataset.groupId),depth=Number.isFinite(mapped)?mapped:(Number(cv.dataset.depth)||zero);cv.dataset.depth=String(depth);const z=Math.max(0,(depth-zero)/front)*maxZ;cv.style.transform='translateZ('+z.toFixed(2)+'px)'}}
+
+    function productionGroups(){return state.groups.filter(group=>!group.staticBase&&!isStructuralGroup(group)&&!isLogoTextDuplicate(group))}
+    function maskIsWeak(group){
+      const coverage=maskCoverage(group?.mask||new Uint8ClampedArray()).percent,areaPct=boxArea(group?.bbox)*100;
+      if(areaPct<=0)return true;
+      const role=String(group?.role||'').toLowerCase(),ratio=coverage/areaPct;
+      const minRatio=['name','company','title','phone','email','address','website','social','slogan','service','logo'].includes(role)?0.035:0.02;
+      return coverage<0.015||ratio<minRatio;
+    }
+    function addBoxToMask(target,box,padding=.004){
+      if(!Array.isArray(box)||box.length<4)return;
+      const x0=Math.max(0,Math.floor((Number(box[0])-padding)*state.width)),y0=Math.max(0,Math.floor((Number(box[1])-padding)*state.height));
+      const x1=Math.min(state.width,Math.ceil((Number(box[0])+Number(box[2])+padding)*state.width)),y1=Math.min(state.height,Math.ceil((Number(box[1])+Number(box[3])+padding)*state.height));
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)target[y*state.width+x]=255;
+    }
+    function deriveLayerMask(group,backgroundRgba){
+      const N=state.width*state.height,out=new Uint8ClampedArray(group.mask||N);
+      if(!maskIsWeak(group))return out;
+      const box=group.bbox;if(!Array.isArray(box)||box.length<4)return out;
+      const x0=Math.max(0,Math.floor(Number(box[0])*state.width)),y0=Math.max(0,Math.floor(Number(box[1])*state.height));
+      const x1=Math.min(state.width,Math.ceil((Number(box[0])+Number(box[2]))*state.width)),y1=Math.min(state.height,Math.ceil((Number(box[1])+Number(box[3]))*state.height));
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const p=y*state.width+x,k=p*4;
+        const d=(Math.abs(state.rgba[k]-backgroundRgba[k])+Math.abs(state.rgba[k+1]-backgroundRgba[k+1])+Math.abs(state.rgba[k+2]-backgroundRgba[k+2]))/3;
+        const a=Math.max(0,Math.min(255,Math.round((d-5)/24*255)));if(a>out[p])out[p]=a;
+      }
+      return out;
+    }
+    function fastLocalBackground(removal){
+      const W=state.width,H=state.height,N=W*H,src=state.rgba,work=new Uint8ClampedArray(src),unknown=new Uint8Array(N);
+      for(let i=0;i<N;i++)unknown[i]=removal[i]?1:0;
+      const left=new Int32Array(W),right=new Int32Array(W);
+      for(let y=0;y<H;y++){
+        let last=-1;for(let x=0;x<W;x++){const p=y*W+x;if(!unknown[p])last=x;left[x]=last}
+        last=-1;for(let x=W-1;x>=0;x--){const p=y*W+x;if(!unknown[p])last=x;right[x]=last}
+        for(let x=0;x<W;x++){const p=y*W+x;if(!unknown[p])continue;const l=left[x],r=right[x],k=p*4;
+          if(l>=0&&r>=0&&r>l){const u=(x-l)/(r-l),a=(y*W+l)*4,b=(y*W+r)*4;work[k]=src[a]*(1-u)+src[b]*u;work[k+1]=src[a+1]*(1-u)+src[b+1]*u;work[k+2]=src[a+2]*(1-u)+src[b+2]*u;work[k+3]=255}
+          else{const q=l>=0?y*W+l:(r>=0?y*W+r:-1);if(q>=0){const j=q*4;work[k]=src[j];work[k+1]=src[j+1];work[k+2]=src[j+2];work[k+3]=255}}
+        }
+      }
+      return work;
+    }
+
+    function buildRigidPreviewLayers(){
+      const N=state.width*state.height,groups=productionGroups(),removalSeed=new Uint8ClampedArray(N),layers=[];
+      for(const group of groups){
+        const weak=maskIsWeak(group);
+        if(weak)addBoxToMask(removalSeed,group.bbox,.004);
+        else for(let i=0;i<N;i++)if(group.mask[i]>=3)removalSeed[i]=255;
+        const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;
+        const ctx=canvas.getContext('2d'),img=ctx.createImageData(state.width,state.height);
+        for(let i=0;i<N;i++){let a=group.mask[i];if(a<12)continue;a=Math.max(0,Math.min(255,(a-12)*1.12));const j=i*4;img.data[j]=state.rgba[j];img.data[j+1]=state.rgba[j+1];img.data[j+2]=state.rgba[j+2];img.data[j+3]=a}
+        ctx.putImageData(img,0,0);layers.push({canvas,depth:group.depth,label:group.label,groupId:group.id,weakMask:weak});
+      }
+      const removal=new Uint8ClampedArray(N),r=Math.max(6,Math.round(Math.min(state.width,state.height)*.011));
+      for(let y=0;y<state.height;y++)for(let x=0;x<state.width;x++){const i=y*state.width+x;if(!removalSeed[i])continue;for(let dy=-r;dy<=r;dy++)for(let dx=-r;dx<=r;dx++){if(dx*dx+dy*dy>r*r)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<state.width&&yy<state.height)removal[yy*state.width+xx]=255}}
+      // Lightweight local base only keeps the UI responsive before MI-GAN. Production background
+      // is replaced by rebuildMasterWithMigan(); no expensive whole-image iterative propagation here.
+      const work=fastLocalBackground(removal),base=document.createElement('canvas');base.width=state.width;base.height=state.height;base.getContext('2d').putImageData(new ImageData(work,state.width,state.height),0,0);
+      state.rigidPreview={base,layers,removalMask:removal,productionGroupIds:groups.map(g=>g.id),weakGroupIds:groups.filter(maskIsWeak).map(g=>g.id),structuralGroupIds:state.groups.filter(isStructuralGroup).map(g=>g.id),duplicateGroupIds:state.groups.filter(isLogoTextDuplicate).map(g=>g.id)};
+    }
+    function drawProjectedTriangle(ctx,image,s0,s1,s2,d0,d1,d2){
+      const sx0=s0[0],sy0=s0[1],sx1=s1[0],sy1=s1[1],sx2=s2[0],sy2=s2[1];
+      const dx0=d0.x,dy0=d0.y,dx1=d1.x,dy1=d1.y,dx2=d2.x,dy2=d2.y;
+      const det=sx0*(sy1-sy2)+sx1*(sy2-sy0)+sx2*(sy0-sy1);
+      if(Math.abs(det)<1e-8)return;
+      const a=(dx0*(sy1-sy2)+dx1*(sy2-sy0)+dx2*(sy0-sy1))/det;
+      const cc=(dx0*(sx2-sx1)+dx1*(sx0-sx2)+dx2*(sx1-sx0))/det;
+      const e=(dx0*(sx1*sy2-sx2*sy1)+dx1*(sx2*sy0-sx0*sy2)+dx2*(sx0*sy1-sx1*sy0))/det;
+      const b=(dy0*(sy1-sy2)+dy1*(sy2-sy0)+dy2*(sy0-sy1))/det;
+      const d=(dy0*(sx2-sx1)+dy1*(sx0-sx2)+dy2*(sx1-sx0))/det;
+      const ff=(dy0*(sx1*sy2-sx2*sy1)+dy1*(sx2*sy0-sx0*sy2)+dy2*(sx0*sy1-sx1*sy0))/det;
+      ctx.save();ctx.beginPath();ctx.moveTo(dx0,dy0);ctx.lineTo(dx1,dy1);ctx.lineTo(dx2,dy2);ctx.closePath();ctx.clip();ctx.setTransform(a,b,cc,d,e,ff);ctx.drawImage(image,0,0);ctx.restore();
+    }
+    function drawProjectedPlane(ctx,image,corners){
+      const W=image.width,H=image.height;
+      drawProjectedTriangle(ctx,image,[0,0],[W,0],[0,H],corners[0],corners[1],corners[3]);
+      drawProjectedTriangle(ctx,image,[W,0],[W,H],[0,H],corners[1],corners[2],corners[3]);
+    }
+    function renderRigidScene(normal,w,h,{exactCenter=false}={}){
+      if(!state.rgba)return null;if(!state.rigidPreview)buildRigidPreviewLayers();
+      const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+      const ctx=canvas.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,w,h);
+      const n=Math.max(-1,Math.min(1,normal)),strength=Number($('simDepth').value),zero=Number($('zero').value);
+      if(exactCenter&&Math.abs(n)<1e-9&&w===state.width&&h===state.height){
+        ctx.putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        return {canvas,angleDeg:0};
+      }
+      ctx.fillStyle='#07080a';ctx.fillRect(0,0,w,h);
+      const angleDeg=n<0?n*35:n*22,angle=angleDeg*Math.PI/180;
+      const source=state.aiMaster||{background:state.rigidPreview.base,layers:state.rigidPreview.layers.map(layer=>({image:layer.canvas,depth:layer.depth,label:layer.label,groupId:layer.groupId}))};
+      const layers=(source.layers||[]).map(layer=>({...layer,depth:Number(layer.depth)})).filter(layer=>layer.image&&Number.isFinite(layer.depth));
+      const aspect=state.width/state.height,cam=4.4,
+        // 1.00x = relief visuel d'environ 3 mm sur une carte de 55 mm de haut.
+        // L'ancienne valeur .24 équivalait à >13 mm et arrachait visuellement les textes à -35°.
+        maxLift=.055*Math.max(0,strength),
+        baseScale=Math.min(w/(aspect*1.18),h/1.18),cx=w*.5,cy=h*.5;
+      const projectPlane=z=>{
+        // Same CardRig rotation for the card and every semantic plane.
+        // Convergence compensation keeps X/Y aligned when angle = 0; only Z separates planes.
+        const convergence=(cam-z)/cam;
+        const pts=[[-aspect*.5*convergence,-.5*convergence],[aspect*.5*convergence,-.5*convergence],[aspect*.5*convergence,.5*convergence],[-aspect*.5*convergence,.5*convergence]];
+        const cos=Math.cos(angle),sin=Math.sin(angle);
+        return pts.map(([x,y])=>{const xr=x*cos+z*sin,zr=-x*sin+z*cos,den=Math.max(.5,cam-zr),persp=cam/den;return{x:cx+xr*baseScale*persp,y:cy+y*baseScale*persp,z:zr}});
+      };
+      const frontScale=Math.max(1,255-zero);
+      const scene=[
+        {image:source.background,z:0,order:-1,label:'Carte'},
+        ...layers.map(layer=>({...layer,z:Math.max(0,(layer.depth-zero)/frontScale)*maxLift,order:layer.depth}))
+      ].sort((a,b)=>a.z-b.z||a.order-b.order);
+      for(const item of scene)drawProjectedPlane(ctx,item.image,projectPlane(item.z));
+      return {canvas,angleDeg};
+    }
+    function drawRigidPreview(position){
+      if(!state.rgba||!ensureDomRig())return;setSimulationMode('rig');applyDomRigDepths();
+      const p=Math.max(0,Math.min(8,position)),normal=(p-4)/4,angleDeg=normal<0?normal*35:normal*22;
+      simRig.style.transform='rotateY('+angleDeg.toFixed(3)+'deg)';
+      $('tiltOut').textContent=(angleDeg>0?'+':'')+angleDeg.toFixed(1)+'°';$('simDepthOut').textContent=Number($('simDepth').value).toFixed(2)+'×';
+    }
+        function drawReliefPhoto(){
+      if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();stopAnimation();
+      const W=1600,H=980;sim3d.width=W;sim3d.height=H;
+      const gl=sim3d.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true})||sim3d.getContext('experimental-webgl',{alpha:false,antialias:true,preserveDrawingBuffer:true});
+      if(!gl){drawReliefPhotoCanvas();return}
+      const vs='precision highp float;attribute vec2 p;uniform float z;uniform mat4 mvp;varying vec2 uv;void main(){uv=vec2(p.x,1.0-p.y);gl_Position=mvp*vec4((p.x-.5)*1.545,(p.y-.5),z,1.0);}';
+      const fs='precision highp float;varying vec2 uv;uniform sampler2D tex;uniform float alphaCut;void main(){vec4 c=texture2D(tex,uv);if(c.a<alphaCut)discard;gl_FragColor=c;}';
+      const sh=(type,src)=>{const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s};
+      const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pr);if(!gl.getProgramParameter(pr,gl.LINK_STATUS)){drawReliefPhotoCanvas();return}gl.useProgram(pr);
+      const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]),gl.STATIC_DRAW);
+      const loc=gl.getAttribLocation(pr,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+      const mul=(a,b)=>{let o=new Float32Array(16);for(let r=0;r<4;r++)for(let q=0;q<4;q++)for(let k=0;k<4;k++)o[r*4+q]+=a[r*4+k]*b[k*4+q];return o};
+      const persp=(fov,asp,n,far)=>{const f=1/Math.tan(fov/2),o=new Float32Array(16);o[0]=f/asp;o[5]=f;o[10]=(far+n)/(n-far);o[11]=-1;o[14]=2*far*n/(n-far);return o};
+      const norm=v=>{const l=Math.hypot(v[0],v[1],v[2])||1;return v.map(x=>x/l)},cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+      const look=(eye,at,up)=>{const z=norm([eye[0]-at[0],eye[1]-at[1],eye[2]-at[2]]),x=norm(cross(up,z)),y=cross(z,x),o=new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,0,0,0,1]);o[12]=-(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]);o[13]=-(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]);o[14]=-(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]);return o};
+      const M=mul(persp(34*Math.PI/180,W/H,.1,20),look([-1.38,.58,3.35],[0,0,.16],[0,1,0]));
+      gl.uniformMatrix4fv(gl.getUniformLocation(pr,'mvp'),false,M);gl.uniform1i(gl.getUniformLocation(pr,'tex'),0);gl.viewport(0,0,W,H);gl.clearColor(.025,.028,.035,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+      const texture=canvas=>{const t=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,t);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);return t};
+      const zero=Number($('zero').value),layers=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),ds=layers.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const draw=(canvas,z,cut)=>{gl.bindTexture(gl.TEXTURE_2D,texture(canvas));gl.uniform1f(gl.getUniformLocation(pr,'z'),z);gl.uniform1f(gl.getUniformLocation(pr,'alphaCut'),cut);gl.drawArrays(gl.TRIANGLES,0,6)};
+      draw(state.rigidPreview.base,0,0);for(const layer of layers){const zn=(Number(layer.depth)-dMin)/span;draw(layer.canvas,.035+zn*.305,.035)}
+      $('simOut').textContent='Photo relief 3D';$('renderStatus').textContent='Photo relief WebGL1 iPad : plans plats flottants, caméra perspective, hauteurs issues des profondeurs V32.';$('downloadRelief').disabled=false;
+    }
+    function drawReliefPhotoCanvas(){
+      const W=1600,H=980,ctx=sim3d.getContext('2d');ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#07090c';ctx.fillRect(0,0,W,H);
+      const zero=Number($('zero').value),layers=[...state.rigidPreview.layers].sort((a,b)=>a.depth-b.depth),ds=layers.map(l=>Number(l.depth)||zero),dMin=Math.min(...ds,zero),dMax=Math.max(...ds,zero),span=Math.max(1,dMax-dMin);
+      const x=225,y=190,w=1120,h=w/state.width*state.height,skew=-.115;
+      const plane=(canvas,z)=>{const zn=(z-dMin)/span,lift=zn*115,scale=1+zn*.035;ctx.save();ctx.setTransform(scale,skew,-.08,1,x+lift,y-lift*.35);ctx.drawImage(canvas,0,0,w,h);ctx.restore()};
+      plane(state.rigidPreview.base,dMin);for(const layer of layers)plane(layer.canvas,Number(layer.depth)||zero);
+      $('simOut').textContent='Photo relief 3D';$('renderStatus').textContent='Photo relief compatible iPad : projection de plans plats flottants, sans épaisseur ni ombre.';$('downloadRelief').disabled=false;
+    }
+
+    async function buildReliefPackage(download=true){
+      if(!state.rgba)return;if(!state.rigidPreview)buildRigidPreviewLayers();
+      const zip=new JSZip(),root=zip.folder('microplayer-photo-relief');
+      const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+      root.file('original-rectifie.png',await toBlob(original));root.file('background-master-local.png',await toBlob(state.rigidPreview.base));
+      const groups=[],rigidByLabel=new Map(state.rigidPreview.layers.map(l=>[String(l.label),l]));
+      for(let n=0;n<state.groups.length;n++){const g=state.groups[n],layer=rigidByLabel.get(String(g.label));if(!layer)continue;
+        const safe=String(g.label||g.role||('groupe-'+n)).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'-').replace(/^-|-$/g,'').toLowerCase()||('groupe-'+n);
+        const file='layers/'+String(n+1).padStart(2,'0')+'-'+safe+'.png';root.file(file,await toBlob(layer.canvas));
+        groups.push({id:g.id,label:g.label,role:g.role,type:g.type,depth:Number(g.depth),zNormalized:Math.max(0,Math.min(1,(Number(g.depth)-Number($('zero').value))/127*.5+.5)),file,coverage:maskCoverage(g.mask).percent});
+      }
+      const manifest={format:'microplayer-photo-relief-v1',createdAt:new Date().toISOString(),source:{width:state.width,height:state.height},renderIntent:{mode:'ai-master-scene-then-deterministic-views',aiRole:'semantic-understanding-background-reconstruction-and-flat-rgba-layer-preparation',localRole:'depth-assignment-parallax-and-nine-view-rendering',noExtrusion:true,noAddedShadow:true,lockPixelsAcrossViews:true,centerViewIsOriginal:true,camera:'front-parallax',reference:'validated-flat-floating-planes'},depth:{zero:Number($('zero').value),groups},instructions:['AI stage: understand the rectified card semantically before editing pixels.','AI stage: reconstruct one clean background_master after removing every semantic foreground group.','AI stage: prepare one exact flat RGBA layer per semantic group; preserve spelling, typography, colors, dimensions and original XY placement.','Never regenerate nine independent images. The AI output is one master scene only.','Lock every accepted layer pixel-for-pixel for all views. No extrusion, bevel, thickness, blur or cast shadow.','Local MicroPlayer stage: assign Z depth and calculate views 01-09 deterministically from the same locked master layers.','View 05 must remain the original rectified card pixel-for-pixel.','Only horizontal parallax may vary between lenticular views; no AI variation between views.']};
+      root.file('manifest.json',JSON.stringify(manifest,null,2));
+      if(download){const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='microplayer-photo-relief-package.zip';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+      $('renderStatus').textContent='Paquet scène maîtresse prêt : original + fond de travail + couches RGBA + profondeurs. Cible : reconstruction IA unique, puis 9 vues déterministes MicroPlayer.';return manifest;
+    }
+    $('reliefPack').onclick=()=>buildReliefPackage(true);
+    $('reliefGuide').onclick=async()=>{const m=await buildReliefPackage(false);$('renderStatus').textContent='Diagnostic scène maîtresse : '+m.depth.groups.length+' plans exportables · zéro '+m.depth.zero+' · IA = reconstruction unique · MicroPlayer = 9 vues déterministes · sans extrusion ni ombre.'};
+    function canvasDataUrl(canvas){return canvas.toDataURL('image/png')}
+    async function createAutomaticRelief(){
+      if(!state.rgba)return;
+      $('photoRelief').disabled=true;$('photoRelief').textContent='Traitement IA…';
+      $('renderStatus').className='status';$('renderStatus').textContent='MicroPlayer envoie la photo chargée au moteur de composition. La photo source reste inchangée dans la vue centrale.';
+      try{
+        if(!state.rigidPreview)buildRigidPreviewLayers();
+        const original=document.createElement('canvas');original.width=state.width;original.height=state.height;original.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);
+        // V33: the server only needs semantic metadata here. Sending two full PNG data URLs
+        // made the request exceed Vercel's function body limit (HTTP 413).
+        const apiPayload={
+          mode:'relief-compose-v33-metadata',
+          width:state.width,height:state.height,
+          zero:Number($('zero').value),parallax:Number($('parallax').value),
+          groups:state.groups.map(group=>({id:group.id,label:group.label,role:group.role,type:group.type,depth:Number(group.depth),bbox:group.bbox,items:(group.items||[]).map(item=>({id:item.id,type:item.type,role:item.role,text:item.text||'',label:item.label||'',bbox:item.bbox}))}))
+        };
+        const response=await fetch('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(apiPayload)});
+        const responseText=await response.text();let data={};
+        if(responseText.trim()){try{data=JSON.parse(responseText)}catch(parseError){throw Error('ETAPE API_JSON · HTTP '+response.status+' · réponse non JSON : '+responseText.slice(0,160));}}
+        if(!response.ok)throw Error('ETAPE API_HTTP · '+(data.error||('HTTP '+response.status)));
+        state.autoRelief=data;
+        state.aiReady=false;state.aiMaster=null;state.masterOriginal=null;state.masterHistory=[];$('targetMaster').disabled=true;invalidateRig();$('generate').disabled=true;$('results').classList.add('hidden');$('aiGate').className='status warn';$('aiGate').textContent='Analyse IA reçue · étape 1/5 : préparation des masques…';
+        const corrected=new Map((data.groups||[]).map(group=>[String(group.id),Number(group.depth)]));
+        let changed=false;
+        state.groups.forEach(group=>{const value=corrected.get(String(group.id));if(Number.isFinite(value)&&value!==group.depth){group.depth=value;changed=true}});
+        if(changed){renderGroups();compose();}
+        const exclusiveQc=enforceExclusiveMasks();state.rigidPreview=null;buildRigidPreviewLayers();
+        $('aiGate').textContent='Analyse IA reçue · étape 2/5 : reconstruction MI-GAN du fond…';
+        try{await rebuildMasterWithMigan();}catch(inpaintError){throw Error('Reconstruction IA du fond impossible — '+inpaintError.message);}
+        $('aiGate').textContent='Analyse IA reçue · étape 3/5 : contrôle anti-fantôme…';
+        state.masterQc=qcMasterScene();state.masterQc.exclusive=exclusiveQc;state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine||'none';
+        const rm=state.rigidPreview.removalMask,W=state.width,H=state.height,N=W*H;
+        let bgCtx=state.rigidPreview.base.getContext('2d'),bgPx=bgCtx.getImageData(0,0,W,H).data;
+        let ghost=measureMasterGhost(bgPx,rm);
+        state.masterQc.ghost={removed:ghost.removed,suspect:ghost.suspect,residual:ghost.residual,ratio:Number((ghost.residualRatio*100).toFixed(2)),suspectRatio:Number((ghost.suspectRatio*100).toFixed(2)),meanLocalError:Number(ghost.meanLocalError.toFixed(2)),corePixels:ghost.core,coreUnchanged:ghost.coreUnchanged,coreUnchangedRatio:Number((ghost.coreUnchangedRatio*100).toFixed(2)),cleanupPass:false};
+
+        // Automatic recovery instead of blocking immediately: if either the strict local ghost metric
+        // or the strong-core source-survival metric is too high, rebuild only the suspicious foreground core.
+        if((ghost.removed>200&&ghost.residualRatio>.035)||(ghost.core>200&&ghost.coreUnchangedRatio>.12)){
+          const cleanupMask=buildResidualCleanupMask(bgPx),cleanupPixels=cleanupMask.reduce((n,v)=>n+(v?1:0),0);
+          if(cleanupPixels>20){
+            const cleaned=await runMiganCleanupPass(bgPx,cleanupMask);
+            const base=document.createElement('canvas');base.width=W;base.height=H;base.getContext('2d').putImageData(new ImageData(cleaned,W,H),0,0);
+            state.rigidPreview.base=base;state.rigidPreview.inpaintEngine='MI-GAN pipeline V2 native uint8 + residual cleanup';
+            bgCtx=base.getContext('2d');bgPx=bgCtx.getImageData(0,0,W,H).data;ghost=measureMasterGhost(bgPx,rm);
+            state.masterQc.inpaintEngine=state.rigidPreview.inpaintEngine;
+            state.masterQc.ghost={removed:ghost.removed,suspect:ghost.suspect,residual:ghost.residual,ratio:Number((ghost.residualRatio*100).toFixed(2)),suspectRatio:Number((ghost.suspectRatio*100).toFixed(2)),meanLocalError:Number(ghost.meanLocalError.toFixed(2)),corePixels:ghost.core,coreUnchanged:ghost.coreUnchanged,coreUnchangedRatio:Number((ghost.coreUnchangedRatio*100).toFixed(2)),cleanupPass:true,cleanupPixels};
+          }
+        }
+        if(ghost.removed>200&&ghost.residualRatio>.035)throw Error('QC anti-fantôme strict refusé après seconde passe · résidus '+state.masterQc.ghost.ratio+'% · discontinuités '+state.masterQc.ghost.suspectRatio+'%.');
+        if(ghost.core>200&&ghost.coreUnchangedRatio>.25)throw Error('QC anti-fantôme source refusé après seconde passe · '+state.masterQc.ghost.coreUnchangedRatio+'% du cœur réel du premier plan reste identique à la source.');
+        // Rebuild production layers from the ORIGINAL pixels after exclusivity/QC.
+        // Their alpha is clipped by the removal mask so no source glyph can remain simultaneously
+        // in background_master and in a moving foreground plane.
+        const rmProd=state.rigidPreview.removalMask,NProd=state.width*state.height,masterLayers=[];
+        const cleanPx=state.rigidPreview.base.getContext('2d').getImageData(0,0,state.width,state.height).data;
+        for(const group of productionGroups()){
+          const productionMask=deriveLayerMask(group,cleanPx);group.productionMask=productionMask;
+          const layer=document.createElement('canvas');layer.width=state.width;layer.height=state.height;const lctx=layer.getContext('2d'),lid=lctx.createImageData(state.width,state.height);
+          for(let i=0;i<NProd;i++){const a=productionMask[i];if(a<12||!rmProd[i])continue;const j=i*4;lid.data[j]=state.rgba[j];lid.data[j+1]=state.rgba[j+1];lid.data[j+2]=state.rgba[j+2];lid.data[j+3]=a}
+          lctx.putImageData(lid,0,0);if(maskCoverage(productionMask).percent>=.01)masterLayers.push({image:layer,depth:group.depth,label:group.label,groupId:group.id});
+        }
+        if(!state.masterQc.ok)throw Error('QC scène maître refusé · calques actifs '+state.masterQc.active+' · chevauchements avant correction '+exclusiveQc.before+' · après '+exclusiveQc.after+' · couverture '+state.masterQc.coverage+'%.');
+        // Freeze an immutable production background; later preview/simulator operations must not mutate it.
+        const frozenBg=document.createElement('canvas');frozenBg.width=state.width;frozenBg.height=state.height;frozenBg.getContext('2d').drawImage(state.rigidPreview.base,0,0);
+        state.aiMaster={background:frozenBg,layers:masterLayers,source:'v33-master-scene-ldi-disocclusion',qc:state.masterQc};
+        state.masterOriginal=document.createElement('canvas');state.masterOriginal.width=state.width;state.masterOriginal.height=state.height;state.masterOriginal.getContext('2d').drawImage(frozenBg,0,0);state.masterHistory=[];state.masterTool='heal';state.cloneSource=null;state.cloneStroke=null;state.cloneSnapshot=null;state.cloneCurrentSource=null;$('targetMaster').disabled=false;invalidateRig();syncAiMasterDepths();
+        const threeOk=buildThreePlanControl();if(!threeOk)throw Error('Contrôle technique impossible.');
+        state.aiReady=true;$('threeViews').disabled=false;$('generate').disabled=true;
+        $('aiGate').className='status ok';$('aiGate').textContent='SCÈNE MAÎTRE PRÊTE : '+masterLayers.length+' calques exclusifs · chevauchements = 0. Étape obligatoire : contrôler le fond maître puis les 3 vues. Les 9 vues restent verrouillées.';
+        $('renderStatus').className='status ok';$('renderStatus').textContent='Chaîne impression séparée : scène maître → 9 vues déterministes. Aperçu client = branche indépendante, jamais injectée dans la production.';
+      }catch(error){
+        state.aiReady=false;$('generate').disabled=true;$('threePlanWrap').classList.add('hidden');
+        $('aiGate').className='status warn';$('aiGate').textContent='PRODUCTION BLOQUÉE — '+(error.name?error.name+' · ':'')+error.message+'\n'+(error.stack||'').split('\n').slice(0,3).join(' ← ');
+        $('clientGate').className='status warn';$('clientGate').textContent='Aperçu client bloqué tant que le QC de la scène maître échoue.';
+        $('renderStatus').className='status warn';$('renderStatus').textContent='Diagnostic QC : '+error.message+'\nAucun fallback vers l’ancien renderer.';
+      }finally{$('photoRelief').disabled=false;$('photoRelief').textContent='Envoyer à l’IA et composer'}
+    }
+    $('photoRelief').onclick=createAutomaticRelief;
+    $('downloadRelief').onclick=()=>{};
+    function drawSimulation(position){
+      const p=Math.max(0,Math.min(8,Number(position)||0));
+      state.simPosition=p;
+      $('simRange').value=String(p);
+      $('simOut').textContent=(p+1).toFixed(2)+' / 9';
+      drawRigidPreview(p);
+    }
+    function updatePlaybackUi(){
+      $('toggle').textContent=state.playing?'Pause':'Lecture';
+      $('loopMode').textContent=state.playbackMode==='pingpong'?'Boucle ↔':'Boucle →';
+      $('loopMode').classList.toggle('active',true);
+      $('playbackSpeedOut').textContent=Number(state.playbackSpeed).toFixed(2)+'×';
+      $('playbackSpeed').value=String(state.playbackSpeed);
+    }
+    function animationLoop(time){
+      if(!state.playing)return;
+      if(!state.lastTime)state.lastTime=time;
+      const dt=Math.min(60,time-state.lastTime);state.lastTime=time;
+      const speed=Math.max(.1,Number(state.playbackSpeed)||1);
+      const advance=dt/760*speed;
+      if(state.playbackMode==='forward'){
+        state.simPosition+=advance;
+        if(state.simPosition>8)state.simPosition=0;
+      }else{
+        state.simPosition+=state.direction*advance;
+        if(state.simPosition>=8){state.simPosition=8;state.direction=-1}
+        if(state.simPosition<=0){state.simPosition=0;state.direction=1}
+      }
+      drawSimulation(state.simPosition);
+      state.animation=requestAnimationFrame(animationLoop);
+    }
+    function startAnimation(){
+      cancelAnimationFrame(state.animation);
+      state.playing=true;state.lastTime=0;
+      updatePlaybackUi();
+      state.animation=requestAnimationFrame(animationLoop);
+    }
+    function stopAnimation(){
+      state.playing=false;cancelAnimationFrame(state.animation);state.animation=0;
+      updatePlaybackUi();
+    }
+    $('toggle').onclick=()=>state.playing?stopAnimation():startAnimation();
+    $('loopMode').onclick=()=>{state.playbackMode=state.playbackMode==='pingpong'?'forward':'pingpong';state.direction=1;updatePlaybackUi();if(!state.playing)startAnimation()};
+    $('playbackSpeed').oninput=event=>{state.playbackSpeed=Number(event.target.value)||1;updatePlaybackUi()};
+    $('restartLoop').onclick=()=>{state.simPosition=4;state.direction=1;drawSimulation(4);startAnimation()};
+    $('simRange').oninput=event=>{stopAnimation();drawSimulation(Number(event.target.value))};
+    $('prev').onclick=()=>{stopAnimation();drawSimulation(Math.max(0,state.simPosition-1))};
+    $('next').onclick=()=>{stopAnimation();drawSimulation(Math.min(8,state.simPosition+1))};
+    for(const id of ['tilt','simDepth'])$(id).oninput=()=>{drawRigidPreview(state.simPosition);if(id==='simDepth')refreshLiveThumbnails().catch(()=>{})};
+
+        async function maskBlob(group){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;const context=canvas.getContext('2d'),image=context.createImageData(state.width,state.height);for(let index=0;index<group.mask.length;index++){const value=group.mask[index];image.data[index*4]=image.data[index*4+1]=image.data[index*4+2]=value;image.data[index*4+3]=255}context.putImageData(image,0,0);return toBlob(canvas)}
+    $('zip').onclick=async()=>{if(!window.JSZip)return;$('zip').disabled=true;$('zip').textContent='ZIP…';const zip=new JSZip(),sourceResponse=await fetch(state.payload.image),sourceBlob=await sourceResponse.blob();zip.file('source-photo.png',sourceBlob);state.blobs.forEach((blob,index)=>zip.file(`vue-${String(index+1).padStart(2,'0')}.png`,blob));for(let index=0;index<state.groups.length;index++)zip.file(`masques/groupe-${String(index+1).padStart(2,'0')}.png`,await maskBlob(state.groups[index]));const depthCanvas=document.createElement('canvas');depthCanvas.width=state.width;depthCanvas.height=state.height;const depthContext=depthCanvas.getContext('2d'),depthImage=depthContext.createImageData(state.width,state.height);for(let index=0;index<state.finalDepth.length;index++){const value=state.finalDepth[index];depthImage.data[index*4]=depthImage.data[index*4+1]=depthImage.data[index*4+2]=value;depthImage.data[index*4+3]=255}depthContext.putImageData(depthImage,0,0);zip.file('depth-map.png',await toBlob(depthCanvas));const settings={zero:Number($('zero').value),relief:Number($('relief').value),parallax:Number($('parallax').value),backgroundRelief:Number($('background').value)};const groups=state.groups.map(({mask,autoMask,productionMask,selected,...group},index)=>({...group,maskFile:`masques/groupe-${String(index+1).padStart(2,'0')}.png`}));zip.file('manifest.json',JSON.stringify({schema:'microplayer.photo-v01',version:1,exportedAt:new Date().toISOString(),dimensions:{width:state.width,height:state.height},source:{rectified:false,capture:state.payload.capture||null,file:'source-photo.png'},pipeline:{stage:'photo-depth-bands-v01',centerViewPixelPerfect:true},ocr:state.payload.ocrLines,ocrSummary:{engine:'tesseract-local',lineCount:state.payload.ocrLines?.length||0},groups,settings,render:{engine:state.views.length===3?'card-rig-true-z-preview':'depthflow-v42',viewCount:state.views.length,depthMapFile:'depth-map.png',views:state.renderStats}},null,2));const blob=await zip.generateAsync({type:'blob'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=state.views.length===3?'MicroPlayer-photo-V01-test-3-vues.zip':'MicroPlayer-photo-V01-9-vues.zip';link.click();setTimeout(()=>URL.revokeObjectURL(link.href),30000);$('zip').disabled=false;$('zip').textContent='ZIP complet'};
+
+    $('back').onclick=()=>location.reload();$('auto').onclick=applyPreset;$('preset').onchange=applyPreset;
+    for(const id of ['zero','relief','parallax','background'])$(id).oninput=()=>{updateOutputs();syncAiMasterDepths();compose();markSceneDirty('Paramètres de relief modifiés');scheduleLivePreview(false)};
+
+    let activityTimer=null,activityStarted=0,activityStep='Démarrage';
+    function activity(step,percent,detail=''){activityStep=step;const bar=$('activityBar'),info=$('activityInfo');if(bar)bar.style.width=Math.max(2,Math.min(100,percent))+'%';if(info)info.textContent=step+(detail?' · '+detail:'')+' · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';}
+    function startActivity(){activityStarted=Date.now();clearInterval(activityTimer);activityTimer=setInterval(()=>{const info=$('activityInfo');if(info)info.textContent=activityStep+' · activité navigateur · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';},500);}
+    function stopActivity(ok=true){clearInterval(activityTimer);activityTimer=null;const bar=$('activityBar');if(bar)bar.style.width=ok?'100%':'0%';}
+    function readTransferredPayload(){
+      const candidates=[['microplayer-card-v33','V33'],['microplayer-card-v32','V32']];
+      const errors=[];
+      for(const [key,label] of candidates){
+        const raw=sessionStorage.getItem(key);if(!raw)continue;
+        try{
+          const parsed=JSON.parse(raw);
+          if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('racine JSON invalide');
+          return {payload:parsed,label,key};
+        }catch(error){
+          errors.push(label+' : '+error.message);
+          // Preserve the corrupt value for diagnosis, but stop selecting it on the next reload.
+          try{sessionStorage.setItem(key+'-corrupt-backup',raw);sessionStorage.removeItem(key)}catch(_){}
+        }
+      }
+      if(errors.length)throw Error('Transfert carte illisible · '+errors.join(' · ')+' · Retourne au scanner puis relance Continuer vers Pencil.');
+      return null;
+    }
+    async function initialise(){startActivity();activity('Lecture état V33',5);const transfer=readTransferredPayload();if(!transfer){$('sourceInfo').className='status warn';$('sourceInfo').innerHTML='Aucune carte transférée. <a href="./microplayer-card-v32-scanner.html" style="color:#9bd0ff">Ouvrir le scanner</a>.';$('generate').disabled=true;return}state.payload=transfer.payload;activity('État '+transfer.label+' chargé',12,(state.payload.groups?.length||0)+' groupes');
+      let imageUrl=state.payload.image;
+      if(!imageUrl&&state.payload.imageCacheKey&&window.caches){activity('Ouverture cache image',20);$('sourceInfo').textContent='Récupération de la carte V33…';const cache=await caches.open('microplayer-v33-transfer');const response=await cache.match(state.payload.imageCacheKey);if(!response)throw Error('Image V33 absente du cache de transfert.');activity('Lecture PNG depuis cache',32);const blob=await response.blob();activity('PNG récupéré',42,Math.round(blob.size/1024)+' Ko');
+        // iPad Safari can stall decoding an object URL created from Cache Storage.
+        // Decode from bytes via FileReader first; it is slower but deterministic on Safari.
+        activity('Conversion PNG iPad',50);imageUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||Error('Lecture PNG impossible'));reader.readAsDataURL(blob)});
+      }
+      if(!imageUrl)throw Error('Image rectifiée absente du transfert.');
+      state.payload.image=imageUrl;activity('Décodage image Safari',62);$('sourceInfo').textContent='Décodage de la carte…';state.image=await Promise.race([loadImage(imageUrl),new Promise((_,reject)=>setTimeout(()=>reject(Error('Décodage image > 8 s')),8000))]);activity('Image décodée',72,state.image.naturalWidth+'×'+state.image.naturalHeight);state.width=photo.width=mask.width=state.payload.width||state.image.naturalWidth;state.height=photo.height=mask.height=state.payload.height||state.image.naturalHeight;stage.style.aspectRatio=state.width+'/'+state.height;drawPhoto();activity('Lecture pixels',80);state.rgba=photoContext.getImageData(0,0,state.width,state.height).data;state.baseDepth=new Uint8ClampedArray(state.width*state.height).fill(128);activity('Construction masques',88);state.groups=(state.payload.groups||[]).map((group,index)=>{const full={...group,id:String(group.id||group.groupId||index),depth:Number(group.depth??128)};full.autoMask=semanticMaskForGroup(full);full.mask=new Uint8ClampedArray(full.autoMask);return full});state.selected=state.groups[0]?.id||null;$('sourceInfo').className='status ok';$('sourceInfo').textContent=`${state.payload.ocrLines?.length||0} lignes OCR verrouillées · ${state.payload.layers?.length||0} composants · ${state.groups.length} groupes.`;activity('Rendu interface',96);applyPreset();showCard();updateUndo();activity('Atelier prêt',100);stopActivity(true)}
+    initialise().catch(error=>{stopActivity(false);$('sourceInfo').className='status warn';$('sourceInfo').textContent='Erreur initialisation : '+error.message;const info=$('activityInfo');if(info)info.textContent='BLOQUÉ À : '+activityStep+' · '+error.message});
+  </script>
+</body>
+</html>
