@@ -519,7 +519,25 @@
     function activity(step,percent,detail=''){activityStep=step;const bar=$('activityBar'),info=$('activityInfo');if(bar)bar.style.width=Math.max(2,Math.min(100,percent))+'%';if(info)info.textContent=step+(detail?' · '+detail:'')+' · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';}
     function startActivity(){activityStarted=Date.now();clearInterval(activityTimer);activityTimer=setInterval(()=>{const info=$('activityInfo');if(info)info.textContent=activityStep+' · activité navigateur · '+((Date.now()-activityStarted)/1000).toFixed(1)+' s';},500);}
     function stopActivity(ok=true){clearInterval(activityTimer);activityTimer=null;const bar=$('activityBar');if(bar)bar.style.width=ok?'100%':'0%';}
-    async function initialise(){startActivity();activity('Lecture état V33',5);let raw=sessionStorage.getItem('microplayer-card-v33')||sessionStorage.getItem('microplayer-card-v32');if(!raw){$('sourceInfo').className='status warn';$('sourceInfo').innerHTML='Aucune carte transférée. <a href="./microplayer-card-v32-scanner.html" style="color:#9bd0ff">Ouvrir le scanner</a>.';$('generate').disabled=true;return}state.payload=JSON.parse(raw);activity('État V33 chargé',12,(state.payload.groups?.length||0)+' groupes');
+    function readTransferredPayload(){
+      const candidates=[['microplayer-card-v33','V33'],['microplayer-card-v32','V32']];
+      const errors=[];
+      for(const [key,label] of candidates){
+        const raw=sessionStorage.getItem(key);if(!raw)continue;
+        try{
+          const parsed=JSON.parse(raw);
+          if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw Error('racine JSON invalide');
+          return {payload:parsed,label,key};
+        }catch(error){
+          errors.push(label+' : '+error.message);
+          // Preserve the corrupt value for diagnosis, but stop selecting it on the next reload.
+          try{sessionStorage.setItem(key+'-corrupt-backup',raw);sessionStorage.removeItem(key)}catch(_){}
+        }
+      }
+      if(errors.length)throw Error('Transfert carte illisible · '+errors.join(' · ')+' · Retourne au scanner puis relance Continuer vers Pencil.');
+      return null;
+    }
+    async function initialise(){startActivity();activity('Lecture état V33',5);const transfer=readTransferredPayload();if(!transfer){$('sourceInfo').className='status warn';$('sourceInfo').innerHTML='Aucune carte transférée. <a href="./microplayer-card-v32-scanner.html" style="color:#9bd0ff">Ouvrir le scanner</a>.';$('generate').disabled=true;return}state.payload=transfer.payload;activity('État '+transfer.label+' chargé',12,(state.payload.groups?.length||0)+' groupes');
       let imageUrl=state.payload.image;
       if(!imageUrl&&state.payload.imageCacheKey&&window.caches){activity('Ouverture cache image',20);$('sourceInfo').textContent='Récupération de la carte V33…';const cache=await caches.open('microplayer-v33-transfer');const response=await cache.match(state.payload.imageCacheKey);if(!response)throw Error('Image V33 absente du cache de transfert.');activity('Lecture PNG depuis cache',32);const blob=await response.blob();activity('PNG récupéré',42,Math.round(blob.size/1024)+' Ko');
         // iPad Safari can stall decoding an object URL created from Cache Storage.
