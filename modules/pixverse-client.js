@@ -145,6 +145,74 @@ export async function createPixVerseVideo({
   return { videoId, raw: data, mode: data?._microplayer?.mode || mode };
 }
 
+
+export async function selectPixVerseMasks(videoFile, { keyframeId = 0 } = {}) {
+  if (!videoFile) throw new Error('Vidéo source requise pour analyser les masques.');
+  const { mediaId } = await uploadPixVerseMedia(videoFile);
+  const r = await fetch('/api/pixverse-create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mode: 'mask_selection',
+      video_media_id: mediaId,
+      keyframe_id: Math.max(0, Number(keyframeId) || 0)
+    })
+  });
+  const data = await readJson(r);
+  return {
+    videoMediaId: mediaId,
+    keyframeId: data?.Resp?.keyframe_id ?? 0,
+    keyframeUrl: data?.Resp?.keyframe_url || '',
+    credits: Number(data?.Resp?.credits || 0),
+    masks: Array.isArray(data?.Resp?.mask_info) ? data.Resp.mask_info : [],
+    raw: data
+  };
+}
+
+export async function modifyPixVerseVideo({
+  videoFile,
+  videoMediaId,
+  maskIds = [],
+  keyframeIds,
+  prompt,
+  referenceImageFiles = [],
+  quality = '540p',
+  onStatus
+} = {}) {
+  if (!prompt?.trim()) throw new Error('Prompt de correction Modify manquant.');
+  let mediaId = Number(videoMediaId) || 0;
+  if (!mediaId) {
+    if (!videoFile) throw new Error('Vidéo source Modify manquante.');
+    onStatus?.({ step: 'upload-video' });
+    mediaId = (await uploadPixVerseMedia(videoFile)).mediaId;
+  }
+
+  const imgIds = [];
+  for (const file of Array.from(referenceImageFiles || []).slice(0, 10)) {
+    onStatus?.({ step: 'upload-reference' });
+    imgIds.push((await uploadPixVerseImage(file)).imgId);
+  }
+
+  onStatus?.({ step: 'create' });
+  const { videoId, raw } = await createPixVerseVideo({
+    mode: 'modify',
+    videoMediaId: mediaId,
+    imgIds,
+    maskIds,
+    keyframeIds,
+    prompt: String(prompt).trim(),
+    quality
+  });
+
+  onStatus?.({ step: 'processing', videoId });
+  const result = await waitForPixVerse(videoId, {
+    onStatus: s => onStatus?.({ step: 'processing', videoId, response: s })
+  });
+  const videoUrl = proxiedPixVerseVideoUrl(result.url, videoId);
+  onStatus?.({ step: 'done', videoId, videoUrl });
+  return { videoId, videoMediaId: mediaId, sourceUrl: result.url, videoUrl, createResponse: raw, response: result.raw };
+}
+
 export async function getPixVerseStatus(videoId) {
   const r = await fetch(`/api/pixverse-status?id=${encodeURIComponent(videoId)}`, { cache: 'no-store' });
   return readJson(r);
