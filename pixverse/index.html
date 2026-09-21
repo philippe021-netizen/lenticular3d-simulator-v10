@@ -12,7 +12,7 @@
 <div class="card">
 <h1>Diagnostic PixVerse</h1>
 <div id="key" class="line">Vérification de PIXVERSE_API_KEY…</div>
-<div id="env" class="line">Environnement : …</div>
+<div id="balance" class="line">Solde API PixVerse : …</div>\n<div id="env" class="line">Environnement : …</div>
 <div id="commit" class="line">Commit : …</div>
 <div id="deploy" class="line">Déploiement : …</div>
 <a id="continue" class="btn" href="../happyholo-pixverse-actions-test.html" style="display:none">Ouvrir HappyHolo + PixVerse</a>
@@ -21,7 +21,7 @@
 </div>
 <script>
 async function check(){
- const key=document.getElementById('key'),env=document.getElementById('env'),commit=document.getElementById('commit'),deploy=document.getElementById('deploy'),cont=document.getElementById('continue');
+ const key=document.getElementById('key'),balance=document.getElementById('balance'),env=document.getElementById('env'),commit=document.getElementById('commit'),deploy=document.getElementById('deploy'),cont=document.getElementById('continue');
  key.className='line';key.textContent='Vérification de PIXVERSE_API_KEY…';cont.style.display='none';
  try{
   const r=await fetch('../api/pixverse-diag?ts='+Date.now(),{cache:'no-store'});
@@ -32,7 +32,25 @@ async function check(){
   env.textContent='Environnement : '+(d.environment||'inconnu');
   commit.textContent='Commit : '+(d.gitCommitSha||'inconnu')+(d.gitCommitRef?' — '+d.gitCommitRef:'');
   deploy.textContent='Déploiement : '+(d.deploymentUrl||location.host);
-  if(ok) cont.style.display='block';
+  if(ok){
+    cont.style.display='block';
+    try{
+      const br=await fetch('../api/pixverse-balance?ts='+Date.now(),{cache:'no-store'});
+      const bd=await br.json();
+      if(!br.ok||bd.error) throw new Error(bd.error||('HTTP '+br.status));
+      const monthly=Number(bd.credit_monthly||0),pack=Number(bd.credit_package||0),total=Number(bd.credit_total||0);
+      balance.className='line '+(total>0?'ok':'bad');
+      balance.textContent=total>0
+        ? `✅ Solde API PixVerse : ${total} crédits (mensuels ${monthly} + packs ${pack})`
+        : '⚠️ Solde API PixVerse : 0 crédit. Les crédits Web/App PixVerse sont séparés des crédits API.';
+    }catch(e){
+      balance.className='line bad';
+      balance.textContent='❌ Lecture du solde API impossible : '+e.message;
+    }
+  }else{
+    balance.className='line bad';
+    balance.textContent='Solde API indisponible : clé PixVerse absente.';
+  }
  }catch(e){key.className='line bad';key.textContent='❌ Diagnostic impossible : '+e.message;}
 }
 document.getElementById('retry').onclick=check;check();
