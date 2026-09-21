@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>MicroPlayer — Pitch Lab 50/60 LPI</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#0b1020;color:#eef2ff}main{max-width:980px;margin:auto;padding:22px}.card{background:#151c31;border:1px solid #2b3658;border-radius:18px;padding:18px;margin:14px 0}h1{font-size:26px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}label{display:block;font-size:13px;color:#b9c4e3}input,select,button{width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border-radius:10px;border:1px solid #405077;background:#0e162a;color:white;font-size:16px}button{background:#315be8;border:0;font-weight:700}button.secondary{background:#26314f}.big{font-size:30px;font-weight:800}.ok{color:#8ff0b0}.warn{color:#ffd479}canvas{width:100%;background:white;border-radius:8px;touch-action:none}.small{font-size:13px;color:#aab5d4}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{width:auto;flex:1;min-width:180px}@media print{body{background:white;color:black}main>*:not(#printCard){display:none!important}#printCard{display:block!important;border:0;padding:0;margin:0}canvas{border-radius:0}}
+</style></head><body><main>
+<h1>MicroPlayer · Pitch Lab expérimental</h1>
+<p class="small">Branche isolée. Ne modifie ni V33 validée ni la production. Objectif : mesurer le pitch réel avant entrelacement.</p>
+<div class="card"><div class="grid">
+<div><label>LPI nominal<select id="nom"><option>50</option><option>60</option></select></label></div>
+<div><label>DPI imprimante<input id="dpi" type="number" value="600" min="300" step="1"></label></div>
+<div><label>Centre test (LPI)<input id="center" type="number" value="50" step=".001"></label></div>
+<div><label>Amplitude coarse ± LPI<input id="span" type="number" value=".40" step=".01"></label></div>
+<div><label>Pas coarse<input id="step" type="number" value=".05" step=".001"></label></div>
+<div><label>Phase / registration (px)<input id="phase" type="number" value="0" step=".1"></label></div>
+</div></div>
+<div class="card"><div class="big"><span id="pitch">12.000</span> px/lenticule</div><p id="info" class="small"></p><div class="row"><button id="coarse">Générer mire coarse</button><button id="fine" class="secondary">Mire fine ±0,05</button><button id="print" class="secondary">Imprimer à 100 %</button></div></div>
+<div id="printCard" class="card"><canvas id="c" width="1800" height="1200"></canvas><p class="small">Imprimer sans mise à l'échelle. Après pose de la feuille lenticulaire, noter la bande la plus stable/noire. Reporter sa valeur comme pitch mesuré.</p></div>
+<div class="card"><label>LPI mesuré<input id="measured" type="number" value="50" step=".001"></label><div class="row"><button id="apply">Utiliser comme centre du test fin</button></div><p id="delta" class="small"></p></div>
+</main>
+<script>
+const $=id=>document.getElementById(id), c=$('c'),ctx=c.getContext('2d');
+function syncNom(){ $('center').value=$('nom').value; $('measured').value=$('nom').value; update(); }
+function update(){let dpi=+$('dpi').value,lpi=+$('center').value; $('pitch').textContent=(dpi/lpi).toFixed(4);$('info').textContent='Pitch mathématique = DPI / LPI. Le LPI nominal n’est qu’un point de départ : la mire sert à mesurer le couple réel feuille + imprimante + média + pilote.';let m=+$('measured').value,n=+$('nom').value;$('delta').textContent='Écart au nominal : '+(m-n>=0?'+':'')+(m-n).toFixed(3)+' LPI · pitch à '+dpi+' dpi : '+(dpi/m).toFixed(4)+' px/lenticule';}
+function draw(fine=false){let center=+$('center').value, span=fine?.05:+$('span').value, step=fine?.01:+$('step').value,dpi=+$('dpi').value,phase=+$('phase').value;ctx.fillStyle='white';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='black';ctx.font='bold 38px sans-serif';ctx.fillText('MicroPlayer PITCH '+(fine?'FINE':'COARSE')+' · '+dpi+' DPI · impression 100%',40,55);let vals=[];for(let v=center-span;v<=center+span+1e-9;v+=step)vals.push(+v.toFixed(3));let top=100,h=(c.height-150)/vals.length;vals.forEach((lpi,i)=>{let y=top+i*h,p=dpi/lpi;ctx.fillStyle='black';ctx.font='28px monospace';ctx.fillText(lpi.toFixed(3)+' LPI',35,y+h*.67);let x0=300;ctx.save();ctx.beginPath();ctx.rect(x0,y,c.width-x0-30,h-3);ctx.clip();ctx.fillStyle='white';ctx.fillRect(x0,y,c.width-x0,h);ctx.fillStyle='black';for(let x=x0+phase;x<c.width;x+=p){ctx.fillRect(Math.round(x),y,Math.max(1,Math.round(p/2)),h-3)}ctx.restore()});ctx.strokeStyle='#999';ctx.strokeRect(5,5,c.width-10,c.height-10);}
+$('nom').onchange=syncNom; ['dpi','center','measured'].forEach(x=>$(x).oninput=update);$('coarse').onclick=()=>draw(false);$('fine').onclick=()=>draw(true);$('print').onclick=()=>window.print();$('apply').onclick=()=>{$('center').value=$('measured').value;update();draw(true)};syncNom();draw(false);
+</script></body></html>
