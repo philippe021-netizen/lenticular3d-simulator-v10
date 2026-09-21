@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MicroPlayer — PixVerse V2 Controls</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:5;background:#111;color:#fff;padding:13px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#ffd60a;color:#111;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:850}.wrap{max-width:900px;margin:0 auto;padding:16px}.card{background:#fff;border:1px solid #ddd;border-radius:17px;padding:16px;margin-bottom:14px;box-shadow:0 5px 24px #0001}h2{margin:0 0 5px;font-size:20px}.sub{font-size:12px;color:#666;line-height:1.4}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}@media(max-width:720px){.grid,.grid3{grid-template-columns:1fr}}label{display:block;font-size:12px;font-weight:800;margin:10px 0 5px}input,select,textarea,button{width:100%;font:inherit;border-radius:11px}input,select,textarea{border:1px solid #cfd4d8;padding:11px;background:#fff}textarea{min-height:105px;resize:vertical;line-height:1.4}button{border:0;padding:13px;background:#111;color:#fff;font-weight:850;margin-top:10px}button.secondary{background:#eceff1;color:#111}button:disabled{opacity:.45}.status{margin-top:11px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:12px;white-space:pre-wrap;line-height:1.4}.ok{background:#e7f7eb;color:#17652c}.bad{background:#ffe9e7;color:#8b1f17}.info{background:#eef6ff;color:#20496d}.balance{font-weight:850}.maskgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}@media(max-width:620px){.maskgrid{grid-template-columns:1fr 1fr}}.mask{border:2px solid #ddd;border-radius:12px;padding:7px;background:#fafafa}.mask.active{border-color:#111}.mask img{width:100%;aspect-ratio:16/9;object-fit:contain;background:#111;border-radius:8px}.mask button{padding:8px;margin-top:6px;background:#eceff1;color:#111}.mask.active button{background:#111;color:#fff}video{display:none;width:100%;margin-top:12px;border-radius:12px;background:#111}.meta{margin-top:9px;font-size:12px;color:#555}.warning{padding:10px;border:1px solid #eed47a;background:#fff8d6;border-radius:11px;font-size:12px;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="bar"><b>MicroPlayer — PixVerse V2</b><span class="badge">BRANCHE TEST</span></div>
+<div class="wrap">
+  <section class="card">
+    <h2>Connexion API</h2>
+    <div id="balance" class="status">Lecture du solde…</div>
+    <div class="sub">Cette page utilise la même clé API Vercel que MicroPlayer. Elle ne touche pas à main.</div>
+  </section>
+
+  <section class="card">
+    <h2>Génération contrôlée</h2>
+    <div class="warning"><b>Mode Auto :</b> vidéo-guide → Omni V6 ; images-clés → Multi-transition V5 ; image finale → Transition V6 ; sinon Standard V6.</div>
+    <div class="grid3">
+      <div><label>Mode</label><select id="mode"><option value="auto">Auto</option><option value="standard">Standard V6</option><option value="transition">Transition V6</option><option value="omni">Omni V6</option><option value="multi_transition">Multi-transition V5</option></select></div>
+      <div><label>Qualité</label><select id="quality"><option>540p</option><option>720p</option><option>360p</option><option>1080p</option></select></div>
+      <div><label>Durée / segment</label><select id="duration"><option value="1">1 s</option><option value="2" selected>2 s</option><option value="3">3 s</option></select></div>
+    </div>
+    <label>Photo source MicroPlayer</label><input id="source" type="file" accept="image/png,image/jpeg,image/webp">
+    <div class="grid">
+      <div><label>Image finale — Transition</label><input id="end" type="file" accept="image/png,image/jpeg,image/webp"></div>
+      <div><label>Vidéo-guide — Omni</label><input id="motion" type="file" accept="video/mp4,video/quicktime,video/webm"></div>
+    </div>
+    <div class="grid">
+      <div><label>Images de référence — Omni (jusqu’à 9)</label><input id="refs" type="file" multiple accept="image/png,image/jpeg,image/webp"></div>
+      <div><label>Images-clés supplémentaires — Multi-transition (jusqu’à 6)</label><input id="keys" type="file" multiple accept="image/png,image/jpeg,image/webp"></div>
+    </div>
+    <label>Action</label>
+    <textarea id="prompt">Create one subtle, natural motion. Preserve exact facial identity, clothing, body proportions, lighting, framing and background. Keep the camera completely static. No zoom, no background drift, no extra limbs or fingers.</textarea>
+    <div id="estimate" class="status info">Coût estimé : —</div>
+    <button id="run">Lancer PixVerse V2</button>
+    <div id="status" class="status">Prêt.</div>
+    <video id="video" controls playsinline loop></video>
+    <div id="resultMeta" class="meta"></div>
+  </section>
+
+  <section class="card">
+    <h2>Réparation ciblée — Modify</h2>
+    <div class="sub">Charge une vidéo PixVerse presque correcte. PixVerse détecte les personnes/objets/fond ; choisis un masque puis corrige uniquement cette zone.</div>
+    <label>Vidéo à corriger</label><input id="modifyVideo" type="file" accept="video/mp4,video/quicktime,video/webm">
+    <button id="analyse" class="secondary">1. Analyser les masques</button>
+    <div id="maskStatus" class="status">Aucune analyse.</div>
+    <div id="masks" class="maskgrid"></div>
+    <label>Correction demandée</label><textarea id="modifyPrompt">@selection0 should be repaired to match the original appearance. Preserve the rest of the video exactly. Do not alter faces, background or camera framing.</textarea>
+    <label>Image de référence facultative</label><input id="modifyRef" type="file" multiple accept="image/png,image/jpeg,image/webp">
+    <button id="modify" disabled>2. Corriger la zone sélectionnée</button>
+    <div id="modifyStatus" class="status">Choisis d’abord un masque.</div>
+    <video id="modifyResult" controls playsinline loop></video>
+  </section>
+</div>
+
+<script type="module">
+import { getPixVerseDiagnostic, runPixVerseAction, choosePixVerseMode, estimatePixVerseCredits, selectPixVerseMasks, modifyPixVerseVideo } from './modules/pixverse-client.js';
+
+const $=id=>document.getElementById(id);
+let maskAnalysis=null,selectedMask=null;
+
+function tone(el,text,type=''){el.textContent=text;el.className='status'+(type?' '+type:'')}
+async function refreshBalance(){
+  try{
+    const d=await getPixVerseDiagnostic(),b=d.pixverseBalance;
+    if(!b?.ok)throw new Error(b?.error||'solde indisponible');
+    tone($('balance'),`✅ ${b.credit_total} crédits API disponibles — mensuels ${b.credit_monthly}, packs ${b.credit_package}`,'ok');
+  }catch(e){tone($('balance'),'❌ '+e.message,'bad')}
+}
+
+function controls(){
+  return {
+    mode:$('mode').value,
+    endFile:$('end').files?.[0]||null,
+    motionGuideFile:$('motion').files?.[0]||null,
+    referenceImageFiles:[...($('refs').files||[])],
+    keyframeFiles:[...($('keys').files||[])],
+    quality:$('quality').value,
+    duration:Number($('duration').value),
+    segmentDuration:Number($('duration').value),
+    aspectRatio:'auto',
+    audio:false
+  };
+}
+
+function updateEstimate(){
+  const c=controls();
+  const mode=choosePixVerseMode(c);
+  const keyCount=(c.keyframeFiles?.length||0)+1;
+  const duration=mode==='multi_transition'?Math.max(1,keyCount-1)*c.segmentDuration:c.duration;
+  const credits=estimatePixVerseCredits({mode,quality:c.quality,duration,hasVideoReferences:Boolean(c.motionGuideFile),keyframeCount:keyCount});
+  tone($('estimate'),`Mode effectif : ${mode} · coût estimé : ${credits??'non calculé'} crédits`,'info');
+}
+['mode','end','motion','refs','keys','quality','duration'].forEach(id=>$(id).addEventListener('change',updateEstimate));
+
+$('run').onclick=async()=>{
+  const file=$('source').files?.[0];if(!file){tone($('status'),'Choisis la photo source.','bad');return}
+  const prompt=$('prompt').value.trim();if(!prompt){tone($('status'),'Prompt manquant.','bad');return}
+  $('run').disabled=true;$('video').style.display='none';
+  try{
+    const variant={prompt,negativePrompt:'camera movement, zoom, identity change, background drift, extra limbs, extra fingers',duration:Number($('duration').value),quality:$('quality').value,motionMode:'normal',audio:false};
+    const result=await runPixVerseAction(file,variant,{controls:controls(),onStatus:s=>{
+      const labels={upload:'1/4 — Upload des références…',create:`2/4 — Lancement ${s.mode||''}…`,processing:'3/4 — PixVerse travaille…',done:'4/4 — Vidéo reçue.'};
+      tone($('status'),labels[s.step]||'Traitement…');
+    }});
+    $('video').src=result.videoUrl;$('video').style.display='block';$('video').load();$('video').play().catch(()=>{});
+    $('resultMeta').textContent=`Mode ${result.modeUsed} · ${result.quality} · durée ${result.duration}s · coût estimé ${result.estimatedCredits??'—'} crédits · video_id ${result.videoId}`;
+    tone($('status'),'Résultat PixVerse V2 reçu.','ok');await refreshBalance();
+  }catch(e){tone($('status'),'Erreur : '+e.message,'bad')}finally{$('run').disabled=false}
+};
+
+$('analyse').onclick=async()=>{
+  const file=$('modifyVideo').files?.[0];if(!file){tone($('maskStatus'),'Choisis une vidéo.','bad');return}
+  $('analyse').disabled=true;$('masks').innerHTML='';selectedMask=null;$('modify').disabled=true;
+  try{
+    tone($('maskStatus'),'Upload vidéo puis détection des masques…');
+    maskAnalysis=await selectPixVerseMasks(file);
+    const list=maskAnalysis.masks||[];
+    if(!list.length)throw new Error('PixVerse n’a retourné aucun masque.');
+    for(const m of list){
+      const d=document.createElement('div');d.className='mask';
+      const img=document.createElement('img');img.src=m.mask_url||maskAnalysis.keyframeUrl||'';
+      const b=document.createElement('button');b.textContent=m.mask_name||m.mask_id;
+      b.onclick=()=>{document.querySelectorAll('.mask').forEach(x=>x.classList.remove('active'));d.classList.add('active');selectedMask=m;$('modify').disabled=false;tone($('modifyStatus'),`Masque sélectionné : ${m.mask_name||m.mask_id}`,'info')};
+      d.append(img,b);$('masks').appendChild(d);
+    }
+    tone($('maskStatus'),`${list.length} masque(s) détecté(s) · coût analyse ${maskAnalysis.credits||2} crédits.`,'ok');await refreshBalance();
+  }catch(e){tone($('maskStatus'),'Erreur : '+e.message,'bad')}finally{$('analyse').disabled=false}
+};
+
+$('modify').onclick=async()=>{
+  if(!maskAnalysis||!selectedMask){tone($('modifyStatus'),'Analyse et sélectionne un masque.','bad');return}
+  $('modify').disabled=true;$('modifyResult').style.display='none';
+  try{
+    const refs=[...($('modifyRef').files||[])];
+    const result=await modifyPixVerseVideo({
+      videoMediaId:maskAnalysis.videoMediaId,
+      maskIds:[selectedMask.mask_id],
+      keyframeIds:maskAnalysis.keyframeId,
+      prompt:$('modifyPrompt').value.trim(),
+      referenceImageFiles:refs,
+      quality:$('quality').value,
+      onStatus:s=>tone($('modifyStatus'),s.step==='processing'?'PixVerse corrige la zone…':s.step==='done'?'Correction reçue.':'Préparation Modify…')
+    });
+    $('modifyResult').src=result.videoUrl;$('modifyResult').style.display='block';$('modifyResult').load();$('modifyResult').play().catch(()=>{});
+    tone($('modifyStatus'),`Correction terminée — video_id ${result.videoId}`,'ok');await refreshBalance();
+  }catch(e){tone($('modifyStatus'),'Erreur : '+e.message,'bad')}finally{$('modify').disabled=false}
+};
+
+refreshBalance();updateEstimate();
+</script>
+</body>
+</html>
