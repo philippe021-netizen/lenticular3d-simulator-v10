@@ -42,7 +42,7 @@ function cleanRefs(items, max, idField) {
   }).filter(Boolean);
 }
 
-async function callPixVerse(key, endpoint, payload, signal) {
+async function callPixVerse(key, endpoint, payload, mode, signal) {
   const r = await fetch(`https://app-api.pixverse.ai/openapi/v2${endpoint}`, {
     method: 'POST',
     headers: {
@@ -60,8 +60,7 @@ async function callPixVerse(key, endpoint, payload, signal) {
   catch { return { status:r.status, raw:text, data:null }; }
 
   if (data && typeof data === 'object') {
-    data._microplayer = { mode: payload.__microplayerMode || 'unknown', endpoint };
-    delete payload.__microplayerMode;
+    data._microplayer = { mode, endpoint };
   }
   return { status:r.status, raw:JSON.stringify(data), data };
 }
@@ -96,7 +95,6 @@ export default async function handler(req, res) {
       const imgId = positiveInt(body.img_id);
       if (!imgId) return res.status(400).json({ error: 'img_id PixVerse invalide.' });
       payload = {
-        __microplayerMode: mode,
         duration: clampInt(body.duration, 1, 15, 2),
         img_id: imgId,
         model: 'v6',
@@ -115,7 +113,6 @@ export default async function handler(req, res) {
       const last = positiveInt(body.last_frame_img);
       if (!first || !last) return res.status(400).json({ error: 'first_frame_img et last_frame_img sont requis.' });
       payload = {
-        __microplayerMode: mode,
         first_frame_img: first,
         last_frame_img: last,
         model: 'v6',
@@ -136,7 +133,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Omni requiert au moins une image ou une vidéo de référence.' });
       }
       payload = {
-        __microplayerMode: mode,
         model: 'v6',
         prompt,
         duration: videoReferences.length ? 0 : clampInt(body.duration, 1, 15, 2),
@@ -168,7 +164,6 @@ export default async function handler(req, res) {
       }).filter(Boolean);
       if (items.length !== src.length) return res.status(400).json({ error: 'Une image clé Multi-transition contient un img_id invalide.' });
       payload = {
-        __microplayerMode: mode,
         multi_transition: items,
         model: 'v5',
         quality
@@ -181,7 +176,6 @@ export default async function handler(req, res) {
       const videoMediaId = positiveInt(body.video_media_id);
       if (!videoMediaId) return res.status(400).json({ error: 'video_media_id est requis pour Modify.' });
       payload = {
-        __microplayerMode: mode,
         video_media_id: videoMediaId,
         prompt: basePrompt.slice(0, 5000),
         quality
@@ -200,7 +194,7 @@ export default async function handler(req, res) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120000);
     try {
-      const result = await callPixVerse(key, endpoint, payload, controller.signal);
+      const result = await callPixVerse(key, endpoint, payload, mode, controller.signal);
       res.status(result.status).setHeader('Content-Type', 'application/json').send(result.raw);
     } finally {
       clearTimeout(timeout);
