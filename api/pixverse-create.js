@@ -1,7 +1,7 @@
 const ALLOWED_QUALITIES = new Set(['360p', '540p', '720p', '1080p']);
 const ALLOWED_MOTION_MODES = new Set(['normal', 'fast']);
 const ALLOWED_ASPECT_RATIOS = new Set(['auto','16:9','4:3','1:1','3:4','9:16','2:3','3:2','21:9']);
-const ALLOWED_MODES = new Set(['standard','transition','omni','multi_transition','modify']);
+const ALLOWED_MODES = new Set(['standard','transition','omni','multi_transition','modify','mask_selection']);
 
 const PROMPT_POLICY_MARKER = 'LENTICULAR ONE-WAY MOTION POLICY';
 const ONE_WAY_PROMPT_POLICY = `${PROMPT_POLICY_MARKER}: Perform exactly one continuous transition from the source state to one clearly different final state. Move progressively in one direction only. Reach the final state by 65% of the clip, then hold it completely motionless until the end. Never reverse, repeat, bounce, oscillate, loop, or return toward the starting pose. KEEP EVERY ANIMATED SUBJECT COMPLETELY INSIDE THE ORIGINAL FRAME AT ALL TIMES WITH A CLEAR SAFETY MARGIN. The entire visible silhouette of every person, couple, group member, child, animal, vehicle, machine, object and logo must remain visible from first frame to last frame. Hands, fingers, arms, head, hair, feet, paws, ears, tails, wheels, bodywork, machine parts and logo contours never touch or cross an image edge. Never enlarge a subject, move it toward the camera or push it outside its original framing. CAMERA AND BACKGROUND ARE A FROZEN PHOTOGRAPHIC PLATE: no camera shift and no environmental motion. Only the specifically named subjects, body parts or effect may move. Preserve every identity, anatomy, clothing, scale, framing and geometry.`;
@@ -84,7 +84,7 @@ export default async function handler(req, res) {
     const negativePrompt = appendPolicy(baseNegativePrompt, ONE_WAY_NEGATIVE_POLICY, 'reverse motion, return to starting pose', ', ');
     const aspectRatio = ALLOWED_ASPECT_RATIOS.has(body.aspect_ratio) ? body.aspect_ratio : 'auto';
 
-    if (!basePrompt && mode !== 'multi_transition') {
+    if (!basePrompt && mode !== 'multi_transition' && mode !== 'mask_selection') {
       return res.status(400).json({ error: 'Prompt PixVerse manquant.' });
     }
 
@@ -189,6 +189,17 @@ export default async function handler(req, res) {
       if (body.keyframe_ids !== undefined && body.keyframe_ids !== null) {
         payload.keyframe_ids = body.keyframe_ids;
       }
+    }
+
+
+    if (mode === 'mask_selection') {
+      endpoint = '/video/mask/selection';
+      const videoMediaId = positiveInt(body.video_media_id);
+      if (!videoMediaId) return res.status(400).json({ error: 'video_media_id est requis pour la sélection de masque.' });
+      payload = {
+        video_media_id: videoMediaId,
+        keyframe_id: Math.max(0, Number.isFinite(Number(body.keyframe_id)) ? Math.round(Number(body.keyframe_id)) : 0)
+      };
     }
 
     const controller = new AbortController();
