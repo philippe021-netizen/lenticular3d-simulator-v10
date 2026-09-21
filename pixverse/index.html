@@ -34,18 +34,16 @@ async function check(){
   deploy.textContent='Déploiement : '+(d.deploymentUrl||location.host);
   if(ok){
     cont.style.display='block';
-    try{
-      const br=await fetch('../api/pixverse-balance?ts='+Date.now(),{cache:'no-store'});
-      const bd=await br.json();
-      if(!br.ok||bd.error) throw new Error(bd.error||('HTTP '+br.status));
+    const bd=d.pixverseBalance;
+    if(bd?.ok){
       const monthly=Number(bd.credit_monthly||0),pack=Number(bd.credit_package||0),total=Number(bd.credit_total||0);
       balance.className='line '+(total>0?'ok':'bad');
       balance.textContent=total>0
         ? `✅ Solde API PixVerse : ${total} crédits (mensuels ${monthly} + packs ${pack})`
         : '⚠️ Solde API PixVerse : 0 crédit. Les crédits Web/App PixVerse sont séparés des crédits API.';
-    }catch(e){
+    }else{
       balance.className='line bad';
-      balance.textContent='❌ Lecture du solde API impossible : '+e.message;
+      balance.textContent='❌ Lecture du solde API impossible : '+(bd?.error||'réponse PixVerse absente');
     }
   }else{
     balance.className='line bad';
