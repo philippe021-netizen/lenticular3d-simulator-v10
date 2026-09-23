@@ -68,11 +68,11 @@ export async function getLocalVideoDuration(file) {
 }
 
 export async function createPixVerseMimic({ imgId, videoMediaId, sourceVideoId, quality = '540p' }) {
-  const body = { img_id: imgId, quality };
+  const body = { mode: 'mimic', img_id: imgId, quality };
   if (sourceVideoId) body.source_video_id = sourceVideoId;
   else body.video_media_id = videoMediaId;
 
-  const response = await fetch('/api/pixverse-mimic', {
+  const response = await fetch('/api/pixverse-create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
