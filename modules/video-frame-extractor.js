@@ -1,17 +1,46 @@
-function once(target, event) {
+function once(target, event, timeoutMs = 1500) {
   return new Promise((resolve, reject) => {
-    const onEvent = () => { cleanup(); resolve(); };
-    const onError = () => { cleanup(); reject(new Error(`Erreur vidéo pendant ${event}.`)); };
+    let done = false;
+    let timer = null;
+
     const cleanup = () => {
+      if (timer) clearTimeout(timer);
       target.removeEventListener(event, onEvent);
       target.removeEventListener('error', onError);
     };
+
+    const finish = (fn, value) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      fn(value);
+    };
+
+    const onEvent = () => finish(resolve);
+    const onError = () => finish(reject, new Error(`Erreur vidéo pendant ${event}.`));
+
     target.addEventListener(event, onEvent, { once: true });
     target.addEventListener('error', onError, { once: true });
+
+    timer = setTimeout(() => {
+      finish(reject, new Error(`Timeout pendant ${event}.`));
+    }, timeoutMs);
   });
 }
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function withTimeout(promise, timeoutMs, message) {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    })
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 let pixversePreviewRAF = 0;
 let pixversePreviewFrames = null;
@@ -221,41 +250,113 @@ export function showPixVerseFramesInSimulator(frames) {
 
 async function ensureMetadata(video) {
   if (Number.isFinite(video.duration) && video.duration > 0 && video.videoWidth > 0) return;
-  await once(video, 'loadedmetadata');
+  await withTimeout(
+    once(video, 'loadedmetadata', 2500),
+    3000,
+    'Timeout chargement des métadonnées vidéo.'
+  );
+}
+
+export async function createAnalysisVideoFromSource(sourceVideo) {
+  if (!sourceVideo) throw new Error('Vidéo source absente pour analyse.');
+  const src = sourceVideo.currentSrc || sourceVideo.src;
+  if (!src) throw new Error('Source vidéo introuvable.');
+
+  const video = document.createElement('video');
+  video.crossOrigin = 'anonymous';
+  video.preload = 'auto';
+  video.muted = true;
+  video.playsInline = true;
+  video.setAttribute('playsinline', '');
+  Object.assign(video.style, {
+    position: 'fixed',
+    left: '-99999px',
+    top: '0',
+    width: '1px',
+    height: '1px',
+    opacity: '0',
+    pointerEvents: 'none'
+  });
+
+  document.body.appendChild(video);
+  video.src = src;
+  video.load();
+
+  try {
+    await ensureMetadata(video);
+    return video;
+  } catch (error) {
+    try {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.remove();
+    } catch (_) {}
+    throw error;
+  }
 }
 
 async function waitForDecodedFrame(video, targetTime) {
   if (typeof video.requestVideoFrameCallback === 'function') {
-    await new Promise(resolve => {
-      const started = performance.now();
-      let done = false;
-      const finish = () => { if (!done) { done = true; resolve(); } };
-      const tick = () => {
-        if (done) return;
-        if (performance.now() - started > 900) return finish();
-        video.requestVideoFrameCallback((_now, meta) => {
-          const mediaTime = Number(meta?.mediaTime);
-          if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.065) finish();
-          else requestAnimationFrame(tick);
-        });
-      };
-      tick();
-    });
-  } else await delay(90);
+    try {
+      await withTimeout(
+        new Promise(resolve => {
+          let resolved = false;
+          const finish = () => {
+            if (resolved) return;
+            resolved = true;
+            resolve();
+          };
+          video.requestVideoFrameCallback((_now, meta) => {
+            const mediaTime = Number(meta?.mediaTime);
+            if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.12) finish();
+            else requestAnimationFrame(finish);
+          });
+          setTimeout(finish, 180);
+        }),
+        260,
+        'Timeout decode frame'
+      );
+      return;
+    } catch (_) {}
+  }
+
+  await delay(120);
 }
 
 async function seek(video, time) {
   const duration = Number(video.duration) || 0;
-  const target = Math.max(0, Math.min(Math.max(0, duration - 0.001), time));
-  if (Math.abs((Number(video.currentTime) || 0) - target) < 0.003) {
+  const safeMin = duration > 0.08 ? 0.04 : 0;
+  const safeMax = Math.max(safeMin, duration - (duration > 0.08 ? 0.04 : 0.001));
+  const target = Math.max(safeMin, Math.min(safeMax, time));
+
+  if (Math.abs((Number(video.currentTime) || 0) - target) < 0.01) {
     await waitForDecodedFrame(video, target);
-    return target;
+    return Number(video.currentTime) || target;
   }
-  const seeked = once(video, 'seeked');
-  video.currentTime = target;
-  await seeked;
+
+  let seekWorked = false;
+  try {
+    await withTimeout(
+      (async () => {
+        const seeked = once(video, 'seeked', 1200);
+        video.currentTime = target;
+        await seeked;
+      })(),
+      1400,
+      `Timeout seek vers ${target.toFixed(3)} s`
+    );
+    seekWorked = true;
+  } catch (_) {
+    try {
+      video.currentTime = Math.max(safeMin, Math.min(safeMax, target + 0.001));
+    } catch (_) {}
+    await delay(140);
+  }
+
   await waitForDecodedFrame(video, target);
-  return target;
+  if (!seekWorked) await delay(80);
+  return Number(video.currentTime) || target;
 }
 
 function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
@@ -501,7 +602,11 @@ async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleC
     const r = count === 1 ? 0 : i / (count - 1);
     const time = start + (end - start) * r;
     onProgress?.({ phase: 'analysis', index: i, count, time });
-    const actualTime = await seek(video, time);
+    const actualTime = await withTimeout(
+      seek(video, time),
+      2200,
+      `Analyse bloquée sur l’échantillon ${i + 1}/${count}`
+    );
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const sig = sampleSignature(ctx, canvas.width, canvas.height);
@@ -561,24 +666,25 @@ export async function extractVideoFrames(video, {
   onProgress
 } = {}) {
   if (!video) throw new Error('Vidéo PixVerse introuvable.');
-  await ensureMetadata(video);
-  const duration = Number(video.duration);
+
+  const analysisVideo = await createAnalysisVideoFromSource(video);
+  await ensureMetadata(analysisVideo);
+  const duration = Number(analysisVideo.duration);
   if (!Number.isFinite(duration) || duration <= 0) throw new Error('Durée vidéo PixVerse invalide.');
-  if (!video.videoWidth || !video.videoHeight) throw new Error('Dimensions vidéo PixVerse indisponibles.');
+  if (!analysisVideo.videoWidth || !analysisVideo.videoHeight) throw new Error('Dimensions vidéo PixVerse indisponibles.');
 
   const frameCount = Math.max(2, Math.round(count));
-  const pad = Math.min(Math.max(0, edgePaddingSeconds), duration * 0.12);
+  const pad = Math.min(Math.max(0.04, edgePaddingSeconds), duration * 0.12);
   const fullStart = pad;
   const fullEnd = Math.max(fullStart, duration - pad);
   const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  canvas.width = analysisVideo.videoWidth;
+  canvas.height = analysisVideo.videoHeight;
   const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   if (!ctx) throw new Error('Canvas d’extraction indisponible.');
 
-  const wasPaused = video.paused;
-  const originalTime = Number(video.currentTime) || 0;
-  video.pause();
+  const originalTime = Number(analysisVideo.currentTime) || 0;
+  analysisVideo.pause();
   const hint = (actionHint || currentActionHint()).trim();
   let analysis = null;
   let start = fullStart;
@@ -588,7 +694,7 @@ export async function extractVideoFrames(video, {
 
   try {
     if (actionAware && fullEnd - fullStart > 0.45) {
-      analysis = await analyzeActionWindow(video, ctx, canvas, fullStart, fullEnd, hint, analysisSamples, onProgress);
+      analysis = await analyzeActionWindow(analysisVideo, ctx, canvas, fullStart, fullEnd, hint, analysisSamples, onProgress);
       start = analysis.start;
       end = progressiveOnly ? Math.min(analysis.end, analysis.peak || analysis.end) : analysis.end;
       if (end - start < 0.28) end = Math.min(fullEnd, start + 0.28);
@@ -602,10 +708,14 @@ export async function extractVideoFrames(video, {
       const ratio = frameCount === 1 ? 0.5 : i / (frameCount - 1);
       const requestedTime = plannedTimes?.[i] ?? (start + span * ratio);
       onProgress?.({ phase: 'extract', index: i, count: frameCount, time: requestedTime });
-      const actualTime = await seek(video, requestedTime);
+      const actualTime = await withTimeout(
+        seek(analysisVideo, requestedTime),
+        2200,
+        `Extraction bloquée sur la vue ${i + 1}/${frameCount}`
+      );
       await delay(20);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(analysisVideo, 0, 0, canvas.width, canvas.height);
       const fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
       const signature = sampleSignature(ctx, canvas.width, canvas.height);
       const blob = await canvasToBlob(canvas, type, quality);
@@ -613,8 +723,16 @@ export async function extractVideoFrames(video, {
       frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, signature, blob, url, width: canvas.width, height: canvas.height });
     }
   } finally {
-    try { await seek(video, Math.min(originalTime, Math.max(0, duration - 0.001))); } catch (_) {}
-    if (!wasPaused) { try { await video.play(); } catch (_) {} }
+    try {
+      await seek(analysisVideo, Math.min(originalTime, Math.max(0.04, duration - 0.04)));
+    } catch (_) {}
+
+    try {
+      analysisVideo.pause();
+      analysisVideo.removeAttribute('src');
+      analysisVideo.load();
+      analysisVideo.remove();
+    } catch (_) {}
   }
 
   const qualityGate = assessProgressiveFrames(frames);
