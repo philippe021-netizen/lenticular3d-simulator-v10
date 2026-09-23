@@ -35,7 +35,7 @@
 
 <section class="card">
 <h2>2. 9 vues MicroPlayer</h2>
-<div class="sub">Extraction PNG avec analyse de progression réelle. Un retour brutal vers la pose initiale reste bloquant.</div>
+<div class="sub">Extraction PNG avec analyse de progression réelle. Mode iPad/Safari sécurisé : vidéo d’analyse séparée, seek temporisé et fallback de décodage. Un retour brutal vers la pose initiale reste bloquant.</div>
 <button id="extract" disabled>Analyser et extraire les 9 PNG</button>
 <div id="qc" class="status">Aucune extraction.</div>
 <div id="frames" class="frames"></div>
@@ -94,7 +94,7 @@ $('extract').onclick=async()=>{
     if(!gate.passed)tone($('qc'),`❌ QC refusé : retour vers la pose initiale détecté. Fenêtre ${w.start.toFixed(2)}–${w.end.toFixed(2)} s.`,'bad');
     else tone($('qc'),`✅ 9 vues valides · progression ${gate.finalProgress} · pic ${gate.peakProgress}${gate.warning?' · avertissement '+gate.warning:''} · fenêtre ${w.start.toFixed(2)}–${w.end.toFixed(2)} s`,'ok');
     for(const f of extraction.frames){const d=document.createElement('div'),img=document.createElement('img'),m=document.createElement('div'),b=document.createElement('button');img.src=f.url;m.className='frameMeta';m.textContent=`Vue ${f.index} · ${f.time.toFixed(3)} s`;b.textContent=`Télécharger PNG ${f.index}`;b.onclick=()=>downloadExtractedFrame(f,'microplayer-mimic-v3');d.append(img,m,b);$('frames').appendChild(d)}
-  }catch(e){tone($('qc'),'Erreur extraction : '+e.message,'bad')}finally{$('extract').disabled=false}
+  }catch(e){tone($('qc'),'❌ Extraction interrompue : '+e.message,'bad')}finally{$('extract').disabled=false}
 };
 
 await Promise.all([diagnostic(),loadCatalog()]);
