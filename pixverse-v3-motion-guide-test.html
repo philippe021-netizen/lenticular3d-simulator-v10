@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MicroPlayer — PixVerse V3 Motion Guide</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f4f4f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;z-index:5;background:#111;color:#fff;padding:13px 16px;display:flex;justify-content:space-between;gap:12px;align-items:center}.bar b{font-size:17px}.badge{background:#a7f3d0;color:#073b2a;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:850}.wrap{max-width:980px;margin:0 auto;padding:16px}.card{background:#fff;border:1px solid #ddd;border-radius:17px;padding:16px;margin-bottom:14px;box-shadow:0 5px 24px #0001}h2{margin:0 0 5px;font-size:20px}.sub{font-size:12px;color:#666;line-height:1.45}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media(max-width:720px){.grid{grid-template-columns:1fr}}label{display:block;font-size:12px;font-weight:800;margin:10px 0 5px}input,select,button{width:100%;font:inherit;border-radius:11px}input,select{border:1px solid #cfd4d8;padding:11px;background:#fff}button{border:0;padding:13px;background:#111;color:#fff;font-weight:850;margin-top:10px}button:disabled{opacity:.45}.status{margin-top:11px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:12px;white-space:pre-wrap;line-height:1.45}.ok{background:#e7f7eb;color:#17652c}.bad{background:#ffe9e7;color:#8b1f17}.info{background:#eef6ff;color:#20496d}.warn{background:#fff7d6;color:#6d5200}video{width:100%;margin-top:12px;border-radius:12px;background:#111;display:none}.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:8px;border:1px solid #ddd}
+</style>
+</head>
+<body>
+<div class="bar"><b>MicroPlayer — PixVerse V3 Motion Guide</b><span class="badge">MIMIC · BRANCHE TEST</span></div>
+<div class="wrap">
+<section class="card"><h2>Principe</h2><div class="sub">La photo client fournit l’identité. La vidéo guide fournit le mouvement. Le retour MP4 est ensuite analysé par MicroPlayer pour sélectionner 9 états progressifs A→B sans retour.</div></section>
+<section class="card">
+<h2>1. Mouvement</h2>
+<label>Preset</label><select id="action"></select>
+<div id="presetMeta" class="status info">Chargement du catalogue…</div>
+<div class="grid"><div><label>Photo client</label><input id="photo" type="file" accept="image/png,image/jpeg,image/webp"></div><div><label>Vidéo guide MP4/MOV</label><input id="guide" type="file" accept="video/mp4,video/quicktime,video/mov"></div></div>
+<div class="grid"><div><label>Qualité</label><select id="quality"><option>360p</option><option selected>540p</option><option>720p</option></select></div><div><label>Durée guide</label><input id="duration" value="—" readonly></div></div>
+<button id="run">Lancer PixVerse Mimic</button><div id="status" class="status">Prêt.</div><video id="video" controls playsinline></video>
+</section>
+<section class="card">
+<h2>2. MicroPlayer — 9 vues</h2><div class="sub">L’extracteur recherche le premier passage progressif, bloque un retour franc et répartit les 9 vues sur la progression visuelle.</div>
+<button id="extract" disabled>Analyser et extraire les 9 vues</button><div id="qc" class="status">En attente d’une vidéo.</div><div id="frames" class="frames"></div>
+</section>
+</div>
+<script type="module">
+import { validateActionCatalog } from './modules/action-schema.js';
+import { runPixVerseMimic, getLocalVideoDuration, estimateMimicCredits } from './modules/pixverse-motion-guide.js';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js';
+import { savePixVerseJob, loadPixVerseJob } from './modules/pixverse-job-store.js';
+import { evaluateGenerationQC } from './modules/generation-qc.js';
+const $=id=>document.getElementById(id);let catalog=[];let extraction=null;
+function tone(el,text,type=''){el.textContent=text;el.className='status'+(type?' '+type:'')}
+async function loadCatalog(){const r=await fetch('./data/motion-guide-catalog-v11.json',{cache:'no-store'});const raw=await r.json();const checked=validateActionCatalog(raw);if(!checked.ok)throw new Error('Catalogue v11 invalide.');catalog=checked.actions;$('action').innerHTML=catalog.map(a=>`<option value="${a.id}">${a.label}</option>`).join('');renderPreset();}
+function preset(){return catalog.find(a=>a.id===$('action').value)||catalog[0]}
+function renderPreset(){const p=preset();if(!p)return;tone($('presetMeta'),`${p.label} · mode ${p.preferredMode}\nZones mobiles : ${p.mobileZones.join(', ')}\nZones verrouillées : ${p.lockedZones.join(', ')}\nMarge conseillée : ${Math.round(p.safeMargin*100)} %`,'info')}
+$('action').onchange=renderPreset;
+$('guide').onchange=async()=>{const f=$('guide').files?.[0];if(!f)return;$('duration').value='lecture…';try{const d=await getLocalVideoDuration(f);$('duration').value=d?`${d.toFixed(2)} s · ~${estimateMimicCredits({quality:$('quality').value,duration:d})} crédits`:'inconnue'}catch{$('duration').value='inconnue'}};
+$('quality').onchange=()=>{$('guide').dispatchEvent(new Event('change'))};
+$('run').onclick=async()=>{const photo=$('photo').files?.[0],guide=$('guide').files?.[0],p=preset();$('run').disabled=true;$('extract').disabled=true;$('frames').innerHTML='';try{const out=await runPixVerseMimic(photo,guide,{quality:$('quality').value,onStatus:s=>{const labels={'upload-photo':'1/4 — Upload photo…','upload-guide':'2/4 — Upload vidéo guide…',create:'3/4 — Lancement Mimic…',processing:'4/4 — PixVerse travaille…',done:'Vidéo reçue.'};tone($('status'),labels[s.step]||'Traitement…')}});$('video').src=out.videoUrl;$('video').style.display='block';$('video').load();savePixVerseJob({videoId:out.videoId,state:'done',videoUrl:out.videoUrl,actionId:p.id,quality:out.quality});tone($('status'),`Mimic reçu · video_id ${out.videoId} · ${out.quality} · coût ${out.estimatedCredits??'—'} crédits`,'ok');$('extract').disabled=false}catch(e){tone($('status'),'Erreur : '+e.message,'bad')}finally{$('run').disabled=false}};
+$('extract').onclick=async()=>{$('extract').disabled=true;$('frames').innerHTML='';try{tone($('qc'),'Analyse du premier passage progressif…');extraction?.revoke?.();extraction=await extractVideoFrames($('video'),{count:9,progressiveOnly:true,actionAware:true,actionHint:preset()?.label||'',onProgress:s=>tone($('qc'),s.phase==='analysis'?`Analyse mouvement ${s.index+1}/${s.count}`:`Extraction ${s.index+1}/${s.count}`)});const q=extraction.qualityGate;const overall=evaluateGenerationQC({returnDetected:q.returnDetected,similarFrames:q.warning==='similar-frames'});tone($('qc'),`QC ${overall.status.toUpperCase()} · vues distinctes ${q.distinctFrames}/9 · retour ${q.returnDetected?'OUI':'non'} · pic ${q.peakProgress}`,overall.status==='fail'?'bad':overall.status==='warn'?'warn':'ok');for(const frame of extraction.frames){const img=document.createElement('img');img.src=frame.url;img.alt=`Vue ${frame.index}`;img.title='Toucher pour télécharger cette vue';img.onclick=()=>downloadExtractedFrame(frame,'microplayer-v3');$('frames').appendChild(img)}}catch(e){tone($('qc'),'Erreur extraction : '+e.message,'bad')}finally{$('extract').disabled=false}};
+loadCatalog().catch(e=>tone($('presetMeta'),'Erreur catalogue : '+e.message,'bad'));
+const saved=loadPixVerseJob();if(saved?.videoUrl){$('video').src=saved.videoUrl;$('video').style.display='block';$('video').load();$('extract').disabled=false;tone($('status'),`Reprise du dernier job ${saved.videoId}.`,'info')}
+</script>
+</body>
+</html>
