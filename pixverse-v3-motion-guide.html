@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MicroPlayer — PixVerse V3 Motion Guide</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f5f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;background:#111;color:#fff;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5}.badge{background:#ffd60a;color:#111;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:850}.wrap{max-width:980px;margin:auto;padding:16px}.card{background:#fff;border:1px solid #ddd;border-radius:16px;padding:16px;margin-bottom:14px}h2{margin:0 0 6px}.sub{font-size:12px;color:#666;line-height:1.45}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:720px){.grid{grid-template-columns:1fr}}label{display:block;font-size:12px;font-weight:800;margin:10px 0 5px}input,select,button{width:100%;font:inherit;border-radius:11px}input,select{border:1px solid #ccd1d5;padding:11px;background:#fff}button{border:0;padding:13px;background:#111;color:#fff;font-weight:850;margin-top:10px}button:disabled{opacity:.45}.status{margin-top:10px;padding:11px;border-radius:11px;background:#f1f2f3;font-size:12px;white-space:pre-wrap}.ok{background:#e7f7eb;color:#17652c}.bad{background:#ffe9e7;color:#8b1f17}.info{background:#eef6ff;color:#20496d}video{display:none;width:100%;margin-top:12px;border-radius:12px;background:#111}.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:9px;border:1px solid #ddd}.frameMeta{font-size:10px;color:#555;margin-top:3px}.warning{padding:10px;border:1px solid #eed47a;background:#fff8d6;border-radius:11px;font-size:12px;line-height:1.4}
+</style>
+</head>
+<body>
+<div class="bar"><b>MicroPlayer — PixVerse V3 Motion Guide</b><span class="badge">MIMIC / 60 LPI</span></div>
+<div class="wrap">
+<section class="card">
+<h2>Pipeline V3</h2>
+<div class="warning">Photo client = identité. Vidéo guide = mouvement. PixVerse Mimic génère le MP4, puis MicroPlayer extrait 9 états progressifs A→B sans retour.</div>
+<div id="diag" class="status">Lecture de l’API…</div>
+</section>
+
+<section class="card">
+<h2>1. Génération Mimic</h2>
+<div class="grid">
+<div><label>Photo client</label><input id="photo" type="file" accept="image/png,image/jpeg,image/webp"></div>
+<div><label>Vidéo guide</label><input id="guide" type="file" accept="video/mp4,video/quicktime,video/webm"></div>
+</div>
+<div class="grid">
+<div><label>Mouvement catalogue v11</label><select id="action"></select></div>
+<div><label>Qualité Mimic</label><select id="quality"><option>540p</option><option>720p</option><option>360p</option></select></div>
+</div>
+<div id="actionInfo" class="status info">Catalogue en chargement…</div>
+<button id="run">Lancer PixVerse Mimic</button>
+<div id="status" class="status">Prêt.</div>
+<video id="result" controls playsinline></video>
+</section>
+
+<section class="card">
+<h2>2. 9 vues MicroPlayer</h2>
+<div class="sub">Extraction PNG avec analyse de progression réelle. Un retour brutal vers la pose initiale reste bloquant.</div>
+<button id="extract" disabled>Analyser et extraire les 9 PNG</button>
+<div id="qc" class="status">Aucune extraction.</div>
+<div id="frames" class="frames"></div>
+</section>
+</div>
+
+<script type="module">
+import { getPixVerseDiagnostic } from './modules/pixverse-client.js';
+import { runMimicMotionGuide } from './modules/pixverse-mimic-v3.js';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js';
+
+const $=id=>document.getElementById(id);
+let extraction=null,catalog=null;
+function tone(el,text,type=''){el.textContent=text;el.className='status'+(type?' '+type:'')}
+
+async function loadCatalog(){
+  const r=await fetch('./data/motion-guide-catalog-v11.json',{cache:'no-store'});
+  if(!r.ok)throw new Error('Catalogue v11 introuvable.');
+  catalog=await r.json();$('action').innerHTML='';
+  for(const a of catalog.actions){const o=document.createElement('option');o.value=a.id;o.textContent=a.label;$('action').appendChild(o)}
+  syncAction();
+}
+function syncAction(){
+  const a=catalog?.actions?.find(x=>x.id===$('action').value);if(!a)return;
+  tone($('actionInfo'),`${a.label} · cible ${a.durationSeconds}s · mobile: ${a.mobileZones.join(', ')} · verrouillé: ${a.lockedZones.join(', ')} · ${a.guideHint}`,'info');
+}
+$('action').addEventListener('change',syncAction);
+
+async function diagnostic(){
+  try{
+    const d=await getPixVerseDiagnostic(),b=d.pixverseBalance;
+    if(!b?.ok)throw new Error(b?.error||'solde indisponible');
+    tone($('diag'),`✅ API PixVerse connectée · ${b.credit_total} crédits disponibles`,'ok');
+  }catch(e){tone($('diag'),'⚠️ '+e.message,'bad')}
+}
+
+$('run').onclick=async()=>{
+  const photo=$('photo').files?.[0],guide=$('guide').files?.[0];
+  if(!photo||!guide){tone($('status'),'Choisis la photo client ET la vidéo guide.','bad');return}
+  $('run').disabled=true;$('extract').disabled=true;$('result').style.display='none';$('frames').innerHTML='';
+  try{
+    const labels={'upload-photo':'1/4 — Upload photo identité…','upload-guide':'2/4 — Upload vidéo guide…','create-mimic':'3/4 — Lancement Motion Control / Mimic…','processing':'4/4 — PixVerse génère la vidéo…','done':'Vidéo Mimic reçue.'};
+    const r=await runMimicMotionGuide(photo,guide,{quality:$('quality').value,onStatus:s=>tone($('status'),labels[s.step]||s.step)});
+    $('result').src=r.videoUrl;$('result').style.display='block';$('result').load();
+    await new Promise((resolve,reject)=>{if($('result').readyState>=1)return resolve();$('result').onloadedmetadata=resolve;$('result').onerror=()=>reject(new Error('MP4 PixVerse illisible.'))});
+    tone($('status'),`✅ Mimic reçu · video_id ${r.videoId} · ${r.quality}`,'ok');$('extract').disabled=false;await diagnostic();
+  }catch(e){tone($('status'),'Erreur : '+e.message,'bad')}finally{$('run').disabled=false}
+};
+
+$('extract').onclick=async()=>{
+  $('extract').disabled=true;$('frames').innerHTML='';
+  try{
+    tone($('qc'),'Analyse de la progression puis extraction…');extraction?.revoke?.();
+    extraction=await extractVideoFrames($('result'),{count:9,type:'image/png',quality:1,progressiveOnly:true,actionAware:true,actionHint:$('action').selectedOptions?.[0]?.textContent||'motion guide',analysisSamples:30,onProgress:p=>tone($('qc'),p.phase==='analysis'?`Analyse mouvement ${p.index+1}/${p.count}`:`Extraction PNG ${p.index+1}/${p.count}`)});
+    const gate=extraction.qualityGate,w=extraction.extractionWindow;
+    if(!gate.passed)tone($('qc'),`❌ QC refusé : retour vers la pose initiale détecté. Fenêtre ${w.start.toFixed(2)}–${w.end.toFixed(2)} s.`,'bad');
+    else tone($('qc'),`✅ 9 vues valides · progression ${gate.finalProgress} · pic ${gate.peakProgress}${gate.warning?' · avertissement '+gate.warning:''} · fenêtre ${w.start.toFixed(2)}–${w.end.toFixed(2)} s`,'ok');
+    for(const f of extraction.frames){const d=document.createElement('div'),img=document.createElement('img'),m=document.createElement('div'),b=document.createElement('button');img.src=f.url;m.className='frameMeta';m.textContent=`Vue ${f.index} · ${f.time.toFixed(3)} s`;b.textContent=`Télécharger PNG ${f.index}`;b.onclick=()=>downloadExtractedFrame(f,'microplayer-mimic-v3');d.append(img,m,b);$('frames').appendChild(d)}
+  }catch(e){tone($('qc'),'Erreur extraction : '+e.message,'bad')}finally{$('extract').disabled=false}
+};
+
+await Promise.all([diagnostic(),loadCatalog()]);
+</script>
+</body>
+</html>
