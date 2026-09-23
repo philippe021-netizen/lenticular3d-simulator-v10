@@ -7,7 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.3/dist/ort.min.js"></script>
   <style>
-    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#fff;background:#090a0d;--panel:#15171c;--line:#303541;--blue:#1687ff;--cyan:#00e5ff}*{box-sizing:border-box}body{margin:0}.top{position:sticky;top:0;z-index:20;padding:13px 18px;background:#0d0e12f2;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}.wrap{max-width:1500px;margin:auto;padding:16px}.grid{display:grid;grid-template-columns:410px minmax(0,1fr);gap:16px;height:calc(100vh - 86px);overflow:hidden;align-items:start}.sidebar,.workspace{height:100%;overflow-y:auto;overscroll-behavior:contain;padding-bottom:40px}.sidebar{position:relative;scrollbar-gutter:stable}.sidebarToggle{position:sticky;top:0;z-index:15;width:100%;margin-bottom:10px;background:#20242d;border:1px solid var(--line)}.grid.sidebar-collapsed{grid-template-columns:72px minmax(0,1fr)}.sidebar.collapsed .panel{display:none}.sidebar.collapsed .sidebarToggle{writing-mode:vertical-rl;height:150px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}.stage,.sim{position:relative;aspect-ratio:var(--source-aspect,1.545);background:#050506;border-radius:14px;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}.stage canvas,.sim canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,select,input{font:inherit}button{border:0;border-radius:11px;min-height:44px;padding:10px;background:#2d323d;color:#fff;font-weight:800}button.active,button.primary{background:var(--blue)}button.green{background:#177052}button:disabled{opacity:.4}select,input[type=file]{width:100%}.status{padding:10px;margin-top:9px;border-radius:10px;background:#20242d;font-size:12px;white-space:pre-wrap}.ok{background:#17372c}.warn{background:#443a1b}.group{border:1px solid #373c48;border-radius:13px;padding:10px;margin:8px 0}.group.selected{border:2px solid var(--cyan)}.grouphead{display:flex;gap:7px;align-items:center}.grouphead b{flex:1}.group input[type=range]{width:100%}.small{font-size:12px;color:#aab0bd}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.view{position:relative;aspect-ratio:var(--source-aspect,1.545)}.view img{width:100%;height:100%;object-fit:contain}.view span{position:absolute;top:4px;left:4px;background:#000b;padding:3px}.simnav{display:grid;grid-template-columns:45px 1fr 45px 90px;gap:8px}.sim3d{perspective:1200px;padding:26px 22px 34px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#20242c,#08090b 70%)}.sim3d>canvas{inset:4%;width:92%;height:92%;box-shadow:0 22px 50px #000b;border:1px solid #ffffff20;border-radius:8px}.simRig{position:absolute;inset:4%;width:92%;height:92%;transform-style:preserve-3d;transform-origin:50% 50%;will-change:transform;pointer-events:none}.simRig canvas{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;transform-style:preserve-3d}.simtools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.simtools label{font-size:12px;color:#aab0bd}.simtools input{width:100%}.abgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.abcard{background:#0b0d11;border:1px solid var(--line);border-radius:14px;padding:10px}.abcard canvas{display:block;width:100%;aspect-ratio:var(--source-aspect,1.545);object-fit:contain;background:#050506;border-radius:10px}.abtitle{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:7px}.hidden{display:none!important}.progress{height:7px;border-radius:8px;background:#090a0d;overflow:hidden;margin-top:8px}.progress i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s}@media(max-width:980px){.grid,.grid.sidebar-collapsed{grid-template-columns:1fr;height:auto;overflow:visible}.sidebar,.workspace{height:auto;overflow:visible}.sidebar.collapsed .panel{display:block}.sidebarToggle{display:none}.controls{grid-template-columns:1fr}.top span{display:none}}
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#fff;background:#090a0d;--panel:#15171c;--line:#303541;--blue:#1687ff;--cyan:#00e5ff}*{box-sizing:border-box}body{margin:0}.top{position:sticky;top:0;z-index:20;padding:13px 18px;background:#0d0e12f2;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:10px}.wrap{max-width:1500px;margin:auto;padding:16px}.grid{display:grid;grid-template-columns:410px minmax(0,1fr);gap:16px;height:calc(100vh - 86px);overflow:hidden;align-items:start}.sidebar,.workspace{height:100%;overflow-y:auto;overscroll-behavior:contain;padding-bottom:40px}.sidebar{position:relative;scrollbar-gutter:stable}.sidebarToggle{position:sticky;top:0;z-index:15;width:100%;margin-bottom:10px;background:#20242d;border:1px solid var(--line)}.grid.sidebar-collapsed{grid-template-columns:72px minmax(0,1fr)}.sidebar.collapsed .panel{display:none}.sidebar.collapsed .sidebarToggle{writing-mode:vertical-rl;height:150px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;margin-bottom:14px}.stage,.sim{position:relative;aspect-ratio:var(--source-aspect,1.545);background:#050506;border-radius:14px;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}.stage canvas,.sim canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}button,select,input{font:inherit}button{border:0;border-radius:11px;min-height:44px;padding:10px;background:#2d323d;color:#fff;font-weight:800}button.active,button.primary{background:var(--blue)}button.green{background:#177052}button:disabled{opacity:.4}select,input[type=file]{width:100%}.status{padding:10px;margin-top:9px;border-radius:10px;background:#20242d;font-size:12px;white-space:pre-wrap}.ok{background:#17372c}.warn{background:#443a1b}.group{border:1px solid #373c48;border-radius:13px;padding:10px;margin:8px 0}.group.selected{border:2px solid var(--cyan)}.grouphead{display:flex;gap:7px;align-items:center}.grouphead b{flex:1}.group input[type=range]{width:100%}.small{font-size:12px;color:#aab0bd}.controls{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.view{position:relative;aspect-ratio:var(--source-aspect,1.545)}.view img{width:100%;height:100%;object-fit:contain}.view span{position:absolute;top:4px;left:4px;background:#000b;padding:3px}.simnav{display:grid;grid-template-columns:45px 1fr 45px 90px;gap:8px}.sim3d{perspective:1200px;padding:26px 22px 34px;overflow:hidden;background:radial-gradient(circle at 50% 35%,#20242c,#08090b 70%)}.sim3d>canvas{inset:4%;width:92%;height:92%;box-shadow:0 22px 50px #000b;border:1px solid #ffffff20;border-radius:8px}.simRig{position:absolute;inset:4%;width:92%;height:92%;transform-style:preserve-3d;transform-origin:50% 50%;will-change:transform;pointer-events:none}.simRig canvas{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;transform-style:preserve-3d}.simtools{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.simtools label{font-size:12px;color:#aab0bd}.simtools input{width:100%}.hidden{display:none!important}.progress{height:7px;border-radius:8px;background:#090a0d;overflow:hidden;margin-top:8px}.progress i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s}@media(max-width:980px){.grid,.grid.sidebar-collapsed{grid-template-columns:1fr;height:auto;overflow:visible}.sidebar,.workspace{height:auto;overflow:visible}.sidebar.collapsed .panel{display:block}.sidebarToggle{display:none}.controls{grid-template-columns:1fr}.top span{display:none}}
   </style>
 </head>
 <body>
@@ -19,10 +19,6 @@
         <input id="photoFile" type="file" accept="image/*">
         <div id="sourceInfo" class="status">Choisis une photo pour démarrer.</div><div class="progress"><i id="activityBar"></i></div><div id="activityInfo" class="small" style="margin-top:6px">Photo V02 séparée de la version carte validée.</div>
         <div class="actions" style="margin-top:8px"><button id="back">Nouvelle photo</button><button id="depthflow" disabled>Analyser profondeur</button></div>
-<div class="actions" style="margin-top:8px"><button id="engineCurrent" class="active">Actuel · Depth Anything V2</button><button id="engineZip">TEST · ZipDepth</button></div>
-<div id="engineInfo" class="small" style="margin-top:6px">Moteur actif : Depth Anything V2 Small q8/WASM.</div>
-<button id="compareEngines" class="primary" style="width:100%;margin-top:8px" disabled>COMPARER — Simulation A/B</button>
-<div id="compareStatus" class="status">Charge une photo pour comparer les deux moteurs.</div>
         <div class="progress"><i id="progress"></i></div>
       </section>
       <section class="panel"><h2>2. Zones DepthFlow — éditables</h2><select id="preset"><option value="natural">Naturel</option><option value="portrait">Portrait</option><option value="strong">Relief fort</option></select><button id="auto" style="width:100%;margin-top:8px" disabled>Répartir les profondeurs</button><div id="groups"></div></section>
@@ -31,16 +27,7 @@
       <section id="editPanel" class="panel"><h2>Photo / masque</h2><div id="stage" class="stage"><canvas id="photo"></canvas><canvas id="mask"></canvas></div><div class="actions" style="margin-top:8px"><button id="card" class="active">Photo</button><button id="depthView">Profondeur</button></div></section>
       <section class="panel"><h2>3. Correction Pencil</h2><div class="actions"><button id="targetGroup" class="active">Sélection</button><button id="targetMaster" disabled>Fond maître</button></div><div class="actions" style="margin-top:8px"><button id="add" class="active">Pencil +</button><button id="erase">Gomme</button></div><div id="masterTools" class="actions hidden" style="margin-top:8px"><button id="pickCloneSource">✚ Choisir source</button><button id="cloneBrush">Tampon clone</button></div><label>Pinceau <b id="brushOut">18</b><input id="brush" type="range" min="3" max="70" value="18" style="width:100%"></label><div class="actions"><button id="undo" disabled>Annuler</button><button id="resetMask">Sélection auto</button></div><div id="pencilStatus" class="status ok">Choisis une zone puis corrige sa sélection avec Pencil + / Gomme.</div></section>
       <section class="panel"><h2>4. Relief</h2><div class="controls"><label>Zéro <b id="zeroOut">128</b><input id="zero" type="range" min="0" max="255" value="128"></label><label>Relief <b id="reliefOut">220%</b><input id="relief" type="range" min="80" max="250" value="220"></label><label>Parallaxe <b id="parallaxOut">4.2%</b><input id="parallax" type="range" min="0" max="6" step=".1" value="4.2"></label></div><label>Relief du fond <b id="backgroundOut">12%</b><input id="background" type="range" min="0" max="35" value="12" style="width:100%"></label><div id="report" class="status"></div><button id="photoRelief" class="primary" style="width:100%">Préparer rendu V02</button><div id="aiGate" class="status warn">Simulateur verrouillé : attente du retour IA et de la composition validée.</div><div id="threePlanWrap" class="hidden"><h3>Contrôle technique — scène maître</h3><canvas id="threePlan" style="width:100%;border-radius:12px;background:#08090c"></canvas><div class="small">Contrôle technique uniquement : calques RGBA originaux. Cet aperçu n'est jamais utilisé pour l'impression.</div></div><div class="actions" style="margin-top:8px"><button id="clientPreview">Aperçu client IA</button><button id="masterBg">Contrôler / modifier fond maître</button></div><div class="actions" style="margin-top:8px"><button id="threeViews" class="primary" disabled>TEST — Gauche / Centre / Droite</button><button id="generate" disabled>PRODUCTION — 9 vues</button></div><div id="clientGate" class="status">APERÇU PHOTO : contrôle esthétique uniquement · production issue de la scène maître.</div></section>
-      <section id="abComparePanel" class="panel hidden"><h2>Comparaison relief — même photo, mêmes réglages</h2>
-<div class="abgrid">
-  <div class="abcard"><div class="abtitle"><b>Actuel — Depth Anything V2</b><span id="abCurrentTime" class="small"></span></div><canvas id="abCurrent"></canvas><div id="abCurrentStats" class="small"></div></div>
-  <div class="abcard"><div class="abtitle"><b>TEST — ZipDepth</b><span id="abZipTime" class="small"></span></div><canvas id="abZip"></canvas><div id="abZipStats" class="small"></div></div>
-</div>
-<div class="simnav" style="margin-top:10px"><button id="abPrev">‹</button><input id="abRange" type="range" min="0" max="8" step="1" value="4"><button id="abNext">›</button><output id="abOut">5 / 9</output></div>
-<div class="actions" style="margin-top:8px"><button id="abPlay" class="active">Pause</button><button id="abCenter">Centre</button></div>
-<div id="abVerdict" class="status ok">Compare surtout cheveux, doigts, contours sujet/fond, halos et stabilité du décor.</div>
-</section>
-<section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Position lenticulaire <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief V02 <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim" disabled>Fond global non utilisé</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim" disabled>Désocclusion locale V02</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP simulation</button><button id="productionZip" class="green" disabled>ZIP production</button></div><div id="renderStatus" class="status ok"></div><div id="productionStatus" class="status warn">Production 9 vues non calculée.</div><div id="productionViews" class="views"></div></section>
+      <section id="results" class="panel hidden"><h2>5. Simulation lenticulaire</h2><div class="sim sim3d"><div id="simRig" class="simRig hidden" aria-hidden="true"></div><canvas id="sim3d"></canvas></div><div class="simtools"><label>Position lenticulaire <b id="tiltOut">14°</b><input id="tilt" type="range" min="0" max="5" step="1" value="0" disabled></label><label>Relief V02 <b id="simDepthOut">1.00×</b><input id="simDepth" type="range" min="0" max="2" step=".05" value="1"></label></div><div class="simnav"><button id="prev">‹</button><input id="simRange" type="range" min="0" max="8" step="0.01" value="4"><button id="next">›</button><output id="simOut">5 / 9</output></div><div id="views" class="views"></div><div class="actions"><button id="toggle">Pause</button><button id="loopMode" class="active">Boucle ↔</button></div><label style="display:block;margin-top:9px">Vitesse de lecture <b id="playbackSpeedOut">1.00×</b><input id="playbackSpeed" type="range" min="0.35" max="2.5" step="0.05" value="1" style="width:100%"></label><div class="actions" style="margin-top:8px"><button id="editMasterFromSim" disabled>Fond global non utilisé</button><button id="restartLoop">Repartir du centre</button></div><div class="actions" style="margin-top:8px"><button id="downloadRelief" disabled>Résultat automatique</button><button id="showMasterFromSim" disabled>Désocclusion locale V02</button></div><div class="actions" style="margin-top:8px"><button id="reliefPack">Exporter données de secours</button><button id="reliefGuide">Vérifier données</button></div><div class="actions" style="margin-top:8px"><button id="zip" class="green">ZIP simulation</button><button id="productionZip" class="green" disabled>ZIP production</button></div><div id="renderStatus" class="status ok"></div><div id="productionStatus" class="status warn">Production 9 vues non calculée.</div><div id="productionViews" class="views"></div></section>
     </section>
   </div></main>
   <script type="module">
@@ -49,7 +36,7 @@
 
     const $=id=>document.getElementById(id),photo=$('photo'),mask=$('mask'),stage=$('stage'),editPanel=$('editPanel'),sim3d=$('sim3d'),simRig=$('simRig'),threePlan=$('threePlan'),sidebar=$('sidebar'),workspace=$('workspace');
     const photoContext=photo.getContext('2d',{willReadFrequently:true}),maskContext=mask.getContext('2d');
-    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,photoDepthOriginal:null,depthHistory:[],continuousCache:[],continuousStats:[],backgroundSeed:null,backgroundSeedKey:'',productionViews:[],productionBlobs:[],productionUrls:[],productionStats:[],productionQc:null,engineDepths:{current:null,zipdepth:null},engineTimes:{},abFrames:{current:[],zipdepth:[]},abStats:{current:[],zipdepth:[]},abIndex:4,abPlaying:true,abDirection:1,abAnimation:0,abLastTime:0};
+    const state={payload:null,image:null,rgba:null,width:0,height:0,groups:[],selected:null,mode:'add',editTarget:'group',preview:'card',baseDepth:null,finalDepth:null,history:[],masterHistory:[],masterOriginal:null,masterTool:'heal',cloneSource:null,cloneStroke:null,cloneSnapshot:null,cloneCurrentSource:null,drawing:false,lastPoint:null,overlayFrame:0,worker:null,requestId:0,views:[],blobs:[],urls:[],renderStats:[],simPosition:4,playing:true,direction:1,lastTime:0,animation:0,playbackMode:'pingpong',playbackSpeed:1,simSource:null,glPreview:null,rigidPreview:null,autoRelief:null,aiReady:false,aiMaster:null,masterQc:null,threeViewQc:null,liveFrame:0,liveRebuildLayers:false,rigVersion:1,photoDepth:null,photoDepthOriginal:null,depthHistory:[],continuousCache:[],continuousStats:[],backgroundSeed:null,backgroundSeedKey:'',productionViews:[],productionBlobs:[],productionUrls:[],productionStats:[],productionQc:null};
     const loadImage=url=>new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=url});
     const toBlob=canvas=>new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
     function sourceCanvasExact(){const canvas=document.createElement('canvas');canvas.width=state.width;canvas.height=state.height;canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),state.width,state.height),0,0);return canvas}
@@ -99,7 +86,7 @@
         const prepared=document.createElement('canvas');prepared.width=W;prepared.height=H;prepared.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(state.rgba),W,H),0,0);
         const imageUrl=prepared.toDataURL('image/png');state.payload={image:imageUrl,width:W,height:H,capture:{source:'photo-upload',name:file.name||'photo'}};
         state.image=await loadImage(imageUrl);state.baseDepth=new Uint8ClampedArray(W*H).fill(128);state.photoDepth=null;state.photoDepthOriginal=null;state.depthHistory=[];clearContinuousCache();clearProduction();state.groups=[];state.selected=null;state.aiReady=false;state.aiMaster=null;state.rigidPreview=null;state.masterOriginal=null;state.masterHistory=[];state.masterQc=null;state.threeViewQc=null;
-        drawPhoto();maskContext.clearRect(0,0,W,H);$('groups').innerHTML='';$('depthflow').disabled=false;$('compareEngines').disabled=false;state.engineDepths={current:null,zipdepth:null};state.engineTimes={};state.abFrames={current:[],zipdepth:[]};state.abStats={current:[],zipdepth:[]};$('abComparePanel').classList.add('hidden');$('auto').disabled=true;$('photoRelief').disabled=true;$('threeViews').disabled=true;$('generate').disabled=true;$('results').classList.add('hidden');
+        drawPhoto();maskContext.clearRect(0,0,W,H);$('groups').innerHTML='';$('depthflow').disabled=false;$('auto').disabled=true;$('photoRelief').disabled=true;$('threeViews').disabled=true;$('generate').disabled=true;$('results').classList.add('hidden');
         $('sourceInfo').className='status ok';$('sourceInfo').textContent='Photo chargée '+W+'×'+H+' · lance « Analyser profondeur ».';
         activity('Photo prête',100,W+'×'+H);stopActivity(true);
       }finally{URL.revokeObjectURL(rawUrl)}
@@ -131,10 +118,10 @@
       if(d>=zero)return (d-zero)/Math.max(1,255-zero);
       return -((zero-d)/Math.max(1,zero))*bgScale;
     }
-    function backgroundSeedMask(depthOverride=null){
-      const depth=depthOverride||continuousDepth(),W=state.width,H=state.height;if(!depth?.length)return null;
-      const zero=Number($('zero').value),limit=Math.max(24,Math.min(220,zero-6)),cacheable=!depthOverride,key=W+'x'+H+':'+limit+':'+(depth===state.photoDepth?'photo':'base');
-      if(cacheable&&state.backgroundSeed&&state.backgroundSeedKey===key)return state.backgroundSeed;
+    function backgroundSeedMask(){
+      const depth=continuousDepth(),W=state.width,H=state.height;if(!depth?.length)return null;
+      const zero=Number($('zero').value),limit=Math.max(24,Math.min(220,zero-6)),key=W+'x'+H+':'+limit+':'+(depth===state.photoDepth?'photo':'base');
+      if(state.backgroundSeed&&state.backgroundSeedKey===key)return state.backgroundSeed;
       const mask=new Uint8Array(W*H),r=2,tol=4;
       for(let y=0;y<H;y++)for(let x=0;x<W;x++){
         const i=y*W+x,d=depth[i];if(d>limit)continue;
@@ -143,7 +130,7 @@
         let stable=true;for(const q of probes)if(depth[q]>limit+tol){stable=false;break}
         if(stable)mask[i]=1;
       }
-      if(cacheable){state.backgroundSeed=mask;state.backgroundSeedKey=key}return mask;
+      state.backgroundSeed=mask;state.backgroundSeedKey=key;return mask;
     }
     function nearestSeedField(seed,W,H){
       const N=W*H,nearest=new Int32Array(N),dist=new Uint16Array(N);nearest.fill(-1);dist.fill(65535);
@@ -176,7 +163,7 @@
       return {filled,backgroundFilled,fallbackFilled,interiorFallbackFilled,backgroundFillPercent:filled?backgroundFilled/filled*100:100,fallbackFillPercent:filled?fallbackFilled/filled*100:0,interiorFallbackFillPercent:filled?interiorFallbackFilled/filled*100:0,maxFillDistance,fillRadius:radius,borderGuard};
     }
     function renderContinuousDepthView(position,options={}){
-      const SW=state.width,SH=state.height,depth=options.depth||continuousDepth(),bgSeed=backgroundSeedMask(options.depth||null);
+      const SW=state.width,SH=state.height,depth=continuousDepth(),bgSeed=backgroundSeedMask();
       if(!state.rgba||!depth?.length)throw Error('Profondeur continue indisponible.');
       const maxEdge=Number(options.maxEdge)||Math.max(SW,SH),scale=Math.min(1,maxEdge/Math.max(SW,SH)),W=Math.max(1,Math.round(SW*scale)),H=Math.max(1,Math.round(SH*scale)),N=W*H;
       const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d',{willReadFrequently:true});
@@ -511,103 +498,23 @@
     $('targetMaster').onclick=()=>{};
     $('card').onclick=showCard;$('depthView').onclick=()=>{state.editTarget='group';state.preview='depth';drawDepth();$('depthView').classList.add('active');$('card').classList.remove('active');updatePencilUi()};
 
-    state.depthEngine='current'; state.workers=state.workers||{};
-    function setDepthEngine(engine){
-      state.depthEngine=engine;
-      $('engineCurrent').classList.toggle('active',engine==='current');$('engineZip').classList.toggle('active',engine==='zipdepth');
-      $('engineInfo').textContent=engine==='zipdepth'?'Moteur actif : TEST ZipDepth NPU ONNX + raffinement MicroPlayer.':'Moteur actif : Depth Anything V2 Small q8/WASM.';
-    }
-    $('engineCurrent').onclick=()=>setDepthEngine('current');$('engineZip').onclick=()=>setDepthEngine('zipdepth');
     function depthWorker(){
-      const key=state.depthEngine||'current'; if(state.workers?.[key])return state.workers[key];
-      const worker=new Worker(new URL(key==='zipdepth'?'./zipdepth-worker.js':'./depthflow-v42-worker.js',import.meta.url),{type:'module'});
+      if(state.worker)return state.worker;
+      const worker=new Worker(new URL('./depthflow-v42-worker.js',import.meta.url),{type:'module'});
       worker.onmessage=event=>{
         const message=event.data||{};if(message.requestId!==state.requestId)return;
         if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}
-        if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);state.photoDepth=prepareContinuousPhotoDepth(state.baseDepth);state.engineDepths[key]=new Uint8ClampedArray(state.photoDepth);state.photoDepthOriginal=new Uint8ClampedArray(state.photoDepth);state.depthHistory=[];clearContinuousCache();$('progress').style.width='100%';buildPhotoGroupsFromDepth();compose();updateUndo();$('sourceInfo').className='status ok';$('sourceInfo').textContent=(message.provider==='zipdepth'?'TEST ZipDepth':'Depth Anything V2')+' terminé'+(Number.isFinite(message.inferenceMs)?' · inférence '+Math.round(message.inferenceMs)+' ms':'')+'.'}
+        if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);state.photoDepth=prepareContinuousPhotoDepth(state.baseDepth);state.photoDepthOriginal=new Uint8ClampedArray(state.photoDepth);state.depthHistory=[];clearContinuousCache();$('progress').style.width='100%';buildPhotoGroupsFromDepth();compose();updateUndo()}
         if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow photo indisponible : '+message.message}
       };
-      state.workers[key]=worker;return worker;
+      state.worker=worker;return worker;
     }
     $('depthflow').onclick=()=>{
       if(!state.rgba||!state.payload?.image)return;
-      state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent=(state.depthEngine==='zipdepth'?'TEST ZipDepth':'Depth Anything V2')+' — analyse de profondeur en cours…';
+      state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='Analyse de profondeur photo en cours…';
       const guide=new Uint8ClampedArray(state.rgba);
       depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer]);
     };
-
-
-    function runDepthEngineOnce(engine){
-      return new Promise((resolve,reject)=>{
-        if(!state.rgba||!state.payload?.image){reject(new Error('Photo source absente.'));return}
-        const worker=new Worker(new URL(engine==='zipdepth'?'./zipdepth-worker.js':'./depthflow-v42-worker.js',import.meta.url),{type:'module'});
-        const requestId=Date.now()+Math.floor(Math.random()*100000),guide=new Uint8ClampedArray(state.rgba),started=performance.now();
-        const cleanup=()=>{try{worker.terminate()}catch(_){}};
-        worker.onmessage=event=>{
-          const m=event.data||{};if(m.requestId!==requestId)return;
-          if(m.type==='progress'){$('compareStatus').textContent=(engine==='zipdepth'?'ZipDepth':'Depth Anything V2')+' — '+m.stage}
-          if(m.type==='result'){const depth=prepareContinuousPhotoDepth(new Uint8ClampedArray(m.refinedBuffer));const totalMs=performance.now()-started;cleanup();resolve({depth,totalMs,inferenceMs:m.inferenceMs})}
-          if(m.type==='error'){cleanup();reject(new Error(m.message||'Erreur moteur profondeur'))}
-        };
-        worker.onerror=e=>{cleanup();reject(new Error(e.message||'Erreur Worker'))};
-        worker.postMessage({type:'estimate-and-refine',requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer]);
-      });
-    }
-    function drawAbFrame(index){
-      if(!state.abFrames.current.length||!state.abFrames.zipdepth.length)return;
-      const i=Math.max(0,Math.min(8,Math.round(index)));state.abIndex=i;
-      for(const [engine,id] of [['current','abCurrent'],['zipdepth','abZip']]){
-        const src=state.abFrames[engine][i],dst=$(id);if(!src||!dst)continue;
-        dst.width=src.width;dst.height=src.height;dst.getContext('2d').drawImage(src,0,0);
-      }
-      $('abRange').value=String(i);$('abOut').textContent=(i+1)+' / 9';
-    }
-    function abMetric(stats){
-      const relevant=stats.filter((_,i)=>i!==4);if(!relevant.length)return '—';
-      const avg=key=>relevant.reduce((s,v)=>s+(Number(v?.[key])||0),0)/relevant.length;
-      return 'trous avant remplissage '+avg('holeRatioBeforeFill').toFixed(2)+'% · recours photo source '+avg('fallbackFillPercent').toFixed(1)+'%';
-    }
-    function animateAb(ts){
-      if(!state.abPlaying){state.abAnimation=requestAnimationFrame(animateAb);return}
-      if(!state.abLastTime)state.abLastTime=ts;
-      if(ts-state.abLastTime>260){
-        let next=state.abIndex+state.abDirection;if(next>=8){next=8;state.abDirection=-1}else if(next<=0){next=0;state.abDirection=1}
-        drawAbFrame(next);state.abLastTime=ts;
-      }
-      state.abAnimation=requestAnimationFrame(animateAb);
-    }
-    $('compareEngines').onclick=async()=>{
-      if(!state.rgba)return;
-      $('compareEngines').disabled=true;$('compareStatus').className='status';$('compareStatus').textContent='A/B : calcul Depth Anything V2…';
-      try{
-        state.abFrames={current:[],zipdepth:[]};state.abStats={current:[],zipdepth:[]};
-        let current;
-        if(state.engineDepths.current?.length){current={depth:new Uint8ClampedArray(state.engineDepths.current),totalMs:state.engineTimes.current||0};$('abCurrentTime').textContent='résultat déjà calculé'}
-        else{current=await runDepthEngineOnce('current');state.engineDepths.current=current.depth;state.engineTimes.current=current.totalMs;$('abCurrentTime').textContent=Math.round(current.totalMs)+' ms total'}
-        if(state.workers){for(const worker of Object.values(state.workers)){try{worker?.terminate()}catch(_){}}state.workers={}}
-        await new Promise(resolve=>setTimeout(resolve,300));
-        $('compareStatus').textContent='A/B : mémoire libérée · calcul ZipDepth iPad…';
-        const zip=await runDepthEngineOnce('zipdepth');state.engineDepths.zipdepth=zip.depth;state.engineTimes.zipdepth=zip.totalMs;
-        $('abZipTime').textContent=(Number.isFinite(zip.inferenceMs)?Math.round(zip.inferenceMs)+' ms inf. · ':'')+Math.round(zip.totalMs)+' ms total';
-        $('compareStatus').textContent='A/B : génération des 9 vues synchronisées…';
-        for(const engine of ['current','zipdepth']){
-          state.abFrames[engine]=[];state.abStats[engine]=[];
-          for(let i=0;i<9;i++){const r=renderContinuousDepthView((i-4)/4,{depth:state.engineDepths[engine],maxEdge:480});state.abFrames[engine][i]=r.canvas;state.abStats[engine][i]=r.stats}
-        }
-        $('abCurrentStats').textContent=abMetric(state.abStats.current);$('abZipStats').textContent=abMetric(state.abStats.zipdepth);
-        $('abComparePanel').classList.remove('hidden');state.abPlaying=true;state.abDirection=1;state.abIndex=4;state.abLastTime=0;drawAbFrame(4);
-        $('abPlay').textContent='Pause';$('abPlay').classList.add('active');
-        if(!state.abAnimation)state.abAnimation=requestAnimationFrame(animateAb);
-        $('compareStatus').className='status ok';$('compareStatus').textContent='Comparaison prête · même zéro, relief et parallaxe · ZipDepth utilise le profil mémoire iPad 256.';
-        $('abComparePanel').scrollIntoView({behavior:'smooth',block:'start'});
-      }catch(error){$('compareStatus').className='status warn';$('compareStatus').textContent='Comparaison impossible : '+error.message}
-      finally{$('compareEngines').disabled=false}
-    };
-    $('abRange').oninput=()=>{state.abPlaying=false;$('abPlay').textContent='Lecture';$('abPlay').classList.remove('active');drawAbFrame(Number($('abRange').value))};
-    $('abPrev').onclick=()=>{state.abPlaying=false;$('abPlay').textContent='Lecture';drawAbFrame(state.abIndex-1)};
-    $('abNext').onclick=()=>{state.abPlaying=false;$('abPlay').textContent='Lecture';drawAbFrame(state.abIndex+1)};
-    $('abCenter').onclick=()=>{state.abPlaying=false;$('abPlay').textContent='Lecture';drawAbFrame(4)};
-    $('abPlay').onclick=()=>{state.abPlaying=!state.abPlaying;$('abPlay').textContent=state.abPlaying?'Pause':'Lecture';$('abPlay').classList.toggle('active',state.abPlaying);state.abLastTime=0;if(state.abPlaying&&!state.abAnimation)state.abAnimation=requestAnimationFrame(animateAb)};
 
     function renderSemanticPlaneView(position){return renderContinuousDepthView(position).canvas}
     function renderAiMasterView(position){return renderContinuousDepthView(position).canvas}
