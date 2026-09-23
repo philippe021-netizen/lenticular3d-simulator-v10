@@ -1,27 +1,230 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>MicroPlayer — Pitch Lab 50/60 LPI</title>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>MicroPlayer — Pitch Lab physique 50/60 LPI</title>
 <style>
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;background:#0b1020;color:#eef2ff}main{max-width:980px;margin:auto;padding:22px}.card{background:#151c31;border:1px solid #2b3658;border-radius:18px;padding:18px;margin:14px 0}h1{font-size:26px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}label{display:block;font-size:13px;color:#b9c4e3}input,select,button{width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border-radius:10px;border:1px solid #405077;background:#0e162a;color:white;font-size:16px}button{background:#315be8;border:0;font-weight:700}button.secondary{background:#26314f}.big{font-size:30px;font-weight:800}.ok{color:#8ff0b0}.warn{color:#ffd479}canvas{width:100%;background:white;border-radius:8px;touch-action:none}.small{font-size:13px;color:#aab5d4}.row{display:flex;gap:10px;flex-wrap:wrap}.row button{width:auto;flex:1;min-width:180px}@media print{body{background:white;color:black}main>*:not(#printCard){display:none!important}#printCard{display:block!important;border:0;padding:0;margin:0}canvas{border-radius:0}}
-</style></head><body><main>
-<h1>MicroPlayer · Pitch Lab expérimental</h1>
-<p class="small">Branche isolée. Ne modifie ni V33 validée ni la production. Objectif : mesurer le pitch réel avant entrelacement.</p>
-<div class="card"><div class="grid">
-<div><label>LPI nominal<select id="nom"><option>50</option><option>60</option></select></label></div>
-<div><label>DPI imprimante<input id="dpi" type="number" value="600" min="300" step="1"></label></div>
-<div><label>Centre test (LPI)<input id="center" type="number" value="50" step=".001"></label></div>
-<div><label>Amplitude coarse ± LPI<input id="span" type="number" value=".40" step=".01"></label></div>
-<div><label>Pas coarse<input id="step" type="number" value=".05" step=".001"></label></div>
-<div><label>Phase / registration (px)<input id="phase" type="number" value="0" step=".1"></label></div>
-</div></div>
-<div class="card"><div class="big"><span id="pitch">12.000</span> px/lenticule</div><p id="info" class="small"></p><div class="row"><button id="coarse">Générer mire coarse</button><button id="fine" class="secondary">Mire fine ±0,05</button><button id="print" class="secondary">Imprimer à 100 %</button></div></div>
-<div id="printCard" class="card"><canvas id="c" width="1800" height="1200"></canvas><p class="small">Imprimer sans mise à l'échelle. Après pose de la feuille lenticulaire, noter la bande la plus stable/noire. Reporter sa valeur comme pitch mesuré.</p></div>
-<div class="card"><label>LPI mesuré<input id="measured" type="number" value="50" step=".001"></label><div class="row"><button id="apply">Utiliser comme centre du test fin</button></div><p id="delta" class="small"></p></div>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef2ff;background:#0b1020}
+*{box-sizing:border-box}body{margin:0}main{max-width:1120px;margin:auto;padding:20px}
+.card{background:#151c31;border:1px solid #2b3658;border-radius:18px;padding:17px;margin:13px 0}
+h1{font-size:26px;margin:.2em 0}.small{font-size:13px;color:#aab5d4}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:11px}
+label{display:block;font-size:13px;color:#b9c4e3}input,select,button{width:100%;box-sizing:border-box;margin-top:6px;padding:11px;border-radius:10px;border:1px solid #405077;background:#0e162a;color:white;font-size:16px}
+button{background:#315be8;border:0;font-weight:750}button.secondary{background:#26314f}.row{display:flex;gap:9px;flex-wrap:wrap}.row button{width:auto;flex:1;min-width:170px}
+.big{font-size:28px;font-weight:800}.ok{color:#8ff0b0}.warn{color:#ffd479}.danger{color:#ff9b9b}
+.metric{padding:11px;border-radius:12px;background:#0e162a}.metric b{display:block;font-size:21px;margin-top:4px}
+#sheetWrap{overflow:auto;background:#ddd;padding:8px;border-radius:12px}#sheet{display:block;width:min(100%,794px);height:auto;margin:auto;background:white;box-shadow:0 3px 20px #0007}
+.notice{border-left:4px solid #ffd479;padding:9px 12px;background:#2a2413;border-radius:8px}
+@page{size:A4 portrait;margin:0}
+@media print{
+ body{background:white}
+ main{padding:0;max-width:none}
+ main>*:not(#printCard){display:none!important}
+ #printCard{display:block!important;background:white;border:0;padding:0;margin:0;width:210mm;height:297mm}
+ #sheetWrap{padding:0;background:white;overflow:visible}
+ #sheet{width:210mm!important;height:297mm!important;box-shadow:none;margin:0}
+}
+</style>
+</head>
+<body>
+<main>
+<h1>MicroPlayer · Pitch Lab physique</h1>
+<p class="small">Calibration expérimentale isolée. Mire vectorielle A4 en unités physiques. Aucun changement sur Photo V02.3, Carte V33 ou main.</p>
+
+<section class="card">
+<h2>1. Configuration</h2>
+<div class="grid">
+<label>Lentille nominale
+<select id="nom"><option value="50">50 LPI — relief</option><option value="60">60 LPI — mouvement</option></select></label>
+<label>DPI de référence imprimante
+<input id="dpi" type="number" value="600" min="300" max="2400" step="1"></label>
+<label>Centre du balayage (LPI commande)
+<input id="center" type="number" value="50" step=".001"></label>
+<label>Amplitude grossière ± LPI
+<input id="span" type="number" value=".40" min=".05" max="2" step=".01"></label>
+<label>Pas grossier
+<input id="step" type="number" value=".05" min=".005" max=".25" step=".005"></label>
+</div>
+<div class="row" style="margin-top:10px">
+<button id="coarse">Mire PITCH grossière</button>
+<button id="fine" class="secondary">Mire PITCH fine ±0,05</button>
+<button id="phaseSheet" class="secondary">Mire PHASE 8 positions</button>
+</div>
+</section>
+
+<section class="card">
+<h2>2. Contrôle de l'échelle d'impression</h2>
+<p class="notice small"><b>Important :</b> ne valide pas le pitch avant d'avoir mesuré la barre de 100,00 mm imprimée. Si AirPrint redimensionne la page, MicroPlayer doit connaître cet écart.</p>
+<div class="grid">
+<label>Longueur cible de contrôle
+<input id="targetMm" type="number" value="100" step=".01"></label>
+<label>Longueur réellement mesurée sur papier (mm)
+<input id="printedMm" type="number" value="100" step=".01"></label>
+<div class="metric">Échelle réelle<b id="scaleOut">100.000 %</b><span class="small">mesuré / cible</span></div>
+<div class="metric">Correction géométrique<b id="corrOut">1.000000×</b><span class="small">cible / mesuré</span></div>
+</div>
+<div id="scaleStatus" class="small" style="margin-top:9px"></div>
+</section>
+
+<section class="card">
+<h2>3. Résultat du test</h2>
+<div class="grid">
+<label>Bande PITCH la plus stable (valeur imprimée)
+<input id="measuredBand" type="number" value="50" step=".001"></label>
+<label>Phase retenue
+<select id="phase"><option value="0">0 / 8</option><option value="1">1 / 8</option><option value="2">2 / 8</option><option value="3">3 / 8</option><option value="4">4 / 8</option><option value="5">5 / 8</option><option value="6">6 / 8</option><option value="7">7 / 8</option></select></label>
+<div class="metric">LPI physique estimé<b id="physicalLpi">50.000</b><span class="small">corrigé de l'échelle d'impression</span></div>
+<div class="metric">Pas numérique à 600 DPI<b id="pixelPitch">12.0000 px</b><span class="small">pour le LPI commande retenu</span></div>
+</div>
+<div id="resultInfo" class="small" style="margin-top:9px"></div>
+<div class="row" style="margin-top:10px">
+<button id="useFine">Utiliser comme centre fin</button>
+<button id="exportJson" class="secondary">Exporter fiche calibration JSON</button>
+</div>
+</section>
+
+<section class="card">
+<div class="row">
+<button id="print">Imprimer la mire A4</button>
+<button id="saveSvg" class="secondary">Enregistrer la mire SVG A4</button>
+</div>
+<p class="small">À l'impression : A4, portrait, aucune option « Ajuster à la page ». Après impression, mesurer la barre 100 mm avant toute conclusion.</p>
+</section>
+
+<section id="printCard" class="card">
+<div id="sheetWrap">
+<svg id="sheet" xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297" aria-label="Mire physique MicroPlayer"></svg>
+</div>
+</section>
 </main>
+
 <script>
-const $=id=>document.getElementById(id), c=$('c'),ctx=c.getContext('2d');
-function syncNom(){ $('center').value=$('nom').value; $('measured').value=$('nom').value; update(); }
-function update(){let dpi=+$('dpi').value,lpi=+$('center').value; $('pitch').textContent=(dpi/lpi).toFixed(4);$('info').textContent='Pitch mathématique = DPI / LPI. Le LPI nominal n’est qu’un point de départ : la mire sert à mesurer le couple réel feuille + imprimante + média + pilote.';let m=+$('measured').value,n=+$('nom').value;$('delta').textContent='Écart au nominal : '+(m-n>=0?'+':'')+(m-n).toFixed(3)+' LPI · pitch à '+dpi+' dpi : '+(dpi/m).toFixed(4)+' px/lenticule';}
-function draw(fine=false){let center=+$('center').value, span=fine?.05:+$('span').value, step=fine?.01:+$('step').value,dpi=+$('dpi').value,phase=+$('phase').value;ctx.fillStyle='white';ctx.fillRect(0,0,c.width,c.height);ctx.fillStyle='black';ctx.font='bold 38px sans-serif';ctx.fillText('MicroPlayer PITCH '+(fine?'FINE':'COARSE')+' · '+dpi+' DPI · impression 100%',40,55);let vals=[];for(let v=center-span;v<=center+span+1e-9;v+=step)vals.push(+v.toFixed(3));let top=100,h=(c.height-150)/vals.length;vals.forEach((lpi,i)=>{let y=top+i*h,p=dpi/lpi;ctx.fillStyle='black';ctx.font='28px monospace';ctx.fillText(lpi.toFixed(3)+' LPI',35,y+h*.67);let x0=300;ctx.save();ctx.beginPath();ctx.rect(x0,y,c.width-x0-30,h-3);ctx.clip();ctx.fillStyle='white';ctx.fillRect(x0,y,c.width-x0,h);ctx.fillStyle='black';for(let x=x0+phase;x<c.width;x+=p){ctx.fillRect(Math.round(x),y,Math.max(1,Math.round(p/2)),h-3)}ctx.restore()});ctx.strokeStyle='#999';ctx.strokeRect(5,5,c.width-10,c.height-10);}
-$('nom').onchange=syncNom; ['dpi','center','measured'].forEach(x=>$(x).oninput=update);$('coarse').onclick=()=>draw(false);$('fine').onclick=()=>draw(true);$('print').onclick=()=>window.print();$('apply').onclick=()=>{$('center').value=$('measured').value;update();draw(true)};syncNom();draw(false);
-</script></body></html>
+const $=id=>document.getElementById(id);
+const sheet=$('sheet');
+let mode='coarse';
+
+function n(id,fallback=0){const v=Number($(id).value);return Number.isFinite(v)?v:fallback}
+function fmt(v,d=3){return Number(v).toFixed(d)}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function scaleRatio(){const t=Math.max(.001,n('targetMm',100)),m=Math.max(.001,n('printedMm',100));return m/t}
+function compensation(){return 1/scaleRatio()}
+function physicalLpi(){return n('measuredBand',n('nom',50))*compensation()}
+
+function updateMetrics(){
+ const s=scaleRatio(),k=1/s,dpi=n('dpi',600),cmd=n('measuredBand',n('nom',50)),phys=physicalLpi();
+ $('scaleOut').textContent=fmt(s*100,3)+' %';
+ $('corrOut').textContent=fmt(k,6)+'×';
+ $('physicalLpi').textContent=fmt(phys,3);
+ $('pixelPitch').textContent=fmt(dpi/cmd,4)+' px';
+ const err=(s-1)*100;
+ $('scaleStatus').className='small '+(Math.abs(err)<=.10?'ok':Math.abs(err)<=.50?'warn':'danger');
+ $('scaleStatus').textContent='Écart dimensionnel : '+(err>=0?'+':'')+fmt(err,3)+' %. '+(Math.abs(err)<=.10?'Très faible : calibration exploitable.':'Conserver cette correction pour le profil imprimante/support.');
+ const p=Number($('phase').value)||0,periodMm=25.4/phys,phaseMm=periodMm*p/8;
+ $('resultInfo').textContent='LPI commande retenu : '+fmt(cmd,3)+' · LPI physique estimé : '+fmt(phys,3)+' · période physique : '+fmt(periodMm,4)+' mm · phase '+p+'/8 = '+fmt(phaseMm,4)+' mm. Pour le même pilote/support, LentiPrint devra reprendre le LPI commande et la correction d’échelle enregistrés.';
+}
+
+function valuesForMode(){
+ const center=n('center',n('nom',50));
+ if(mode==='phase')return [center];
+ const span=mode==='fine'?.05:Math.abs(n('span',.40));
+ const step=mode==='fine'?.01:Math.abs(n('step',.05));
+ const vals=[];for(let v=center-span;v<=center+span+1e-9;v+=step)vals.push(Number(v.toFixed(3)));return vals;
+}
+
+function svgEl(tag,attrs={},text=''){
+ const e=document.createElementNS('http://www.w3.org/2000/svg',tag);
+ for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));
+ if(text)e.textContent=text;return e;
+}
+
+function addText(x,y,text,size=3.2,weight='400',anchor='start'){
+ sheet.appendChild(svgEl('text',{x,y,'font-family':'Arial,Helvetica,sans-serif','font-size':size,'font-weight':weight,'text-anchor':anchor,fill:'#000'},text));
+}
+
+function addPattern(defs,id,lpi,phaseFrac=0){
+ const period=25.4/lpi,pat=svgEl('pattern',{id,patternUnits:'userSpaceOnUse',width:period,height:8,x:-(period*phaseFrac),y:0});
+ pat.appendChild(svgEl('rect',{x:0,y:0,width:period/2,height:8,fill:'#000'}));
+ pat.appendChild(svgEl('rect',{x:period/2,y:0,width:period/2,height:8,fill:'#fff'}));
+ defs.appendChild(pat);return period;
+}
+
+function render(){
+ while(sheet.firstChild)sheet.removeChild(sheet.firstChild);
+ sheet.appendChild(svgEl('rect',{x:0,y:0,width:210,height:297,fill:'#fff'}));
+ const defs=svgEl('defs');sheet.appendChild(defs);
+ addText(12,12,'MicroPlayer — Calibration physique '+(mode==='phase'?'PHASE':'PITCH '+mode.toUpperCase()),5,'700');
+ addText(12,18,'A4 210 × 297 mm · unités vectorielles physiques · impression sans ajustement',2.8);
+ addText(198,12,new Date().toLocaleDateString('fr-FR'),2.6,'400','end');
+
+ // 100 mm control bar + 50 mm square
+ sheet.appendChild(svgEl('line',{x1:15,y1:27,x2:115,y2:27,stroke:'#000','stroke-width':.35}));
+ for(let i=0;i<=100;i+=10){sheet.appendChild(svgEl('line',{x1:15+i,y1:25.5,x2:15+i,y2:i%50===0?30:28.8,stroke:'#000','stroke-width':.25}));addText(15+i,33,String(i),2.4,'400','middle')}
+ addText(65,23.8,'BARRE DE CONTRÔLE — 100,00 mm',2.7,'700','middle');
+ sheet.appendChild(svgEl('rect',{x:140,y:20,width:50,height:50,fill:'none',stroke:'#000','stroke-width':.35}));
+ addText(165,74,'Carré 50,00 × 50,00 mm',2.5,'700','middle');
+
+ const x0=42,x1=198,top=82,bottom=266;
+ if(mode==='phase'){
+   const lpi=n('center',n('nom',50)),rows=8,rowH=(bottom-top)/rows;
+   for(let i=0;i<8;i++){
+     const id='phase-'+i,period=addPattern(defs,id,lpi,i/8),y=top+i*rowH;
+     addText(12,y+rowH*.58,'Phase '+i+'/8',3,'700');
+     sheet.appendChild(svgEl('rect',{x:x0,y:y+1,width:x1-x0,height:rowH-2,fill:'url(#'+id+')',stroke:'#999','stroke-width':.08}));
+     addText(196,y+rowH*.82,fmt(period*i/8,4)+' mm',2.2,'400','end');
+   }
+   addText(12,276,'LPI commande : '+fmt(lpi,3)+' · choisir la phase donnant la transition la plus nette et la plus stable.',2.7,'700');
+ }else{
+   const vals=valuesForMode(),rows=vals.length,rowH=(bottom-top)/rows;
+   vals.forEach((lpi,i)=>{
+     const id='pitch-'+i,period=addPattern(defs,id,lpi,0),y=top+i*rowH;
+     addText(8,y+rowH*.60,fmt(lpi,3)+' LPI',2.8,'700');
+     sheet.appendChild(svgEl('rect',{x:x0,y:y+.6,width:x1-x0,height:Math.max(2,rowH-1.2),fill:'url(#'+id+')',stroke:'#aaa','stroke-width':.05}));
+   });
+   addText(12,276,'Sous la lentille : relever la bande la plus uniforme/stable. Sa valeur est le LPI commande du profil.',2.7,'700');
+ }
+ addText(12,283,'1) mesurer la barre 100 mm  2) relever le pitch  3) générer la mire phase  4) archiver la fiche JSON',2.5);
+ addText(198,290,'MicroPlayer Pitch Lab · '+fmt(n('nom',50),0)+' LPI nominal',2.4,'700','end');
+ updateMetrics();
+}
+
+function setMode(next){mode=next;render()}
+function syncNom(){const v=n('nom',50);$('center').value=v;$('measuredBand').value=v;render()}
+
+$('nom').onchange=syncNom;
+['dpi','center','span','step','targetMm','printedMm','measuredBand','phase'].forEach(id=>$(id).addEventListener('input',()=>{updateMetrics();if(['center','span','step'].includes(id))render()}));
+$('coarse').onclick=()=>setMode('coarse');
+$('fine').onclick=()=>setMode('fine');
+$('phaseSheet').onclick=()=>setMode('phase');
+$('useFine').onclick=()=>{$('center').value=$('measuredBand').value;setMode('fine')};
+$('print').onclick=()=>window.print();
+$('saveSvg').onclick=()=>{
+ const data='<?xml version="1.0" encoding="UTF-8"?>\n'+new XMLSerializer().serializeToString(sheet);
+ const blob=new Blob([data],{type:'image/svg+xml'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='microplayer-calibration-'+mode+'-'+fmt(n('center',50),3).replace('.','_')+'lpi.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+};
+$('exportJson').onclick=()=>{
+ const profile={
+  schema:'microplayer-lenticular-calibration-v1',
+  date:new Date().toISOString(),
+  nominal_lpi:n('nom',50),
+  printer:'Canon PIXMA PRO-200S',
+  reference_dpi:n('dpi',600),
+  scale_control_target_mm:n('targetMm',100),
+  scale_control_printed_mm:n('printedMm',100),
+  print_scale_ratio:scaleRatio(),
+  geometry_compensation:compensation(),
+  selected_command_lpi:n('measuredBand',50),
+  estimated_physical_lpi:physicalLpi(),
+  command_pixel_pitch_at_reference_dpi:n('dpi',600)/n('measuredBand',50),
+  phase_eighth:Number($('phase').value)||0,
+  phase_fraction:(Number($('phase').value)||0)/8,
+  notes:'Profil valide uniquement pour le même lot de lentilles, support, pilote et réglages impression.'
+ };
+ const blob=new Blob([JSON.stringify(profile,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='microplayer-calibration-'+profile.nominal_lpi+'lpi.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+};
+
+syncNom();
+</script>
+</body>
+</html>
