@@ -1,6 +1,11 @@
 name: Build ZipDepth ONNX
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - experiment/zipdepth
+    paths:
+      - '.github/workflows/build-zipdepth-onnx.yml'
 permissions:
   contents: write
 jobs:
