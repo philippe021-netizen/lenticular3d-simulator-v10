@@ -1,0 +1,36 @@
+name: Build ZipDepth ONNX
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: experiment/zipdepth
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Clone ZipDepth
+        run: git clone --depth 1 https://github.com/fabiotosi92/ZipDepth.git /tmp/ZipDepth
+      - name: Install exporter
+        working-directory: /tmp/ZipDepth
+        run: |
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install onnx onnxsim
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Export NPU/mobile ONNX 384
+        working-directory: /tmp/ZipDepth
+        run: |
+          python scripts/export.py --ckpt checkpoints/zipdepth_base_npu.pth --format onnx --height 384 --width 384 --npu --output zipdepth_base_npu_384.onnx
+          cp zipdepth_base_npu_384.onnx "$GITHUB_WORKSPACE/zipdepth_base_npu_384.onnx"
+      - name: Commit model only to experiment branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f zipdepth_base_npu_384.onnx
+          git commit -m "model: add ZipDepth NPU ONNX 384" || exit 0
+          git push origin HEAD:experiment/zipdepth
