@@ -513,7 +513,7 @@
       worker.onmessage=event=>{
         const message=event.data||{};if(message.requestId!==state.requestId)return;
         if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}
-        if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);state.photoDepth=prepareContinuousPhotoDepth(state.baseDepth);state.photoDepthOriginal=new Uint8ClampedArray(state.photoDepth);state.depthHistory=[];clearContinuousCache();$('progress').style.width='100%';buildPhotoGroupsFromDepth();compose();updateUndo()}
+        if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);state.photoDepth=prepareContinuousPhotoDepth(state.baseDepth);state.photoDepthOriginal=new Uint8ClampedArray(state.photoDepth);state.depthHistory=[];clearContinuousCache();$('progress').style.width='100%';buildPhotoGroupsFromDepth();compose();updateUndo();$('sourceInfo').className='status ok';$('sourceInfo').textContent=(message.provider==='zipdepth'?'TEST ZipDepth':'Depth Anything V2')+' terminé'+(Number.isFinite(message.inferenceMs)?' · inférence '+Math.round(message.inferenceMs)+' ms':'')+'.'}
         if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow photo indisponible : '+message.message}
       };
       state.workers[key]=worker;return worker;
