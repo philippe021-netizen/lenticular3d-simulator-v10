@@ -36,6 +36,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin experiment/zipdepth
+          git reset --hard origin/experiment/zipdepth
           git add -f zipdepth_base_npu_256.onnx
-          git commit -m "model: add ZipDepth NPU ONNX 384" || exit 0
+          git commit -m "model: add ZipDepth NPU ONNX 256 iPad" || exit 0
           git push origin HEAD:experiment/zipdepth
