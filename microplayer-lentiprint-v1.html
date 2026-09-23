@@ -28,7 +28,8 @@ canvas{max-width:100%;background:white;border-radius:9px;display:block;margin:au
 <section class="card">
 <h2>1. 9 vues de production</h2>
 <input id="viewsInput" type="file" accept="image/png,image/jpeg,image/webp" multiple>
-<div id="viewsStatus" class="status">Charge exactement 9 images, idéalement nommées vue-01 à vue-09.</div>
+<input id="zipInput" type="file" accept=".zip,application/zip,application/x-zip-compressed" style="margin-top:10px">
+<div id="viewsStatus" class="status">Charge exactement 9 images, ou un ZIP contenant les 9 vues. Priorité au dossier sources/ si présent.</div>
 <div id="thumbs" class="views"></div>
 </section>
 
@@ -101,14 +102,24 @@ function updateDims(){
 }
 ['lpi','dpi','geometry','widthMm','heightMm','phase','order'].forEach(id=>$(id).addEventListener('input',updateDims));
 
+function naturalCompare(a,b){return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:'base'})}
+function isSupportedImageName(name){return /\.(png|jpe?g|webp)$/i.test(name||'')}
+function guessMimeType(name){
+ const lower=String(name||'').toLowerCase();
+ if(lower.endsWith('.png'))return 'image/png';
+ if(lower.endsWith('.jpg')||lower.endsWith('.jpeg'))return 'image/jpeg';
+ if(lower.endsWith('.webp'))return 'image/webp';
+ return 'application/octet-stream';
+}
+function baseName(path){return String(path||'').split('/').filter(Boolean).pop()||'image'}
 function loadImageFile(file){
  return new Promise((resolve,reject)=>{
    const url=URL.createObjectURL(file),img=new Image();
    img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=e=>{URL.revokeObjectURL(url);reject(e)};img.src=url;
  });
 }
-async function loadViews(files){
- const list=[...files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+async function loadViews(files,sourceLabel='images'){
+ const list=[...files].sort((a,b)=>naturalCompare(a.name,b.name));
  if(list.length!==9){$('viewsStatus').className='status warn';$('viewsStatus').textContent='Il faut exactement 9 images. Reçu : '+list.length;state.files=[];$('generate').disabled=true;return}
  const images=[];
  try{for(const file of list)images.push(await loadImageFile(file))}
@@ -117,12 +128,63 @@ async function loadViews(files){
  const bad=images.findIndex(im=>im.naturalWidth!==w||im.naturalHeight!==h);
  if(bad>=0){$('viewsStatus').className='status warn';$('viewsStatus').textContent='Les 9 vues doivent avoir exactement la même résolution. Vue '+(bad+1)+' différente.';state.files=[];$('generate').disabled=true;return}
  state.files=list;state.images=images;state.names=list.map(f=>f.name);state.sourceW=w;state.sourceH=h;
- $('viewsStatus').className='status ok';$('viewsStatus').textContent='9 vues chargées · '+w+' × '+h+' px · ordre trié par nom.';
+ $('viewsStatus').className='status ok';$('viewsStatus').textContent='9 vues chargées depuis '+sourceLabel+' · '+w+' × '+h+' px · ordre 01 → 09 vérifié.';
  const thumbs=$('thumbs');thumbs.innerHTML='';
  images.forEach((im,i)=>{const d=document.createElement('div');d.className='view';const x=document.createElement('img');x.src=im.src;const s=document.createElement('span');s.textContent=(i+1).toString().padStart(2,'0')+' · '+state.names[i];d.append(x,s);thumbs.appendChild(d)});
  $('generate').disabled=false;updateDims();
 }
-$('viewsInput').onchange=e=>loadViews(e.target.files);
+$('viewsInput').onchange=e=>loadViews(e.target.files,'sélection manuelle');
+
+async function zipEntryToFile(entry){
+ const blob=await entry.async('blob');
+ const name=baseName(entry.name);
+ return new File([blob],name,{type:guessMimeType(name),lastModified:Date.now()});
+}
+function chooseZipEntries(allEntries,manifest){
+ const sourceEntries=allEntries.filter(entry=>/^sources\//i.test(entry.name));
+ let selected=sourceEntries.length?sourceEntries:allEntries;
+ if(manifest&&Array.isArray(manifest.view_files)&&manifest.view_files.length===9){
+   const wanted=manifest.view_files.map(baseName);
+   const byBase=new Map(selected.map(entry=>[baseName(entry.name),entry]));
+   const ordered=wanted.map(name=>byBase.get(name)).filter(Boolean);
+   if(ordered.length===9)return ordered;
+ }
+ return [...selected].sort((a,b)=>naturalCompare(a.name,b.name));
+}
+async function loadZipViews(zipFile){
+ $('generate').disabled=true;
+ $('viewsStatus').className='status';
+ $('viewsStatus').textContent='Analyse du ZIP…';
+ try{
+   const zip=await JSZip.loadAsync(zipFile);
+   const allEntries=Object.values(zip.files).filter(entry=>!entry.dir&&isSupportedImageName(entry.name)&&!entry.name.startsWith('__MACOSX/'));
+   let manifest=null;
+   const manifestEntry=Object.values(zip.files).find(entry=>!entry.dir&&/(^|\/)manifest\.json$/i.test(entry.name));
+   if(manifestEntry){
+     try{manifest=JSON.parse(await manifestEntry.async('text'))}catch(_){}
+   }
+   if(!allEntries.length)throw new Error('aucune image PNG/JPG/WEBP trouvée');
+   const selected=chooseZipEntries(allEntries,manifest);
+   if(selected.length!==9)throw new Error(selected.length+' image(s) détectée(s), il en faut exactement 9');
+   const files=[];
+   for(const entry of selected)files.push(await zipEntryToFile(entry));
+   await loadViews(files,'ZIP '+zipFile.name);
+   if(state.files.length===9){
+     const manifestText=manifest?' · manifest.json détecté':'';
+     $('viewsStatus').textContent='ZIP valide : 9 vues chargées · '+state.sourceW+' × '+state.sourceH+' px'+manifestText+'.';
+   }
+ }catch(err){
+   state.files=[];state.images=[];state.names=[];state.sourceW=state.sourceH=0;
+   $('thumbs').innerHTML='';$('generate').disabled=true;
+   $('viewsStatus').className='status warn';
+   $('viewsStatus').textContent='ZIP refusé : '+(err?.message||String(err));
+   updateDims();
+ }
+}
+$('zipInput').onchange=async e=>{
+ const file=e.target.files?.[0];
+ if(file)await loadZipViews(file);
+};
 
 $('profileInput').onchange=async e=>{
  const file=e.target.files?.[0];if(!file)return;
