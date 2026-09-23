@@ -53,8 +53,8 @@ export function buildMimicRequest({ imgId, videoMediaId, sourceVideoId, quality 
 }
 
 export async function createMimicVideo(args) {
-  const body = buildMimicRequest(args);
-  const r = await fetch('/api/pixverse-mimic', {
+  const body = { mode: 'mimic', ...buildMimicRequest(args) };
+  const r = await fetch('/api/pixverse-create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
