@@ -1,0 +1,77 @@
+{
+  "version": 11,
+  "engine": "pixverse-mimic",
+  "notes": "La vidéo guide transmet le geste. L’identité provient toujours de la photo client. Pour Mimic, le guide doit montrer principalement une personne.",
+  "actions": [
+    {
+      "id": "coeur_mains_v2",
+      "label": "Cœur avec les mains",
+      "target": "person",
+      "preferredMode": "mimic",
+      "durationSeconds": 3,
+      "guideHint": "Départ mains séparées, progression régulière, cœur lisible en fin, maintien final sans retour.",
+      "prompt": "Former progressivement un cœur avec les mains, sans mouvement de caméra ni déplacement du visage.",
+      "negativePrompt": "retour à la pose initiale, mains coupées, doigts supplémentaires, visage modifié, zoom, mouvement du fond",
+      "mobileZones": ["avant-bras", "mains", "doigts", "epaules"],
+      "lockedZones": ["visage", "tete", "cheveux", "torse", "fond"],
+      "safeMargin": 0.1,
+      "finalHoldRatio": 0.22
+    },
+    {
+      "id": "bisou_main_v1",
+      "label": "Bisou de la main",
+      "target": "person",
+      "preferredMode": "mimic",
+      "durationSeconds": 3,
+      "guideHint": "Main vers la bouche puis geste vers l’avant, sans retour dans le même clip.",
+      "prompt": "Envoyer progressivement un bisou de la main, geste simple et lisible, tête stable.",
+      "negativePrompt": "retour, double geste, tête déformée, main coupée, doigts supplémentaires, zoom",
+      "mobileZones": ["bras", "avant-bras", "main", "doigts"],
+      "lockedZones": ["visage", "tete", "torse", "fond"],
+      "safeMargin": 0.1,
+      "finalHoldRatio": 0.2
+    },
+    {
+      "id": "salut_main_v1",
+      "label": "Petit salut de la main",
+      "target": "person",
+      "preferredMode": "mimic",
+      "durationSeconds": 3,
+      "guideHint": "Lever la main et terminer sur une position ouverte, sans oscillation répétée.",
+      "prompt": "Faire un salut unique de la main avec progression A vers B, sans boucle.",
+      "negativePrompt": "main qui oscille, répétition, retour, visage modifié, fond mobile, recadrage",
+      "mobileZones": ["bras", "avant-bras", "main"],
+      "lockedZones": ["visage", "tete", "torse", "fond"],
+      "safeMargin": 0.09,
+      "finalHoldRatio": 0.2
+    },
+    {
+      "id": "balancement_doux_v1",
+      "label": "Mini balancement",
+      "target": "person",
+      "preferredMode": "mimic",
+      "durationSeconds": 3,
+      "guideHint": "Déplacement très faible des épaules et des bras, visage quasiment fixe.",
+      "prompt": "Créer un mini balancement naturel, très faible, avec visage et décor stables.",
+      "negativePrompt": "danse ample, rotation du corps, visage modifié, déplacement caméra, zoom",
+      "mobileZones": ["epaules", "bras", "mains"],
+      "lockedZones": ["visage", "tete", "fond"],
+      "safeMargin": 0.08,
+      "finalHoldRatio": 0.2
+    },
+    {
+      "id": "mini_danse_v1",
+      "label": "Mini danse",
+      "target": "person",
+      "preferredMode": "mimic",
+      "durationSeconds": 3,
+      "guideHint": "Un seul déplacement chorégraphié court, sans saut, sans rotation complète, fin tenue.",
+      "prompt": "Reproduire une mini danse courte et contrôlée, sans sortir du cadre et sans retour.",
+      "negativePrompt": "saut, tour complet, sortie du cadre, retour, répétition, visage modifié, zoom",
+      "mobileZones": ["epaules", "bras", "mains", "bassin"],
+      "lockedZones": ["visage", "tete", "fond"],
+      "safeMargin": 0.12,
+      "finalHoldRatio": 0.25
+    }
+  ]
+}
