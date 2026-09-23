@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MicroPlayer — PixVerse V3 Motion Guide</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f5f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;background:#111;color:#fff;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5}.badge{background:#ffd60a;color:#111;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:850}.wrap{max-width:980px;margin:auto;padding:16px}.card{background:#fff;border:1px solid #ddd;border-radius:16px;padding:16px;margin-bottom:14px}h2{margin:0 0 6px}.sub{font-size:12px;color:#666;line-height:1.45}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:720px){.grid{grid-template-columns:1fr}}label{display:block;font-size:12px;font-weight:800;margin:10px 0 5px}input,select,button{width:100%;font:inherit;border-radius:11px}input,select{border:1px solid #ccd1d5;padding:11px;background:#fff}button{border:0;padding:13px;background:#111;color:#fff;font-weight:850;margin-top:10px}button:disabled{opacity:.45}.status{margin-top:10px;padding:11px;border-radius:11px;background:#f1f2f3;font-size:12px;white-space:pre-wrap}.ok{background:#e7f7eb;color:#17652c}.bad{background:#ffe9e7;color:#8b1f17}.info{background:#eef6ff;color:#20496d}video{display:none;width:100%;margin-top:12px;border-radius:12px;background:#111}.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:9px;border:1px solid #ddd}.frameMeta{font-size:10px;color:#555;margin-top:3px}.warning{padding:10px;border:1px solid #eed47a;background:#fff8d6;border-radius:11px;font-size:12px;line-height:1.4}
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f5f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;background:#111;color:#fff;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5}.badge{background:#ffd60a;color:#111;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:850}.wrap{max-width:980px;margin:auto;padding:16px}.card{background:#fff;border:1px solid #ddd;border-radius:16px;padding:16px;margin-bottom:14px}h2{margin:0 0 6px}.sub{font-size:12px;color:#666;line-height:1.45}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:720px){.grid{grid-template-columns:1fr}}label{display:block;font-size:12px;font-weight:800;margin:10px 0 5px}input,select,button{width:100%;font:inherit;border-radius:11px}input,select{border:1px solid #ccd1d5;padding:11px;background:#fff}button{border:0;padding:13px;background:#111;color:#fff;font-weight:850;margin-top:10px}button:disabled{opacity:.45}.status{margin-top:10px;padding:11px;border-radius:11px;background:#f1f2f3;font-size:12px;white-space:pre-wrap}.ok{background:#e7f7eb;color:#17652c}.bad{background:#ffe9e7;color:#8b1f17}.info{background:#eef6ff;color:#20496d}video{display:none;width:100%;margin-top:12px;border-radius:12px;background:#111}.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:9px;border:1px solid #ddd}.frameMeta{font-size:10px;color:#555;margin-top:3px}.warning{padding:10px;border:1px solid #eed47a;background:#fff8d6;border-radius:11px;font-size:12px;line-height:1.4}.simulator{display:none}.simStage{background:#111;border-radius:14px;padding:10px;overflow:hidden}.simStage img{display:block;width:100%;max-height:720px;object-fit:contain;border-radius:10px;background:#111}.simMeta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:#555}.simControls{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:end;margin-top:10px}.simControls button{min-width:150px}.simControls label{margin:0}.simAngle{width:100%}.simReadout{font-weight:800}@media(max-width:720px){.simControls{grid-template-columns:1fr}.simControls button{min-width:0}}
 </style>
 </head>
 <body>
@@ -40,6 +40,30 @@
 <div id="qc" class="status">Aucune extraction.</div>
 <div id="frames" class="frames"></div>
 </section>
+
+<section id="simulatorCard" class="card simulator">
+<h2>3. Simulateur lenticulaire</h2>
+<div class="sub">Inclinaison virtuelle de −30° à +30° : les 9 vues sont affichées comme elles se succèdent quand on fait basculer le support. La lecture automatique va naturellement de 1→9 puis 9→1 pour simuler le mouvement réel du support.</div>
+<div class="simStage">
+<img id="simImage" alt="Simulation lenticulaire des 9 vues">
+</div>
+<div class="simMeta">
+<span id="simReadout" class="simReadout">Vue 5/9 · 0°</span>
+<span id="simTime">—</span>
+</div>
+<div class="simControls">
+<div>
+<label for="simAngle">Inclinaison</label>
+<input id="simAngle" class="simAngle" type="range" min="-30" max="30" step="0.1" value="0">
+</div>
+<button id="simPlay" type="button">Pause</button>
+<button id="simCenter" type="button" class="secondary">Recentrer</button>
+</div>
+<div class="grid">
+<div><label for="simSpeed">Vitesse aller-retour</label><select id="simSpeed"><option value="5">5 s</option><option value="4">4 s</option><option value="3" selected>3 s</option><option value="2">2 s</option><option value="1.5">1,5 s</option></select></div>
+<div><label>Contrôle</label><div class="status info">Glisse l’inclinaison à la main pour examiner précisément chaque transition.</div></div>
+</div>
+</section>
 </div>
 
 <script type="module">
@@ -49,7 +73,54 @@ import { extractVideoFrames, downloadExtractedFrame } from './modules/video-fram
 
 const $=id=>document.getElementById(id);
 let extraction=null,catalog=null;
+let simRAF=0,simPlaying=false,simStartedAt=0,simFrames=[];
 function tone(el,text,type=''){el.textContent=text;el.className='status'+(type?' '+type:'')}
+
+function stopSimulator(){
+  if(simRAF)cancelAnimationFrame(simRAF);
+  simRAF=0;simPlaying=false;
+  if($('simPlay'))$('simPlay').textContent='Lecture';
+}
+
+function renderSimulatorAngle(angle){
+  if(!simFrames.length)return;
+  const clamped=Math.max(-30,Math.min(30,Number(angle)||0));
+  const normalized=(clamped+30)/60;
+  const idx=Math.max(0,Math.min(simFrames.length-1,Math.round(normalized*(simFrames.length-1))));
+  const frame=simFrames[idx];
+  $('simImage').src=frame.url;
+  $('simReadout').textContent=`Vue ${idx+1}/${simFrames.length} · ${clamped>=0?'+':''}${clamped.toFixed(1)}°`;
+  $('simTime').textContent=`Image source : ${Number(frame.time).toFixed(3)} s`;
+  $('simAngle').value=String(clamped);
+}
+
+function animateSimulator(now){
+  if(!simPlaying||!simFrames.length)return;
+  const period=Math.max(1.2,Number($('simSpeed').value)||3)*1000;
+  const phase=((now-simStartedAt)%period)/period;
+  const sweep=(1-Math.cos(phase*Math.PI*2))/2;
+  renderSimulatorAngle(-30+sweep*60);
+  simRAF=requestAnimationFrame(animateSimulator);
+}
+
+function startSimulator(){
+  if(!simFrames.length)return;
+  if(simRAF)cancelAnimationFrame(simRAF);
+  simPlaying=true;
+  simStartedAt=performance.now();
+  $('simPlay').textContent='Pause';
+  simRAF=requestAnimationFrame(animateSimulator);
+}
+
+function installSimulator(frames){
+  stopSimulator();
+  simFrames=Array.isArray(frames)?frames:[];
+  if(!simFrames.length){$('simulatorCard').style.display='none';return}
+  $('simulatorCard').style.display='block';
+  renderSimulatorAngle(0);
+  if(!matchMedia('(prefers-reduced-motion: reduce)').matches)startSimulator();
+  $('simulatorCard').scrollIntoView({behavior:'smooth',block:'start'});
+}
 
 async function loadCatalog(){
   const r=await fetch('./data/motion-guide-catalog-v11.json',{cache:'no-store'});
@@ -75,7 +146,7 @@ async function diagnostic(){
 $('run').onclick=async()=>{
   const photo=$('photo').files?.[0],guide=$('guide').files?.[0];
   if(!photo||!guide){tone($('status'),'Choisis la photo client ET la vidéo guide.','bad');return}
-  $('run').disabled=true;$('extract').disabled=true;$('result').style.display='none';$('frames').innerHTML='';
+  $('run').disabled=true;$('extract').disabled=true;$('result').style.display='none';$('frames').innerHTML='';stopSimulator();simFrames=[];$('simulatorCard').style.display='none';
   try{
     const labels={'upload-photo':'1/4 — Upload photo identité…','upload-guide':'2/4 — Upload vidéo guide…','create-mimic':'3/4 — Lancement Motion Control / Mimic…','processing':'4/4 — PixVerse génère la vidéo…','done':'Vidéo Mimic reçue.'};
     const r=await runMimicMotionGuide(photo,guide,{quality:$('quality').value,onStatus:s=>tone($('status'),labels[s.step]||s.step)});
@@ -94,8 +165,14 @@ $('extract').onclick=async()=>{
     if(!gate.passed)tone($('qc'),`❌ QC refusé : retour vers la pose initiale détecté. Fenêtre ${w.start.toFixed(2)}–${w.end.toFixed(2)} s.`,'bad');
     else tone($('qc'),`✅ 9 vues valides · progression ${gate.finalProgress} · pic ${gate.peakProgress}${gate.warning?' · avertissement '+gate.warning:''} · fenêtre ${w.start.toFixed(2)}–${w.end.toFixed(2)} s`,'ok');
     for(const f of extraction.frames){const d=document.createElement('div'),img=document.createElement('img'),m=document.createElement('div'),b=document.createElement('button');img.src=f.url;m.className='frameMeta';m.textContent=`Vue ${f.index} · ${f.time.toFixed(3)} s`;b.textContent=`Télécharger PNG ${f.index}`;b.onclick=()=>downloadExtractedFrame(f,'microplayer-mimic-v3');d.append(img,m,b);$('frames').appendChild(d)}
+    installSimulator(extraction.frames);
   }catch(e){tone($('qc'),'❌ Extraction interrompue : '+e.message,'bad')}finally{$('extract').disabled=false}
 };
+
+$('simAngle').addEventListener('input',()=>{stopSimulator();renderSimulatorAngle($('simAngle').value)});
+$('simPlay').addEventListener('click',()=>{if(simPlaying)stopSimulator();else startSimulator()});
+$('simCenter').addEventListener('click',()=>{stopSimulator();renderSimulatorAngle(0)});
+$('simSpeed').addEventListener('change',()=>{if(simPlaying)startSimulator()});
 
 await Promise.all([diagnostic(),loadCatalog()]);
 </script>
