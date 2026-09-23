@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>MicroPlayer — LentiPrint V1</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0a0d14;color:#f3f6ff}
+*{box-sizing:border-box}body{margin:0}.wrap{max-width:1180px;margin:auto;padding:18px}
+.card{background:#141923;border:1px solid #30384a;border-radius:18px;padding:16px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+label{display:block;font-size:13px;color:#b8c0d3}input,select,button{width:100%;margin-top:6px;padding:11px;border-radius:10px;border:1px solid #414b62;background:#0d1320;color:#fff;font-size:16px}
+button{background:#1769e0;border:0;font-weight:750}button.secondary{background:#283247}button.green{background:#177052}button:disabled{opacity:.45}
+.small{font-size:13px;color:#aab4c7}.status{padding:10px;border-radius:10px;background:#202735;margin-top:8px;white-space:pre-wrap}.ok{background:#17382c}.warn{background:#493d17}
+.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1;min-width:170px}
+.views{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.view{background:#090c12;border-radius:10px;padding:5px}.view img{width:100%;display:block;border-radius:7px}.view span{font-size:12px}
+canvas{max-width:100%;background:white;border-radius:9px;display:block;margin:auto}
+.metric{background:#0d1320;padding:10px;border-radius:10px}.metric b{display:block;font-size:20px;margin-top:4px}
+@media(max-width:760px){.views{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<main class="wrap">
+<h1>MicroPlayer · LentiPrint V1</h1>
+<p class="small">Branche isolée. Transforme exactement 9 vues validées en trame lenticulaire selon un profil de calibration physique.</p>
+
+<section class="card">
+<h2>1. 9 vues de production</h2>
+<input id="viewsInput" type="file" accept="image/png,image/jpeg,image/webp" multiple>
+<div id="viewsStatus" class="status">Charge exactement 9 images, idéalement nommées vue-01 à vue-09.</div>
+<div id="thumbs" class="views"></div>
+</section>
+
+<section class="card">
+<h2>2. Profil de calibration</h2>
+<input id="profileInput" type="file" accept=".json,application/json">
+<div class="grid" style="margin-top:9px">
+<label>LPI commande
+<input id="lpi" type="number" value="50" step=".001"></label>
+<label>DPI de référence
+<input id="dpi" type="number" value="600" step="1"></label>
+<label>Correction géométrique
+<input id="geometry" type="number" value="1" step=".000001"></label>
+<label>Phase / 8
+<select id="phase"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></label>
+<label>Ordre des vues
+<select id="order"><option value="normal">01 → 09</option><option value="reverse">09 → 01</option></select></label>
+</div>
+<div id="profileStatus" class="status">Profil manuel. Pour une production réelle, importe le JSON généré par Pitch Lab.</div>
+</section>
+
+<section class="card">
+<h2>3. Dimensions physiques finales</h2>
+<div class="grid">
+<label>Largeur finale voulue (mm)
+<input id="widthMm" type="number" value="85.60" step=".01"></label>
+<label>Hauteur finale voulue (mm)
+<input id="heightMm" type="number" value="54.00" step=".01"></label>
+<div class="metric">Fichier raster<b id="pxOut">—</b><span class="small">après compensation imprimante</span></div>
+<div class="metric">Pitch numérique<b id="pitchOut">—</b><span class="small">px / lenticule</span></div>
+</div>
+<div id="dimensionStatus" class="status"></div>
+</section>
+
+<section class="card">
+<h2>4. Entrelacement</h2>
+<div class="row">
+<button id="generate" disabled>Générer LentiPrint</button>
+<button id="downloadPng" class="secondary" disabled>PNG entrelacé</button>
+<button id="downloadSvg" class="secondary" disabled>Planche A4 SVG</button>
+<button id="downloadZip" class="green" disabled>ZIP production</button>
+</div>
+<div id="renderStatus" class="status">En attente des 9 vues.</div>
+</section>
+
+<section class="card">
+<h2>Aperçu technique</h2>
+<canvas id="preview" width="800" height="500"></canvas>
+<p class="small">L'aperçu n'est pas une simulation lenticulaire. Il montre uniquement le fichier entrelacé destiné à l'impression.</p>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const state={files:[],images:[],names:[],sourceW:0,sourceH:0,canvas:null,blob:null,manifest:null};
+const preview=$('preview');
+
+function n(id,fallback=0){const v=Number($(id).value);return Number.isFinite(v)?v:fallback}
+function mmToPx(mm){return Math.round(mm/25.4*n('dpi',600)*n('geometry',1))}
+function pitchPx(){return n('dpi',600)/Math.max(.001,n('lpi',50))}
+function updateDims(){
+ const w=mmToPx(n('widthMm',85.6)),h=mmToPx(n('heightMm',54));
+ $('pxOut').textContent=w+' × '+h+' px';
+ $('pitchOut').textContent=pitchPx().toFixed(4)+' px';
+ if(state.sourceW&&state.sourceH){
+   const src=state.sourceW/state.sourceH,target=w/h,diff=Math.abs(src-target)/src*100;
+   $('dimensionStatus').className='status '+(diff<.5?'ok':'warn');
+   $('dimensionStatus').textContent='Ratio source '+src.toFixed(5)+' · ratio cible '+target.toFixed(5)+' · écart '+diff.toFixed(2)+' %. '+(diff<.5?'Compatible.':'Attention : les vues seront redimensionnées vers ce format physique.');
+ }else $('dimensionStatus').textContent='Charge les 9 vues pour vérifier le ratio.';
+}
+['lpi','dpi','geometry','widthMm','heightMm','phase','order'].forEach(id=>$(id).addEventListener('input',updateDims));
+
+function loadImageFile(file){
+ return new Promise((resolve,reject)=>{
+   const url=URL.createObjectURL(file),img=new Image();
+   img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=e=>{URL.revokeObjectURL(url);reject(e)};img.src=url;
+ });
+}
+async function loadViews(files){
+ const list=[...files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+ if(list.length!==9){$('viewsStatus').className='status warn';$('viewsStatus').textContent='Il faut exactement 9 images. Reçu : '+list.length;state.files=[];$('generate').disabled=true;return}
+ const images=[];
+ try{for(const file of list)images.push(await loadImageFile(file))}
+ catch(e){$('viewsStatus').className='status warn';$('viewsStatus').textContent='Une image est illisible.';return}
+ const w=images[0].naturalWidth,h=images[0].naturalHeight;
+ const bad=images.findIndex(im=>im.naturalWidth!==w||im.naturalHeight!==h);
+ if(bad>=0){$('viewsStatus').className='status warn';$('viewsStatus').textContent='Les 9 vues doivent avoir exactement la même résolution. Vue '+(bad+1)+' différente.';state.files=[];$('generate').disabled=true;return}
+ state.files=list;state.images=images;state.names=list.map(f=>f.name);state.sourceW=w;state.sourceH=h;
+ $('viewsStatus').className='status ok';$('viewsStatus').textContent='9 vues chargées · '+w+' × '+h+' px · ordre trié par nom.';
+ const thumbs=$('thumbs');thumbs.innerHTML='';
+ images.forEach((im,i)=>{const d=document.createElement('div');d.className='view';const x=document.createElement('img');x.src=im.src;const s=document.createElement('span');s.textContent=(i+1).toString().padStart(2,'0')+' · '+state.names[i];d.append(x,s);thumbs.appendChild(d)});
+ $('generate').disabled=false;updateDims();
+}
+$('viewsInput').onchange=e=>loadViews(e.target.files);
+
+$('profileInput').onchange=async e=>{
+ const file=e.target.files?.[0];if(!file)return;
+ try{
+   const p=JSON.parse(await file.text());
+   if(p.schema!=='microplayer-lenticular-calibration-v1')throw new Error('format de calibration inconnu');
+   $('lpi').value=p.selected_command_lpi;
+   $('dpi').value=p.reference_dpi;
+   $('geometry').value=p.geometry_compensation;
+   $('phase').value=String(p.phase_eighth??0);
+   $('profileStatus').className='status ok';
+   $('profileStatus').textContent='Profil Pitch Lab chargé · nominal '+p.nominal_lpi+' LPI · commande '+Number(p.selected_command_lpi).toFixed(3)+' LPI · correction '+Number(p.geometry_compensation).toFixed(6)+'×.';
+   updateDims();
+ }catch(err){$('profileStatus').className='status warn';$('profileStatus').textContent='Profil refusé : '+err.message}
+};
+
+function buildInterlace(){
+ if(state.images.length!==9)throw new Error('9 vues requises');
+ const W=mmToPx(n('widthMm',85.6)),H=mmToPx(n('heightMm',54));
+ if(W<50||H<50||W*H>30000000)throw new Error('Dimensions raster non raisonnables');
+ const sourceCanvases=state.images.map(img=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,0,0,W,H);return x});
+ const sourceData=sourceCanvases.map(c=>c.getContext('2d').getImageData(0,0,W,H).data);
+ const out=document.createElement('canvas');out.width=W;out.height=H;const ctx=out.getContext('2d'),image=ctx.createImageData(W,H),dst=image.data;
+ const p=pitchPx(),phaseFraction=(Number($('phase').value)||0)/8,phasePx=p*phaseFraction,reverse=$('order').value==='reverse';
+ for(let x=0;x<W;x++){
+   let f=((x+phasePx)%p+p)%p/p;
+   let vi=Math.min(8,Math.floor(f*9));if(reverse)vi=8-vi;
+   const src=sourceData[vi];
+   for(let y=0;y<H;y++){const i=(y*W+x)*4;dst[i]=src[i];dst[i+1]=src[i+1];dst[i+2]=src[i+2];dst[i+3]=255}
+ }
+ ctx.putImageData(image,0,0);state.canvas=out;
+ state.manifest={
+   schema:'microplayer-lentiprint-v1',
+   created:new Date().toISOString(),
+   view_count:9,
+   view_files:state.names,
+   source_px:[state.sourceW,state.sourceH],
+   final_target_mm:[n('widthMm',85.6),n('heightMm',54)],
+   raster_px:[W,H],
+   reference_dpi:n('dpi',600),
+   command_lpi:n('lpi',50),
+   pitch_px:p,
+   geometry_compensation:n('geometry',1),
+   phase_eighth:Number($('phase').value)||0,
+   phase_fraction:phaseFraction,
+   view_order:$('order').value,
+   warning:'Production valide uniquement avec le même profil imprimante/support/lentille que la calibration.'
+ };
+ return out;
+}
+
+function drawPreview(c){
+ const ctx=preview.getContext('2d');ctx.clearRect(0,0,preview.width,preview.height);
+ const s=Math.min(preview.width/c.width,preview.height/c.height),w=c.width*s,h=c.height*s;
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,preview.width,preview.height);ctx.drawImage(c,(preview.width-w)/2,(preview.height-h)/2,w,h);
+}
+$('generate').onclick=async()=>{
+ $('generate').disabled=true;$('renderStatus').className='status';$('renderStatus').textContent='Entrelacement des 9 vues…';
+ try{
+   const c=buildInterlace();drawPreview(c);
+   state.blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));
+   $('downloadPng').disabled=$('downloadSvg').disabled=$('downloadZip').disabled=false;
+   $('renderStatus').className='status ok';$('renderStatus').textContent='LentiPrint généré · '+c.width+' × '+c.height+' px · pitch '+pitchPx().toFixed(4)+' px · phase '+$('phase').value+'/8.';
+ }catch(e){$('renderStatus').className='status warn';$('renderStatus').textContent='Échec : '+e.message}
+ finally{$('generate').disabled=false}
+};
+
+function saveBlob(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+$('downloadPng').onclick=()=>state.blob&&saveBlob(state.blob,'microplayer-lentiprint.png');
+
+async function productionSvgBlob(){
+ if(!state.blob)throw new Error('génère d’abord LentiPrint');
+ const pngData=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(state.blob)});
+ const targetW=n('widthMm',85.6),targetH=n('heightMm',54),k=n('geometry',1),designW=targetW*k,designH=targetH*k;
+ const x=(210-designW)/2,y=40;
+ const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297">
+ <rect width="210" height="297" fill="white"/>
+ <text x="12" y="13" font-family="Arial" font-size="4.2" font-weight="700">MicroPlayer LentiPrint V1</text>
+ <text x="12" y="19" font-family="Arial" font-size="2.7">Impression 100 % · ne pas ajuster à la page · profil calibré requis</text>
+ <image href="${pngData}" x="${x}" y="${y}" width="${designW}" height="${designH}" preserveAspectRatio="none"/>
+ <rect x="${x}" y="${y}" width="${designW}" height="${designH}" fill="none" stroke="black" stroke-width=".15"/>
+ <line x1="15" y1="275" x2="115" y2="275" stroke="black" stroke-width=".3"/>
+ <text x="65" y="272" text-anchor="middle" font-family="Arial" font-size="2.7">Contrôle 100,00 mm</text>
+ <text x="12" y="288" font-family="Arial" font-size="2.5">${n('lpi',50).toFixed(3)} LPI commande · phase ${$('phase').value}/8 · ${n('dpi',600)} DPI réf. · correction ${k.toFixed(6)}×</text>
+ </svg>`;
+ return new Blob([svg],{type:'image/svg+xml'});
+}
+$('downloadSvg').onclick=async()=>saveBlob(await productionSvgBlob(),'microplayer-lentiprint-a4.svg');
+$('downloadZip').onclick=async()=>{
+ if(!state.blob)return;
+ const zip=new JSZip();zip.file('lentiprint.png',state.blob);zip.file('manifest.json',JSON.stringify(state.manifest,null,2));zip.file('planche-a4.svg',await productionSvgBlob());
+ state.files.forEach((f,i)=>zip.file('sources/vue-'+String(i+1).padStart(2,'0')+'-'+f.name,f));
+ const blob=await zip.generateAsync({type:'blob'});saveBlob(blob,'microplayer-lentiprint-production.zip');
+};
+
+updateDims();
+</script>
+</body>
+</html>
