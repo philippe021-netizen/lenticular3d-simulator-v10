@@ -19,6 +19,8 @@
         <input id="photoFile" type="file" accept="image/*">
         <div id="sourceInfo" class="status">Choisis une photo pour démarrer.</div><div class="progress"><i id="activityBar"></i></div><div id="activityInfo" class="small" style="margin-top:6px">Photo V02 séparée de la version carte validée.</div>
         <div class="actions" style="margin-top:8px"><button id="back">Nouvelle photo</button><button id="depthflow" disabled>Analyser profondeur</button></div>
+<div class="actions" style="margin-top:8px"><button id="engineCurrent" class="active">Actuel · Depth Anything V2</button><button id="engineZip">TEST · ZipDepth</button></div>
+<div id="engineInfo" class="small" style="margin-top:6px">Moteur actif : Depth Anything V2 Small q8/WASM.</div>
         <div class="progress"><i id="progress"></i></div>
       </section>
       <section class="panel"><h2>2. Zones DepthFlow — éditables</h2><select id="preset"><option value="natural">Naturel</option><option value="portrait">Portrait</option><option value="strong">Relief fort</option></select><button id="auto" style="width:100%;margin-top:8px" disabled>Répartir les profondeurs</button><div id="groups"></div></section>
@@ -498,20 +500,27 @@
     $('targetMaster').onclick=()=>{};
     $('card').onclick=showCard;$('depthView').onclick=()=>{state.editTarget='group';state.preview='depth';drawDepth();$('depthView').classList.add('active');$('card').classList.remove('active');updatePencilUi()};
 
+    state.depthEngine='current'; state.workers=state.workers||{};
+    function setDepthEngine(engine){
+      state.depthEngine=engine;
+      $('engineCurrent').classList.toggle('active',engine==='current');$('engineZip').classList.toggle('active',engine==='zipdepth');
+      $('engineInfo').textContent=engine==='zipdepth'?'Moteur actif : TEST ZipDepth NPU ONNX + raffinement MicroPlayer.':'Moteur actif : Depth Anything V2 Small q8/WASM.';
+    }
+    $('engineCurrent').onclick=()=>setDepthEngine('current');$('engineZip').onclick=()=>setDepthEngine('zipdepth');
     function depthWorker(){
-      if(state.worker)return state.worker;
-      const worker=new Worker(new URL('./depthflow-v42-worker.js',import.meta.url),{type:'module'});
+      const key=state.depthEngine||'current'; if(state.workers?.[key])return state.workers[key];
+      const worker=new Worker(new URL(key==='zipdepth'?'./zipdepth-worker.js':'./depthflow-v42-worker.js',import.meta.url),{type:'module'});
       worker.onmessage=event=>{
         const message=event.data||{};if(message.requestId!==state.requestId)return;
         if(message.type==='progress'){$('sourceInfo').textContent=message.stage;$('progress').style.width=message.percent+'%'}
         if(message.type==='result'){state.baseDepth=new Uint8ClampedArray(message.refinedBuffer);state.photoDepth=prepareContinuousPhotoDepth(state.baseDepth);state.photoDepthOriginal=new Uint8ClampedArray(state.photoDepth);state.depthHistory=[];clearContinuousCache();$('progress').style.width='100%';buildPhotoGroupsFromDepth();compose();updateUndo()}
         if(message.type==='error'){$('sourceInfo').className='status warn';$('sourceInfo').textContent='DepthFlow photo indisponible : '+message.message}
       };
-      state.worker=worker;return worker;
+      state.workers[key]=worker;return worker;
     }
     $('depthflow').onclick=()=>{
       if(!state.rgba||!state.payload?.image)return;
-      state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent='Analyse de profondeur photo en cours…';
+      state.requestId++;$('sourceInfo').className='status';$('sourceInfo').textContent=(state.depthEngine==='zipdepth'?'TEST ZipDepth':'Depth Anything V2')+' — analyse de profondeur en cours…';
       const guide=new Uint8ClampedArray(state.rgba);
       depthWorker().postMessage({type:'estimate-and-refine',requestId:state.requestId,payload:{imageUrl:state.payload.image,width:state.width,height:state.height,fullGuideBuffer:guide.buffer}},[guide.buffer]);
     };
