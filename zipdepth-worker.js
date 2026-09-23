@@ -8,9 +8,9 @@ ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/di
 ort.env.wasm.numThreads = 1;
 
 let sessionPromise = null;
-const MODEL_W = 384;
-const MODEL_H = 384;
-const MODEL_URL = "./zipdepth_base_npu_384.onnx";
+const MODEL_W = 256;
+const MODEL_H = 256;
+const MODEL_URL = "./zipdepth_base_npu_256.onnx";
 const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
 
 function postProgress(requestId, stage, percent) {
@@ -65,7 +65,7 @@ function buildLetterboxedTensor(fullGuide, sourceWidth, sourceHeight) {
 async function getSession(requestId){
   if(!sessionPromise){
     postProgress(requestId,"Chargement ZipDepth ONNX…",8);
-    sessionPromise=ort.InferenceSession.create(MODEL_URL,{executionProviders:["wasm"],graphOptimizationLevel:"all"});
+    sessionPromise=ort.InferenceSession.create(MODEL_URL,{executionProviders:["wasm"],executionMode:"sequential",enableCpuMemArena:false,enableMemPattern:false,graphOptimizationLevel:"basic",intraOpNumThreads:1,interOpNumThreads:1});
   }
   try{return await sessionPromise;}catch(error){sessionPromise=null;throw error;}
 }
