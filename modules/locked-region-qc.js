@@ -5,9 +5,11 @@ function clamp01(value) {
 export function normalizeLockedRegion(region = {}) {
   const x = clamp01(region.x);
   const y = clamp01(region.y);
-  const width = Math.max(0.04, Math.min(1 - x, Number(region.width) || 0));
-  const height = Math.max(0.04, Math.min(1 - y, Number(region.height) || 0));
-  if (width < 0.04 || height < 0.04) throw new Error('Zone verrouillée trop petite.');
+  const maxWidth = 1 - x;
+  const maxHeight = 1 - y;
+  if (maxWidth < 0.04 || maxHeight < 0.04) throw new Error('Zone verrouillée hors cadre.');
+  const width = Math.min(maxWidth, Math.max(0.04, Number(region.width) || 0));
+  const height = Math.min(maxHeight, Math.max(0.04, Number(region.height) || 0));
   return { x, y, width, height };
 }
 
