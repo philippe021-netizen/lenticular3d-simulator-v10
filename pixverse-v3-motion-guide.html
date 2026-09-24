@@ -71,11 +71,1740 @@
 </div>
 
 <script type="module">
-import { getPixVerseDiagnostic } from './modules/pixverse-client.js';
-import { runMimicMotionGuide } from './modules/pixverse-mimic-v3.js';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor.js';
-import { evaluateGenerationQC } from './modules/generation-qc.js';
-import { measureLockedSequence, recomposeLockedRegion, assessLockedRegionMetrics } from './modules/locked-region-qc.js';
+
+const SHARE_TOKEN = new URLSearchParams(location.search).get('_vercel_share') || '';
+const NATIVE_FETCH = window.fetch.bind(window);
+function microplayerUrl(input){
+  try{
+    const u=new URL(String(input),location.href);
+    if(SHARE_TOKEN && u.origin===location.origin && u.pathname.startsWith('/api/')) {
+      u.searchParams.set('_vercel_share',SHARE_TOKEN);
+    }
+    return u.toString();
+  }catch{return input}
+}
+window.fetch=(input,init)=>{
+  if(typeof input==='string' || input instanceof URL) return NATIVE_FETCH(microplayerUrl(input),init);
+  return NATIVE_FETCH(input,init);
+};
+window.addEventListener('error',e=>{
+  const el=document.getElementById('diag');
+  if(el){el.textContent='❌ Erreur JavaScript : '+(e.message||'inconnue');el.className='status bad'}
+});
+window.addEventListener('unhandledrejection',e=>{
+  const el=document.getElementById('diag');
+  if(el){el.textContent='❌ Erreur JavaScript : '+(e.reason?.message||String(e.reason||'inconnue'));el.className='status bad'}
+});
+const BUNDLED_CATALOG={"version":11,"engine":"pixverse-mimic","notes":"La vidéo guide transmet le geste. L’identité provient toujours de la photo client. Pour Mimic, le guide doit montrer principalement une personne.","actions":[{"id":"coeur_mains_v2","label":"Cœur avec les mains","target":"person","preferredMode":"mimic","durationSeconds":3,"guideHint":"Départ mains séparées, progression régulière, cœur lisible en fin, maintien final sans retour.","prompt":"Former progressivement un cœur avec les mains, sans mouvement de caméra ni déplacement du visage.","negativePrompt":"retour à la pose initiale, mains coupées, doigts supplémentaires, visage modifié, zoom, mouvement du fond","mobileZones":["avant-bras","mains","doigts","epaules"],"lockedZones":["visage","tete","cheveux","torse","fond"],"safeMargin":0.1,"finalHoldRatio":0.22},{"id":"bisou_main_v1","label":"Bisou de la main","target":"person","preferredMode":"mimic","durationSeconds":3,"guideHint":"Main vers la bouche puis geste vers l’avant, sans retour dans le même clip.","prompt":"Envoyer progressivement un bisou de la main, geste simple et lisible, tête stable.","negativePrompt":"retour, double geste, tête déformée, main coupée, doigts supplémentaires, zoom","mobileZones":["bras","avant-bras","main","doigts"],"lockedZones":["visage","tete","torse","fond"],"safeMargin":0.1,"finalHoldRatio":0.2},{"id":"salut_main_v1","label":"Petit salut de la main","target":"person","preferredMode":"mimic","durationSeconds":3,"guideHint":"Lever la main et terminer sur une position ouverte, sans oscillation répétée.","prompt":"Faire un salut unique de la main avec progression A vers B, sans boucle.","negativePrompt":"main qui oscille, répétition, retour, visage modifié, fond mobile, recadrage","mobileZones":["bras","avant-bras","main"],"lockedZones":["visage","tete","torse","fond"],"safeMargin":0.09,"finalHoldRatio":0.2},{"id":"balancement_doux_v1","label":"Mini balancement","target":"person","preferredMode":"mimic","durationSeconds":3,"guideHint":"Déplacement très faible des épaules et des bras, visage quasiment fixe.","prompt":"Créer un mini balancement naturel, très faible, avec visage et décor stables.","negativePrompt":"danse ample, rotation du corps, visage modifié, déplacement caméra, zoom","mobileZones":["epaules","bras","mains"],"lockedZones":["visage","tete","fond"],"safeMargin":0.08,"finalHoldRatio":0.2},{"id":"mini_danse_v1","label":"Mini danse","target":"person","preferredMode":"mimic","durationSeconds":3,"guideHint":"Un seul déplacement chorégraphié court, sans saut, sans rotation complète, fin tenue.","prompt":"Reproduire une mini danse courte et contrôlée, sans sortir du cadre et sans retour.","negativePrompt":"saut, tour complet, sortie du cadre, retour, répétition, visage modifié, zoom","mobileZones":["epaules","bras","mains","bassin"],"lockedZones":["visage","tete","fond"],"safeMargin":0.12,"finalHoldRatio":0.25}]};
+
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+const PROMPT_POLICY_MARKER = 'LENTICULAR ONE-WAY MOTION POLICY';
+const ONE_WAY_PROMPT_POLICY = `${PROMPT_POLICY_MARKER}: Perform exactly one continuous transition from the source state to one clearly different final state. Move progressively in one direction only. Reach the final state by 65% of the clip, then hold it completely motionless until the end. Never reverse, repeat, bounce, oscillate, loop, or return toward the starting pose. KEEP EVERY ANIMATED SUBJECT COMPLETELY INSIDE THE ORIGINAL FRAME AT ALL TIMES WITH A CLEAR SAFETY MARGIN. The entire visible silhouette of every person, couple, group member, child, animal, vehicle, machine, object and logo must remain visible from first frame to last frame. Hands, fingers, arms, head, hair, feet, paws, ears, tails, wheels, bodywork, machine parts and logo contours never touch or cross an image edge. Never enlarge a subject, move it toward the camera or push it outside its original framing. CAMERA AND BACKGROUND ARE A FROZEN PHOTOGRAPHIC PLATE: no camera shift and no environmental motion. Only the specifically named subjects, body parts or effect may move. Preserve every identity, anatomy, clothing, scale, framing and geometry.`;
+const ONE_WAY_NEGATIVE_POLICY = 'reverse motion, return to starting pose, repeated action, bounce, oscillation, loop, cropped subject, partial body, out of frame, subject touching image edge, subject enlargement, subject drift, camera movement, camera shake, zoom, moving background, changing shadows, background regeneration, environmental motion, face change, identity change, extra limbs, extra fingers, duplicate person, duplicate object';
+
+function appendPolicy(value, policy, marker = '', separator = ' ') {
+  const source = String(value || '').trim();
+  if (marker && source.includes(marker)) return source.slice(0, 5000);
+  const joiner = source ? separator : '';
+  const room = Math.max(0, 5000 - joiner.length - policy.length);
+  return `${source.slice(0, room)}${joiner}${policy}`;
+}
+
+function hardenPixVersePrompts(prompt, negativePrompt = '') {
+  return {
+    prompt: appendPolicy(prompt, ONE_WAY_PROMPT_POLICY, PROMPT_POLICY_MARKER),
+    negativePrompt: appendPolicy(negativePrompt, ONE_WAY_NEGATIVE_POLICY, 'reverse motion, return to starting pose', ', '),
+    policy: 'lenticular-one-way-v2'
+  };
+}
+
+async function readJson(r) {
+  const text = await r.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!r.ok) throw new Error(data?.error || data?.message || data?.ErrMsg || `Erreur HTTP ${r.status}`);
+  if (Number(data?.ErrCode) && Number(data.ErrCode) !== 0) {
+    throw new Error(data?.ErrMsg || `Erreur PixVerse ${data.ErrCode}`);
+  }
+  return data;
+}
+
+async function getPixVerseDiagnostic() {
+  const r = await fetch('/api/pixverse-diag?ts=' + Date.now(), { cache: 'no-store' });
+  return readJson(r);
+}
+
+async function uploadPixVerseImage(file) {
+  const form = new FormData();
+  form.append('image', file, file.name || `microplayer-${Date.now()}.png`);
+  const r = await fetch('/api/pixverse-upload?kind=image', { method: 'POST', body: form });
+  const data = await readJson(r);
+  const imgId = data?.Resp?.img_id ?? data?.img_id ?? data?.data?.img_id;
+  if (imgId === undefined || imgId === null || imgId === '') {
+    throw new Error(`PixVerse n’a pas renvoyé de img_id${data?.ErrMsg ? ` : ${data.ErrMsg}` : ''}.`);
+  }
+  return { imgId: Number(imgId), raw: data };
+}
+
+async function uploadPixVerseMedia(file) {
+  const form = new FormData();
+  form.append('file', file, file.name || `microplayer-guide-${Date.now()}.mp4`);
+  const r = await fetch('/api/pixverse-upload?kind=media', { method: 'POST', body: form });
+  const data = await readJson(r);
+  const mediaId = data?.Resp?.media_id ?? data?.media_id ?? data?.data?.media_id;
+  if (mediaId === undefined || mediaId === null || mediaId === '') {
+    throw new Error(`PixVerse n’a pas renvoyé de media_id${data?.ErrMsg ? ` : ${data.ErrMsg}` : ''}.`);
+  }
+  return { mediaId: Number(mediaId), raw: data };
+}
+
+function choosePixVerseMode({ mode = 'auto', endFile, motionGuideFile, keyframeFiles, modify } = {}) {
+  if (mode && mode !== 'auto') return mode;
+  if (modify) return 'modify';
+  if (motionGuideFile) return 'omni';
+  if (Array.isArray(keyframeFiles) && keyframeFiles.length) return 'multi_transition';
+  if (endFile) return 'transition';
+  return 'standard';
+}
+
+function estimatePixVerseCredits({ mode = 'standard', quality = '540p', duration = 2, hasVideoReferences = false, keyframeCount = 0 } = {}) {
+  const q = ['360p','540p','720p','1080p'].includes(quality) ? quality : '540p';
+  if (mode === 'standard' || mode === 'transition' || mode === 'omni') {
+    const table = hasVideoReferences
+      ? { '360p':10, '540p':14, '720p':18, '1080p':36 }
+      : { '360p':5, '540p':7, '720p':9, '1080p':18 };
+    return Math.max(1, Number(duration) || 1) * table[q];
+  }
+  if (mode === 'multi_transition') {
+    const seconds = Math.max(1, Number(duration) || Math.max(1, keyframeCount - 1));
+    const tables = {
+      '360p':[0,23,27,32,36,45,59,72,90,95,99],
+      '540p':[0,23,27,32,36,45,59,72,90,95,99],
+      '720p':[0,30,36,42,48,60,78,96,120,126,132],
+      '1080p':[0,60,72,84,96,120,156,192,240,252,264]
+    };
+    const row = tables[q];
+    return seconds <= 10 ? row[seconds] : null;
+  }
+  return null;
+}
+
+async function createPixVerseVideo({
+  mode = 'standard',
+  imgId,
+  firstFrameImg,
+  lastFrameImg,
+  imageReferences,
+  videoReferences,
+  multiTransition,
+  videoMediaId,
+  imgIds,
+  maskIds,
+  keyframeIds,
+  prompt,
+  negativePrompt = '',
+  duration = 2,
+  quality = '540p',
+  motionMode = 'normal',
+  seed = 0,
+  audio = false,
+  aspectRatio = 'auto'
+}) {
+  const body = {
+    mode,
+    prompt,
+    negative_prompt: negativePrompt,
+    duration,
+    quality,
+    motion_mode: motionMode,
+    seed,
+    generate_audio_switch: audio === true,
+    aspect_ratio: aspectRatio
+  };
+
+  if (imgId) body.img_id = imgId;
+  if (firstFrameImg) body.first_frame_img = firstFrameImg;
+  if (lastFrameImg) body.last_frame_img = lastFrameImg;
+  if (imageReferences?.length) body.image_references = imageReferences;
+  if (videoReferences?.length) body.video_references = videoReferences;
+  if (multiTransition?.length) body.multi_transition = multiTransition;
+  if (videoMediaId) body.video_media_id = videoMediaId;
+  if (imgIds?.length) body.img_ids = imgIds;
+  if (maskIds?.length) body.mask_ids = maskIds;
+  if (keyframeIds !== undefined) body.keyframe_ids = keyframeIds;
+
+  const r = await fetch('/api/pixverse-create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await readJson(r);
+  const videoId = data?.Resp?.video_id ?? data?.video_id ?? data?.data?.video_id;
+  if (videoId === undefined || videoId === null || videoId === '') throw new Error('PixVerse n’a pas renvoyé de video_id.');
+  return { videoId, raw: data, mode: data?._microplayer?.mode || mode };
+}
+
+
+async function selectPixVerseMasks(videoFile, { keyframeId = 0 } = {}) {
+  if (!videoFile) throw new Error('Vidéo source requise pour analyser les masques.');
+  const { mediaId } = await uploadPixVerseMedia(videoFile);
+  const r = await fetch('/api/pixverse-create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mode: 'mask_selection',
+      video_media_id: mediaId,
+      keyframe_id: Math.max(0, Number(keyframeId) || 0)
+    })
+  });
+  const data = await readJson(r);
+  return {
+    videoMediaId: mediaId,
+    keyframeId: data?.Resp?.keyframe_id ?? 0,
+    keyframeUrl: data?.Resp?.keyframe_url || '',
+    credits: Number(data?.Resp?.credits || 0),
+    masks: Array.isArray(data?.Resp?.mask_info) ? data.Resp.mask_info : [],
+    raw: data
+  };
+}
+
+async function modifyPixVerseVideo({
+  videoFile,
+  videoMediaId,
+  maskIds = [],
+  keyframeIds,
+  prompt,
+  referenceImageFiles = [],
+  quality = '540p',
+  onStatus
+} = {}) {
+  if (!prompt?.trim()) throw new Error('Prompt de correction Modify manquant.');
+  let mediaId = Number(videoMediaId) || 0;
+  if (!mediaId) {
+    if (!videoFile) throw new Error('Vidéo source Modify manquante.');
+    onStatus?.({ step: 'upload-video' });
+    mediaId = (await uploadPixVerseMedia(videoFile)).mediaId;
+  }
+
+  const imgIds = [];
+  for (const file of Array.from(referenceImageFiles || []).slice(0, 10)) {
+    onStatus?.({ step: 'upload-reference' });
+    imgIds.push((await uploadPixVerseImage(file)).imgId);
+  }
+
+  onStatus?.({ step: 'create' });
+  const { videoId, raw } = await createPixVerseVideo({
+    mode: 'modify',
+    videoMediaId: mediaId,
+    imgIds,
+    maskIds,
+    keyframeIds,
+    prompt: String(prompt).trim(),
+    quality
+  });
+
+  onStatus?.({ step: 'processing', videoId });
+  const result = await waitForPixVerse(videoId, {
+    onStatus: s => onStatus?.({ step: 'processing', videoId, response: s })
+  });
+  const videoUrl = proxiedPixVerseVideoUrl(result.url, videoId);
+  onStatus?.({ step: 'done', videoId, videoUrl });
+  return { videoId, videoMediaId: mediaId, sourceUrl: result.url, videoUrl, createResponse: raw, response: result.raw };
+}
+
+async function getPixVerseStatus(videoId) {
+  const r = await fetch(`/api/pixverse-status?id=${encodeURIComponent(videoId)}`, { cache: 'no-store' });
+  return readJson(r);
+}
+
+async function waitForPixVerse(videoId, { intervalMs = 4000, timeoutMs = 180000, onStatus } = {}) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const data = await getPixVerseStatus(videoId);
+    onStatus?.(data);
+    const status = Number(data?.Resp?.status ?? data?.status ?? data?.data?.status);
+    const url = data?.Resp?.url ?? data?.url ?? data?.data?.url;
+    if (status === 1 && url) return { url, raw: data };
+    if (status === 7) throw new Error('PixVerse a refusé la génération (modération).');
+    if (status === 8) throw new Error('La génération PixVerse a échoué.');
+    await sleep(intervalMs);
+  }
+  throw new Error('Délai d’attente PixVerse dépassé.');
+}
+
+function proxiedPixVerseVideoUrl(url, videoId = '') {
+  const p = new URLSearchParams();
+  if (videoId !== undefined && videoId !== null && String(videoId).trim()) p.set('id', String(videoId).trim());
+  if (url) p.set('url', url);
+  if (SHARE_TOKEN) p.set('_vercel_share', SHARE_TOKEN); return `/api/pixverse-video?${p.toString()}`;
+}
+
+function enrichOmniPrompt(basePrompt, hasMotionGuide, hasExtraRefs) {
+  const refs = [
+    'Use @main as the exact visual identity, composition, clothing, proportions, lighting and framing reference.',
+    hasMotionGuide ? 'Use @motion only as the motion reference. Reproduce its action timing while preserving @main.' : '',
+    hasExtraRefs ? 'Use the additional image references only to reinforce identity and visual details.' : '',
+    'Keep the camera static and preserve the background as closely as possible.'
+  ].filter(Boolean).join(' ');
+  return `${refs} ${basePrompt}`.trim();
+}
+
+async function runPixVerseAction(file, variant, {
+  onStatus,
+  controls = {}
+} = {}) {
+  if (!file) throw new Error('Image source manquante.');
+  if (!variant?.prompt) throw new Error('Prompt d’action manquant.');
+
+  const hardened = hardenPixVersePrompts(variant.prompt, variant.negativePrompt || '');
+  const mode = choosePixVerseMode({
+    mode: controls.mode || 'auto',
+    endFile: controls.endFile,
+    motionGuideFile: controls.motionGuideFile,
+    keyframeFiles: controls.keyframeFiles,
+    modify: controls.modify
+  });
+
+  const quality = controls.quality || variant.quality || '540p';
+  const seed = controls.seed ?? variant.seed ?? 0;
+  const audio = controls.audio ?? (variant.audio === true);
+  const motionMode = controls.motionMode || variant.motionMode || 'normal';
+  const requestedDuration = controls.duration ?? variant.duration ?? 2;
+  const aspectRatio = controls.aspectRatio || 'auto';
+
+  let createArgs = {
+    mode,
+    prompt: hardened.prompt,
+    negativePrompt: hardened.negativePrompt,
+    duration: requestedDuration,
+    quality,
+    motionMode,
+    seed,
+    audio,
+    aspectRatio
+  };
+
+  onStatus?.({ step: 'upload', mode });
+
+  if (mode === 'standard') {
+    const { imgId } = await uploadPixVerseImage(file);
+    createArgs.imgId = imgId;
+  }
+
+  if (mode === 'transition') {
+    if (!controls.endFile) throw new Error('Le mode Transition requiert une image finale.');
+    const [{ imgId:firstFrameImg }, { imgId:lastFrameImg }] = await Promise.all([
+      uploadPixVerseImage(file),
+      uploadPixVerseImage(controls.endFile)
+    ]);
+    createArgs.firstFrameImg = firstFrameImg;
+    createArgs.lastFrameImg = lastFrameImg;
+  }
+
+  if (mode === 'omni') {
+    const main = await uploadPixVerseImage(file);
+    const refs = [{ img_id: main.imgId, type: 'subject', ref_name: 'main' }];
+    const extraFiles = Array.from(controls.referenceImageFiles || []).slice(0, 9);
+    for (let i = 0; i < extraFiles.length; i++) {
+      const { imgId } = await uploadPixVerseImage(extraFiles[i]);
+      refs.push({ img_id: imgId, type: 'subject', ref_name: `ref${i + 1}` });
+    }
+    createArgs.imageReferences = refs;
+
+    if (controls.motionGuideFile) {
+      const { mediaId } = await uploadPixVerseMedia(controls.motionGuideFile);
+      createArgs.videoReferences = [{ video_media_id: mediaId, ref_name: 'motion' }];
+      createArgs.duration = 0;
+    }
+    createArgs.prompt = enrichOmniPrompt(hardened.prompt, Boolean(controls.motionGuideFile), extraFiles.length > 0);
+  }
+
+  if (mode === 'multi_transition') {
+    const extras = Array.from(controls.keyframeFiles || []).slice(0, 6);
+    if (!extras.length) throw new Error('Multi-transition requiert au moins une image clé supplémentaire.');
+    const files = [file, ...extras];
+    const ids = [];
+    for (const f of files) {
+      const { imgId } = await uploadPixVerseImage(f);
+      ids.push(imgId);
+    }
+    const segmentDuration = Math.max(1, Math.min(files.length >= 3 ? 5 : 8, Number(controls.segmentDuration || 1)));
+    createArgs.multiTransition = ids.map((imgId, i) => ({
+      img_id: imgId,
+      duration: i === ids.length - 1 ? 0 : segmentDuration,
+      prompt: i === ids.length - 1 ? '' : hardened.prompt
+    }));
+    createArgs.duration = segmentDuration * (ids.length - 1);
+  }
+
+  if (mode === 'modify') {
+    const m = controls.modify || {};
+    if (!m.videoFile) throw new Error('Modify requiert la vidéo à corriger.');
+    const { mediaId } = await uploadPixVerseMedia(m.videoFile);
+    createArgs.videoMediaId = mediaId;
+    createArgs.imgIds = Array.isArray(m.imgIds) ? m.imgIds : [];
+    createArgs.maskIds = Array.isArray(m.maskIds) ? m.maskIds : [];
+    createArgs.keyframeIds = m.keyframeIds;
+    createArgs.prompt = String(m.prompt || variant.prompt || '').trim();
+  }
+
+  onStatus?.({ step: 'create', mode });
+  const { videoId, raw } = await createPixVerseVideo(createArgs);
+  onStatus?.({ step: 'processing', videoId, mode });
+
+  const result = await waitForPixVerse(videoId, {
+    onStatus: s => onStatus?.({ step: 'processing', videoId, mode, response: s })
+  });
+
+  const videoUrl = proxiedPixVerseVideoUrl(result.url, videoId);
+  const estimatedCredits = estimatePixVerseCredits({
+    mode,
+    quality,
+    duration: createArgs.duration || requestedDuration,
+    hasVideoReferences: Boolean(createArgs.videoReferences?.length),
+    keyframeCount: createArgs.multiTransition?.length || 0
+  });
+
+  onStatus?.({ step: 'done', videoId, videoUrl, mode, estimatedCredits });
+  return {
+    videoId,
+    sourceUrl: result.url,
+    videoUrl,
+    response: result.raw,
+    createResponse: raw,
+    promptUsed: createArgs.prompt,
+    negativePromptUsed: hardened.negativePrompt,
+    promptPolicy: hardened.policy,
+    modeUsed: mode,
+    quality,
+    duration: createArgs.duration || requestedDuration,
+    seed,
+    estimatedCredits
+  };
+}
+
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function normalizeBox(box = {}) {
+  const x = clamp(Number(box.x) || 0, 0, 1);
+  const y = clamp(Number(box.y) || 0, 0, 1);
+  const w = clamp(Number(box.w) || 0, 0, 1 - x);
+  const h = clamp(Number(box.h) || 0, 0, 1 - y);
+  return { x, y, w, h };
+}
+
+function computeSafeFraming(box, { margin = 0.08, maxScale = 1, minScale = 0.55 } = {}) {
+  const b = normalizeBox(box);
+  if (b.w <= 0 || b.h <= 0) return { ok: false, reason: 'empty-subject-box' };
+  const m = clamp(Number(margin) || 0, 0, 0.3);
+  const available = Math.max(0.05, 1 - 2 * m);
+  const scale = clamp(Math.min(available / b.w, available / b.h, Number(maxScale) || 1), minScale, maxScale);
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2;
+  const tx = 0.5 - cx;
+  const ty = 0.5 - cy;
+  const left = cx - (b.w * scale) / 2;
+  const right = cx + (b.w * scale) / 2;
+  const top = cy - (b.h * scale) / 2;
+  const bottom = cy + (b.h * scale) / 2;
+  const clearance = Math.min(left, 1 - right, top, 1 - bottom);
+  return {
+    ok: clearance >= m - 1e-6,
+    scale: Number(scale.toFixed(4)),
+    translateX: Number(tx.toFixed(4)),
+    translateY: Number(ty.toFixed(4)),
+    requestedMargin: m,
+    estimatedClearance: Number(clearance.toFixed(4)),
+    box: b
+  };
+}
+
+function framingRisk(box, margin = 0.08) {
+  const b = normalizeBox(box);
+  const clearance = Math.min(b.x, b.y, 1 - (b.x + b.w), 1 - (b.y + b.h));
+  if (clearance < 0.015) return 'critical';
+  if (clearance < margin) return 'warning';
+  return 'ok';
+}
+
+function computeSafeFrameGeometry({ width, height, safeMargin = 0.14, anchor = 'center' }) {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    throw new Error('Dimensions source invalides.');
+  }
+  if (!Number.isFinite(safeMargin) || safeMargin < 0 || safeMargin > 0.3) {
+    throw new Error('safeMargin doit être compris entre 0 et 0.3.');
+  }
+  const scale = Number((1 - 2 * safeMargin).toFixed(6));
+  const drawWidth = Math.round(width * scale);
+  const drawHeight = Math.round(height * scale);
+  const dx = Math.round((width - drawWidth) / 2);
+  const defaultDy = Math.round((height - drawHeight) / 2);
+  const dy = anchor === 'top'
+    ? Math.round(height * safeMargin * 0.6)
+    : anchor === 'bottom'
+      ? Math.round(height - drawHeight - height * safeMargin * 0.6)
+      : defaultDy;
+  return { outputWidth: width, outputHeight: height, drawWidth, drawHeight, dx, dy, scale, anchor };
+}
+
+function safeFrameCanvasBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      blob => blob ? resolve(blob) : reject(new Error('Encodage safe framing impossible.')),
+      'image/jpeg',
+      0.94
+    );
+  });
+}
+
+async function prepareSafeFramedImage(file, framing = {}) {
+  if (!file) throw new Error('Image source manquante pour le safe framing.');
+  if (typeof document === 'undefined' || typeof createImageBitmap !== 'function') {
+    return { file, geometry: null, warnings: ['Safe framing indisponible dans cet environnement.'] };
+  }
+
+  const bitmap = await createImageBitmap(file);
+  try {
+    const geometry = computeSafeFrameGeometry({
+      width: bitmap.width,
+      height: bitmap.height,
+      safeMargin: Number(framing.safeMargin ?? 0.14),
+      anchor: framing.anchor || 'center'
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = geometry.outputWidth;
+    canvas.height = geometry.outputHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas safe framing indisponible.');
+
+    ctx.save();
+    ctx.filter = `blur(${Math.max(8, Math.round(Math.min(canvas.width, canvas.height) * 0.018))}px)`;
+    ctx.drawImage(
+      bitmap,
+      -geometry.dx,
+      -geometry.dy,
+      canvas.width + geometry.dx * 2,
+      canvas.height + geometry.dy * 2
+    );
+    ctx.restore();
+
+    ctx.drawImage(bitmap, geometry.dx, geometry.dy, geometry.drawWidth, geometry.drawHeight);
+
+    const blob = await safeFrameCanvasBlob(canvas);
+    const prepared = new File(
+      [blob],
+      `safe-${file.name || 'microplayer.jpg'}`,
+      { type: blob.type, lastModified: Date.now() }
+    );
+    const warnings = geometry.scale < 0.62
+      ? ['Marge importante : vérifier que le sujet reste assez grand.']
+      : [];
+    return { file: prepared, geometry, warnings };
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+
+
+const MIMIC_V3_POLICY = Object.freeze({
+  mode: 'mimic',
+  engine: 'PixVerse Motion Control / Mimic',
+  outputViews: 9,
+  lpi: 60,
+  progression: 'A-to-B-no-return',
+  identityReference: 'photo',
+  motionReference: 'guide-video'
+});
+
+async function readMimicJson(r) {
+  const text = await r.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (!r.ok) throw new Error(data?.error || data?.ErrMsg || data?.message || `Erreur HTTP ${r.status}`);
+  if (Number(data?.ErrCode) && Number(data.ErrCode) !== 0) {
+    const code = Number(data.ErrCode);
+    if (code === 701002) throw new Error('PixVerse Mimic ne détecte pas clairement le sujet dans la photo.');
+    if (code === 701003) throw new Error('PixVerse Mimic ne détecte pas une personne principale exploitable dans la vidéo guide.');
+    throw new Error(data?.ErrMsg || `Erreur PixVerse ${code}`);
+  }
+  return data;
+}
+
+function validateMotionGuideFile(file) {
+  if (!file) return { ok: false, reason: 'missing-guide' };
+  const type = String(file.type || '').toLowerCase();
+  const validType = ['video/mp4', 'video/quicktime', 'video/mov', 'video/webm'].includes(type)
+    || /\.(mp4|mov|webm)$/i.test(file.name || '');
+  if (!validType) return { ok: false, reason: 'unsupported-format' };
+  if (Number(file.size) > 100 * 1024 * 1024) return { ok: false, reason: 'too-large' };
+  return { ok: true };
+}
+
+function buildMimicRequest({ imgId, videoMediaId, sourceVideoId, quality = '540p' }) {
+  const request = {
+    img_id: Number(imgId),
+    quality: ['360p', '540p', '720p'].includes(quality) ? quality : '540p'
+  };
+  if (Number(videoMediaId) > 0) request.video_media_id = Number(videoMediaId);
+  if (Number(sourceVideoId) > 0) request.source_video_id = Number(sourceVideoId);
+  if (!Number.isInteger(request.img_id) || request.img_id <= 0) throw new Error('img_id Mimic invalide.');
+  if (!request.video_media_id && !request.source_video_id) throw new Error('Référence vidéo Mimic manquante.');
+  if (request.video_media_id && request.source_video_id) throw new Error('Références vidéo Mimic ambiguës.');
+  return request;
+}
+
+async function createMimicVideo(args) {
+  const body = { mode: 'mimic', ...buildMimicRequest(args) };
+  const r = await fetch('/api/pixverse-create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await readMimicJson(r);
+  const videoId = data?.Resp?.video_id ?? data?.video_id ?? data?.data?.video_id;
+  if (!Number(videoId)) throw new Error('PixVerse Mimic n’a pas renvoyé de video_id.');
+  return { videoId: Number(videoId), raw: data };
+}
+
+async function runMimicMotionGuide(photoFile, motionGuideFile, {
+  quality = '540p',
+  framing = null,
+  onStatus
+} = {}) {
+  if (!photoFile) throw new Error('Photo client manquante.');
+  const guideCheck = validateMotionGuideFile(motionGuideFile);
+  if (!guideCheck.ok) {
+    const labels = {
+      'missing-guide': 'Vidéo guide manquante.',
+      'unsupported-format': 'Format de vidéo guide non pris en charge.',
+      'too-large': 'Vidéo guide supérieure à 100 Mo.'
+    };
+    throw new Error(labels[guideCheck.reason] || 'Vidéo guide invalide.');
+  }
+
+  let sourcePhoto = photoFile;
+  let safeFraming = null;
+  if (framing) {
+    onStatus?.({ step: 'safe-framing' });
+    const prepared = await prepareSafeFramedImage(photoFile, framing);
+    sourcePhoto = prepared.file;
+    safeFraming = prepared.geometry;
+    onStatus?.({ step: 'safe-framing-done', geometry: prepared.geometry, warnings: prepared.warnings });
+  }
+
+  onStatus?.({ step: 'upload-photo' });
+  const { imgId } = await uploadPixVerseImage(sourcePhoto);
+  onStatus?.({ step: 'upload-guide' });
+  const { mediaId } = await uploadPixVerseMedia(motionGuideFile);
+
+  onStatus?.({ step: 'create-mimic', imgId, mediaId });
+  const { videoId, raw } = await createMimicVideo({ imgId, videoMediaId: mediaId, quality });
+
+  onStatus?.({ step: 'processing', videoId });
+  const result = await waitForPixVerse(videoId, {
+    timeoutMs: 240000,
+    onStatus: response => onStatus?.({ step: 'processing', videoId, response })
+  });
+
+  const videoUrl = proxiedPixVerseVideoUrl(result.url, videoId);
+  onStatus?.({ step: 'done', videoId, videoUrl });
+  return {
+    videoId,
+    imgId,
+    videoMediaId: mediaId,
+    quality,
+    sourceUrl: result.url,
+    videoUrl,
+    createResponse: raw,
+    response: result.raw,
+    safeFraming,
+    policy: MIMIC_V3_POLICY
+  };
+}
+
+
+function once(target, event, timeoutMs = 1500) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    let timer = null;
+
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      target.removeEventListener(event, onEvent);
+      target.removeEventListener('error', onError);
+    };
+
+    const finish = (fn, value) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      fn(value);
+    };
+
+    const onEvent = () => finish(resolve);
+    const onError = () => finish(reject, new Error(`Erreur vidéo pendant ${event}.`));
+
+    target.addEventListener(event, onEvent, { once: true });
+    target.addEventListener('error', onError, { once: true });
+
+    timer = setTimeout(() => {
+      finish(reject, new Error(`Timeout pendant ${event}.`));
+    }, timeoutMs);
+  });
+}
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function withTimeout(promise, timeoutMs, message) {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    })
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+let pixversePreviewRAF = 0;
+let pixversePreviewFrames = null;
+let pixversePreviewEnabled = false;
+let pixversePreviewStart = 0;
+let pixversePlacementBound = false;
+let pixverseLastFrameIndex = -1;
+
+function simulatorTarget() {
+  const iframe = document.getElementById('hhApp');
+  const doc = iframe?.contentDocument;
+  const supportCanvas = doc?.getElementById('supportCanvas');
+  const imageWindow = supportCanvas?.parentElement;
+  const product = doc?.getElementById('productObject');
+  return { doc, imageWindow, product };
+}
+
+function ensurePixVersePreviewControls() {
+  const { doc } = simulatorTarget();
+  if (!doc) return null;
+  let btn = doc.getElementById('pixverseSimulatorToggle');
+  if (btn) return btn;
+  const supportControls = doc.querySelector('.support-controls');
+  if (!supportControls) return null;
+  btn = doc.createElement('button');
+  btn.id = 'pixverseSimulatorToggle';
+  btn.type = 'button';
+  btn.className = 'secondary';
+  btn.style.width = '100%';
+  btn.style.marginTop = '8px';
+  btn.textContent = 'Aperçu PixVerse : indisponible';
+  btn.disabled = true;
+  supportControls.appendChild(btn);
+  btn.addEventListener('click', () => {
+    if (!pixversePreviewFrames?.length) return;
+    if (pixversePreviewEnabled) stopPixVerseSimulatorPreview(false);
+    else showPixVerseFramesInSimulator(pixversePreviewFrames);
+  });
+  return btn;
+}
+
+function currentFrontPlacement(doc) {
+  const fit = doc?.getElementById('supportFit')?.value || 'contain';
+  const zoom = Number(doc?.getElementById('supportZoom')?.value || 100);
+  const x = Number(doc?.getElementById('supportX')?.value || 0);
+  const y = Number(doc?.getElementById('supportY')?.value || 0);
+  const margin = Number(doc?.getElementById('supportMargin')?.value || 0);
+  return { fit, zoom, x, y, margin };
+}
+
+function applyPixVersePlacement() {
+  const { doc } = simulatorTarget();
+  const img = doc?.getElementById('pixverseSimulatorImage');
+  if (!doc || !img) return;
+  const p = currentFrontPlacement(doc);
+  img.style.objectFit = p.fit === 'cover' ? 'cover' : 'contain';
+  img.style.objectPosition = 'center';
+  let scale = Math.max(0.1, p.zoom / 100);
+  if (p.fit === 'preserve') scale *= Math.max(0.55, 1 - p.margin / 100);
+  img.style.transformOrigin = '50% 50%';
+  img.style.transform = `translate(${p.x * 0.5}%, ${p.y * 0.5}%) scale(${scale})`;
+}
+
+function bindPixVersePlacementControls() {
+  if (pixversePlacementBound) return;
+  const { doc } = simulatorTarget();
+  if (!doc) return;
+  ['supportFit','supportMargin','supportZoom','supportX','supportY','supportType'].forEach(id => {
+    const el = doc.getElementById(id);
+    if (!el || el.dataset.pixversePlacementBound === '1') return;
+    el.dataset.pixversePlacementBound = '1';
+    el.addEventListener('input', applyPixVersePlacement);
+    el.addEventListener('change', applyPixVersePlacement);
+  });
+  pixversePlacementBound = true;
+}
+
+function ensurePixVerseOverlay() {
+  const { doc, imageWindow } = simulatorTarget();
+  if (!doc || !imageWindow) return null;
+  if (getComputedStyle(imageWindow).position === 'static') imageWindow.style.position = 'relative';
+  let img = doc.getElementById('pixverseSimulatorImage');
+  if (!img) {
+    img = doc.createElement('img');
+    img.id = 'pixverseSimulatorImage';
+    Object.assign(img.style, {
+      position: 'absolute', inset: '0', width: '100%', height: '100%', objectFit: 'contain',
+      objectPosition: 'center', display: 'none', zIndex: '20', pointerEvents: 'none',
+      borderRadius: 'inherit', maxWidth: 'none', maxHeight: 'none', backfaceVisibility: 'hidden'
+    });
+    imageWindow.appendChild(img);
+  }
+  let badge = doc.getElementById('pixverseSimulatorBadge');
+  if (!badge) {
+    badge = doc.createElement('div');
+    badge.id = 'pixverseSimulatorBadge';
+    Object.assign(badge.style, {
+      position: 'absolute', left: '8px', bottom: '8px', zIndex: '21', padding: '4px 7px',
+      borderRadius: '999px', background: 'rgba(0,0,0,.72)', color: '#fff', fontSize: '10px',
+      fontWeight: '800', display: 'none', pointerEvents: 'none'
+    });
+    imageWindow.appendChild(badge);
+  }
+  bindPixVersePlacementControls();
+  applyPixVersePlacement();
+  return { img, badge };
+}
+
+function simulatorSpeedMs(doc) {
+  const seconds = Number(doc?.getElementById('supportSpeed')?.value || 5);
+  return Math.max(2500, Math.min(8000, seconds * 1000));
+}
+
+function simulatorRotation(doc) {
+  const deg = Number(doc?.getElementById('supportRot')?.value || 6);
+  return Math.max(0, Math.min(8, deg));
+}
+
+function stabilizeProductForPixVerse(product) {
+  if (!product) return;
+  product.classList.remove('support-playing');
+  product.style.animation = 'none';
+  product.style.willChange = 'transform';
+  const shell = product.querySelector('.shell');
+  if (shell) shell.style.animation = 'none';
+}
+
+function animatePixVersePreview(now) {
+  if (!pixversePreviewEnabled || !pixversePreviewFrames?.length) return;
+  const { doc, product } = simulatorTarget();
+  const img = doc?.getElementById('pixverseSimulatorImage');
+  const badge = doc?.getElementById('pixverseSimulatorBadge');
+  if (!doc || !img || !badge) {
+    pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
+    return;
+  }
+  stabilizeProductForPixVerse(product);
+  const period = simulatorSpeedMs(doc);
+  const elapsed = Math.max(0, now - pixversePreviewStart);
+  const phase = (elapsed % period) / period;
+  const sweep = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  if (product) {
+    const rot = simulatorRotation(doc);
+    const angle = -rot + sweep * rot * 2;
+    const shift = -4 + sweep * 8;
+    product.style.transform = `perspective(620px) rotateY(${angle.toFixed(3)}deg) translateX(${shift.toFixed(2)}px)`;
+  }
+  const idx = Math.max(0, Math.min(pixversePreviewFrames.length - 1, Math.round(sweep * (pixversePreviewFrames.length - 1))));
+  if (idx !== pixverseLastFrameIndex) {
+    pixverseLastFrameIndex = idx;
+    const frame = pixversePreviewFrames[idx];
+    img.src = frame.url;
+    badge.textContent = `PIXVERSE ${frame.index || idx + 1}/${pixversePreviewFrames.length}`;
+  }
+  pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
+}
+
+function stopPixVerseSimulatorPreview(clearFrames = false) {
+  if (pixversePreviewRAF) cancelAnimationFrame(pixversePreviewRAF);
+  pixversePreviewRAF = 0;
+  pixversePreviewEnabled = false;
+  pixverseLastFrameIndex = -1;
+  const { doc, product } = simulatorTarget();
+  const img = doc?.getElementById('pixverseSimulatorImage');
+  const badge = doc?.getElementById('pixverseSimulatorBadge');
+  const btn = doc?.getElementById('pixverseSimulatorToggle');
+  if (img) img.style.display = 'none';
+  if (badge) badge.style.display = 'none';
+  if (product) {
+    product.style.transform = '';
+    product.style.animation = '';
+    product.style.willChange = '';
+    const shell = product.querySelector('.shell');
+    if (shell) shell.style.animation = '';
+  }
+  if (btn) {
+    btn.textContent = pixversePreviewFrames?.length ? 'Aperçu PixVerse : OFF' : 'Aperçu PixVerse : indisponible';
+    btn.disabled = !pixversePreviewFrames?.length;
+  }
+  if (clearFrames) pixversePreviewFrames = null;
+}
+
+function showPixVerseFramesInSimulator(frames) {
+  if (!Array.isArray(frames) || frames.length < 2) return false;
+  pixversePreviewFrames = frames;
+  const controls = ensurePixVersePreviewControls();
+  const overlay = ensurePixVerseOverlay();
+  if (!overlay) return false;
+  if (pixversePreviewRAF) cancelAnimationFrame(pixversePreviewRAF);
+  const { product } = simulatorTarget();
+  stabilizeProductForPixVerse(product);
+  pixversePreviewEnabled = true;
+  pixversePreviewStart = performance.now();
+  pixverseLastFrameIndex = 0;
+  overlay.img.src = frames[0].url;
+  overlay.img.style.display = 'block';
+  overlay.badge.textContent = `PIXVERSE 1/${frames.length}`;
+  overlay.badge.style.display = 'block';
+  applyPixVersePlacement();
+  if (controls) {
+    controls.disabled = false;
+    controls.textContent = 'Aperçu PixVerse : ON';
+  }
+  pixversePreviewRAF = requestAnimationFrame(animatePixVersePreview);
+  return true;
+}
+
+async function ensureMetadata(video) {
+  if (Number.isFinite(video.duration) && video.duration > 0 && video.videoWidth > 0) return;
+  await withTimeout(
+    once(video, 'loadedmetadata', 2500),
+    3000,
+    'Timeout chargement des métadonnées vidéo.'
+  );
+}
+
+async function createAnalysisVideoFromSource(sourceVideo) {
+  if (!sourceVideo) throw new Error('Vidéo source absente pour analyse.');
+  const src = sourceVideo.currentSrc || sourceVideo.src;
+  if (!src) throw new Error('Source vidéo introuvable.');
+
+  const video = document.createElement('video');
+  video.crossOrigin = 'anonymous';
+  video.preload = 'auto';
+  video.muted = true;
+  video.playsInline = true;
+  video.setAttribute('playsinline', '');
+  Object.assign(video.style, {
+    position: 'fixed',
+    left: '-99999px',
+    top: '0',
+    width: '1px',
+    height: '1px',
+    opacity: '0',
+    pointerEvents: 'none'
+  });
+
+  document.body.appendChild(video);
+  video.src = src;
+  video.load();
+
+  try {
+    await ensureMetadata(video);
+    return video;
+  } catch (error) {
+    try {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.remove();
+    } catch (_) {}
+    throw error;
+  }
+}
+
+async function waitForDecodedFrame(video, targetTime) {
+  if (typeof video.requestVideoFrameCallback === 'function') {
+    try {
+      await withTimeout(
+        new Promise(resolve => {
+          let resolved = false;
+          const finish = () => {
+            if (resolved) return;
+            resolved = true;
+            resolve();
+          };
+          video.requestVideoFrameCallback((_now, meta) => {
+            const mediaTime = Number(meta?.mediaTime);
+            if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.12) finish();
+            else requestAnimationFrame(finish);
+          });
+          setTimeout(finish, 180);
+        }),
+        260,
+        'Timeout decode frame'
+      );
+      return;
+    } catch (_) {}
+  }
+
+  await delay(120);
+}
+
+async function seek(video, time) {
+  const duration = Number(video.duration) || 0;
+  const safeMin = duration > 0.08 ? 0.04 : 0;
+  const safeMax = Math.max(safeMin, duration - (duration > 0.08 ? 0.04 : 0.001));
+  const target = Math.max(safeMin, Math.min(safeMax, time));
+
+  if (Math.abs((Number(video.currentTime) || 0) - target) < 0.01) {
+    await waitForDecodedFrame(video, target);
+    return Number(video.currentTime) || target;
+  }
+
+  let seekWorked = false;
+  try {
+    await withTimeout(
+      (async () => {
+        const seeked = once(video, 'seeked', 1200);
+        video.currentTime = target;
+        await seeked;
+      })(),
+      1400,
+      `Timeout seek vers ${target.toFixed(3)} s`
+    );
+    seekWorked = true;
+  } catch (_) {
+    try {
+      video.currentTime = Math.max(safeMin, Math.min(safeMax, target + 0.001));
+    } catch (_) {}
+    await delay(140);
+  }
+
+  await waitForDecodedFrame(video, target);
+  if (!seekWorked) await delay(80);
+  return Number(video.currentTime) || target;
+}
+
+function canvasToBlob(canvas, type = 'image/jpeg', quality = 0.96) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Impossible de créer une vue extraite.')), type, quality);
+  });
+}
+
+function fingerprintCanvas(ctx, width, height) {
+  const sample = document.createElement('canvas');
+  sample.width = 128;
+  sample.height = 96;
+  const sampleCtx = sample.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!sampleCtx) return '';
+  sampleCtx.drawImage(ctx.canvas, 0, 0, width, height, 0, 0, sample.width, sample.height);
+  const pixels = sampleCtx.getImageData(0, 0, sample.width, sample.height).data;
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    h ^= pixels[i];
+    h = Math.imul(h, 16777619) >>> 0;
+    h ^= pixels[i + 1];
+    h = Math.imul(h, 16777619) >>> 0;
+    h ^= pixels[i + 2];
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+function currentActionHint() {
+  const custom = document.getElementById('customAction');
+  const family = document.getElementById('family')?.value || '';
+  const actionSelect = document.getElementById('action');
+  const actionText = actionSelect?.selectedOptions?.[0]?.textContent || '';
+  const customText = custom?.value?.trim() || '';
+  const promptText = document.getElementById('prompt')?.textContent || '';
+  return [family, customText || actionText, promptText].filter(Boolean).join(' · ').toLowerCase().slice(0, 1400);
+}
+
+function actionSensitivity(hint) {
+  const subtle = /(clin d.?œil|wink|blink|sourire|smile|regard|look|yeux|eyes|oreille|ear|langue|tongue|bouche|mouth|kiss|bisou|cheek)/i.test(hint);
+  const large = /(danse|dance|bras|hands up|tourne|rotate|rotation|avance|move|walk|saute|jump|explod|explode|démont|teardown)/i.test(hint);
+  return subtle ? 0.72 : large ? 1.18 : 1;
+}
+
+function sampleSignature(ctx, width, height) {
+  const sx = 32, sy = 24;
+  const out = new Float32Array(sx * sy);
+  let n = 0;
+  for (let y = 0; y < sy; y++) {
+    for (let x = 0; x < sx; x++) {
+      const px = Math.min(width - 1, Math.round((x + 0.5) * width / sx));
+      const py = Math.min(height - 1, Math.round((y + 0.5) * height / sy));
+      const d = ctx.getImageData(px, py, 1, 1).data;
+      out[n++] = 0.299 * d[0] + 0.587 * d[1] + 0.114 * d[2];
+    }
+  }
+  return out;
+}
+
+function signatureDistance(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += Math.abs(a[i] - b[i]);
+  return sum / (a.length * 255);
+}
+
+function median(values) {
+  if (!values.length) return 0;
+  const a = [...values].sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+/**
+ * Keep the first complete one-way action. PixVerse can ignore the prompt's
+ * final hold and restart the animation inside the same two-second clip. A
+ * global maximum is therefore unsafe: it can select the second pass.
+ */
+function selectFirstProgressivePass(samples, {
+  start = samples?.[0]?.time ?? 0,
+  end = samples?.[samples.length - 1]?.time ?? start,
+  medianMotion = 0,
+  threshold = 0
+} = {}) {
+  if (!Array.isArray(samples) || samples.length < 2) {
+    return { actionStartIndex: 0, actionEndIndex: 0, peakIndex: 0, returnIndex: -1, returnDetected: false };
+  }
+
+  const overallMax = Math.max(...samples.map(sample => Number(sample.fromStart) || 0));
+  const activityFloor = Math.max(0.004, medianMotion * 1.15, overallMax * 0.08);
+  let actionStartIndex = 0;
+  for (let i = 1; i < samples.length; i++) {
+    if (samples[i].fromStart >= activityFloor || samples[i].stepMotion >= threshold) {
+      // Keep one quiet sample before the first detected motion so view 1 is
+      // the real source pose, including when the analysis grid is sparse.
+      actionStartIndex = Math.max(0, i - 2);
+      break;
+    }
+  }
+
+  const armedFloor = Math.max(0.008, medianMotion * 1.4, overallMax * 0.16);
+  let peakIndex = actionStartIndex;
+  let peakDistance = samples[peakIndex].fromStart || 0;
+  let returnIndex = -1;
+  let reversalRun = 0;
+
+  for (let i = actionStartIndex + 1; i < samples.length; i++) {
+    const sample = samples[i];
+    const previousPeak = peakDistance;
+    if (sample.fromStart > peakDistance) {
+      peakDistance = sample.fromStart;
+      peakIndex = i;
+    }
+    if (previousPeak < armedFloor) continue;
+
+    const drop = previousPeak - sample.fromStart;
+    const hardReturn = sample.fromStart <= Math.max(0.003, previousPeak * 0.32)
+      && sample.stepMotion >= Math.max(0.008, medianMotion * 1.15);
+    const meaningfulReversal = sample.fromStart <= previousPeak * 0.58
+      && drop >= Math.max(0.008, medianMotion * 1.5);
+    reversalRun = meaningfulReversal ? reversalRun + 1 : 0;
+
+    if (hardReturn || reversalRun >= 2) {
+      returnIndex = i;
+      break;
+    }
+  }
+
+  const cycleLimit = returnIndex >= 0 ? returnIndex : samples.length;
+  peakIndex = actionStartIndex;
+  peakDistance = samples[peakIndex].fromStart || 0;
+  for (let i = actionStartIndex + 1; i < cycleLimit; i++) {
+    if (samples[i].fromStart > peakDistance) {
+      peakDistance = samples[i].fromStart;
+      peakIndex = i;
+    }
+  }
+
+  // Stop when the first pass has essentially reached its final state. This
+  // removes a long final hold without drifting into a later restart.
+  let actionEndIndex = peakIndex;
+  const completionFloor = peakDistance * 0.94;
+  for (let i = actionStartIndex + 1; i <= peakIndex; i++) {
+    if (samples[i].fromStart >= completionFloor) {
+      actionEndIndex = i;
+      break;
+    }
+  }
+
+  const minSpan = Math.max(0.28, (end - start) * 0.14);
+  while (actionEndIndex < peakIndex && samples[actionEndIndex].time - samples[actionStartIndex].time < minSpan) {
+    actionEndIndex++;
+  }
+
+  return {
+    actionStartIndex,
+    actionEndIndex,
+    peakIndex,
+    returnIndex,
+    returnDetected: returnIndex >= 0,
+    peakDistance
+  };
+}
+
+function planProgressiveFrameTimes(samples, startIndex, endIndex, count = 9) {
+  const frameCount = Math.max(2, Math.round(count));
+  const segment = samples.slice(startIndex, endIndex + 1);
+  if (segment.length < 2) return Array.from({ length: frameCount }, () => segment[0]?.time ?? 0);
+
+  const monotoneProgress = [];
+  let runningMax = Number(segment[0].fromStart) || 0;
+  for (const sample of segment) {
+    runningMax = Math.max(runningMax, Number(sample.fromStart) || 0);
+    monotoneProgress.push(runningMax);
+  }
+  const firstProgress = monotoneProgress[0];
+  const lastProgress = monotoneProgress[monotoneProgress.length - 1];
+  const usableProgress = lastProgress - firstProgress;
+  const firstTime = segment[0].time;
+  const lastTime = segment[segment.length - 1].time;
+
+  if (usableProgress < 0.004) {
+    return Array.from({ length: frameCount }, (_, i) => firstTime + (lastTime - firstTime) * i / (frameCount - 1));
+  }
+
+  return Array.from({ length: frameCount }, (_, i) => {
+    if (i === 0) return firstTime;
+    if (i === frameCount - 1) return lastTime;
+    const target = firstProgress + usableProgress * i / (frameCount - 1);
+    let upper = 1;
+    while (upper < monotoneProgress.length - 1 && monotoneProgress[upper] < target) upper++;
+    const lower = Math.max(0, upper - 1);
+    const lowProgress = monotoneProgress[lower];
+    const highProgress = monotoneProgress[upper];
+    const ratio = highProgress > lowProgress ? (target - lowProgress) / (highProgress - lowProgress) : 1;
+    return segment[lower].time + (segment[upper].time - segment[lower].time) * Math.max(0, Math.min(1, ratio));
+  });
+}
+
+function assessProgressiveFrames(frames) {
+  if (!Array.isArray(frames) || frames.length < 2) {
+    return { passed: false, reason: 'not-enough-frames', distinctFrames: frames?.length || 0, returnDetected: false };
+  }
+  const distinctFrames = new Set(frames.map(frame => frame.fingerprint)).size;
+  const baseline = frames[0].signature;
+  const progress = frames.map(frame => signatureDistance(baseline, frame.signature));
+  let runningPeak = 0;
+  let returnDetected = false;
+  for (let i = 1; i < progress.length; i++) {
+    runningPeak = Math.max(runningPeak, progress[i - 1]);
+    // Only an unmistakable reset remains blocking. Small backward variations
+    // are normal with faces, fur, reflections and compressed PixVerse frames.
+    if (runningPeak >= 0.018 && progress[i] <= runningPeak * 0.25 && runningPeak - progress[i] >= 0.012) {
+      returnDetected = true;
+      break;
+    }
+  }
+  const finalProgress = progress[progress.length - 1];
+  const enoughMotion = Math.max(...progress) >= 0.002;
+  const repeatedFrames = Math.max(0, frames.length - distinctFrames);
+  const warning = repeatedFrames > 0 ? 'similar-frames' : enoughMotion ? null : 'subtle-motion';
+  // Similar frames and subtle motion are advisory: the user can still export.
+  // A confirmed hard reset is the sole content-quality blocker.
+  const passed = !returnDetected;
+  return {
+    passed,
+    reason: returnDetected ? 'return-detected' : null,
+    warning,
+    distinctFrames,
+    repeatedFrames,
+    returnDetected,
+    finalProgress: Number(finalProgress.toFixed(5)),
+    peakProgress: Number(Math.max(...progress).toFixed(5))
+  };
+}
+
+async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleCount = 26, onProgress) {
+  const count = Math.max(14, Math.min(42, Math.round(sampleCount)));
+  const samples = [];
+  let previousSig = null;
+  let baselineSig = null;
+  for (let i = 0; i < count; i++) {
+    const r = count === 1 ? 0 : i / (count - 1);
+    const time = start + (end - start) * r;
+    onProgress?.({ phase: 'analysis', index: i, count, time });
+    const actualTime = await withTimeout(
+      seek(video, time),
+      2200,
+      `Analyse bloquée sur l’échantillon ${i + 1}/${count}`
+    );
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const sig = sampleSignature(ctx, canvas.width, canvas.height);
+    if (!baselineSig) baselineSig = sig;
+    const stepMotion = previousSig ? signatureDistance(previousSig, sig) : 0;
+    const fromStart = signatureDistance(baselineSig, sig);
+    samples.push({ time: actualTime, sig, stepMotion, fromStart });
+    previousSig = sig;
+  }
+
+  const motions = samples.slice(1).map(s => s.stepMotion);
+  const med = median(motions);
+  const deviations = motions.map(v => Math.abs(v - med));
+  const mad = median(deviations) || 0.001;
+  const sensitivity = actionSensitivity(hint);
+  const threshold = med + mad * 0.85 * sensitivity;
+
+  const selected = selectFirstProgressivePass(samples, { start, end, medianMotion: med, threshold });
+  const { peakIndex, actionStartIndex, actionEndIndex } = selected;
+
+  const minSpan = Math.max(0.34, (end - start) * 0.22);
+  let selectedStart = samples[actionStartIndex]?.time ?? start;
+  let selectedEnd = samples[actionEndIndex]?.time ?? samples[peakIndex]?.time ?? end;
+  if (selectedEnd - selectedStart < minSpan) {
+    selectedStart = Math.max(start, (samples[peakIndex]?.time ?? end) - minSpan);
+    selectedEnd = Math.min(end, selectedStart + minSpan);
+  }
+  if (selectedEnd <= selectedStart) selectedEnd = Math.min(end, selectedStart + minSpan);
+
+  return {
+    start: selectedStart,
+    end: selectedEnd,
+    peak: samples[peakIndex]?.time ?? selectedEnd,
+    peakIndex,
+    actionStartIndex,
+    actionEndIndex,
+    returnIndex: selected.returnIndex,
+    returnDetected: selected.returnDetected,
+    threshold,
+    medianMotion: med,
+    sensitivity,
+    sampleCount: count,
+    hint: hint || null,
+    samples
+  };
+}
+
+async function extractVideoFrames(video, {
+  count = 9,
+  edgePaddingSeconds = 0.05,
+  progressiveOnly = true,
+  type = 'image/jpeg',
+  quality = 0.96,
+  actionAware = true,
+  actionHint = '',
+  analysisSamples = 26,
+  onProgress
+} = {}) {
+  if (!video) throw new Error('Vidéo PixVerse introuvable.');
+
+  const analysisVideo = await createAnalysisVideoFromSource(video);
+  await ensureMetadata(analysisVideo);
+  const duration = Number(analysisVideo.duration);
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error('Durée vidéo PixVerse invalide.');
+  if (!analysisVideo.videoWidth || !analysisVideo.videoHeight) throw new Error('Dimensions vidéo PixVerse indisponibles.');
+
+  const frameCount = Math.max(2, Math.round(count));
+  const pad = Math.min(Math.max(0.04, edgePaddingSeconds), duration * 0.12);
+  const fullStart = pad;
+  const fullEnd = Math.max(fullStart, duration - pad);
+  const canvas = document.createElement('canvas');
+  canvas.width = analysisVideo.videoWidth;
+  canvas.height = analysisVideo.videoHeight;
+  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
+  if (!ctx) throw new Error('Canvas d’extraction indisponible.');
+
+  const originalTime = Number(analysisVideo.currentTime) || 0;
+  analysisVideo.pause();
+  const hint = (actionHint || currentActionHint()).trim();
+  let analysis = null;
+  let start = fullStart;
+  let end = fullEnd;
+  const frames = [];
+  let plannedTimes = null;
+
+  try {
+    if (actionAware && fullEnd - fullStart > 0.45) {
+      analysis = await analyzeActionWindow(analysisVideo, ctx, canvas, fullStart, fullEnd, hint, analysisSamples, onProgress);
+      start = analysis.start;
+      end = progressiveOnly ? Math.min(analysis.end, analysis.peak || analysis.end) : analysis.end;
+      if (end - start < 0.28) end = Math.min(fullEnd, start + 0.28);
+      plannedTimes = planProgressiveFrameTimes(analysis.samples, analysis.actionStartIndex, analysis.actionEndIndex, frameCount);
+      start = plannedTimes[0];
+      end = plannedTimes[plannedTimes.length - 1];
+    }
+
+    const span = Math.max(0, end - start);
+    for (let i = 0; i < frameCount; i++) {
+      const ratio = frameCount === 1 ? 0.5 : i / (frameCount - 1);
+      const requestedTime = plannedTimes?.[i] ?? (start + span * ratio);
+      onProgress?.({ phase: 'extract', index: i, count: frameCount, time: requestedTime });
+      const actualTime = await withTimeout(
+        seek(analysisVideo, requestedTime),
+        2200,
+        `Extraction bloquée sur la vue ${i + 1}/${frameCount}`
+      );
+      await delay(20);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(analysisVideo, 0, 0, canvas.width, canvas.height);
+      const fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
+      const signature = sampleSignature(ctx, canvas.width, canvas.height);
+      const blob = await canvasToBlob(canvas, type, quality);
+      const url = URL.createObjectURL(blob);
+      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, signature, blob, url, width: canvas.width, height: canvas.height });
+    }
+  } finally {
+    try {
+      await seek(analysisVideo, Math.min(originalTime, Math.max(0.04, duration - 0.04)));
+    } catch (_) {}
+
+    try {
+      analysisVideo.pause();
+      analysisVideo.removeAttribute('src');
+      analysisVideo.load();
+      analysisVideo.remove();
+    } catch (_) {}
+  }
+
+  const qualityGate = assessProgressiveFrames(frames);
+  const result = {
+    duration,
+    width: canvas.width,
+    height: canvas.height,
+    frames,
+    distinctFingerprints: qualityGate.distinctFrames,
+    qualityGate,
+    extractionWindow: {
+      mode: actionAware ? 'action-aware-progressive' : (progressiveOnly ? 'progressive-one-way' : 'full-duration'),
+      start,
+      end,
+      originalStart: fullStart,
+      originalEnd: fullEnd,
+      actionPeak: analysis?.peak ?? null,
+      returnDetected: analysis?.returnDetected ?? false,
+      returnTime: analysis?.returnIndex >= 0 ? analysis.samples[analysis.returnIndex]?.time ?? null : null,
+      plannedBeforeExtraction: Boolean(plannedTimes),
+      plannedTimes: plannedTimes?.map(time => Number(time.toFixed(3))) || null,
+      actionHint: hint || null,
+      analysis: analysis ? {
+        sampleCount: analysis.sampleCount,
+        medianMotion: Number(analysis.medianMotion.toFixed(5)),
+        threshold: Number(analysis.threshold.toFixed(5)),
+        sensitivity: analysis.sensitivity
+      } : null
+    },
+    revoke() {
+      stopPixVerseSimulatorPreview(true);
+      frames.forEach(frame => URL.revokeObjectURL(frame.url));
+    }
+  };
+  try { showPixVerseFramesInSimulator(frames); } catch (_) {}
+  return result;
+}
+
+function downloadExtractedFrame(frame, prefix = 'happyholo-pixverse') {
+  const a = document.createElement('a');
+  a.href = frame.url;
+  const subtype = frame?.blob?.type?.split('/')?.[1]?.replace('jpeg', 'jpg') || 'jpg';
+  a.download = `${prefix}-vue-${String(frame.index).padStart(2, '0')}.${subtype}`;
+  a.click();
+}
+
+
+function metric(value) { return Number.isFinite(Number(value)) ? Number(value) : null; }
+
+function evaluateGenerationQC(metrics = {}, thresholds = {}) {
+  const limits = {
+    identityDriftMax: thresholds.identityDriftMax ?? 0.08,
+    headDriftMax: thresholds.headDriftMax ?? 0.035,
+    preHeadDriftMax: thresholds.preHeadDriftMax ?? 0.16,
+    backgroundDriftMax: thresholds.backgroundDriftMax ?? 0.06,
+    framingLossMax: thresholds.framingLossMax ?? 0.01,
+    motionMonotonicityMin: thresholds.motionMonotonicityMin ?? 0.84,
+    requireIdentityConfirmation: thresholds.requireIdentityConfirmation === true,
+    requireHeadDrift: thresholds.requireHeadDrift === true,
+    requireBackgroundDrift: thresholds.requireBackgroundDrift === true
+  };
+
+  const checks = [];
+  const add = (name, value, pass, severity = 'fail') => {
+    if (value === null) return;
+    checks.push({ name, value, pass, severity: pass ? 'ok' : severity });
+  };
+  const missing = name => checks.push({ name, value: null, pass: false, severity: 'fail', reason: 'missing-metric' });
+
+  const identityDrift = metric(metrics.identityDrift);
+  const headDrift = metric(metrics.headDrift);
+  const preHeadDrift = metric(metrics.preHeadDrift);
+  const backgroundDrift = metric(metrics.backgroundDrift);
+  const framingLoss = metric(metrics.framingLoss);
+  const monotonicity = metric(metrics.motionMonotonicity);
+
+  if (identityDrift !== null) add('identity-drift', identityDrift, identityDrift <= limits.identityDriftMax);
+  if (limits.requireIdentityConfirmation) {
+    add('identity-confirmed', metrics.identityConfirmed === true ? 1 : 0, metrics.identityConfirmed === true);
+  }
+
+  if (headDrift !== null) add('head-drift', headDrift, headDrift <= limits.headDriftMax);
+  else if (limits.requireHeadDrift) missing('head-drift');
+
+  if (preHeadDrift !== null) add('head-correction', preHeadDrift, preHeadDrift <= limits.preHeadDriftMax);
+  if (metrics.correctionTooLarge === true) checks.push({ name: 'head-correction', value: preHeadDrift, pass: false, severity: 'fail' });
+
+  if (backgroundDrift !== null) add('background', backgroundDrift, backgroundDrift <= limits.backgroundDriftMax);
+  else if (limits.requireBackgroundDrift) missing('background');
+
+  add('framing', framingLoss, framingLoss === null ? true : framingLoss <= limits.framingLossMax);
+  add('motion', monotonicity, monotonicity === null ? true : monotonicity >= limits.motionMonotonicityMin);
+
+  if (metrics.returnDetected === true) checks.push({ name: 'return', value: true, pass: false, severity: 'fail' });
+  if (metrics.jumpDetected === true) checks.push({ name: 'jump', value: true, pass: false, severity: 'fail' });
+  if (metrics.subjectReplacement === true) checks.push({ name: 'subject-replacement', value: true, pass: false, severity: 'fail' });
+  if (metrics.unrecoverableCrop === true) checks.push({ name: 'crop', value: true, pass: false, severity: 'fail' });
+  if (metrics.similarFrames === true) checks.push({ name: 'similar-frames', value: true, pass: false, severity: 'warn' });
+
+  const hardFailures = checks.filter(c => !c.pass && c.severity === 'fail');
+  const warnings = checks.filter(c => !c.pass && c.severity === 'warn');
+  return {
+    status: hardFailures.length ? 'fail' : warnings.length ? 'warn' : 'pass',
+    passed: hardFailures.length === 0,
+    exportAllowed: hardFailures.length === 0,
+    checks,
+    hardFailures: hardFailures.map(c => c.name),
+    warnings: warnings.map(c => c.name),
+    thresholds: limits
+  };
+}
+
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+
+function normalizeLockedRegion(region = {}) {
+  const x = clamp01(region.x);
+  const y = clamp01(region.y);
+  const maxWidth = 1 - x;
+  const maxHeight = 1 - y;
+  if (maxWidth < 0.04 || maxHeight < 0.04) throw new Error('Zone verrouillée hors cadre.');
+  const width = Math.min(maxWidth, Math.max(0.04, Number(region.width) || 0));
+  const height = Math.min(maxHeight, Math.max(0.04, Number(region.height) || 0));
+  return { x, y, width, height };
+}
+
+function regionPixels(region, width, height) {
+  const r = normalizeLockedRegion(region);
+  const x = Math.round(r.x * width);
+  const y = Math.round(r.y * height);
+  const w = Math.max(1, Math.round(r.width * width));
+  const h = Math.max(1, Math.round(r.height * height));
+  return {
+    x: Math.max(0, Math.min(width - 1, x)),
+    y: Math.max(0, Math.min(height - 1, y)),
+    width: Math.max(1, Math.min(width - x, w)),
+    height: Math.max(1, Math.min(height - y, h))
+  };
+}
+
+async function bitmapFromFrame(frame) {
+  if (!frame?.blob) throw new Error('Image de vue manquante pour le contrôle verrouillé.');
+  if (typeof createImageBitmap !== 'function') throw new Error('createImageBitmap indisponible.');
+  return createImageBitmap(frame.blob);
+}
+
+function makeCanvas(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
+  if (!ctx) throw new Error('Canvas indisponible.');
+  return { canvas, ctx };
+}
+
+function grayscaleSample(bitmap, region, size = 56) {
+  const { canvas, ctx } = makeCanvas(size, size);
+  const src = regionPixels(region, bitmap.width, bitmap.height);
+  ctx.drawImage(bitmap, src.x, src.y, src.width, src.height, 0, 0, size, size);
+  const data = ctx.getImageData(0, 0, size, size).data;
+  const out = new Float32Array(size * size);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    out[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  return out;
+}
+
+function wholeFrameSample(bitmap, size = 64) {
+  const { canvas, ctx } = makeCanvas(size, size);
+  ctx.drawImage(bitmap, 0, 0, bitmap.width, bitmap.height, 0, 0, size, size);
+  const data = ctx.getImageData(0, 0, size, size).data;
+  const out = new Float32Array(size * size);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    out[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+  }
+  return out;
+}
+
+function shiftedMae(reference, candidate, size, sx, sy) {
+  let total = 0;
+  let count = 0;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const cx = x + sx;
+    const cy = y + sy;
+    if (cx < 0 || cy < 0 || cx >= size || cy >= size) continue;
+    total += Math.abs(reference[y * size + x] - candidate[cy * size + cx]);
+    count++;
+  }
+  return count ? total / (count * 255) : 1;
+}
+
+function bestAlignedDrift(reference, candidate, size, maxShift = 3) {
+  if (!reference || !candidate || reference.length !== size * size || candidate.length !== size * size) {
+    throw new Error('Signatures verrouillées invalides.');
+  }
+  let best = { drift: Infinity, dx: 0, dy: 0 };
+  for (let sy = -maxShift; sy <= maxShift; sy++) for (let sx = -maxShift; sx <= maxShift; sx++) {
+    const drift = shiftedMae(reference, candidate, size, sx, sy);
+    if (drift < best.drift) best = { drift, dx: -sx / size, dy: -sy / size };
+  }
+  return { ...best, drift: Number(best.drift.toFixed(6)) };
+}
+
+function borderDrift(reference, candidate, size, borderRatio = 0.1) {
+  const border = Math.max(1, Math.round(size * borderRatio));
+  let total = 0;
+  let count = 0;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    if (x >= border && x < size - border && y >= border && y < size - border) continue;
+    const i = y * size + x;
+    total += Math.abs(reference[i] - candidate[i]);
+    count++;
+  }
+  return count ? total / (count * 255) : 0;
+}
+
+async function measureLockedSequence(frames, region, {
+  sampleSize = 56,
+  maxShift = 3,
+  borderRatio = 0.1
+} = {}) {
+  if (!Array.isArray(frames) || frames.length < 2) throw new Error('Au moins deux vues sont requises.');
+  const bitmaps = [];
+  try {
+    for (const frame of frames) bitmaps.push(await bitmapFromFrame(frame));
+    const referenceHead = grayscaleSample(bitmaps[0], region, sampleSize);
+    const referenceFrame = wholeFrameSample(bitmaps[0], 64);
+    const head = [];
+    const background = [];
+    for (let i = 0; i < bitmaps.length; i++) {
+      const currentHead = grayscaleSample(bitmaps[i], region, sampleSize);
+      const aligned = bestAlignedDrift(referenceHead, currentHead, sampleSize, maxShift);
+      head.push({ index: i + 1, ...aligned });
+      const currentFrame = wholeFrameSample(bitmaps[i], 64);
+      background.push({ index: i + 1, drift: Number(borderDrift(referenceFrame, currentFrame, 64, borderRatio).toFixed(6)) });
+    }
+    const maxHeadDrift = Math.max(...head.map(item => item.drift));
+    const meanHeadDrift = head.reduce((sum, item) => sum + item.drift, 0) / head.length;
+    const maxBackgroundDrift = Math.max(...background.map(item => item.drift));
+    return {
+      region: normalizeLockedRegion(region),
+      head,
+      background,
+      maxHeadDrift: Number(maxHeadDrift.toFixed(6)),
+      meanHeadDrift: Number(meanHeadDrift.toFixed(6)),
+      maxBackgroundDrift: Number(maxBackgroundDrift.toFixed(6))
+    };
+  } finally {
+    bitmaps.forEach(bitmap => bitmap.close?.());
+  }
+}
+
+function lockedCanvasToBlob(canvas, type = 'image/png', quality = 1) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Encodage de la vue verrouillée impossible.')), type, quality);
+  });
+}
+
+function applyFeatheredReference(ctx, reference, region, width, height, featherRatio) {
+  const r = regionPixels(region, width, height);
+  const feather = Math.max(2, Math.round(Math.min(r.width, r.height) * Math.max(0.02, Math.min(0.25, featherRatio))));
+  const { canvas: patch, ctx: pctx } = makeCanvas(r.width, r.height);
+  const src = regionPixels(region, reference.width, reference.height);
+  pctx.drawImage(reference, src.x, src.y, src.width, src.height, 0, 0, r.width, r.height);
+  const image = pctx.getImageData(0, 0, r.width, r.height);
+  for (let y = 0; y < r.height; y++) for (let x = 0; x < r.width; x++) {
+    const edge = Math.min(x, y, r.width - 1 - x, r.height - 1 - y);
+    const alpha = Math.max(0, Math.min(1, edge / feather));
+    image.data[(y * r.width + x) * 4 + 3] = Math.round(255 * alpha);
+  }
+  pctx.putImageData(image, 0, 0);
+  ctx.drawImage(patch, r.x, r.y);
+}
+
+async function recomposeLockedRegion(frames, region, {
+  featherRatio = 0.1,
+  type = 'image/png',
+  quality = 1
+} = {}) {
+  if (!Array.isArray(frames) || frames.length < 2) throw new Error('Au moins deux vues sont requises.');
+  const normalized = normalizeLockedRegion(region);
+  const bitmaps = [];
+  const output = [];
+  try {
+    for (const frame of frames) bitmaps.push(await bitmapFromFrame(frame));
+    const reference = bitmaps[0];
+    for (let i = 0; i < bitmaps.length; i++) {
+      const current = bitmaps[i];
+      const { canvas, ctx } = makeCanvas(current.width, current.height);
+      ctx.drawImage(current, 0, 0, current.width, current.height);
+      if (i > 0) applyFeatheredReference(ctx, reference, normalized, current.width, current.height, featherRatio);
+      const blob = await lockedCanvasToBlob(canvas, type, quality);
+      const url = URL.createObjectURL(blob);
+      output.push({
+        ...frames[i],
+        blob,
+        url,
+        width: current.width,
+        height: current.height,
+        lockedRegion: normalized,
+        locked: i > 0
+      });
+    }
+  } finally {
+    bitmaps.forEach(bitmap => bitmap.close?.());
+  }
+  return {
+    frames: output,
+    region: normalized,
+    revoke() { output.forEach(frame => URL.revokeObjectURL(frame.url)); }
+  };
+}
+
+function assessLockedRegionMetrics(before, after, {
+  maxCorrectableHeadDrift = 0.16
+} = {}) {
+  if (!before || !after) {
+    return {
+      availableMetrics: [],
+      headDrift: null,
+      backgroundDrift: null,
+      preHeadDrift: null,
+      correctionTooLarge: true
+    };
+  }
+  return {
+    availableMetrics: ['headDrift', 'backgroundDrift', 'preHeadDrift'],
+    headDrift: after.maxHeadDrift,
+    backgroundDrift: after.maxBackgroundDrift,
+    preHeadDrift: before.maxHeadDrift,
+    correctionTooLarge: before.maxHeadDrift > maxCorrectableHeadDrift
+  };
+}
+
+
+
+
+
+
+
+
 
 const $=id=>document.getElementById(id);
 let extraction=null,catalog=null,locked=null,lockMetrics=null,lockRegion=null,lockImage=null,sourcePreviewUrl='';
@@ -121,9 +1850,7 @@ function renderFrames(frames, exportAllowed=false){
 }
 
 async function loadCatalog(){
-  const r=await fetch('./data/motion-guide-catalog-v11.json',{cache:'no-store'});
-  if(!r.ok)throw new Error('Catalogue v11 introuvable.');
-  catalog=await r.json();$('action').innerHTML='';
+  catalog=BUNDLED_CATALOG;$('action').innerHTML='';
   for(const a of catalog.actions){const o=document.createElement('option');o.value=a.id;o.textContent=a.label;$('action').appendChild(o)}
   syncAction();
 }
@@ -244,6 +1971,7 @@ $('simCenter').addEventListener('click',()=>{stopSimulator();renderSimulatorAngl
 $('simSpeed').addEventListener('change',()=>{if(simPlaying)startSimulator()});
 
 await Promise.all([diagnostic(),loadCatalog()]);
+
 </script>
 </body>
 </html>
