@@ -216,8 +216,9 @@ $('run').onclick=async()=>{
   if(!photo||!guide){tone($('status'),'Choisis la photo client ET la vidéo guide.','bad');return}
   $('run').disabled=true;$('extract').disabled=true;$('result').style.display='none';$('frames').innerHTML='';$('lockCard').style.display='none';locked?.revoke?.();locked=null;extraction?.revoke?.();extraction=null;stopSimulator();simFrames=[];$('simulatorCard').style.display='none';
   try{
-    const labels={'upload-photo':'1/4 — Upload photo identité…','upload-guide':'2/4 — Upload vidéo guide…','create-mimic':'3/4 — Lancement Motion Control / Mimic…','processing':'4/4 — PixVerse génère la vidéo…','done':'Vidéo Mimic reçue.'};
-    const r=await runMimicMotionGuide(photo,guide,{quality:$('quality').value,onStatus:s=>tone($('status'),labels[s.step]||s.step)});
+    const labels={'safe-framing':'Préparation du cadrage de sécurité…','safe-framing-done':'Cadrage de sécurité prêt.','upload-photo':'1/4 — Upload photo identité…','upload-guide':'2/4 — Upload vidéo guide…','create-mimic':'3/4 — Lancement Motion Control / Mimic…','processing':'4/4 — PixVerse génère la vidéo…','done':'Vidéo Mimic reçue.'};
+    const preset=currentPreset();
+    const r=await runMimicMotionGuide(photo,guide,{quality:$('quality').value,framing:{safeMargin:preset?.safeMargin??0.1,anchor:'center'},onStatus:s=>tone($('status'),labels[s.step]||s.step)});
     $('result').src=r.videoUrl;$('result').style.display='block';$('result').load();
     await new Promise((resolve,reject)=>{if($('result').readyState>=1)return resolve();$('result').onloadedmetadata=resolve;$('result').onerror=()=>reject(new Error('MP4 PixVerse illisible.'))});
     tone($('status'),`✅ Mimic reçu · video_id ${r.videoId} · ${r.quality}`,'ok');$('extract').disabled=false;await diagnostic();
