@@ -59,16 +59,18 @@ Image-to-Video car PixVerse Mimic n'est pas activé automatiquement pour cette c
 
 ## Résultats automatisés
 
-- suite ciblée PixVerse/MicroPlayer : **39/39 réussis** ;
-- suite complète du dépôt : **81/86 réussis** ;
+- suite ciblée PixVerse/MicroPlayer : **40/40 réussis** ;
+- suite complète du dépôt : **82/87 réussis** ;
 - cinq échecs historiques inchangés concernent exclusivement les contrats Carte V32/V33
   (interpolation du simulateur, cadence d'animation, manifeste carte, bouton relief et
   retrait du masque faible) ;
 - syntaxe du module d'interface et du service worker validée ;
 - page, catalogue et guide servis correctement par le serveur HTTP local.
 
-Le navigateur cloud de vérification bloque les adresses locales ; la validation visuelle
-iPad doit donc être réalisée sur une prévisualisation publiée, après autorisation de push.
+La prévisualisation Vercel publiée a été contrôlée dans un navigateur : le guide cœur
+intégré est chargé (3 s), le routage Mimic est affiché, et les sélections « petit salut »,
+« bisou de la main » et « objet tenu » persistent correctement. Les actions dépourvues
+de guide intégré restent volontairement en Image-to-Video jusqu'à l'ajout d'un guide.
 
 ## Smoke test externe autorisé
 
