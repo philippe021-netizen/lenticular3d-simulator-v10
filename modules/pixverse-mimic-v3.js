@@ -4,6 +4,7 @@ import {
   waitForPixVerse,
   proxiedPixVerseVideoUrl
 } from './pixverse-client.js';
+import { prepareSafeFramedImage } from './safe-framing.js';
 
 export const MIMIC_V3_POLICY = Object.freeze({
   mode: 'mimic',
@@ -67,6 +68,7 @@ export async function createMimicVideo(args) {
 
 export async function runMimicMotionGuide(photoFile, motionGuideFile, {
   quality = '540p',
+  framing = null,
   onStatus
 } = {}) {
   if (!photoFile) throw new Error('Photo client manquante.');
@@ -80,8 +82,18 @@ export async function runMimicMotionGuide(photoFile, motionGuideFile, {
     throw new Error(labels[guideCheck.reason] || 'Vidéo guide invalide.');
   }
 
+  let sourcePhoto = photoFile;
+  let safeFraming = null;
+  if (framing) {
+    onStatus?.({ step: 'safe-framing' });
+    const prepared = await prepareSafeFramedImage(photoFile, framing);
+    sourcePhoto = prepared.file;
+    safeFraming = prepared.geometry;
+    onStatus?.({ step: 'safe-framing-done', geometry: prepared.geometry, warnings: prepared.warnings });
+  }
+
   onStatus?.({ step: 'upload-photo' });
-  const { imgId } = await uploadPixVerseImage(photoFile);
+  const { imgId } = await uploadPixVerseImage(sourcePhoto);
   onStatus?.({ step: 'upload-guide' });
   const { mediaId } = await uploadPixVerseMedia(motionGuideFile);
 
@@ -105,6 +117,7 @@ export async function runMimicMotionGuide(photoFile, motionGuideFile, {
     videoUrl,
     createResponse: raw,
     response: result.raw,
+    safeFraming,
     policy: MIMIC_V3_POLICY
   };
 }
