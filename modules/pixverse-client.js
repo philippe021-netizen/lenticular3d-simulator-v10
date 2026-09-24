@@ -1,22 +1,11 @@
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-const PROMPT_POLICY_MARKER = 'LENTICULAR ONE-WAY MOTION POLICY';
-const ONE_WAY_PROMPT_POLICY = `${PROMPT_POLICY_MARKER}: Perform exactly one continuous transition from the source state to one clearly different final state. Move progressively in one direction only. Reach the final state by 65% of the clip, then hold it completely motionless until the end. Never reverse, repeat, bounce, oscillate, loop, or return toward the starting pose. KEEP EVERY ANIMATED SUBJECT COMPLETELY INSIDE THE ORIGINAL FRAME AT ALL TIMES WITH A CLEAR SAFETY MARGIN. The entire visible silhouette of every person, couple, group member, child, animal, vehicle, machine, object and logo must remain visible from first frame to last frame. Hands, fingers, arms, head, hair, feet, paws, ears, tails, wheels, bodywork, machine parts and logo contours never touch or cross an image edge. Never enlarge a subject, move it toward the camera or push it outside its original framing. CAMERA AND BACKGROUND ARE A FROZEN PHOTOGRAPHIC PLATE: no camera shift and no environmental motion. Only the specifically named subjects, body parts or effect may move. Preserve every identity, anatomy, clothing, scale, framing and geometry.`;
-const ONE_WAY_NEGATIVE_POLICY = 'reverse motion, return to starting pose, repeated action, bounce, oscillation, loop, cropped subject, partial body, out of frame, subject touching image edge, subject enlargement, subject drift, camera movement, camera shake, zoom, moving background, changing shadows, background regeneration, environmental motion, face change, identity change, extra limbs, extra fingers, duplicate person, duplicate object';
+import { hardenMotionPrompts } from './pixverse-motion-policy.js';
+import { resolvePixVerseMode } from './action-schema.js';
+import { prepareSafeFramedImage } from './safe-framing.js';
 
-function appendPolicy(value, policy, marker = '', separator = ' ') {
-  const source = String(value || '').trim();
-  if (marker && source.includes(marker)) return source.slice(0, 5000);
-  const joiner = source ? separator : '';
-  const room = Math.max(0, 5000 - joiner.length - policy.length);
-  return `${source.slice(0, room)}${joiner}${policy}`;
-}
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 export function hardenPixVersePrompts(prompt, negativePrompt = '') {
-  return {
-    prompt: appendPolicy(prompt, ONE_WAY_PROMPT_POLICY, PROMPT_POLICY_MARKER),
-    negativePrompt: appendPolicy(negativePrompt, ONE_WAY_NEGATIVE_POLICY, 'reverse motion, return to starting pose', ', '),
-    policy: 'lenticular-one-way-v2'
-  };
+  return hardenMotionPrompts(prompt, negativePrompt);
 }
 
 async function readJson(r) {
@@ -59,10 +48,10 @@ export async function uploadPixVerseMedia(file) {
   return { mediaId: Number(mediaId), raw: data };
 }
 
-export function choosePixVerseMode({ mode = 'auto', endFile, motionGuideFile, keyframeFiles, modify } = {}) {
+export function choosePixVerseMode({ mode = 'auto', endFile, motionGuideFile, keyframeFiles, modify, subjectType, guide, pixverse } = {}) {
   if (mode && mode !== 'auto') return mode;
   if (modify) return 'modify';
-  if (motionGuideFile) return 'omni';
+  if (motionGuideFile) return resolvePixVerseMode({ requestedMode: 'auto', subjectType, guide: guide || { url: 'custom-guide' }, pixverse: pixverse || {} }).mode;
   if (Array.isArray(keyframeFiles) && keyframeFiles.length) return 'multi_transition';
   if (endFile) return 'transition';
   return 'standard';
@@ -70,6 +59,10 @@ export function choosePixVerseMode({ mode = 'auto', endFile, motionGuideFile, ke
 
 export function estimatePixVerseCredits({ mode = 'standard', quality = '540p', duration = 2, hasVideoReferences = false, keyframeCount = 0 } = {}) {
   const q = ['360p','540p','720p','1080p'].includes(quality) ? quality : '540p';
+  if (mode === 'mimic') {
+    const table = { '360p':9, '540p':10, '720p':12 };
+    return table[q] ? Math.max(1, Number(duration) || 1) * table[q] : null;
+  }
   if (mode === 'standard' || mode === 'transition' || mode === 'omni') {
     const table = hasVideoReferences
       ? { '360p':10, '540p':14, '720p':18, '1080p':36 }
@@ -88,6 +81,20 @@ export function estimatePixVerseCredits({ mode = 'standard', quality = '540p', d
     return seconds <= 10 ? row[seconds] : null;
   }
   return null;
+}
+
+export async function orchestrateMimic(input, deps = {}) {
+  if (!input?.imageFile) throw new Error('Image source Mimic manquante.');
+  if (!input?.guideFile) throw new Error('Vidéo guide Mimic manquante.');
+  const uploadImage = deps.uploadImage || uploadPixVerseImage;
+  const uploadMedia = deps.uploadMedia || uploadPixVerseMedia;
+  const createVideo = deps.createVideo || createPixVerseVideo;
+  const imageUpload = uploadImage(input.imageFile);
+  const guideUpload = Number(input.guideMediaId) > 0
+    ? Promise.resolve({ mediaId: Number(input.guideMediaId) })
+    : uploadMedia(input.guideFile);
+  const [{ imgId }, { mediaId }] = await Promise.all([imageUpload, guideUpload]);
+  return createVideo({ mode: 'mimic', imgId, videoMediaId: mediaId, quality: input.quality || '540p' });
 }
 
 export async function createPixVerseVideo({
@@ -257,13 +264,22 @@ export async function runPixVerseAction(file, variant, {
   if (!file) throw new Error('Image source manquante.');
   if (!variant?.prompt) throw new Error('Prompt d’action manquant.');
 
+  const framed = variant.framing
+    ? await prepareSafeFramedImage(file, variant.framing)
+    : { file, geometry: null, warnings: [] };
+  const sourceFile = framed.file;
+  await onStatus?.({ step: 'safe-framing', geometry: framed.geometry, warnings: framed.warnings });
+
   const hardened = hardenPixVersePrompts(variant.prompt, variant.negativePrompt || '');
   const mode = choosePixVerseMode({
     mode: controls.mode || 'auto',
     endFile: controls.endFile,
     motionGuideFile: controls.motionGuideFile,
     keyframeFiles: controls.keyframeFiles,
-    modify: controls.modify
+    modify: controls.modify,
+    subjectType: controls.subjectType || variant.compatibleSubjects?.[0],
+    guide: variant.guide,
+    pixverse: variant.pixverse
   });
 
   const quality = controls.quality || variant.quality || '540p';
@@ -285,17 +301,30 @@ export async function runPixVerseAction(file, variant, {
     aspectRatio
   };
 
-  onStatus?.({ step: 'upload', mode });
+  await onStatus?.({ step: 'upload', mode });
 
   if (mode === 'standard') {
-    const { imgId } = await uploadPixVerseImage(file);
+    const { imgId } = await uploadPixVerseImage(sourceFile);
     createArgs.imgId = imgId;
+  }
+
+  if (mode === 'mimic') {
+    if (!controls.motionGuideFile) throw new Error('Le mode Mimic requiert une vidéo guide.');
+    const imageUpload = uploadPixVerseImage(sourceFile);
+    const guideUpload = Number(controls.motionGuideMediaId) > 0
+      ? Promise.resolve({ mediaId: Number(controls.motionGuideMediaId), cached: true })
+      : uploadPixVerseMedia(controls.motionGuideFile);
+    const [{ imgId }, { mediaId, cached = false }] = await Promise.all([imageUpload, guideUpload]);
+    createArgs.imgId = imgId;
+    createArgs.videoMediaId = mediaId;
+    createArgs.prompt = hardened.prompt;
+    await onStatus?.({ step: 'guide-ready', mode, guideMediaId: mediaId, cached });
   }
 
   if (mode === 'transition') {
     if (!controls.endFile) throw new Error('Le mode Transition requiert une image finale.');
     const [{ imgId:firstFrameImg }, { imgId:lastFrameImg }] = await Promise.all([
-      uploadPixVerseImage(file),
+      uploadPixVerseImage(sourceFile),
       uploadPixVerseImage(controls.endFile)
     ]);
     createArgs.firstFrameImg = firstFrameImg;
@@ -303,7 +332,7 @@ export async function runPixVerseAction(file, variant, {
   }
 
   if (mode === 'omni') {
-    const main = await uploadPixVerseImage(file);
+    const main = await uploadPixVerseImage(sourceFile);
     const refs = [{ img_id: main.imgId, type: 'subject', ref_name: 'main' }];
     const extraFiles = Array.from(controls.referenceImageFiles || []).slice(0, 9);
     for (let i = 0; i < extraFiles.length; i++) {
@@ -323,7 +352,7 @@ export async function runPixVerseAction(file, variant, {
   if (mode === 'multi_transition') {
     const extras = Array.from(controls.keyframeFiles || []).slice(0, 6);
     if (!extras.length) throw new Error('Multi-transition requiert au moins une image clé supplémentaire.');
-    const files = [file, ...extras];
+    const files = [sourceFile, ...extras];
     const ids = [];
     for (const f of files) {
       const { imgId } = await uploadPixVerseImage(f);
@@ -349,9 +378,9 @@ export async function runPixVerseAction(file, variant, {
     createArgs.prompt = String(m.prompt || variant.prompt || '').trim();
   }
 
-  onStatus?.({ step: 'create', mode });
+  await onStatus?.({ step: 'create', mode });
   const { videoId, raw } = await createPixVerseVideo(createArgs);
-  onStatus?.({ step: 'processing', videoId, mode });
+  await onStatus?.({ step: 'processing', videoId, mode });
 
   const result = await waitForPixVerse(videoId, {
     onStatus: s => onStatus?.({ step: 'processing', videoId, mode, response: s })
@@ -366,7 +395,7 @@ export async function runPixVerseAction(file, variant, {
     keyframeCount: createArgs.multiTransition?.length || 0
   });
 
-  onStatus?.({ step: 'done', videoId, videoUrl, mode, estimatedCredits });
+  await onStatus?.({ step: 'done', videoId, videoUrl, mode, estimatedCredits });
   return {
     videoId,
     sourceUrl: result.url,
@@ -380,6 +409,7 @@ export async function runPixVerseAction(file, variant, {
     quality,
     duration: createArgs.duration || requestedDuration,
     seed,
-    estimatedCredits
+    estimatedCredits,
+    safeFraming: framed.geometry
   };
 }

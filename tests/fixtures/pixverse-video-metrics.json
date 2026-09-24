@@ -1,0 +1,5 @@
+{
+  "guide": { "maxSceneCut": 0.011581 },
+  "mimic": { "maxSceneCut": 0.016446 },
+  "fusion": { "maxSceneCut": 0.847326, "atSeconds": 2.4 }
+}

@@ -40,6 +40,17 @@
       <div class="small">Décris une seule action simple. HappyHolo crée le prompt complet et conserve automatiquement tout le sujet dans le cadre.</div>
     </div>
     <div id="prompt" class="prompt">Chargement…</div>
+    <section class="exports" aria-label="Vidéo guide de mouvement">
+      <b>Vidéo guide</b>
+      <video id="guidePreview" controls muted playsinline style="display:none"></video>
+      <label for="guideOverride">Remplacer le guide (mode expert)</label>
+      <input id="guideOverride" type="file" accept="video/mp4,video/quicktime,video/webm">
+      <div class="small">Mode PixVerse : <output id="pixverseMode">Automatique recommandé</output></div>
+    </section>
+    <ol id="pipelineProgress" class="small"><li>PixVerse — attente</li><li>Vidéo reçue</li><li>Analyse MicroPlayer</li><li>QC et 9 vues</li></ol>
+    <section id="qcSummary" class="diag" aria-live="polite">QC — en attente</section>
+    <details id="expertPanel"><summary>Mode expert — candidats et sélection</summary><div id="candidateFrames" class="frames-grid"></div></details>
+    <div id="selectedFrames" class="frames-grid" aria-label="Neuf vues retenues"></div>
     <section class="local-tools">
       <label for="localTarget">Cible de l’action locale</label>
       <select id="localTarget"><option value="auto">Première sélection</option></select>
@@ -71,8 +82,10 @@
 </div>
 <script type="module">
 import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=405';
-import { runPixVerseAction } from './modules/pixverse-client.js?v=405';
+import { runPixVerseAction, waitForPixVerse, proxiedPixVerseVideoUrl } from './modules/pixverse-client.js?v=405';
 import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor-2s.js?v=409';
+import { gradeGeneration } from './modules/generation-qc.js';
+import { createPixVerseJobStore } from './modules/pixverse-job-store.js';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -95,11 +108,21 @@ const downloadPixVerse=document.getElementById('downloadPixVerse');
 const localTarget=document.getElementById('localTarget');
 const previewLocal=document.getElementById('previewLocal');
 const repairEdge=document.getElementById('repairEdge');
+const guidePreview=document.getElementById('guidePreview');
+const guideOverride=document.getElementById('guideOverride');
+const pixverseMode=document.getElementById('pixverseMode');
+const pipelineProgress=document.getElementById('pipelineProgress');
+const qcSummary=document.getElementById('qcSummary');
+const candidateFrames=document.getElementById('candidateFrames');
+const selectedFrames=document.getElementById('selectedFrames');
+const jobStore=createPixVerseJobStore();
 let library=null;
 let extracted=null;
 let lastVideoId=null;
 let lastActionContext=null;
 let lastLaunchSelection=null;
+let lastQc=null;
+let guideOverrideUrl=null;
 
 function setStatus(text,error=false,ok=false){status.textContent=text;status.style.background=error?'#ffe9e7':ok?'#e7f7eb':'#f2f2f2';status.style.color=error?'#8b1f17':ok?'#17652c':'#333'}
 function cleanCustomIdea(){return customAction.value.replace(/\s+/g,' ').trim().slice(0,800)}
@@ -130,8 +153,12 @@ function refresh(){
   const acts=actionsForAudience();
   action.innerHTML=acts.map(a=>`<option value="${a.id}">${a.label}</option>`).join('');
   const s=selection();
-  run.textContent='Lancer PixVerse';if(s){renderPrompt(s);run.disabled=false}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true}refreshLocalTargets()
+  run.textContent='Lancer PixVerse';if(s){renderPrompt(s);run.disabled=false;syncMotionGuide(s)}else{prompt.textContent='Aucune action pour cette catégorie.';run.disabled=true;syncMotionGuide(null)}refreshLocalTargets()
 }
+function subjectTypeForFamily(value){return value==='person'?'person-single':value==='animal'?'dog':value==='logo'?'object':value}
+function syncMotionGuide(s){const custom=guideOverride.files?.[0];if(guideOverrideUrl){URL.revokeObjectURL(guideOverrideUrl);guideOverrideUrl=null}const url=custom?(guideOverrideUrl=URL.createObjectURL(custom)):(s?.variant?.guide?.url||'');guidePreview.src=url;guidePreview.style.display=url?'block':'none';pixverseMode.textContent=s?.variant?.pixverse?.mode==='mimic'&&url?'Mimic — transfert de mouvement':(s?.variant?.pixverse?.fallbackMode||'Standard V6')}
+async function activeGuideFile(s){const custom=guideOverride.files?.[0];if(custom)return custom;const url=s?.variant?.guide?.url;if(!url)return null;const response=await fetch(url);if(!response.ok)throw new Error(`Vidéo guide introuvable (HTTP ${response.status}).`);const blob=await response.blob();return new File([blob],url.split('/').pop()||'guide.mp4',{type:blob.type||'video/mp4'})}
+async function guideHash(file,s){if(!guideOverride.files?.[0]&&s?.variant?.guide?.sha256)return s.variant.guide.sha256;if(!file||!crypto.subtle)return null;const bytes=await file.arrayBuffer(),hash=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(hash)].map(value=>value.toString(16).padStart(2,'0')).join('')}
 function renderPrompt(s){const v=s.variant;prompt.replaceChildren();const title=document.createElement('b');title.textContent=s.customRequest?'Prompt préparé — action libre':s.action.label;const text=document.createElement('div');text.textContent=v.prompt;text.style.marginTop='4px';const meta=document.createElement('span');meta.style.color='#666';meta.textContent=`${v.duration||2} s · ${v.quality||'540p'} · audio ${v.audio?'ON':'OFF'} · sujet intégralement cadré`;prompt.append(title,text,meta)}
 async function prepareCustomSelection(s){const response=await fetch('/api/pixverse-build-prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea:s.customRequest})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data?.error||`Préparation du prompt impossible (HTTP ${response.status}).`);return customSelection(s.customRequest,data)}
 function canvasToFile(canvas){return new Promise((resolve,reject)=>{if(!canvas)return reject(new Error('Canvas final HappyHolo introuvable.'));canvas.toBlob(blob=>blob?resolve(new File([blob],`happyholo-${Date.now()}.png`,{type:'image/png'})):reject(new Error('Impossible de préparer l’image finale.')),'image/png',.95)})}
@@ -163,9 +190,28 @@ function renderFrames(result){
   framesDiag.textContent=!gate.passed?'Extraction bloquée : un retour brutal à la pose initiale subsiste.':gate.warning==='similar-frames'?`Export autorisé : ${distinct}/9 images différentes · certaines vues sont proches, contrôle visuel conseillé.`:gate.warning==='subtle-motion'?'Export autorisé : mouvement subtil détecté · contrôle visuel conseillé.':`Contrôle extraction : ${distinct}/9 images distinctes · première action complète · aucun retour`;
   framesDiag.className=`diag${gate.passed?'':' bad'}`;
   framesBlock.style.display='block';downloadPixVerse.disabled=result.frames.length!==9||!gate.passed;
+  selectedFrames.innerHTML='';candidateFrames.innerHTML='';result.frames.forEach((frame,index)=>{const html=`<figure style="margin:0"><img src="${frame.url}" alt="Vue ${index+1}" style="width:100%"><figcaption class="small">${frame.time.toFixed(2)} s · retenue</figcaption></figure>`;selectedFrames.insertAdjacentHTML('beforeend',html)});result.candidateFrames.forEach((item,index)=>{const visual=item.dataUrl?`<img src="${item.dataUrl}" alt="Candidate ${index+1}" style="width:100%;opacity:${item.selected?1:.62}">`:'';candidateFrames.insertAdjacentHTML('beforeend',`<figure data-selected="${item.selected}" style="margin:0">${visual}<figcaption class="small">${item.time.toFixed(2)} s · ${item.progress===null?'hors geste':Math.round(item.progress*100)+'%'} · ${item.reasons.join(', ')}${item.discontinuityScore?` · saut ${item.discontinuityScore.toFixed(3)}`:''}</figcaption></figure>`)});
+  const analysis=result.extractionWindow?.analysis||{},stabilization=result.stabilization||{};const qc=gradeGeneration({maxAdjacentJump:analysis.maxAdjacentJump||0,reversalRatio:result.extractionWindow?.returnDetected?1:(analysis.reversalRatio||0),cameraShift:stabilization.maxCameraShift||0,correctedCameraShift:stabilization.correctedCameraShift||0,availableMetrics:['temporalContinuity','motionContinuity','cameraShift']},lastLaunchSelection?.variant?.qc||{},lastLaunchSelection?.variant?.qc?.requiredMetrics||[]);lastQc=qc;qcSummary.textContent=`QC ${qc.grade.toUpperCase()} — ${qc.reasons.join(' ')||'continuité, progression et cadrage conformes'}`;qcSummary.className=`diag${qc.grade==='red'?' bad':''}`;downloadPixVerse.disabled=downloadPixVerse.disabled||qc.grade==='red';
   requestAnimationFrame(()=>framesBlock.scrollIntoView({behavior:'smooth',block:'start'}));
 }
 async function extractNineViews(){setStatus('5/5 — Analyse de la première action, puis calcul des 9 vues…');const result=await extractVideoFrames(video,{count:9,type:'image/png',onProgress:p=>setStatus(p.phase==='analysis'?`5/5 — Analyse du mouvement ${p.index+1}/${p.count}…`:`5/5 — Extraction vue ${p.index+1}/9…`)});renderFrames(result);return result}
+
+async function loadResultVideo(videoUrl){
+  video.src=videoUrl;video.style.display='block';video.load();
+  await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});
+}
+
+async function resumeActiveJob(){
+  const active=await jobStore.loadActive();if(!active?.videoId)return false;
+  try{
+    const s=getActionVariant(library,active.actionId);lastLaunchSelection=s;lastVideoId=active.videoId;lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,resumed:true};
+    run.disabled=true;setStatus(`Reprise de la génération PixVerse #${active.videoId}…`);pipelineProgress.children[0].textContent='PixVerse — reprise';
+    const result=await waitForPixVerse(active.videoId,{onStatus:()=>setStatus(`Génération PixVerse #${active.videoId} toujours en cours…`)});const videoUrl=proxiedPixVerseVideoUrl(result.url,active.videoId);
+    await loadResultVideo(videoUrl);pipelineProgress.children[0].textContent='PixVerse — terminé';pipelineProgress.children[1].textContent='Vidéo reçue — OK';pipelineProgress.children[2].textContent='Analyse MicroPlayer — en cours';
+    await extractNineViews();pipelineProgress.children[2].textContent='Analyse MicroPlayer — OK';pipelineProgress.children[3].textContent='QC et 9 vues — terminé';await jobStore.complete({videoId:active.videoId,videoUrl,actionId:active.actionId});
+    setStatus(`Génération #${active.videoId} récupérée après rechargement.`,false,true);return true;
+  }catch(error){setStatus(`Reprise PixVerse impossible : ${error.message}`,true);return false}finally{run.disabled=false}
+}
 
 function currentSupportSpec(){
   const doc=iframe.contentDocument;
@@ -230,7 +276,7 @@ async function downloadPixVerseZip(){
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
   const distinct=extracted.distinctFingerprints ?? new Set(extracted.frames.map(f=>f.fingerprint)).size;
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,customRequest:lastActionContext?.customRequest||null,promptProvider:lastActionContext?.promptProvider||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:9,distinctFrames:distinct,qualityGate:extracted.qualityGate,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,diameterMm:spec.diameterMm||null,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
+  if(lastQc?.grade==='red')throw new Error('QC rouge : export de production bloqué.');zip.file('manifest.json',JSON.stringify({schemaVersion:3,effectType:'motion',pipeline:'pixverse-microplayer',lpi:60,generator:'MicroPlayer + PixVerse',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,customRequest:lastActionContext?.customRequest||null,promptProvider:lastActionContext?.promptProvider||null,promptPolicy:lastActionContext?.promptPolicy||'microplayer-one-way-v3',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,viewCount:9,distinctFrames:distinct,qualityGate:extracted.qualityGate,qc:lastQc,stabilization:extracted.stabilization,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,diameterMm:spec.diameterMm||null,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,candidates:extracted.candidateFrames.map(({dataUrl,...candidate})=>candidate),times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
   const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
 }
 async function launch(selectionOverride=null){
@@ -238,7 +284,7 @@ async function launch(selectionOverride=null){
   let s=selectionOverride||selection();if(!s)return;run.disabled=true;video.style.display='none';rerun.style.display='none';clearFrames();
   try{
     if(s.customRequest&&!selectionOverride){setStatus('Création du prompt PixVerse avec les contraintes HappyHolo…');s=await prepareCustomSelection(s);renderPrompt(s)}
-    lastLaunchSelection=s;setStatus('Préparation de l’image finale HappyHolo…');const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,customRequest:s.customRequest||null,promptProvider:s.promptProvider||null,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(!views.qualityGate?.passed)setStatus('Vidéo récupérée, mais export bloqué : retour brutal à la pose initiale confirmé.',true);else if(views.qualityGate?.warning)setStatus(`Vidéo #${result.videoId} prête — export autorisé avec contrôle visuel conseillé.`,false,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues calculées sur la première action, sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,qualityGate:views.qualityGate,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}
+    lastLaunchSelection=s;setStatus('Préparation de l’image finale HappyHolo…');pipelineProgress.children[0].textContent='PixVerse — préparation';const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const motionGuideFile=await activeGuideFile(s),motionGuideHash=await guideHash(motionGuideFile,s),motionGuideMediaId=motionGuideHash?await jobStore.getGuideMediaId(motionGuideHash):null;const result=await runPixVerseAction(file,s.variant,{controls:{mode:'auto',motionGuideFile,motionGuideMediaId,subjectType:subjectTypeForFamily(family.value)},onStatus:async x=>{const map={'safe-framing':'Cadrage sécurisé…',upload:'1/5 — Envoi image et guide…','guide-ready':x.cached?'Guide PixVerse réutilisé.':'Guide PixVerse chargé.','create':'2/5 — Génération PixVerse lancée…','processing':'3/5 — Génération PixVerse en cours…','done':'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…');if(x.guideMediaId&&motionGuideHash)await jobStore.putGuideMediaId(motionGuideHash,x.guideMediaId);if(x.videoId)await jobStore.save({videoId:x.videoId,actionId:s.action.id,status:'processing',createdAt:Date.now()})}});pipelineProgress.children[0].textContent='PixVerse — terminé';pipelineProgress.children[1].textContent='Vidéo reçue — OK';lastVideoId=result.videoId;await loadResultVideo(result.videoUrl);pipelineProgress.children[2].textContent='Analyse MicroPlayer — en cours';const views=await extractNineViews();await jobStore.complete({videoId:result.videoId,videoUrl:result.videoUrl,actionId:s.action.id});pipelineProgress.children[2].textContent='Analyse MicroPlayer — OK';pipelineProgress.children[3].textContent='QC et 9 vues — terminé';lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,customRequest:s.customRequest||null,promptProvider:s.promptProvider||null,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(!views.qualityGate?.passed)setStatus('Vidéo récupérée, mais export bloqué : retour brutal à la pose initiale confirmé.',true);else if(views.qualityGate?.warning)setStatus(`Vidéo #${result.videoId} prête — export autorisé avec contrôle visuel conseillé.`,false,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues calculées sur la première action, sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,qualityGate:views.qualityGate,stabilization:views.stabilization,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint,transform:f.transform}))}
   }catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{run.disabled=false}
 }
 
@@ -255,12 +301,13 @@ function bindHappyHoloSceneChanges(){
 }
 
 audienceTabs.forEach(b=>b.onclick=()=>{family.value=b.dataset.family;refresh();});family.onchange=refresh;action.onchange=refresh;customAction.addEventListener('input',refresh);run.onclick=()=>launch();rerun.onclick=()=>launch(lastLaunchSelection||selection());
+guideOverride.onchange=()=>syncMotionGuide(selection());
 previewLocal.onclick=()=>{try{const result=previewChosenAction();setStatus(result.message,false,true)}catch(error){setStatus(error.message,true)}};
 repairEdge.onclick=async()=>{try{await repairDetectedEdge()}catch(error){setStatus(`Réparation impossible : ${error.message}`,true);refreshLocalTargets()}};
 downloadStatic.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP statique ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadStaticSupportZip();setStatus(`ZIP statique prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP statique : ${e.message}`,true)}};
 downloadPixVerse.onclick=async()=>{try{const spec=currentSupportSpec();setStatus(`Création du ZIP PixVerse ${spec.width}×${spec.height} avec cadrage du simulateur…`);await downloadPixVerseZip();setStatus(`ZIP PixVerse prêt — cadrage du simulateur conservé.`,false,true)}catch(e){setStatus(`Erreur ZIP PixVerse : ${e.message}`,true)}};
 iframe.addEventListener('load',()=>{stabilizeLocalSupport();bindHappyHoloSceneChanges();const w=iframe.contentWindow;w.addEventListener('happyholo:selection-plan',refreshLocalTargets);w.addEventListener('happyholo-relief-ready',refreshLocalTargets);refreshLocalTargets();setStatus('HappyHolo chargé. Prépare une image, puis utilise l’aperçu local ou PixVerse.')});
-try{library=await loadActionLibrary();refresh()}catch(e){setStatus(`Bibliothèque indisponible : ${e.message}`,true)}
+try{library=await loadActionLibrary();refresh();await resumeActiveJob()}catch(e){setStatus(`Bibliothèque indisponible : ${e.message}`,true)}
 </script>
 </body>
 </html>

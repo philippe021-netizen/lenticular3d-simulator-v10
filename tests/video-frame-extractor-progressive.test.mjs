@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import {
   assessProgressiveFrames,
   planProgressiveFrameTimes,
   selectFirstProgressivePass
 } from '../modules/video-frame-extractor.js';
+import { analyzeMotionProgress, selectNineProgressStates } from '../modules/motion-progress-analyzer.js';
 
 function samples(progress) {
   return progress.map((fromStart, index) => ({
@@ -84,3 +86,18 @@ function samples(progress) {
 }
 
 console.log('video-frame-extractor progressive tests: ok');
+
+{
+  const source = await readFile(new URL('../modules/video-frame-extractor.js', import.meta.url), 'utf8');
+  assert.match(source, /estimateTranslation/);
+  assert.match(source, /stabilizeFrame/);
+  assert.match(source, /candidateFrames/);
+}
+
+{
+  const timeline = samples([0, 0, 0.002, 0.006, 0.014, 0.025, 0.039, 0.056, 0.076, 0.099, 0.125, 0.154]);
+  const selected = selectNineProgressStates(analyzeMotionProgress(timeline), { count: 9 });
+  assert.equal(selected.length, 9);
+  assert.equal(new Set(selected.map(frame => frame.sampleIndex)).size, 9);
+  assert.ok(selected.every((frame, index) => index === 0 || frame.time > selected[index - 1].time));
+}

@@ -1,3 +1,6 @@
+import { analyzeMotionProgress, selectNineProgressStates } from './motion-progress-analyzer.js';
+import { estimateTranslation, stabilizeFrame } from './frame-stabilizer.js';
+
 function once(target, event) {
   return new Promise((resolve, reject) => {
     const onEvent = () => { cleanup(); resolve(); };
@@ -315,6 +318,18 @@ function sampleSignature(ctx, width, height) {
   return out;
 }
 
+function candidatePreview(ctx, width, height) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 96;
+    canvas.getContext('2d', { alpha: false }).drawImage(ctx.canvas, 0, 0, width, height, 0, 0, 128, 96);
+    return canvas.toDataURL('image/jpeg', 0.68);
+  } catch (_) {
+    return null;
+  }
+}
+
 function signatureDistance(a, b) {
   if (!a || !b || a.length !== b.length) return 0;
   let sum = 0;
@@ -508,7 +523,7 @@ async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleC
     if (!baselineSig) baselineSig = sig;
     const stepMotion = previousSig ? signatureDistance(previousSig, sig) : 0;
     const fromStart = signatureDistance(baselineSig, sig);
-    samples.push({ time: actualTime, sig, stepMotion, fromStart });
+    samples.push({ time: actualTime, sig, stepMotion, fromStart, preview: candidatePreview(ctx, canvas.width, canvas.height) });
     previousSig = sig;
   }
 
@@ -531,6 +546,8 @@ async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleC
   }
   if (selectedEnd <= selectedStart) selectedEnd = Math.min(end, selectedStart + minSpan);
 
+  const progressAnalysis = analyzeMotionProgress(samples.map(sample => ({ ...sample, value: sample.fromStart })), { count: 9 });
+
   return {
     start: selectedStart,
     end: selectedEnd,
@@ -545,7 +562,8 @@ async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleC
     sensitivity,
     sampleCount: count,
     hint: hint || null,
-    samples
+    samples,
+    progressAnalysis
   };
 }
 
@@ -585,6 +603,10 @@ export async function extractVideoFrames(video, {
   let end = fullEnd;
   const frames = [];
   let plannedTimes = null;
+  let selectedStates = null;
+  let referenceSignature = null;
+  const transforms = [];
+  const correctedShifts = [];
 
   try {
     if (actionAware && fullEnd - fullStart > 0.45) {
@@ -592,7 +614,8 @@ export async function extractVideoFrames(video, {
       start = analysis.start;
       end = progressiveOnly ? Math.min(analysis.end, analysis.peak || analysis.end) : analysis.end;
       if (end - start < 0.28) end = Math.min(fullEnd, start + 0.28);
-      plannedTimes = planProgressiveFrameTimes(analysis.samples, analysis.actionStartIndex, analysis.actionEndIndex, frameCount);
+      selectedStates = selectNineProgressStates(analysis.progressAnalysis, { count: frameCount });
+      plannedTimes = selectedStates.map(state => state.time);
       start = plannedTimes[0];
       end = plannedTimes[plannedTimes.length - 1];
     }
@@ -606,11 +629,24 @@ export async function extractVideoFrames(video, {
       await delay(20);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const fingerprint = fingerprintCanvas(ctx, canvas.width, canvas.height);
-      const signature = sampleSignature(ctx, canvas.width, canvas.height);
-      const blob = await canvasToBlob(canvas, type, quality);
+      const rawSignature = sampleSignature(ctx, canvas.width, canvas.height);
+      if (!referenceSignature) referenceSignature = rawSignature;
+      const estimate = i === 0 ? { dx: 0, dy: 0, confidence: 1 } : estimateTranslation(referenceSignature, rawSignature, 32, 24, 2);
+      const transform = {
+        dx: Number((estimate.dx * canvas.width / 32).toFixed(3)),
+        dy: Number((estimate.dy * canvas.height / 24).toFixed(3)),
+        confidence: estimate.confidence
+      };
+      const outputCanvas = i === 0 || (!transform.dx && !transform.dy) ? canvas : stabilizeFrame(canvas, transform);
+      const outputCtx = outputCanvas.getContext('2d', { alpha: false, willReadFrequently: true });
+      const fingerprint = fingerprintCanvas(outputCtx, outputCanvas.width, outputCanvas.height);
+      const signature = sampleSignature(outputCtx, outputCanvas.width, outputCanvas.height);
+      const corrected = i === 0 ? { dx: 0, dy: 0 } : estimateTranslation(referenceSignature, signature, 32, 24, 2);
+      const blob = await canvasToBlob(outputCanvas, type, quality);
       const url = URL.createObjectURL(blob);
-      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, signature, blob, url, width: canvas.width, height: canvas.height });
+      transforms.push(transform);
+      correctedShifts.push(Math.hypot(corrected.dx / 32, corrected.dy / 24));
+      frames.push({ index: i + 1, time: actualTime, requestedTime, fingerprint, signature, transform, blob, url, width: canvas.width, height: canvas.height });
     }
   } finally {
     try { await seek(video, Math.min(originalTime, Math.max(0, duration - 0.001))); } catch (_) {}
@@ -618,6 +654,17 @@ export async function extractVideoFrames(video, {
   }
 
   const qualityGate = assessProgressiveFrames(frames);
+  const selectedIndices = new Set((selectedStates || []).map(state => Math.round(state.sampleIndex)));
+  const usefulStart = analysis?.progressAnalysis?.usefulWindow?.startIndex ?? 0;
+  const candidateFrames = (analysis?.samples || []).map((sample, index) => {
+    const progressIndex = index - usefulStart;
+    const progress = analysis.progressAnalysis.progression[progressIndex];
+    const selected = selectedIndices.has(index);
+    const discontinuity = analysis.progressAnalysis.discontinuities.find(item => item.index === index);
+    const reasons = selected ? ['visual-progress-quantile'] : discontinuity ? ['discontinuity'] : index < usefulStart ? ['initial-idle'] : index > analysis.progressAnalysis.usefulWindow.endIndex ? ['final-idle-or-return'] : ['candidate-not-selected'];
+    return { time: sample.time, progress: Number.isFinite(progress) ? progress : null, stepMotion: sample.stepMotion, discontinuityScore: discontinuity?.score || 0, selected, reasons, dataUrl: sample.preview };
+  });
+  const normalizedShifts = transforms.map(transform => Math.hypot(transform.dx / canvas.width, transform.dy / canvas.height));
   const result = {
     duration,
     width: canvas.width,
@@ -625,8 +672,15 @@ export async function extractVideoFrames(video, {
     frames,
     distinctFingerprints: qualityGate.distinctFrames,
     qualityGate,
+    candidateFrames,
+    stabilization: {
+      applied: transforms.some(transform => transform.dx || transform.dy),
+      transforms,
+      maxCameraShift: Number(Math.max(0, ...normalizedShifts).toFixed(5)),
+      correctedCameraShift: Number(Math.max(0, ...correctedShifts).toFixed(5))
+    },
     extractionWindow: {
-      mode: actionAware ? 'action-aware-progressive' : (progressiveOnly ? 'progressive-one-way' : 'full-duration'),
+      mode: actionAware ? 'visual-progress-v3' : (progressiveOnly ? 'progressive-one-way' : 'full-duration'),
       start,
       end,
       originalStart: fullStart,
@@ -641,7 +695,10 @@ export async function extractVideoFrames(video, {
         sampleCount: analysis.sampleCount,
         medianMotion: Number(analysis.medianMotion.toFixed(5)),
         threshold: Number(analysis.threshold.toFixed(5)),
-        sensitivity: analysis.sensitivity
+        sensitivity: analysis.sensitivity,
+        maxAdjacentJump: Number(analysis.progressAnalysis.maxAdjacentJump.toFixed(5)),
+        reversalRatio: Number(analysis.progressAnalysis.reversalRatio.toFixed(5)),
+        discontinuityCount: analysis.progressAnalysis.discontinuities.length
       } : null
     },
     revoke() {

@@ -19,16 +19,16 @@
 
   <section class="card">
     <h2>Génération contrôlée</h2>
-    <div class="warning"><b>Mode Auto :</b> vidéo-guide → Omni V6 ; images-clés → Multi-transition V5 ; image finale → Transition V6 ; sinon Standard V6.</div>
+    <div class="warning"><b>Mode Auto :</b> vidéo-guide compatible → Mimic ; images-clés → Multi-transition V5 ; image finale → Transition V6 ; sinon Standard V6. Omni/Fusion reste réservé à la composition de références.</div>
     <div class="grid3">
-      <div><label>Mode</label><select id="mode"><option value="auto">Auto</option><option value="standard">Standard V6</option><option value="transition">Transition V6</option><option value="omni">Omni V6</option><option value="multi_transition">Multi-transition V5</option></select></div>
+      <div><label>Mode</label><select id="mode"><option value="auto">Auto</option><option value="standard">Standard V6</option><option value="transition">Transition V6</option><option value="mimic">Mimic — transfert de mouvement</option><option value="omni">Omni/Fusion — composition</option><option value="multi_transition">Multi-transition V5</option></select></div>
       <div><label>Qualité</label><select id="quality"><option>540p</option><option>720p</option><option>360p</option><option>1080p</option></select></div>
       <div><label>Durée / segment</label><select id="duration"><option value="1">1 s</option><option value="2" selected>2 s</option><option value="3">3 s</option></select></div>
     </div>
     <label>Photo source MicroPlayer</label><input id="source" type="file" accept="image/png,image/jpeg,image/webp">
     <div class="grid">
       <div><label>Image finale — Transition</label><input id="end" type="file" accept="image/png,image/jpeg,image/webp"></div>
-      <div><label>Vidéo-guide — Omni</label><input id="motion" type="file" accept="video/mp4,video/quicktime,video/webm"></div>
+      <div><label>Vidéo-guide — Mimic</label><input id="motion" type="file" accept="video/mp4,video/quicktime,video/webm"></div>
     </div>
     <div class="grid">
       <div><label>Images de référence — Omni (jusqu’à 9)</label><input id="refs" type="file" multiple accept="image/png,image/jpeg,image/webp"></div>
@@ -84,7 +84,10 @@ function controls(){
     duration:Number($('duration').value),
     segmentDuration:Number($('duration').value),
     aspectRatio:'auto',
-    audio:false
+    audio:false,
+    subjectType:'person-single',
+    guide:$("motion").files?.[0]?{url:'expert-guide'}:null,
+    pixverse:{mode:'mimic',fallbackMode:'standard'}
   };
 }
 

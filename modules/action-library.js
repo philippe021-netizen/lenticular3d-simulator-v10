@@ -1,3 +1,5 @@
+import { normalizeActionLibrary } from './action-schema.js';
+
 const DB_NAME = 'happyholo-actions';
 const DB_VERSION = 1;
 const STORE = 'library';
@@ -38,7 +40,7 @@ async function idbSet(value) {
 async function loadBundledLibrary() {
   const r = await fetch('./data/actions-library.json', { cache: 'no-store' });
   if (!r.ok) throw new Error('Bibliothèque d’actions introuvable.');
-  return r.json();
+  return normalizeActionLibrary(await r.json());
 }
 
 function ensureFamilyOptions(library) {
@@ -72,7 +74,7 @@ export async function loadActionLibrary() {
 }
 
 export async function saveActionLibrary(library) {
-  const copy = structuredClone(library);
+  const copy = normalizeActionLibrary(library);
   copy.lastUpdated = new Date().toISOString();
   await idbSet(copy);
   ensureFamilyOptions(copy);
@@ -123,5 +125,5 @@ export async function importActionLibrary(file) {
   const text = await file.text();
   const parsed = JSON.parse(text);
   if (!parsed || !Array.isArray(parsed.actions)) throw new Error('Fichier d’actions invalide.');
-  return saveActionLibrary(parsed);
+  return saveActionLibrary(normalizeActionLibrary(parsed));
 }

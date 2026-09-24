@@ -1,3 +1,31 @@
+export function assertMotionExportable(qc) {
+  if (qc?.grade === 'red') throw new Error('QC rouge : export de production bloqué.');
+}
+
+export function buildMotionManifest({ action = {}, job = {}, selection = {}, stabilization = {}, qc = {} }) {
+  const frames = selection.frames || [];
+  if (frames.length !== 9) throw new Error('Le manifeste Motion exige exactement 9 vues.');
+  assertMotionExportable(qc);
+  return {
+    schemaVersion: 3,
+    effectType: 'motion',
+    pipeline: 'pixverse-microplayer',
+    lpi: 60,
+    actionId: action.id || null,
+    guide: action.guide ? { url: action.guide.url || null, sha256: action.guide.sha256 || null } : null,
+    pixverse: { mode: job.modeUsed || job.mode || null, videoId: job.videoId || null },
+    views: frames.map((frame, index) => ({
+      index: index + 1,
+      file: `view-${String(index + 1).padStart(2, '0')}.png`,
+      time: Number(frame.time),
+      progress: frame.progress ?? null,
+      reasons: frame.reasons || []
+    })),
+    stabilization,
+    qc
+  };
+}
+
 function supportSpec(doc) {
   const support = doc?.getElementById('supportType')?.value || 'keychain-vertical';
   const map = {
@@ -66,9 +94,8 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
       if (!Array.isArray(frames) || frames.length !== 9) {
         throw new Error('Les 9 vues PixVerse ne sont pas prêtes.');
       }
-      if (!payload?.qualityGate?.passed) {
-        throw new Error('Export bloqué : retour brutal à la pose initiale confirmé.');
-      }
+      const qc = payload.qc || { grade: payload?.qualityGate?.passed ? 'green' : 'red', reasons: [payload?.qualityGate?.reason].filter(Boolean) };
+      assertMotionExportable(qc);
       const ZipCtor = iframe.contentWindow?.JSZip || window.JSZip;
       if (!ZipCtor) throw new Error('JSZip indisponible.');
 
@@ -82,7 +109,15 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
       }
 
       const distinct = payload.distinct ?? new Set(frames.map(f => f.fingerprint)).size;
+      const motionManifest = buildMotionManifest({
+        action: { id: payload.actionId, guide: payload.guide },
+        job: { modeUsed: payload.modeUsed, videoId: payload.videoId },
+        selection: { frames },
+        stabilization: payload.stabilization || {},
+        qc
+      });
       zip.file('manifest.json', JSON.stringify({
+        ...motionManifest,
         generator: 'HappyHolo + PixVerse V6',
         source: 'pixverse-video',
         videoId: payload.videoId || null,
@@ -91,10 +126,10 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
         variantId: payload.variantId || null,
         customRequest: payload.customRequest || null,
         promptProvider: payload.promptProvider || null,
-        promptPolicy: payload.promptPolicy || 'lenticular-one-way-v1',
+        promptPolicy: payload.promptPolicy || 'microplayer-one-way-v3',
         prompt: payload.promptUsed || payload.prompt || null,
         negativePrompt: payload.negativePromptUsed || payload.negativePrompt || null,
-        views: 9,
+        viewCount: 9,
         distinctFrames: distinct,
         qualityGate: payload.qualityGate,
         sourceWidth: payload.width,

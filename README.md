@@ -1,21 +1,27 @@
 # LentiPrint Lab v11 — PixVerse → 9 vues
 
-Flux automatisé :
-1. Upload d'une photo.
-2. Envoi serveur à PixVerse (clé cachée dans Vercel).
-3. Génération Image-to-Video V6, 720p, 5 s.
-4. Suivi du `video_id` jusqu'à la vidéo terminée.
-5. Analyse locale de 49 instants de la vidéo.
-6. Sélection de 9 instants distincts avec garde-fou de couverture temporelle.
-7. Détection des transitions trop proches.
-8. Export `vue-01.png` à `vue-09.png` + `manifest.json` dans un ZIP.
+Flux automatisé 60 LPI :
+1. Choix d'une photo et d'une action du catalogue configurable.
+2. Chargement automatique de la vidéo guide lorsque l'action en possède une.
+3. Safe framing local, puis upload de la photo et du guide avec la clé cachée dans Vercel.
+4. Routage par capacité : PixVerse Mimic pour les sujets compatibles, sinon Image-to-Video.
+5. Suivi persistant du `video_id` jusqu'à la réception du MP4.
+6. Analyse du mouvement utile sur toute la durée, y compris les clips courts.
+7. Sélection de neuf états visuellement réguliers suivant une seule progression A → B.
+8. Recalage spatial, contrôle qualité VERT/ORANGE/ROUGE et export 60 LPI.
+
+L'interface de référence est `happyholo-pixverse-actions-test.html`. Son mode expert
+affiche la vidéo guide, le MP4 PixVerse, les images candidates, les neuf vues retenues
+et le diagnostic qualité. Un résultat ROUGE bloque l'export automatique.
 
 ## Variable Vercel
 `PIXVERSE_API_KEY` doit être présente dans Project Settings → Environment Variables.
 
 ## API PixVerse utilisée
 - POST `/openapi/v2/image/upload`
+- POST `/openapi/v2/media/upload`
 - POST `/openapi/v2/video/img/generate`
+- POST `/openapi/v2/video/mimic/generate`
 - GET `/openapi/v2/video/result/{id}`
 
 La clé PixVerse n'est jamais exposée dans le navigateur.

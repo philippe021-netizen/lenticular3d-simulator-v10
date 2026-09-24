@@ -43,6 +43,10 @@ function buildPanel() {
       </div>
     </div>
     <div id="hhPvPromptBox" style="margin-top:12px;padding:11px;border-radius:11px;background:#f7f7f7;font-size:13px;line-height:1.4"></div>
+    <video id="guidePreview" controls muted playsinline style="display:none;width:100%;margin-top:10px"></video>
+    <div style="margin-top:8px;font-size:12px">Mode : <output id="pixverseMode">Automatique recommandé</output></div>
+    <ol id="pipelineProgress" style="font-size:12px"><li>PixVerse</li><li>Vidéo reçue</li><li>Analyse MicroPlayer</li><li>QC et 9 vues</li></ol>
+    <section id="qcSummary" aria-live="polite"></section><details id="expertPanel"><summary>Mode expert</summary><div id="candidateFrames"></div></details><div id="selectedFrames"></div>
     <button id="hhPvRun" type="button" style="width:100%;margin-top:12px;border:0;border-radius:13px;padding:14px 16px;font:inherit;font-weight:800;background:#111;color:#fff">Lancer l’action PixVerse</button>
     <div id="hhPvStatus" style="margin-top:12px;padding:11px;border-radius:11px;background:#f2f2f2;font-size:13px;white-space:pre-wrap">Prêt.</div>
     <video id="hhPvVideo" controls playsinline loop style="display:none;width:100%;max-height:520px;margin-top:14px;border-radius:14px;background:#111"></video>
