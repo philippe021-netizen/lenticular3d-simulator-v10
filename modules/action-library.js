@@ -88,6 +88,12 @@ export async function resetActionLibraryToBundled() {
   return library;
 }
 
+export function chooseActionId(actions = [], requestedId = '') {
+  return actions.some(action => action?.id === requestedId)
+    ? requestedId
+    : (actions[0]?.id || '');
+}
+
 function resolveActionIdFromVisibleSelect(library, requestedId) {
   try {
     const select = document.getElementById('action');
