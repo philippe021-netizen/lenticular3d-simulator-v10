@@ -263,16 +263,21 @@ export class GaussianNineViewStudio{
     return metadata;
   }
 
-  setOutputSize(width,height){
+  setOutputSize(width,height,framingScale=1.14){
     const w=Math.max(64,Math.round(width)),h=Math.max(64,Math.round(height));
     this.renderWidth=w;this.renderHeight=h;
     this.renderer.setSize(w,h,false);
     this.camera.aspect=w/h;
     const fy=this.metadata?.intrinsics?.fy||h*1.07;
-    this.camera.fov=2*Math.atan(h/(2*fy))*180/Math.PI;
+    const safeScale=clamp(Number(framingScale)||1.14,1,1.35);
+    // Safe framing: enlarge the virtual sensor instead of cropping/scaling the PNG afterwards.
+    // This keeps one identical camera framing for all 9 views and reveals extra Gaussian content
+    // around the original frame, especially above the head.
+    this.camera.fov=2*Math.atan((h*safeScale)/(2*fy))*180/Math.PI;
     this.camera.near=.01;
     this.camera.far=Math.max(100,Number(this.metadata?.depth?.far||50)*2);
     this.camera.updateProjectionMatrix();
+    this.framingScale=safeScale;
   }
 
   setCamera(eyeX,focusDepth){
@@ -293,11 +298,12 @@ export class GaussianNineViewStudio{
   async snapshot(planView,focusDepth,options={}){
     if(!this.mesh||!this.metadata)throw new Error('Charge d’abord un scene.ply.');
     const maxEdge=Number(options.maxEdge)||0;
+    const framingScale=clamp(Number(options.framingScale)||1.14,1,1.35);
     let w=this.metadata.image.width,h=this.metadata.image.height;
     if(maxEdge>0&&Math.max(w,h)>maxEdge){
       const s=maxEdge/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);
     }
-    if(w!==this.renderWidth||h!==this.renderHeight)this.setOutputSize(w,h);
+    if(w!==this.renderWidth||h!==this.renderHeight||Math.abs((this.framingScale||1)-framingScale)>1e-6)this.setOutputSize(w,h,framingScale);
     this.setCamera(planView.eyeX,focusDepth);
     await this.settle(options.settleFrames??3);
 
@@ -325,6 +331,7 @@ export class GaussianNineViewStudio{
         name:'view_'+String(index).padStart(2,'0')+'.png',
         normal:pv.normal,
         eyeX:pv.eyeX,
+        framingScale:clamp(Number(options.framingScale)||1.14,1,1.35),
         ...snap
       });
       await waitFrame();
@@ -335,7 +342,8 @@ export class GaussianNineViewStudio{
         : this.metadata.image.width,
       options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
         ? Math.round(this.metadata.image.height*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
-        : this.metadata.image.height
+        : this.metadata.image.height,
+      clamp(Number(options.framingScale)||1.14,1,1.35)
     );
     this.setCamera(0,plan.focusDepth);
     await this.settle(2);
@@ -413,7 +421,9 @@ export function buildManifest(metadata,rendered,profile){
       height:center?.height||rendered.views[0]?.height,
       order:'left-to-right',
       centerView:5,
-      profile
+      profile,
+      safeFramingScale:center?.framingScale||1.14,
+      safeFramingMarginPercent:Number((((center?.framingScale||1.14)-1)*100).toFixed(1))
     },
     qc:{
       worstTransparentPercent:worstFull,
