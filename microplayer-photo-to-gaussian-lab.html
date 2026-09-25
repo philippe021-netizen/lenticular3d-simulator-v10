@@ -57,16 +57,9 @@
         <label class="field">Convergence sujet (m)
           <input id="focusDepth" type="number" min="0.10" max="20" step="0.01" value="1">
         </label>
-        <label class="field">Marge de sécurité — vues latérales 01/09
-          <select id="framing">
-            <option value="1.08">+8%</option>
-            <option value="1.12" selected>+12% recommandé</option>
-            <option value="1.16">+16%</option>
-            <option value="1.20">+20%</option>
-          </select>
-        </label>
+        <input id="framing" type="hidden" value="1">
         <input id="headroom" type="hidden" value="0">
-        <div class="status ok">Vue 05 = caméra native du PLY · aucun déplacement vertical · aucun recadrage automatique.</div>
+        <div class="status ok">NOUVEAU MOTEUR NATIF · aucun Spark/SplatMesh pour les exports · aucun auto-fit · aucun zoom · vue 05 = projection directe x/y/z du PLY.</div>
         <label class="field">Résolution production
           <select id="resolution">
             <option value="0">Source PLY</option>
@@ -76,7 +69,7 @@
           </select>
         </label>
         <div id="cameraInfo" class="status">Les valeurs métriques apparaîtront après chargement.</div>
-        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. La vue 05 reprend exactement les intrinsics fx/fy/cx/cy du PLY. La marge apparaît progressivement uniquement vers les vues latérales 01/09. Reconstruction locale des trous de fond activée.</div>
+        <div class="small">Forward = 0 · Z offset = 0 · focale constante · 9 translations X régulières. La vue 05 utilise exactement fx/fy/cx/cy du PLY. Les vues 01→09 utilisent une convergence off-axis : le point de convergence reste fixe sans changer la focale ni grossir l’image.</div>
       </section>
 
       <section class="panel">
@@ -92,7 +85,7 @@
 
       <section class="panel">
         <h2>Règles V01</h2>
-        <div class="small">Le sujet principal n’est jamais régénéré. La vue 05 conserve la caméra native du scene.ply, sans headroom ni mode cover. Les vues latérales reçoivent seulement une petite marge progressive pour éviter de couper tête et bords. Les trous transparents sont reconstruits depuis le fond, jamais depuis le visage/corps. Le profil 0,018 reste un test ; la production par défaut est 0,012.</div>
+        <div class="small">Le sujet principal n’est jamais régénéré. Le rendu 3/9 vues ne passe plus par le viewer Gaussian externe : il est calculé directement depuis les coordonnées du scene.ply. Zéro headroom, zéro crop, zéro auto-center et zéro zoom. La reconstruction de fond intervient seulement après la projection.</div>
       </section>
     </aside>
 
@@ -154,7 +147,7 @@ function currentOptions(preview=false){
   return {
     maxDisparity:Number($('disparity').value)||.012,
     focusDepth:Number($('focusDepth').value)||metadata?.depth?.focus||1,
-    framingScale:Number($('framing').value)||1.12,
+    framingScale:1,
     headroomRatio:0,
     repairBorders:true,
     maxEdge:preview?1024:Number($('resolution').value)||0,
@@ -171,13 +164,12 @@ function updateCameraInfo(){
   if(!metadata)return;
   const p=cameraPlan(metadata,Number($('disparity').value),Number($('focusDepth').value));
   $('cameraInfo').className='status ok';
-  const framing=(Number($('framing').value)||1.12);
   $('cameraInfo').textContent=
     'Amplitude caméra : ±'+fmt(p.cameraHalfRangeMillimeters,2)+' mm\n'+
-    'Convergence : '+fmt(p.focusDepth,3)+' m\n'+
-    'Vue 05 : caméra native PLY · marge 0%\n'+
-    'Marge max vues 01/09 : +'+fmt((framing-1)*100,0)+'%\n'+
-    'Vue 01 → 09 : '+fmt(-p.cameraHalfRangeMillimeters,2)+' à +'+fmt(p.cameraHalfRangeMillimeters,2)+' mm';
+    'Convergence off-axis : '+fmt(p.focusDepth,3)+' m\n'+
+    'Vue 05 : projection PLY native · zoom 0%\n'+
+    'Focale : fx/fy inchangés\n'+
+    'Vue 01 → 09 : translation X '+fmt(-p.cameraHalfRangeMillimeters,2)+' à +'+fmt(p.cameraHalfRangeMillimeters,2)+' mm';
 }
 function renderDiag(){
   const d=metadata;
@@ -212,7 +204,7 @@ function showRendered(data){
     const card=document.createElement('div');card.className='viewCard';
     const repair=v.qc.borderRepair||{};
     card.innerHTML='<img src="'+url+'" alt="'+v.name+'"><div class="viewMeta">Vue '+String(v.index).padStart(2,'0')+
-      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · marge +'+((v.framingScale-1)*100).toFixed(0)+'% · caméra Y native · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
+      ' · translation X '+(v.eyeX*1000).toFixed(1)+' mm · zoom 0% · projection native · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
     $('views').appendChild(card);
   }
   const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
@@ -278,7 +270,7 @@ async function loadGaussianFile(file,label='scene.ply'){
     $('loadStatus').textContent='SCÈNE PRÊTE · '+metadata.gaussianCount.toLocaleString('fr-FR')+' Gaussians · '+metadata.image.width+'×'+metadata.image.height;
     $('viewer').style.aspectRatio=metadata.image.width+'/'+metadata.image.height;
     $('focusDepth').value=metadata.depth.focus.toFixed(3);
-    $('viewerBadge').textContent='Caméra centrale · convergence '+metadata.depth.focus.toFixed(3)+' m';
+    $('viewerBadge').textContent='PLY natif · vue 05 · zoom 0%';
     $('diagPanel').classList.remove('hidden');renderDiag();updateCameraInfo();
     $('resultPanel').classList.add('hidden');$('simPanel').classList.add('hidden');
     rendered=null;$('downloadZip').disabled=true;
@@ -395,16 +387,15 @@ async function run(mode){
     showRendered(data);
     const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
     $('renderStatus').className=worst<=.25?'status ok':'status warn';
-    const framePct=((Number(opts.framingScale)||1.12)-1)*100;
     const repairedBorder=Math.max(...data.views.map(v=>v.qc.borderRepair?.borderRepairedPercent||0));
     const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
     $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
-      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · vue 05 native · marge latérale max +'+framePct.toFixed(0)+'% · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%';
+      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · rendu PLY natif · zoom 0% · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%';
   }catch(err){
     console.error(err);
     $('renderStatus').className='status bad';$('renderStatus').textContent='RENDU BLOQUÉ — '+(err?.message||err);
   }finally{
-    $('viewerBadge').textContent='Caméra centrale · convergence '+Number($('focusDepth').value).toFixed(3)+' m';
+    $('viewerBadge').textContent='PLY natif · vue 05 · zoom 0%';
     setButtons(false);
   }
 }
