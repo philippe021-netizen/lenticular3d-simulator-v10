@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+  <title>MicroPlayer Photo → InfiniSplat → 9 vues</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+      "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/0.1.10/spark.module.js"
+    }
+  }
+  </script>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#f7f8fa;background:#08090c;--panel:#14171d;--line:#303642;--blue:#1687ff;--green:#17865d;--amber:#8c6514;--muted:#aab1be}
+    *{box-sizing:border-box}body{margin:0;background:#08090c}.top{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;gap:12px;padding:13px 16px;background:#0c0e12f2;border-bottom:1px solid var(--line);backdrop-filter:blur(14px)}.top b{font-size:17px}.top span{font-size:12px;color:var(--muted)}
+    .wrap{max-width:1450px;margin:auto;padding:14px}.layout{display:grid;grid-template-columns:390px minmax(0,1fr);gap:14px;align-items:start}.sidebar{position:sticky;top:62px;max-height:calc(100vh - 76px);overflow:auto;padding-bottom:20px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}.panel h2{font-size:16px;margin:0 0 12px}.panel h3{font-size:14px;margin:12px 0 8px}.small{font-size:12px;color:var(--muted);line-height:1.45}.status{margin-top:9px;padding:10px;border-radius:10px;background:#20242d;font-size:12px;line-height:1.45;white-space:pre-wrap}.status.ok{background:#17382e}.status.warn{background:#463a1d}.status.bad{background:#4c2427}
+    button,input,select{font:inherit}button{min-height:46px;border:0;border-radius:11px;padding:10px 12px;background:#2c323d;color:#fff;font-weight:800}button.primary{background:var(--blue)}button.green{background:var(--green)}button:disabled{opacity:.38}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.field{display:block;margin:10px 0;font-size:12px;color:var(--muted)}.field input,.field select{display:block;width:100%;margin-top:5px;min-height:42px;border-radius:9px;border:1px solid var(--line);background:#0e1116;color:#fff;padding:8px}.filebox{display:block;border:1px dashed #526071;border-radius:13px;padding:16px;text-align:center;background:#0d1015}.filebox input{width:100%}
+    .progress{height:7px;background:#08090c;border-radius:8px;overflow:hidden;margin-top:10px}.progress i{display:block;height:100%;width:0;background:#00d6ff;transition:width .15s}.viewerShell{background:#030405;border:1px solid var(--line);border-radius:16px;overflow:hidden;min-height:360px}.viewer{width:100%;aspect-ratio:4/3;position:relative;background:repeating-conic-gradient(#171a20 0 25%,#0e1015 0 50%) 50%/24px 24px}.viewer canvas{position:absolute;inset:0;width:100%!important;height:100%!important}.viewerBadge{position:absolute;top:10px;left:10px;z-index:2;background:#000a;border-radius:8px;padding:6px 8px;font-size:12px;pointer-events:none}
+    .results{margin-top:14px}.views{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.viewCard{background:#0e1116;border:1px solid var(--line);border-radius:11px;overflow:hidden}.viewCard img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain;background:#050607}.viewMeta{padding:7px;font-size:11px;color:var(--muted)}.sim{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px}.simFrame{background:#050607;border-radius:14px;overflow:hidden;border:1px solid var(--line)}.simFrame img{display:block;width:100%;aspect-ratio:4/3;object-fit:contain}.slider{width:100%}.metric{display:grid;grid-template-columns:1fr auto;gap:6px;font-size:12px;padding:6px 0;border-bottom:1px solid #242933}.metric b{font-variant-numeric:tabular-nums}
+    .hidden{display:none!important}@media(max-width:940px){.layout{grid-template-columns:1fr}.sidebar{position:static;max-height:none;overflow:visible}.sim{grid-template-columns:1fr}.top span{display:none}.viewerShell{min-height:0}}@media(max-width:620px){.actions,.actions3{grid-template-columns:1fr}.views{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<header class="top"><b>MicroPlayer Photo → Gaussian → 9 vues</b><span>Photo → InfiniSplat → scene.ply → 3/9 vues → ZIP · branche expérimentale</span></header>
+<main class="wrap">
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="panel">
+        <h2>1. Photo → Gaussian</h2>
+        <label class="filebox">Photo JPG / PNG / WebP
+          <input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp">
+        </label>
+        <button id="generateGaussian" class="green" style="width:100%;margin-top:9px" disabled>GÉNÉRER scene.ply avec InfiniSplat</button>
+        <button id="downloadGeneratedPly" style="width:100%;margin-top:8px" disabled>Télécharger le scene.ply généré</button>
+        <div id="photoStatus" class="status">Charge une photo pour lancer InfiniSplat directement depuis MicroPlayer.</div>
+        <div class="progress"><i id="photoProgress"></i></div>
+        <h3>Ou charger un PLY déjà généré</h3>
+        <label class="filebox">scene.ply InfiniSplat / SHARP
+          <input id="plyFile" type="file" accept=".ply,application/octet-stream">
+        </label>
+        <div id="loadStatus" class="status">Aucun PLY chargé.</div>
+        <div class="progress"><i id="progress"></i></div>
+      </section>
+
+      <section class="panel">
+        <h2>2. Caméra lenticulaire</h2>
+        <div class="actions">
+          <button id="softPreset" class="primary">Production 0,012</button>
+          <button id="strongPreset">Renforcé 0,018 (test)</button>
+        </div>
+        <label class="field">Disparité latérale maximale
+          <input id="disparity" type="number" min="0.004" max="0.060" step="0.001" value="0.012">
+        </label>
+        <label class="field">Convergence sujet (m)
+          <input id="focusDepth" type="number" min="0.10" max="20" step="0.01" value="1">
+        </label>
+        <label class="field">Safe framing — marge autour du sujet
+          <select id="framing">
+            <option value="1.14">Standard +14%</option>
+            <option value="1.22" selected>Portrait sûr +22%</option>
+            <option value="1.28">Large +28%</option>
+            <option value="1.34">Très large +34%</option>
+          </select>
+        </label>
+        <label class="field">Headroom — descendre le sujet dans le cadre
+          <select id="headroom">
+            <option value="0.04">+4%</option>
+            <option value="0.06">+6%</option>
+            <option value="0.08">+8%</option>
+            <option value="0.10" selected>Auto +10%</option>
+            <option value="0.12">+12%</option>
+          </select>
+        </label>
+        <label class="field">Résolution production
+          <select id="resolution">
+            <option value="0">Source PLY</option>
+            <option value="1536">Max 1536 px</option>
+            <option value="1280">Max 1280 px</option>
+            <option value="1024">Max 1024 px</option>
+          </select>
+        </label>
+        <div id="cameraInfo" class="status">Les valeurs métriques apparaîtront après chargement.</div>
+        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. Vue 05 centrale. Safe framing + headroom identiques sur les 9 vues. Reconstruction locale des trous reliés au bord activée.</div>
+      </section>
+
+      <section class="panel">
+        <h2>3. Test / production</h2>
+        <div class="actions">
+          <button id="test3" class="primary" disabled>TEST 3 vues</button>
+          <button id="render9" disabled>PRODUCTION 9 vues</button>
+        </div>
+        <div id="renderStatus" class="status">Charge une scène pour commencer.</div>
+        <div class="progress"><i id="renderProgress"></i></div>
+        <button id="downloadZip" class="green" style="width:100%;margin-top:9px" disabled>ZIP production</button>
+      </section>
+
+      <section class="panel">
+        <h2>Règles V01</h2>
+        <div class="small">Le sujet principal n’est jamais régénéré. Le headroom +10% est le réglage de production. Les bords ET les désocclusions transparentes derrière le sujet sont reconstruits depuis le côté fond, jamais depuis le visage/corps. Le profil 0,018 reste un test de relief renforcé ; la production par défaut est 0,012 pour limiter les artefacts.</div>
+      </section>
+    </aside>
+
+    <section>
+      <div class="viewerShell">
+        <div id="viewer" class="viewer"><div id="viewerBadge" class="viewerBadge">Caméra centrale</div></div>
+      </div>
+
+      <section id="diagPanel" class="panel results hidden">
+        <h2>Diagnostic scene.ply</h2>
+        <div id="diag"></div>
+      </section>
+
+      <section id="resultPanel" class="panel results hidden">
+        <h2>Vues calculées</h2>
+        <div id="qcStatus" class="status"></div>
+        <div id="views" class="views"></div>
+      </section>
+
+      <section id="simPanel" class="panel results hidden">
+        <h2>Simulation des vues</h2>
+        <div class="sim">
+          <div class="simFrame"><img id="simImg" alt="Simulation lenticulaire"></div>
+          <div>
+            <label class="field">Position <b id="simOut">5 / 9</b>
+              <input id="simRange" class="slider" type="range" min="1" max="9" step="1" value="5">
+            </label>
+            <div class="actions"><button id="prev">‹</button><button id="next">›</button></div>
+            <button id="play" style="width:100%;margin-top:8px">Lecture ↔</button>
+            <div class="status ok" style="margin-top:10px">Contrôle visuel uniquement. L’export garde les 9 PNG bruts dans l’ordre gauche → droite.</div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import { GaussianNineViewStudio, cameraPlan, makeMontage, buildManifest } from './gaussian-9views-core.js';
+import { Client, handle_file } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+
+const $=id=>document.getElementById(id);
+const studio=new GaussianNineViewStudio($('viewer'));
+let metadata=null;
+let rendered=null;
+let previewUrls=[];
+let playTimer=null;
+let playDir=1;
+let sourcePhotoFile=null;
+let generatedPlyFile=null;
+let generatedPlyUrl=null;
+let infiniClient=null;
+const INFINISPLAT_BASE='https://plus-wave-infinisplat.hf.space';
+
+function setProgress(el,f){el.style.width=Math.round(Math.max(0,Math.min(1,f))*100)+'%'}
+function revokePreviews(){previewUrls.forEach(URL.revokeObjectURL);previewUrls=[]}
+function fmt(n,d=3){return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:d})}
+function currentOptions(preview=false){
+  return {
+    maxDisparity:Number($('disparity').value)||.012,
+    focusDepth:Number($('focusDepth').value)||metadata?.depth?.focus||1,
+    framingScale:Number($('framing').value)||1.22,
+    headroomRatio:Number($('headroom').value)||0.10,
+    repairBorders:true,
+    maxEdge:preview?1024:Number($('resolution').value)||0,
+    settleFrames:3
+  };
+}
+function updatePresetButtons(){
+  const d=Number($('disparity').value)||.012;
+  $('softPreset').classList.toggle('primary',Math.abs(d-.012)<.0005);
+  $('strongPreset').classList.toggle('primary',Math.abs(d-.018)<.0005);
+}
+function updateCameraInfo(){
+  updatePresetButtons();
+  if(!metadata)return;
+  const p=cameraPlan(metadata,Number($('disparity').value),Number($('focusDepth').value));
+  $('cameraInfo').className='status ok';
+  const framing=(Number($('framing').value)||1.14);
+  $('cameraInfo').textContent=
+    'Amplitude caméra : ±'+fmt(p.cameraHalfRangeMillimeters,2)+' mm\n'+
+    'Convergence : '+fmt(p.focusDepth,3)+' m\n'+
+    'Safe framing : +'+fmt((framing-1)*100,0)+'%\n'+
+    'Vue 01 → 09 : '+fmt(-p.cameraHalfRangeMillimeters,2)+' à +'+fmt(p.cameraHalfRangeMillimeters,2)+' mm';
+}
+function renderDiag(){
+  const d=metadata;
+  $('diag').innerHTML=
+    '<div class="metric"><span>Gaussians</span><b>'+d.gaussianCount.toLocaleString('fr-FR')+'</b></div>'+
+    '<div class="metric"><span>Image source</span><b>'+d.image.width+' × '+d.image.height+'</b></div>'+
+    '<div class="metric"><span>Focale fx / fy</span><b>'+fmt(d.intrinsics.fx,1)+' / '+fmt(d.intrinsics.fy,1)+' px</b></div>'+
+    '<div class="metric"><span>Profondeur proche</span><b>'+fmt(d.depth.near,3)+' m</b></div>'+
+    '<div class="metric"><span>Convergence auto</span><b>'+fmt(d.depth.focus,3)+' m</b></div>'+
+    '<div class="metric"><span>Profondeur médiane</span><b>'+fmt(d.depth.median,3)+' m</b></div>'+
+    '<div class="metric"><span>Profondeur lointaine</span><b>'+fmt(d.depth.far,2)+' m</b></div>';
+}
+function setButtons(busy){
+  $('plyFile').disabled=busy;
+  $('photoFile').disabled=busy;
+  $('generateGaussian').disabled=busy||!sourcePhotoFile;
+  $('test3').disabled=busy||!metadata;
+  $('render9').disabled=busy||!metadata;
+  $('softPreset').disabled=busy;
+  $('strongPreset').disabled=busy;
+}
+function stopPlay(){
+  if(playTimer){clearInterval(playTimer);playTimer=null}
+  $('play').textContent='Lecture ↔';
+}
+function showRendered(data){
+  revokePreviews();rendered=data;
+  $('resultPanel').classList.remove('hidden');
+  $('views').innerHTML='';
+  for(const v of data.views){
+    const url=URL.createObjectURL(v.blob);previewUrls.push(url);
+    const card=document.createElement('div');card.className='viewCard';
+    const repair=v.qc.borderRepair||{};
+    card.innerHTML='<img src="'+url+'" alt="'+v.name+'"><div class="viewMeta">Vue '+String(v.index).padStart(2,'0')+
+      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · cadrage +'+((v.framingScale-1)*100).toFixed(0)+'% · headroom +'+((v.headroomRatio||0)*100).toFixed(0)+'% · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
+    $('views').appendChild(card);
+  }
+  const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
+  const repairedBorder=Math.max(...data.views.map(v=>v.qc.borderRepair?.borderRepairedPercent||0));
+  const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
+  $('qcStatus').className=(repairedInterior<=1.2&&worst<=.25)?'status ok':'status warn';
+  $('qcStatus').textContent=(repairedInterior<=1.2&&worst<=.25)
+    ?'FOND RECONSTRUIT · bords '+repairedBorder.toFixed(2)+'% · désocclusions intérieures '+repairedInterior.toFixed(2)+'% · sujet non régénéré.'
+    :'SCÈNE TROP FORTE POUR CE RÉGLAGE · désocclusions '+repairedInterior.toFixed(2)+'%. Passe en Production 0,012 si tu étais en 0,018.';
+  if(data.views.length===9){
+    $('simPanel').classList.remove('hidden');
+    $('downloadZip').disabled=false;
+    $('simRange').value='5';updateSim(5);
+  }else{
+    $('simPanel').classList.add('hidden');
+    $('downloadZip').disabled=true;
+  }
+}
+function viewForIndex(index){
+  return rendered?.views?.find(v=>v.index===index)||null;
+}
+function updateSim(index){
+  const v=viewForIndex(Number(index));if(!v)return;
+  let idx=rendered.views.indexOf(v);
+  $('simImg').src=previewUrls[idx]||'';
+  $('simOut').textContent=v.index+' / 9';
+  $('simRange').value=String(v.index);
+}
+$('simRange').addEventListener('input',()=>updateSim($('simRange').value));
+$('prev').onclick=()=>{stopPlay();updateSim(Math.max(1,Number($('simRange').value)-1))};
+$('next').onclick=()=>{stopPlay();updateSim(Math.min(9,Number($('simRange').value)+1))};
+$('play').onclick=()=>{
+  if(playTimer){stopPlay();return}
+  $('play').textContent='Pause';
+  playDir=1;
+  playTimer=setInterval(()=>{
+    let n=Number($('simRange').value)+playDir;
+    if(n>=9){n=9;playDir=-1}else if(n<=1){n=1;playDir=1}
+    updateSim(n);
+  },180);
+};
+
+$('softPreset').onclick=()=>{$('disparity').value='0.012';updateCameraInfo()};
+$('strongPreset').onclick=()=>{$('disparity').value='0.018';updateCameraInfo()};
+$('disparity').addEventListener('input',updateCameraInfo);
+updatePresetButtons();
+$('focusDepth').addEventListener('input',updateCameraInfo);
+$('framing').addEventListener('change',updateCameraInfo);
+$('headroom').addEventListener('change',updateCameraInfo);
+
+async function loadGaussianFile(file,label='scene.ply'){
+  if(!file)return;
+  stopPlay();setButtons(true);setProgress($('progress'),.1);setProgress($('renderProgress'),0);
+  $('loadStatus').className='status';$('loadStatus').textContent='Lecture de '+label+'…';
+  try{
+    metadata=await studio.load(file,msg=>{
+      $('loadStatus').textContent=msg;
+      if(msg.includes('Métadonnées'))setProgress($('progress'),.35);
+      if(msg.includes('renderer'))setProgress($('progress'),.6);
+    });
+    setProgress($('progress'),1);
+    $('loadStatus').className='status ok';
+    $('loadStatus').textContent='SCÈNE PRÊTE · '+metadata.gaussianCount.toLocaleString('fr-FR')+' Gaussians · '+metadata.image.width+'×'+metadata.image.height;
+    $('viewer').style.aspectRatio=metadata.image.width+'/'+metadata.image.height;
+    $('focusDepth').value=metadata.depth.focus.toFixed(3);
+    $('viewerBadge').textContent='Caméra centrale · convergence '+metadata.depth.focus.toFixed(3)+' m';
+    $('diagPanel').classList.remove('hidden');renderDiag();updateCameraInfo();
+    $('resultPanel').classList.add('hidden');$('simPanel').classList.add('hidden');
+    rendered=null;$('downloadZip').disabled=true;
+    return metadata;
+  }catch(err){
+    console.error(err);
+    $('loadStatus').className='status bad';$('loadStatus').textContent='CHARGEMENT BLOQUÉ — '+(err?.message||err);
+    setProgress($('progress'),0);metadata=null;
+    throw err;
+  }finally{setButtons(false)}
+}
+
+$('plyFile').addEventListener('change',async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  try{await loadGaussianFile(file,file.name);}catch{}
+});
+
+$('photoFile').addEventListener('change',e=>{
+  sourcePhotoFile=e.target.files?.[0]||null;
+  generatedPlyFile=null;
+  if(generatedPlyUrl){URL.revokeObjectURL(generatedPlyUrl);generatedPlyUrl=null;}
+  $('downloadGeneratedPly').disabled=true;
+  if(!sourcePhotoFile){
+    $('generateGaussian').disabled=true;
+    $('photoStatus').className='status';
+    $('photoStatus').textContent='Charge une photo pour lancer InfiniSplat directement depuis MicroPlayer.';
+    setProgress($('photoProgress'),0);
+    return;
+  }
+  $('generateGaussian').disabled=false;
+  $('photoStatus').className='status ok';
+  $('photoStatus').textContent='PHOTO PRÊTE · '+sourcePhotoFile.name+' · '+(sourcePhotoFile.size/1024/1024).toFixed(1)+' Mo\nLance Générer scene.ply.';
+  setProgress($('photoProgress'),.05);
+});
+
+function gradioPayload(result){
+  const value=result?.data?.[0] ?? result?.data ?? result;
+  return value && typeof value==='object' ? value : {};
+}
+function absoluteInfiniUrl(url){
+  if(!url)throw new Error('InfiniSplat n’a pas renvoyé le fichier PLY.');
+  return new URL(url,INFINISPLAT_BASE).href;
+}
+
+$('generateGaussian').addEventListener('click',async()=>{
+  if(!sourcePhotoFile)return;
+  stopPlay();setButtons(true);
+  $('downloadGeneratedPly').disabled=true;
+  setProgress($('photoProgress'),.08);
+  try{
+    $('photoStatus').className='status';
+    $('photoStatus').textContent='Connexion à InfiniSplat…';
+    if(!infiniClient) infiniClient=await Client.connect('PLUS-WAVE/InfiniSplat');
+
+    setProgress($('photoProgress'),.18);
+    $('photoStatus').textContent='RECONSTRUCTION 3D · envoi de la photo et calcul Gaussian…';
+    const reconstruction=await infiniClient.predict('/reconstruct',{image:handle_file(sourcePhotoFile)});
+    const rec=gradioPayload(reconstruction);
+    const requestId=rec.request_id;
+    if(!requestId)throw new Error('InfiniSplat n’a pas renvoyé de request_id.');
+
+    setProgress($('photoProgress'),.62);
+    $('photoStatus').textContent='RECONSTRUCTION OK · export du scene.ply…';
+    const exported=await infiniClient.predict('/export_ply',{request_id:requestId});
+    const ply=gradioPayload(exported);
+    const plyHttpUrl=absoluteInfiniUrl(ply.url);
+
+    setProgress($('photoProgress'),.78);
+    $('photoStatus').textContent='PLY prêt · transfert direct vers le simulateur MicroPlayer…';
+    const response=await fetch(plyHttpUrl);
+    if(!response.ok)throw new Error('Téléchargement PLY impossible · HTTP '+response.status);
+    const blob=await response.blob();
+    generatedPlyFile=new File([blob],'scene.ply',{type:'application/octet-stream'});
+    if(generatedPlyUrl)URL.revokeObjectURL(generatedPlyUrl);
+    generatedPlyUrl=URL.createObjectURL(blob);
+    $('downloadGeneratedPly').disabled=false;
+
+    setProgress($('photoProgress'),.9);
+    await loadGaussianFile(generatedPlyFile,'scene.ply généré par InfiniSplat');
+    setProgress($('photoProgress'),1);
+    $('photoStatus').className='status ok';
+    $('photoStatus').textContent='PHOTO → GAUSSIAN TERMINÉ · '+(blob.size/1024/1024).toFixed(1)+' Mo\nLe scene.ply est déjà chargé dans le simulateur. Lance TEST 3 vues.';
+  }catch(err){
+    console.error(err);
+    $('photoStatus').className='status bad';
+    $('photoStatus').textContent='GÉNÉRATION BLOQUÉE — '+(err?.message||err)+'\nTu peux toujours utiliser le champ scene.ply manuel juste dessous.';
+    setProgress($('photoProgress'),0);
+  }finally{
+    setButtons(false);
+  }
+});
+
+$('downloadGeneratedPly').addEventListener('click',()=>{
+  if(!generatedPlyUrl)return;
+  const a=document.createElement('a');
+  a.href=generatedPlyUrl;
+  a.download='scene.ply';
+  document.body.appendChild(a);a.click();a.remove();
+});
+
+async function run(mode){
+  if(!metadata)return;
+  stopPlay();setButtons(true);$('downloadZip').disabled=true;setProgress($('renderProgress'),0);
+  $('renderStatus').className='status';
+  const isNine=mode==='nine',opts=currentOptions(!isNine);
+  $('renderStatus').textContent=(isNine?'PRODUCTION 9 VUES':'TEST 3 VUES')+' · démarrage…';
+  try{
+    const fn=isNine?'renderNine':'renderThree';
+    const data=await studio[fn](opts,p=>{
+      setProgress($('renderProgress'),p.current/p.total);
+      $('renderStatus').textContent=(isNine?'PRODUCTION':'TEST')+' · vue '+String(p.index).padStart(2,'0')+' · '+p.current+'/'+p.total;
+      $('viewerBadge').textContent='Rendu vue '+String(p.index).padStart(2,'0')+' · x '+(p.planView.eyeX*1000).toFixed(1)+' mm';
+    });
+    showRendered(data);
+    const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
+    $('renderStatus').className=worst<=.25?'status ok':'status warn';
+    const framePct=((Number(opts.framingScale)||1.22)-1)*100;
+    const headPct=(Number(opts.headroomRatio)||.10)*100;
+    const repairedBorder=Math.max(...data.views.map(v=>v.qc.borderRepair?.borderRepairedPercent||0));
+    const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
+    $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
+      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · cadrage +'+framePct.toFixed(0)+'% · headroom +'+headPct.toFixed(0)+'% · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%';
+  }catch(err){
+    console.error(err);
+    $('renderStatus').className='status bad';$('renderStatus').textContent='RENDU BLOQUÉ — '+(err?.message||err);
+  }finally{
+    $('viewerBadge').textContent='Caméra centrale · convergence '+Number($('focusDepth').value).toFixed(3)+' m';
+    setButtons(false);
+  }
+}
+$('test3').onclick=()=>run('three');
+$('render9').onclick=()=>run('nine');
+
+$('downloadZip').onclick=async()=>{
+  if(!rendered||rendered.views.length!==9||!metadata)return;
+  const btn=$('downloadZip');btn.disabled=true;btn.textContent='Création ZIP…';
+  try{
+    const zip=new JSZip();
+    const folder=zip.folder('views');
+    for(const v of rendered.views)folder.file(v.name,v.blob);
+    const profile=Number($('disparity').value)<=.0125?'doux':'renforce';
+    const manifest=buildManifest(metadata,rendered,profile);
+    zip.file('manifest.json',JSON.stringify(manifest,null,2));
+    const montage=await makeMontage(rendered.views,3,420);
+    zip.file('montage.jpg',montage);
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5}},m=>{
+      btn.textContent='ZIP '+Math.round(m.percent)+'%';
+    });
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='MicroPlayer-Gaussian-9-vues-'+profile+'.zip';document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    $('renderStatus').className='status ok';$('renderStatus').textContent+=' · ZIP exporté.';
+  }catch(err){
+    $('renderStatus').className='status bad';$('renderStatus').textContent='ZIP BLOQUÉ — '+(err?.message||err);
+  }finally{btn.disabled=false;btn.textContent='ZIP production'}
+};
+
+window.addEventListener('beforeunload',()=>{
+  stopPlay();revokePreviews();
+  if(generatedPlyUrl)URL.revokeObjectURL(generatedPlyUrl);
+  studio.dispose();
+});
+</script>
+</body>
+</html>
