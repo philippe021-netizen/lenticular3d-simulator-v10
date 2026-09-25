@@ -57,23 +57,16 @@
         <label class="field">Convergence sujet (m)
           <input id="focusDepth" type="number" min="0.10" max="20" step="0.01" value="1">
         </label>
-        <label class="field">Safe framing — marge autour du sujet
+        <label class="field">Marge de sécurité — vues latérales 01/09
           <select id="framing">
-            <option value="1.14">Standard +14%</option>
-            <option value="1.22" selected>Portrait sûr +22%</option>
-            <option value="1.28">Large +28%</option>
-            <option value="1.34">Très large +34%</option>
+            <option value="1.08">+8%</option>
+            <option value="1.12" selected>+12% recommandé</option>
+            <option value="1.16">+16%</option>
+            <option value="1.20">+20%</option>
           </select>
         </label>
-        <label class="field">Headroom — descendre le sujet dans le cadre
-          <select id="headroom">
-            <option value="0.04">+4%</option>
-            <option value="0.06">+6%</option>
-            <option value="0.08">+8%</option>
-            <option value="0.10" selected>Auto +10%</option>
-            <option value="0.12">+12%</option>
-          </select>
-        </label>
+        <input id="headroom" type="hidden" value="0">
+        <div class="status ok">Vue 05 = caméra native du PLY · aucun déplacement vertical · aucun recadrage automatique.</div>
         <label class="field">Résolution production
           <select id="resolution">
             <option value="0">Source PLY</option>
@@ -83,7 +76,7 @@
           </select>
         </label>
         <div id="cameraInfo" class="status">Les valeurs métriques apparaîtront après chargement.</div>
-        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. Vue 05 centrale. Safe framing + headroom identiques sur les 9 vues. Reconstruction locale des trous reliés au bord activée.</div>
+        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. La vue 05 reprend exactement les intrinsics fx/fy/cx/cy du PLY. La marge apparaît progressivement uniquement vers les vues latérales 01/09. Reconstruction locale des trous de fond activée.</div>
       </section>
 
       <section class="panel">
@@ -99,7 +92,7 @@
 
       <section class="panel">
         <h2>Règles V01</h2>
-        <div class="small">Le sujet principal n’est jamais régénéré. Le headroom +10% est le réglage de production. Les bords ET les désocclusions transparentes derrière le sujet sont reconstruits depuis le côté fond, jamais depuis le visage/corps. Le profil 0,018 reste un test de relief renforcé ; la production par défaut est 0,012 pour limiter les artefacts.</div>
+        <div class="small">Le sujet principal n’est jamais régénéré. La vue 05 conserve la caméra native du scene.ply, sans headroom ni mode cover. Les vues latérales reçoivent seulement une petite marge progressive pour éviter de couper tête et bords. Les trous transparents sont reconstruits depuis le fond, jamais depuis le visage/corps. Le profil 0,018 reste un test ; la production par défaut est 0,012.</div>
       </section>
     </aside>
 
@@ -161,8 +154,8 @@ function currentOptions(preview=false){
   return {
     maxDisparity:Number($('disparity').value)||.012,
     focusDepth:Number($('focusDepth').value)||metadata?.depth?.focus||1,
-    framingScale:Number($('framing').value)||1.22,
-    headroomRatio:Number($('headroom').value)||0.10,
+    framingScale:Number($('framing').value)||1.12,
+    headroomRatio:0,
     repairBorders:true,
     maxEdge:preview?1024:Number($('resolution').value)||0,
     settleFrames:3
@@ -178,11 +171,12 @@ function updateCameraInfo(){
   if(!metadata)return;
   const p=cameraPlan(metadata,Number($('disparity').value),Number($('focusDepth').value));
   $('cameraInfo').className='status ok';
-  const framing=(Number($('framing').value)||1.14);
+  const framing=(Number($('framing').value)||1.12);
   $('cameraInfo').textContent=
     'Amplitude caméra : ±'+fmt(p.cameraHalfRangeMillimeters,2)+' mm\n'+
     'Convergence : '+fmt(p.focusDepth,3)+' m\n'+
-    'Safe framing : +'+fmt((framing-1)*100,0)+'%\n'+
+    'Vue 05 : caméra native PLY · marge 0%\n'+
+    'Marge max vues 01/09 : +'+fmt((framing-1)*100,0)+'%\n'+
     'Vue 01 → 09 : '+fmt(-p.cameraHalfRangeMillimeters,2)+' à +'+fmt(p.cameraHalfRangeMillimeters,2)+' mm';
 }
 function renderDiag(){
@@ -218,7 +212,7 @@ function showRendered(data){
     const card=document.createElement('div');card.className='viewCard';
     const repair=v.qc.borderRepair||{};
     card.innerHTML='<img src="'+url+'" alt="'+v.name+'"><div class="viewMeta">Vue '+String(v.index).padStart(2,'0')+
-      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · cadrage +'+((v.framingScale-1)*100).toFixed(0)+'% · headroom +'+((v.headroomRatio||0)*100).toFixed(0)+'% · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
+      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · marge +'+((v.framingScale-1)*100).toFixed(0)+'% · caméra Y native · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
     $('views').appendChild(card);
   }
   const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
