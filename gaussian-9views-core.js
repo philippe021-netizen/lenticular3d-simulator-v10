@@ -1,5 +1,4 @@
-import * as THREE from 'three';
-import { SplatMesh } from '@sparkjsdev/spark';
+import { NativeGaussianRenderer } from './gaussian-native-projection.js';
 
 const TYPE_INFO = {
   char:{size:1,read:(v,o)=>v.getInt8(o)},
@@ -355,28 +354,9 @@ export function cameraPlan(metadata,maxDisparity=0.018,focusDepth){
 export class GaussianNineViewStudio{
   constructor(container){
     this.container=container;
-    this.scene=new THREE.Scene();
-    this.camera=new THREE.PerspectiveCamera(45,4/3,.01,500);
-    this.camera.up.set(0,-1,0);
-    this.renderer=new THREE.WebGLRenderer({
-      antialias:true,
-      alpha:true,
-      preserveDrawingBuffer:true,
-      powerPreference:'high-performance'
-    });
-    this.renderer.setPixelRatio(1);
-    this.renderer.setClearColor(0x000000,0);
-    this.renderer.outputColorSpace=THREE.SRGBColorSpace;
-    this.renderer.domElement.style.width='100%';
-    this.renderer.domElement.style.height='100%';
-    this.renderer.domElement.style.display='block';
-    this.renderer.domElement.style.objectFit='contain';
-    container.appendChild(this.renderer.domElement);
-    this.mesh=null;
+    this.native=new NativeGaussianRenderer(container);
     this.metadata=null;
     this.file=null;
-    this.renderWidth=0;
-    this.renderHeight=0;
   }
 
   async load(file,onStatus=()=>{}){
@@ -386,109 +366,39 @@ export class GaussianNineViewStudio{
     const metadata=inspectGaussianPly(buffer);
     onStatus('Métadonnées lues · '+metadata.gaussianCount.toLocaleString('fr-FR')+' Gaussians');
 
-    if(this.mesh){
-      this.scene.remove(this.mesh);
-      try{this.mesh.dispose();}catch{}
-      this.mesh=null;
-    }
-
-    const blob=new Blob([buffer],{type:'application/octet-stream'});
-    const url=URL.createObjectURL(blob);
-    try{
-      onStatus('Chargement du renderer Gaussian…');
-      const mesh=new SplatMesh({url});
-      this.scene.add(mesh);
-      await mesh.initialized;
-      this.mesh=mesh;
-    }finally{
-      URL.revokeObjectURL(url);
-    }
-
+    // IMPORTANT: aucun SplatMesh, aucun auto-fit, aucun FOV recalculé.
+    // Le même buffer brut alimente directement le rasterizer natif.
+    this.native.load(buffer,metadata,onStatus);
     this.file=file;
     this.metadata=metadata;
-    this.setOutputSize(metadata.image.width,metadata.image.height);
-    this.setCamera(0,metadata.depth.focus,0.06);
-    await this.settle(3);
-    onStatus('Scène Gaussian prête.');
+
+    // Vue centrale = projection native exacte du PLY.
+    this.native.render({
+      eyeX:0,
+      focusDepth:metadata.depth.focus,
+      width:metadata.image.width,
+      height:metadata.image.height
+    });
+    onStatus('Scène prête · vue centrale en projection native directe.');
     return metadata;
   }
 
-  setOutputSize(width,height,framingScale=1){
-    const w=Math.max(64,Math.round(width)),h=Math.max(64,Math.round(height));
-    this.renderWidth=w;this.renderHeight=h;
-    this.renderer.setSize(w,h,false);
-
-    // Rebuild the projection from the PLY intrinsics instead of approximating it
-    // with a centered PerspectiveCamera. This keeps view 05 on the native camera.
-    const intr=this.metadata?.intrinsics||{};
-    const srcW=Math.max(1,Number(this.metadata?.image?.width)||w);
-    const srcH=Math.max(1,Number(this.metadata?.image?.height)||h);
-    const sx=w/srcW,sy=h/srcH;
-    const fx=Math.max(1,(Number(intr.fx)||srcH*1.07)*sx);
-    const fy=Math.max(1,(Number(intr.fy)||srcH*1.07)*sy);
-    const cx=(Number.isFinite(Number(intr.cx))?Number(intr.cx):srcW/2)*sx;
-    const cy=(Number.isFinite(Number(intr.cy))?Number(intr.cy):srcH/2)*sy;
-    const safeScale=clamp(Number(framingScale)||1,1,1.30);
-    const near=.01;
-    const far=Math.max(100,Number(this.metadata?.depth?.far||50)*2);
-
-    const left=(-cx*near/fx)*safeScale;
-    const right=((w-cx)*near/fx)*safeScale;
-    const top=(cy*near/fy)*safeScale;
-    const bottom=(-(h-cy)*near/fy)*safeScale;
-
-    this.camera.near=near;
-    this.camera.far=far;
-    this.camera.aspect=w/h;
-    this.camera.fov=2*Math.atan((h*safeScale)/(2*fy))*180/Math.PI;
-    this.camera.projectionMatrix.makePerspective(left,right,top,bottom,near,far);
-    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
-    this.framingScale=safeScale;
-  }
-
-  setCamera(eyeX,focusDepth,headroomRatio=0){
-    const focus=Math.max(.05,Number(focusDepth)||1);
-    // Native PLY optical axis: no automatic vertical translation and no CSS-style
-    // cover/crop. Only the requested lateral camera displacement is applied.
-    this.camera.position.set(Number(eyeX)||0,0,0);
-    this.camera.up.set(0,-1,0);
-    this.camera.lookAt(new THREE.Vector3(0,0,focus));
-    this.camera.updateMatrixWorld(true);
-    this.headroomRatio=0;
-  }
-
-  async settle(frames=2){
-    for(let i=0;i<frames;i++){
-      await waitFrame();
-      this.renderer.render(this.scene,this.camera);
-    }
-    this.renderer.render(this.scene,this.camera);
-  }
-
   async snapshot(planView,focusDepth,options={}){
-    if(!this.mesh||!this.metadata)throw new Error('Charge d’abord un scene.ply.');
-    const maxEdge=Number(options.maxEdge)||0;
-    const maxSideMargin=clamp(Number(options.framingScale)||1.12,1,1.30);
-    // View 05 stays exactly on the native PLY projection. The safety margin is
-    // introduced progressively only as the camera moves toward views 01/09.
-    const sideFactor=Math.min(1,Math.abs(Number(planView.normal)||0));
-    const framingScale=1+(maxSideMargin-1)*sideFactor;
-    let w=this.metadata.image.width,h=this.metadata.image.height;
-    if(maxEdge>0&&Math.max(w,h)>maxEdge){
-      const s=maxEdge/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);
-    }
-    if(w!==this.renderWidth||h!==this.renderHeight||Math.abs((this.framingScale||1)-framingScale)>1e-6)this.setOutputSize(w,h,framingScale);
-    this.setCamera(planView.eyeX,focusDepth,0);
-    await this.settle(options.settleFrames??3);
+    if(!this.metadata)throw new Error('Charge d’abord un scene.ply.');
 
-    const copy=document.createElement('canvas');
-    copy.width=this.renderWidth;copy.height=this.renderHeight;
-    const ctx=copy.getContext('2d',{willReadFrequently:true});
-    ctx.clearRect(0,0,copy.width,copy.height);
-    ctx.drawImage(this.renderer.domElement,0,0,copy.width,copy.height);
+    const copy=this.native.renderToCanvas({
+      eyeX:Number(planView.eyeX)||0,
+      focusDepth,
+      maxEdge:Number(options.maxEdge)||0,
+      pointGain:Number(options.pointGain)||2.35
+    });
+
+    // La reconstruction intervient APRÈS la projection. Elle ne peut donc pas
+    // modifier la caméra, la focale ou le cadrage du sujet.
     const repair=options.repairBorders===false
-      ? {repairedPixels:0,repairedPercent:0,remainingTransparentPercent:null,mode:'disabled'}
+      ? {repairedPixels:0,repairedPercent:0,borderRepairedPixels:0,borderRepairedPercent:0,interiorRepairedPixels:0,interiorRepairedPercent:0,remainingTransparentPercent:null,mode:'disabled'}
       : repairBorderTransparency(copy);
+    const ctx=copy.getContext('2d',{willReadFrequently:true});
     const imageData=ctx.getImageData(0,0,copy.width,copy.height);
     const qc={...analyzeAlpha(imageData),borderRepair:repair};
     const blob=await canvasBlob(copy,'image/png');
@@ -499,6 +409,11 @@ export class GaussianNineViewStudio{
     if(!this.metadata)throw new Error('Aucune scène chargée.');
     const plan=cameraPlan(this.metadata,options.maxDisparity,options.focusDepth);
     const out=[];
+
+    // Contrôle central systématique : la vue 05 doit rester eyeX=0.
+    const center=plan.views[4];
+    if(Math.abs(center.eyeX)>1e-9)throw new Error('ÉCHEC CAMÉRA NATIVE — la vue 05 n’est pas centrée.');
+
     for(let n=0;n<indices.length;n++){
       const index=indices[n],pv=plan.views[index-1];
       onProgress({current:n+1,total:indices.length,index,planView:pv});
@@ -508,23 +423,21 @@ export class GaussianNineViewStudio{
         name:'view_'+String(index).padStart(2,'0')+'.png',
         normal:pv.normal,
         eyeX:pv.eyeX,
-        framingScale:1+(clamp(Number(options.framingScale)||1.12,1,1.30)-1)*Math.min(1,Math.abs(Number(pv.normal)||0)),
+        framingScale:1,
         headroomRatio:0,
+        projectionMode:'native-ply-direct',
         ...snap
       });
       await waitFrame();
     }
-    this.setOutputSize(
-      options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
-        ? Math.round(this.metadata.image.width*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
-        : this.metadata.image.width,
-      options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
-        ? Math.round(this.metadata.image.height*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
-        : this.metadata.image.height,
-      1
-    );
-    this.setCamera(0,plan.focusDepth,0);
-    await this.settle(2);
+
+    // Remet toujours l’aperçu sur la vraie caméra centrale.
+    this.native.render({
+      eyeX:0,
+      focusDepth:plan.focusDepth,
+      width:this.metadata.image.width,
+      height:this.metadata.image.height
+    });
     return {plan,views:out};
   }
 
@@ -537,12 +450,9 @@ export class GaussianNineViewStudio{
   }
 
   dispose(){
-    if(this.mesh){
-      this.scene.remove(this.mesh);
-      try{this.mesh.dispose();}catch{}
-    }
-    this.renderer.dispose();
-    this.container.innerHTML='';
+    this.native?.dispose();
+    this.metadata=null;
+    this.file=null;
   }
 }
 
@@ -585,7 +495,7 @@ export function buildManifest(metadata,rendered,profile){
       disparityMetadata:metadata.disparity
     },
     camera:{
-      model:'metric-lateral-converged',
+      model:'native-ply-lateral-off-axis-converged',
       maxDisparity:rendered.plan.maxDisparity,
       halfRangeMeters:rendered.plan.cameraHalfRangeMeters,
       halfRangeMillimeters:rendered.plan.cameraHalfRangeMillimeters,
@@ -600,8 +510,11 @@ export function buildManifest(metadata,rendered,profile){
       order:'left-to-right',
       centerView:5,
       profile,
-      projectionMode:'native-ply-intrinsics',
+      projectionMode:'native-ply-direct-rasterizer',
       centerViewNativeProjection:true,
+      autoFit:false,
+      autoCenter:false,
+      autoZoom:false,
       maxSideFramingScale:Math.max(...rendered.views.map(v=>v.framingScale||1)),
       maxSideFramingMarginPercent:Number(((Math.max(...rendered.views.map(v=>v.framingScale||1))-1)*100).toFixed(1)),
       headroomRatio:0,
