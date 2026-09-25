@@ -363,19 +363,19 @@ export class GaussianNineViewStudio{
     this.file=file;
     this.metadata=metadata;
     this.setOutputSize(metadata.image.width,metadata.image.height);
-    this.setCamera(0,metadata.depth.focus);
+    this.setCamera(0,metadata.depth.focus,0.06);
     await this.settle(3);
     onStatus('Scène Gaussian prête.');
     return metadata;
   }
 
-  setOutputSize(width,height,framingScale=1.14){
+  setOutputSize(width,height,framingScale=1.22){
     const w=Math.max(64,Math.round(width)),h=Math.max(64,Math.round(height));
     this.renderWidth=w;this.renderHeight=h;
     this.renderer.setSize(w,h,false);
     this.camera.aspect=w/h;
     const fy=this.metadata?.intrinsics?.fy||h*1.07;
-    const safeScale=clamp(Number(framingScale)||1.14,1,1.35);
+    const safeScale=clamp(Number(framingScale)||1.22,1,1.45);
     // Safe framing: enlarge the virtual sensor instead of cropping/scaling the PNG afterwards.
     // This keeps one identical camera framing for all 9 views and reveals extra Gaussian content
     // around the original frame, especially above the head.
@@ -412,7 +412,7 @@ export class GaussianNineViewStudio{
   async snapshot(planView,focusDepth,options={}){
     if(!this.mesh||!this.metadata)throw new Error('Charge d’abord un scene.ply.');
     const maxEdge=Number(options.maxEdge)||0;
-    const framingScale=clamp(Number(options.framingScale)||1.14,1,1.35);
+    const framingScale=clamp(Number(options.framingScale)||1.22,1,1.45);
     let w=this.metadata.image.width,h=this.metadata.image.height;
     if(maxEdge>0&&Math.max(w,h)>maxEdge){
       const s=maxEdge/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);
@@ -449,7 +449,7 @@ export class GaussianNineViewStudio{
         normal:pv.normal,
         eyeX:pv.eyeX,
         framingScale:clamp(Number(options.framingScale)||1.22,1,1.45),
-        headroomRatio:clamp(Number(options.headroomRatio)??0.06,0,.15),
+        headroomRatio:clamp(Number(options.headroomRatio)||0.06,0,.15),
         ...snap
       });
       await waitFrame();
