@@ -51,10 +51,18 @@
         </label>
         <label class="field">Safe framing — marge autour du sujet
           <select id="framing">
-            <option value="1.08">Standard +8%</option>
-            <option value="1.14" selected>Portrait sûr +14%</option>
-            <option value="1.20">Large +20%</option>
-            <option value="1.26">Très large +26%</option>
+            <option value="1.14">Standard +14%</option>
+            <option value="1.22" selected>Portrait sûr +22%</option>
+            <option value="1.28">Large +28%</option>
+            <option value="1.34">Très large +34%</option>
+          </select>
+        </label>
+        <label class="field">Headroom — descendre le sujet dans le cadre
+          <select id="headroom">
+            <option value="0.04">+4%</option>
+            <option value="0.06" selected>Auto +6%</option>
+            <option value="0.08">+8%</option>
+            <option value="0.10">+10%</option>
           </select>
         </label>
         <label class="field">Résolution production
@@ -66,7 +74,7 @@
           </select>
         </label>
         <div id="cameraInfo" class="status">Les valeurs métriques apparaîtront après chargement.</div>
-        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. La vue 05 reste la caméra centrale. Le même safe framing est verrouillé sur les 9 vues.</div>
+        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. Vue 05 centrale. Safe framing + headroom identiques sur les 9 vues. Reconstruction locale des trous reliés au bord activée.</div>
       </section>
 
       <section class="panel">
@@ -82,7 +90,7 @@
 
       <section class="panel">
         <h2>Règles V01</h2>
-        <div class="small">Le sujet principal n’est jamais régénéré. Safe framing obligatoire : la production utilise un cadrage commun aux 9 vues avec marge haute de sécurité. Si la tête paraît encore trop proche du bord, passe sur Large +20% avant l’export.</div>
+        <div class="small">Le sujet principal n’est jamais régénéré. Le headroom déplace réellement la caméra vers le haut pour laisser de l’air au-dessus de la tête. Les trous reliés aux bords sont reconstruits par extension de texture locale ; les trous intérieurs autour du sujet restent intacts pour éviter tout faux visage.</div>
       </section>
     </aside>
 
@@ -138,7 +146,9 @@ function currentOptions(preview=false){
   return {
     maxDisparity:Number($('disparity').value)||.018,
     focusDepth:Number($('focusDepth').value)||metadata?.depth?.focus||1,
-    framingScale:Number($('framing').value)||1.14,
+    framingScale:Number($('framing').value)||1.22,
+    headroomRatio:Number($('headroom').value)||0.06,
+    repairBorders:true,
     maxEdge:preview?1024:Number($('resolution').value)||0,
     settleFrames:3
   };
@@ -189,15 +199,17 @@ function showRendered(data){
   for(const v of data.views){
     const url=URL.createObjectURL(v.blob);previewUrls.push(url);
     const card=document.createElement('div');card.className='viewCard';
+    const repair=v.qc.borderRepair?.repairedPercent??0;
     card.innerHTML='<img src="'+url+'" alt="'+v.name+'"><div class="viewMeta">Vue '+String(v.index).padStart(2,'0')+
-      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · cadrage +'+((v.framingScale-1)*100).toFixed(0)+'% · trous centre '+v.qc.transparentCenterPercent.toFixed(3)+'%</div>';
+      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · cadrage +'+((v.framingScale-1)*100).toFixed(0)+'% · headroom +'+((v.headroomRatio||0)*100).toFixed(0)+'% · bords réparés '+repair.toFixed(2)+'%</div>';
     $('views').appendChild(card);
   }
   const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
+  const repaired=Math.max(...data.views.map(v=>v.qc.borderRepair?.repairedPercent||0));
   $('qcStatus').className=worst<=.25?'status ok':'status warn';
   $('qcStatus').textContent=worst<=.25
-    ?'FOND CENTRAL PROPRE · zones découvertes centrales max '+worst.toFixed(3)+'% · sujet non régénéré.'
-    :'FOND À SÉCURISER · zones découvertes centrales max '+worst.toFixed(3)+'% · ne pas réparer le sujet.';
+    ?'FOND CENTRAL PROPRE · bords reconstruits jusqu’à '+repaired.toFixed(2)+'% de l’image · sujet non régénéré.'
+    :'FOND CENTRAL À SURVEILLER · bords reconstruits jusqu’à '+repaired.toFixed(2)+'% · aucune réparation appliquée au sujet.';
   if(data.views.length===9){
     $('simPanel').classList.remove('hidden');
     $('downloadZip').disabled=false;
@@ -237,6 +249,7 @@ $('disparity').addEventListener('input',updateCameraInfo);
 updatePresetButtons();
 $('focusDepth').addEventListener('input',updateCameraInfo);
 $('framing').addEventListener('change',updateCameraInfo);
+$('headroom').addEventListener('change',updateCameraInfo);
 
 $('plyFile').addEventListener('change',async e=>{
   const file=e.target.files?.[0];if(!file)return;
@@ -280,9 +293,11 @@ async function run(mode){
     showRendered(data);
     const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
     $('renderStatus').className=worst<=.25?'status ok':'status warn';
-    const framePct=((Number(opts.framingScale)||1.14)-1)*100;
+    const framePct=((Number(opts.framingScale)||1.22)-1)*100;
+    const headPct=(Number(opts.headroomRatio)||.06)*100;
+    const repairedMax=Math.max(...data.views.map(v=>v.qc.borderRepair?.repairedPercent||0));
     $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
-      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · safe framing +'+framePct.toFixed(0)+'% · trous centraux max '+worst.toFixed(3)+'%';
+      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · cadrage +'+framePct.toFixed(0)+'% · headroom +'+headPct.toFixed(0)+'% · bords réparés '+repairedMax.toFixed(2)+'%';
   }catch(err){
     console.error(err);
     $('renderStatus').className='status bad';$('renderStatus').textContent='RENDU BLOQUÉ — '+(err?.message||err);
