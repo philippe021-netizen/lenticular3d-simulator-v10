@@ -49,6 +49,14 @@
         <label class="field">Convergence sujet (m)
           <input id="focusDepth" type="number" min="0.10" max="20" step="0.01" value="1">
         </label>
+        <label class="field">Safe framing — marge autour du sujet
+          <select id="framing">
+            <option value="1.08">Standard +8%</option>
+            <option value="1.14" selected>Portrait sûr +14%</option>
+            <option value="1.20">Large +20%</option>
+            <option value="1.26">Très large +26%</option>
+          </select>
+        </label>
         <label class="field">Résolution production
           <select id="resolution">
             <option value="0">Source PLY</option>
@@ -58,7 +66,7 @@
           </select>
         </label>
         <div id="cameraInfo" class="status">Les valeurs métriques apparaîtront après chargement.</div>
-        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. La vue 05 reste la caméra centrale.</div>
+        <div class="small">Forward = 0 · Z offset = 0 · 9 positions régulières. La vue 05 reste la caméra centrale. Le même safe framing est verrouillé sur les 9 vues.</div>
       </section>
 
       <section class="panel">
@@ -74,7 +82,7 @@
 
       <section class="panel">
         <h2>Règles V01</h2>
-        <div class="small">Le sujet principal n’est jamais régénéré. Les défauts du fond sont mesurés via les zones non couvertes par les Gaussians. Cette V01 signale les zones à réparer mais ne les invente pas.</div>
+        <div class="small">Le sujet principal n’est jamais régénéré. Safe framing obligatoire : la production utilise un cadrage commun aux 9 vues avec marge haute de sécurité. Si la tête paraît encore trop proche du bord, passe sur Large +20% avant l’export.</div>
       </section>
     </aside>
 
@@ -130,6 +138,7 @@ function currentOptions(preview=false){
   return {
     maxDisparity:Number($('disparity').value)||.018,
     focusDepth:Number($('focusDepth').value)||metadata?.depth?.focus||1,
+    framingScale:Number($('framing').value)||1.14,
     maxEdge:preview?1024:Number($('resolution').value)||0,
     settleFrames:3
   };
@@ -138,9 +147,11 @@ function updateCameraInfo(){
   if(!metadata)return;
   const p=cameraPlan(metadata,Number($('disparity').value),Number($('focusDepth').value));
   $('cameraInfo').className='status ok';
+  const framing=(Number($('framing').value)||1.14);
   $('cameraInfo').textContent=
     'Amplitude caméra : ±'+fmt(p.cameraHalfRangeMillimeters,2)+' mm\n'+
     'Convergence : '+fmt(p.focusDepth,3)+' m\n'+
+    'Safe framing : +'+fmt((framing-1)*100,0)+'%\n'+
     'Vue 01 → 09 : '+fmt(-p.cameraHalfRangeMillimeters,2)+' à +'+fmt(p.cameraHalfRangeMillimeters,2)+' mm';
 }
 function renderDiag(){
@@ -173,7 +184,7 @@ function showRendered(data){
     const url=URL.createObjectURL(v.blob);previewUrls.push(url);
     const card=document.createElement('div');card.className='viewCard';
     card.innerHTML='<img src="'+url+'" alt="'+v.name+'"><div class="viewMeta">Vue '+String(v.index).padStart(2,'0')+
-      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · trous centre '+v.qc.transparentCenterPercent.toFixed(3)+'%</div>';
+      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · cadrage +'+((v.framingScale-1)*100).toFixed(0)+'% · trous centre '+v.qc.transparentCenterPercent.toFixed(3)+'%</div>';
     $('views').appendChild(card);
   }
   const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
@@ -218,6 +229,7 @@ $('softPreset').onclick=()=>{$('disparity').value='0.012';updateCameraInfo()};
 $('strongPreset').onclick=()=>{$('disparity').value='0.018';updateCameraInfo()};
 $('disparity').addEventListener('input',updateCameraInfo);
 $('focusDepth').addEventListener('input',updateCameraInfo);
+$('framing').addEventListener('change',updateCameraInfo);
 
 $('plyFile').addEventListener('change',async e=>{
   const file=e.target.files?.[0];if(!file)return;
@@ -261,8 +273,9 @@ async function run(mode){
     showRendered(data);
     const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
     $('renderStatus').className=worst<=.25?'status ok':'status warn';
+    const framePct=((Number(opts.framingScale)||1.14)-1)*100;
     $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
-      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · trous centraux max '+worst.toFixed(3)+'%';
+      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · safe framing +'+framePct.toFixed(0)+'% · trous centraux max '+worst.toFixed(3)+'%';
   }catch(err){
     console.error(err);
     $('renderStatus').className='status bad';$('renderStatus').textContent='RENDU BLOQUÉ — '+(err?.message||err);
