@@ -182,19 +182,23 @@ function repairBorderTransparency(canvas){
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
   const img=ctx.getImageData(0,0,canvas.width,canvas.height);
   const {data,width:W,height:H}=img,N=W*H;
-  const transparent=new Uint8Array(N);
-  let transparentBefore=0;
+  const original=new Uint8ClampedArray(data);
+  const hole=new Uint8Array(N);
+  let holesBefore=0;
   for(let i=0;i<N;i++){
-    if(data[i*4+3]<8){transparent[i]=1;transparentBefore++;}
+    if(original[i*4+3]<16){hole[i]=1;holesBefore++;}
   }
-  if(!transparentBefore)return {repairedPixels:0,repairedPercent:0,remainingTransparentPercent:0};
+  if(!holesBefore)return {
+    repairedPixels:0,repairedPercent:0,
+    borderRepairedPixels:0,borderRepairedPercent:0,
+    interiorRepairedPixels:0,interiorRepairedPercent:0,
+    remainingTransparentPercent:0,mode:'background-directed-inpaint'
+  };
 
-  // Find only transparent regions connected to the image border.
-  // Interior holes around the subject are deliberately not touched.
-  const connected=new Uint8Array(N);
-  const queue=new Int32Array(N);
+  // Classify holes that touch the outer frame.
+  const borderHole=new Uint8Array(N),queue=new Int32Array(N);
   let qh=0,qt=0;
-  const push=i=>{if(transparent[i]&&!connected[i]){connected[i]=1;queue[qt++]=i;}};
+  const push=i=>{if(i>=0&&i<N&&hole[i]&&!borderHole[i]){borderHole[i]=1;queue[qt++]=i;}};
   for(let x=0;x<W;x++){push(x);push((H-1)*W+x);}
   for(let y=1;y<H-1;y++){push(y*W);push(y*W+W-1);}
   while(qh<qt){
@@ -202,84 +206,124 @@ function repairBorderTransparency(canvas){
     if(x>0)push(i-1);if(x<W-1)push(i+1);if(y>0)push(i-W);if(y<H-1)push(i+W);
   }
 
-  const repaired=new Uint8Array(N);
-  const copy=(di,si)=>{
-    const d=di*4,s=si*4;
-    data[d]=data[s];data[d+1]=data[s+1];data[d+2]=data[s+2];data[d+3]=255;
-    repaired[di]=1;
+  const cx=(W-1)/2,cy=(H-1)/2;
+  const maxSearch=Math.round(Math.max(W,H)*.28);
+  const isGood=(x,y)=>{
+    if(x<0||x>=W||y<0||y>=H)return false;
+    return original[(y*W+x)*4+3]>=96;
+  };
+  const patchColor=(x,y)=>{
+    let r=0,g=0,b=0,n=0;
+    for(let oy=-2;oy<=2;oy++)for(let ox=-2;ox<=2;ox++){
+      const xx=x+ox,yy=y+oy;
+      if(!isGood(xx,yy))continue;
+      const p=(yy*W+xx)*4;
+      r+=original[p];g+=original[p+1];b+=original[p+2];n++;
+    }
+    if(!n)return null;
+    return [Math.round(r/n),Math.round(g/n),Math.round(b/n)];
+  };
+  const write=(i,color)=>{
+    if(!color)return false;
+    const p=i*4;data[p]=color[0];data[p+1]=color[1];data[p+2]=color[2];data[p+3]=255;return true;
   };
 
-  // 1) Reflect real border texture horizontally. This preserves much more texture
-  // than a flat nearest-pixel extension on tree / water / pavement backgrounds.
-  for(let y=0;y<H;y++){
-    const row=y*W;let left=-1,right=-1;
-    for(let x=0;x<W;x++){if(!transparent[row+x]){left=x;break;}}
-    for(let x=W-1;x>=0;x--){if(!transparent[row+x]){right=x;break;}}
-    if(left<0||right<0)continue;
-    for(let x=0;x<left;x++){
-      const i=row+x;if(!connected[i])continue;
-      const sx=Math.min(right,left+(left-x));
-      copy(i,row+sx);
+  function findBackgroundSample(x,y,isBorder){
+    let dx=0,dy=0;
+    if(isBorder){
+      // For outer holes move inward, then deliberately skip the fragile contour
+      // before sampling a stable patch.
+      const dl=x,dr=W-1-x,dt=y,db=H-1-y;
+      const m=Math.min(dl,dr,dt,db);
+      if(m===dl)dx=1;else if(m===dr)dx=-1;else if(m===dt)dy=1;else dy=-1;
+    }else{
+      // Interior disocclusion: move away from the centered subject. This avoids
+      // borrowing hair/skin/clothes as "background".
+      const nx=(x-cx)/(W/2),ny=(y-cy)/(H/2);
+      if(Math.abs(nx)>=Math.abs(ny)){dx=nx<0?-1:1;}else{dy=ny<0?-1:1;}
     }
-    for(let x=W-1;x>right;x--){
-      const i=row+x;if(!connected[i])continue;
-      const sx=Math.max(left,right-(x-right));
-      copy(i,row+sx);
+
+    let first=-1;
+    for(let s=1;s<=maxSearch;s++){
+      const xx=Math.round(x+dx*s),yy=Math.round(y+dy*s);
+      if(xx<0||xx>=W||yy<0||yy>=H)break;
+      if(isGood(xx,yy)){first=s;break;}
+    }
+    if(first<0){
+      // Opposite direction fallback.
+      dx=-dx;dy=-dy;
+      for(let s=1;s<=maxSearch;s++){
+        const xx=Math.round(x+dx*s),yy=Math.round(y+dy*s);
+        if(xx<0||xx>=W||yy<0||yy>=H)break;
+        if(isGood(xx,yy)){first=s;break;}
+      }
+    }
+    if(first<0)return null;
+
+    // Skip 6–18 px beyond the first opaque contour so the sample comes from
+    // stable background, not from the edge of hair/body/tree splats.
+    const skip=Math.max(6,Math.min(18,Math.round(Math.max(W,H)*.008)));
+    for(let extra=skip;extra>=0;extra-=3){
+      const sx=Math.round(x+dx*(first+extra)),sy=Math.round(y+dy*(first+extra));
+      const color=patchColor(sx,sy);
+      if(color)return color;
+    }
+    return null;
+  }
+
+  let repairedPixels=0,borderRepairedPixels=0,interiorRepairedPixels=0;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=y*W+x;if(!hole[i])continue;
+    const isBorder=!!borderHole[i];
+    let color=findBackgroundSample(x,y,isBorder);
+    if(!color){
+      // Last-resort local background sample. It still never overwrites opaque pixels.
+      const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+      for(const [dx,dy] of dirs){
+        for(let s=8;s<=maxSearch;s+=4){
+          const sx=x+dx*s,sy=y+dy*s;
+          color=patchColor(sx,sy);
+          if(color)break;
+        }
+        if(color)break;
+      }
+    }
+    if(write(i,color)){
+      repairedPixels++;
+      if(isBorder)borderRepairedPixels++;else interiorRepairedPixels++;
     }
   }
 
-  // 2) Reflect vertically for top/bottom border holes not solved above.
-  for(let x=0;x<W;x++){
-    let top=-1,bottom=-1;
-    for(let y=0;y<H;y++){const i=y*W+x;if(!transparent[i]||repaired[i]){top=y;break;}}
-    for(let y=H-1;y>=0;y--){const i=y*W+x;if(!transparent[i]||repaired[i]){bottom=y;break;}}
-    if(top<0||bottom<0)continue;
-    for(let y=0;y<top;y++){
-      const i=y*W+x;if(!connected[i]||repaired[i])continue;
-      const sy=Math.min(bottom,top+(top-y));copy(i,sy*W+x);
+  // Gentle seam relaxation only inside pixels we filled.
+  const filled=new Uint8Array(N);
+  for(let i=0;i<N;i++)if(hole[i]&&data[i*4+3]===255)filled[i]=1;
+  const tmp=new Uint8ClampedArray(data);
+  for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
+    const i=y*W+x;if(!filled[i])continue;
+    let r=0,g=0,b=0,n=0;
+    for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){
+      const q=((y+oy)*W+x+ox)*4;
+      if(tmp[q+3]<64)continue;
+      r+=tmp[q];g+=tmp[q+1];b+=tmp[q+2];n++;
     }
-    for(let y=H-1;y>bottom;y--){
-      const i=y*W+x;if(!connected[i]||repaired[i])continue;
-      const sy=Math.max(top,bottom-(y-bottom));copy(i,sy*W+x);
+    if(n){
+      const p=i*4;
+      data[p]=Math.round(r/n);data[p+1]=Math.round(g/n);data[p+2]=Math.round(b/n);data[p+3]=255;
     }
   }
 
-  // 3) Remaining irregular border-connected pockets: propagate the nearest
-  // reconstructed/real neighbour. This is still restricted to border holes.
-  qh=0;qt=0;
-  const source=new Int32Array(N);source.fill(-1);
-  for(let i=0;i<N;i++){
-    if(!connected[i]||repaired[i])continue;
-    const x=i%W,y=(i/W)|0;
-    let s=-1;
-    if(x>0&&(!transparent[i-1]||repaired[i-1]))s=i-1;
-    else if(x<W-1&&(!transparent[i+1]||repaired[i+1]))s=i+1;
-    else if(y>0&&(!transparent[i-W]||repaired[i-W]))s=i-W;
-    else if(y<H-1&&(!transparent[i+W]||repaired[i+W]))s=i+W;
-    if(s>=0){source[i]=s;queue[qt++]=i;}
-  }
-  while(qh<qt){
-    const i=queue[qh++],s=source[i];
-    if(s>=0&&!repaired[i])copy(i,s);
-    const x=i%W,y=(i/W)|0;
-    const visit=n=>{
-      if(n<0||n>=N||!connected[n]||repaired[n]||source[n]>=0)return;
-      source[n]=i;queue[qt++]=n;
-    };
-    if(x>0)visit(i-1);if(x<W-1)visit(i+1);if(y>0)visit(i-W);if(y<H-1)visit(i+W);
-  }
-
-  let repairedPixels=0,remaining=0;
-  for(let i=0;i<N;i++){
-    if(repaired[i])repairedPixels++;
-    if(data[i*4+3]<8)remaining++;
-  }
+  let remaining=0;
+  for(let i=0;i<N;i++)if(data[i*4+3]<16)remaining++;
   ctx.putImageData(img,0,0);
   return {
     repairedPixels,
     repairedPercent:pct(repairedPixels/Math.max(1,N)),
+    borderRepairedPixels,
+    borderRepairedPercent:pct(borderRepairedPixels/Math.max(1,N)),
+    interiorRepairedPixels,
+    interiorRepairedPercent:pct(interiorRepairedPixels/Math.max(1,N)),
     remainingTransparentPercent:pct(remaining/Math.max(1,N)),
-    mode:'border-connected-texture-extension'
+    mode:'background-directed-inpaint'
   };
 }
 
