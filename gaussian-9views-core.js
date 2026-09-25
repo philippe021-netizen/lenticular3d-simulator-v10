@@ -177,6 +177,112 @@ function analyzeAlpha(imageData){
   };
 }
 
+
+function repairBorderTransparency(canvas){
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  const img=ctx.getImageData(0,0,canvas.width,canvas.height);
+  const {data,width:W,height:H}=img,N=W*H;
+  const transparent=new Uint8Array(N);
+  let transparentBefore=0;
+  for(let i=0;i<N;i++){
+    if(data[i*4+3]<8){transparent[i]=1;transparentBefore++;}
+  }
+  if(!transparentBefore)return {repairedPixels:0,repairedPercent:0,remainingTransparentPercent:0};
+
+  // Find only transparent regions connected to the image border.
+  // Interior holes around the subject are deliberately not touched.
+  const connected=new Uint8Array(N);
+  const queue=new Int32Array(N);
+  let qh=0,qt=0;
+  const push=i=>{if(transparent[i]&&!connected[i]){connected[i]=1;queue[qt++]=i;}};
+  for(let x=0;x<W;x++){push(x);push((H-1)*W+x);}
+  for(let y=1;y<H-1;y++){push(y*W);push(y*W+W-1);}
+  while(qh<qt){
+    const i=queue[qh++],x=i%W,y=(i/W)|0;
+    if(x>0)push(i-1);if(x<W-1)push(i+1);if(y>0)push(i-W);if(y<H-1)push(i+W);
+  }
+
+  const repaired=new Uint8Array(N);
+  const copy=(di,si)=>{
+    const d=di*4,s=si*4;
+    data[d]=data[s];data[d+1]=data[s+1];data[d+2]=data[s+2];data[d+3]=255;
+    repaired[di]=1;
+  };
+
+  // 1) Reflect real border texture horizontally. This preserves much more texture
+  // than a flat nearest-pixel extension on tree / water / pavement backgrounds.
+  for(let y=0;y<H;y++){
+    const row=y*W;let left=-1,right=-1;
+    for(let x=0;x<W;x++){if(!transparent[row+x]){left=x;break;}}
+    for(let x=W-1;x>=0;x--){if(!transparent[row+x]){right=x;break;}}
+    if(left<0||right<0)continue;
+    for(let x=0;x<left;x++){
+      const i=row+x;if(!connected[i])continue;
+      const sx=Math.min(right,left+(left-x));
+      copy(i,row+sx);
+    }
+    for(let x=W-1;x>right;x--){
+      const i=row+x;if(!connected[i])continue;
+      const sx=Math.max(left,right-(x-right));
+      copy(i,row+sx);
+    }
+  }
+
+  // 2) Reflect vertically for top/bottom border holes not solved above.
+  for(let x=0;x<W;x++){
+    let top=-1,bottom=-1;
+    for(let y=0;y<H;y++){const i=y*W+x;if(!transparent[i]||repaired[i]){top=y;break;}}
+    for(let y=H-1;y>=0;y--){const i=y*W+x;if(!transparent[i]||repaired[i]){bottom=y;break;}}
+    if(top<0||bottom<0)continue;
+    for(let y=0;y<top;y++){
+      const i=y*W+x;if(!connected[i]||repaired[i])continue;
+      const sy=Math.min(bottom,top+(top-y));copy(i,sy*W+x);
+    }
+    for(let y=H-1;y>bottom;y--){
+      const i=y*W+x;if(!connected[i]||repaired[i])continue;
+      const sy=Math.max(top,bottom-(y-bottom));copy(i,sy*W+x);
+    }
+  }
+
+  // 3) Remaining irregular border-connected pockets: propagate the nearest
+  // reconstructed/real neighbour. This is still restricted to border holes.
+  qh=0;qt=0;
+  const source=new Int32Array(N);source.fill(-1);
+  for(let i=0;i<N;i++){
+    if(!connected[i]||repaired[i])continue;
+    const x=i%W,y=(i/W)|0;
+    let s=-1;
+    if(x>0&&(!transparent[i-1]||repaired[i-1]))s=i-1;
+    else if(x<W-1&&(!transparent[i+1]||repaired[i+1]))s=i+1;
+    else if(y>0&&(!transparent[i-W]||repaired[i-W]))s=i-W;
+    else if(y<H-1&&(!transparent[i+W]||repaired[i+W]))s=i+W;
+    if(s>=0){source[i]=s;queue[qt++]=i;}
+  }
+  while(qh<qt){
+    const i=queue[qh++],s=source[i];
+    if(s>=0&&!repaired[i])copy(i,s);
+    const x=i%W,y=(i/W)|0;
+    const visit=n=>{
+      if(n<0||n>=N||!connected[n]||repaired[n]||source[n]>=0)return;
+      source[n]=i;queue[qt++]=n;
+    };
+    if(x>0)visit(i-1);if(x<W-1)visit(i+1);if(y>0)visit(i-W);if(y<H-1)visit(i+W);
+  }
+
+  let repairedPixels=0,remaining=0;
+  for(let i=0;i<N;i++){
+    if(repaired[i])repairedPixels++;
+    if(data[i*4+3]<8)remaining++;
+  }
+  ctx.putImageData(img,0,0);
+  return {
+    repairedPixels,
+    repairedPercent:pct(repairedPixels/Math.max(1,N)),
+    remainingTransparentPercent:pct(remaining/Math.max(1,N)),
+    mode:'border-connected-texture-extension'
+  };
+}
+
 export function cameraPlan(metadata,maxDisparity=0.018,focusDepth){
   const d=clamp(Number(maxDisparity)||0,0,.2);
   const zNear=Math.max(.05,Number(metadata.depth.near)||1);
@@ -280,11 +386,19 @@ export class GaussianNineViewStudio{
     this.framingScale=safeScale;
   }
 
-  setCamera(eyeX,focusDepth){
-    this.camera.position.set(Number(eyeX)||0,0,0);
+  setCamera(eyeX,focusDepth,headroomRatio=0.06){
+    const focus=Math.max(.05,Number(focusDepth)||1);
+    const ratio=clamp(Number(headroomRatio)||0,0,.15);
+    // Translate camera AND its Y target together: optical axis stays level.
+    // In OpenCV coordinates Y grows downward, so negative Y moves the camera up
+    // and moves the subject down in frame, creating real headroom on all views.
+    const fullHeightAtFocus=2*Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*focus;
+    const eyeY=-fullHeightAtFocus*ratio;
+    this.camera.position.set(Number(eyeX)||0,eyeY,0);
     this.camera.up.set(0,-1,0);
-    this.camera.lookAt(new THREE.Vector3(0,0,Math.max(.05,Number(focusDepth)||1)));
+    this.camera.lookAt(new THREE.Vector3(0,eyeY,focus));
     this.camera.updateMatrixWorld(true);
+    this.headroomRatio=ratio;
   }
 
   async settle(frames=2){
@@ -304,7 +418,7 @@ export class GaussianNineViewStudio{
       const s=maxEdge/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);
     }
     if(w!==this.renderWidth||h!==this.renderHeight||Math.abs((this.framingScale||1)-framingScale)>1e-6)this.setOutputSize(w,h,framingScale);
-    this.setCamera(planView.eyeX,focusDepth);
+    this.setCamera(planView.eyeX,focusDepth,options.headroomRatio??0.06);
     await this.settle(options.settleFrames??3);
 
     const copy=document.createElement('canvas');
@@ -312,8 +426,11 @@ export class GaussianNineViewStudio{
     const ctx=copy.getContext('2d',{willReadFrequently:true});
     ctx.clearRect(0,0,copy.width,copy.height);
     ctx.drawImage(this.renderer.domElement,0,0,copy.width,copy.height);
+    const repair=options.repairBorders===false
+      ? {repairedPixels:0,repairedPercent:0,remainingTransparentPercent:null,mode:'disabled'}
+      : repairBorderTransparency(copy);
     const imageData=ctx.getImageData(0,0,copy.width,copy.height);
-    const qc=analyzeAlpha(imageData);
+    const qc={...analyzeAlpha(imageData),borderRepair:repair};
     const blob=await canvasBlob(copy,'image/png');
     return {blob,qc,width:copy.width,height:copy.height};
   }
@@ -331,7 +448,8 @@ export class GaussianNineViewStudio{
         name:'view_'+String(index).padStart(2,'0')+'.png',
         normal:pv.normal,
         eyeX:pv.eyeX,
-        framingScale:clamp(Number(options.framingScale)||1.14,1,1.35),
+        framingScale:clamp(Number(options.framingScale)||1.22,1,1.45),
+        headroomRatio:clamp(Number(options.headroomRatio)??0.06,0,.15),
         ...snap
       });
       await waitFrame();
@@ -343,9 +461,9 @@ export class GaussianNineViewStudio{
       options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
         ? Math.round(this.metadata.image.height*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
         : this.metadata.image.height,
-      clamp(Number(options.framingScale)||1.14,1,1.35)
+      clamp(Number(options.framingScale)||1.22,1,1.45)
     );
-    this.setCamera(0,plan.focusDepth);
+    this.setCamera(0,plan.focusDepth,options.headroomRatio??0.06);
     await this.settle(2);
     return {plan,views:out};
   }
@@ -422,8 +540,11 @@ export function buildManifest(metadata,rendered,profile){
       order:'left-to-right',
       centerView:5,
       profile,
-      safeFramingScale:center?.framingScale||1.14,
-      safeFramingMarginPercent:Number((((center?.framingScale||1.14)-1)*100).toFixed(1))
+      safeFramingScale:center?.framingScale||1.22,
+      safeFramingMarginPercent:Number((((center?.framingScale||1.22)-1)*100).toFixed(1)),
+      headroomRatio:center?.headroomRatio??0.06,
+      headroomPercent:Number(((center?.headroomRatio??0.06)*100).toFixed(1)),
+      borderRepairMode:center?.qc?.borderRepair?.mode||'unknown'
     },
     qc:{
       worstTransparentPercent:worstFull,
