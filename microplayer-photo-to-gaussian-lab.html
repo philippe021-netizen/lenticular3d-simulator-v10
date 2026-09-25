@@ -395,12 +395,11 @@ async function run(mode){
     showRendered(data);
     const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
     $('renderStatus').className=worst<=.25?'status ok':'status warn';
-    const framePct=((Number(opts.framingScale)||1.22)-1)*100;
-    const headPct=(Number(opts.headroomRatio)||.10)*100;
+    const framePct=((Number(opts.framingScale)||1.12)-1)*100;
     const repairedBorder=Math.max(...data.views.map(v=>v.qc.borderRepair?.borderRepairedPercent||0));
     const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
     $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
-      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · cadrage +'+framePct.toFixed(0)+'% · headroom +'+headPct.toFixed(0)+'% · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%';
+      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · vue 05 native · marge latérale max +'+framePct.toFixed(0)+'% · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%';
   }catch(err){
     console.error(err);
     $('renderStatus').className='status bad';$('renderStatus').textContent='RENDU BLOQUÉ — '+(err?.message||err);
