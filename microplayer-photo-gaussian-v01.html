@@ -40,11 +40,11 @@
       <section class="panel">
         <h2>2. Caméra lenticulaire</h2>
         <div class="actions">
-          <button id="softPreset">Doux 0,012</button>
-          <button id="strongPreset">Renforcé 0,018</button>
+          <button id="softPreset" class="primary">Production 0,012</button>
+          <button id="strongPreset">Renforcé 0,018 (test)</button>
         </div>
         <label class="field">Disparité latérale maximale
-          <input id="disparity" type="number" min="0.004" max="0.060" step="0.001" value="0.018">
+          <input id="disparity" type="number" min="0.004" max="0.060" step="0.001" value="0.012">
         </label>
         <label class="field">Convergence sujet (m)
           <input id="focusDepth" type="number" min="0.10" max="20" step="0.01" value="1">
@@ -60,9 +60,10 @@
         <label class="field">Headroom — descendre le sujet dans le cadre
           <select id="headroom">
             <option value="0.04">+4%</option>
-            <option value="0.06" selected>Auto +6%</option>
+            <option value="0.06">+6%</option>
             <option value="0.08">+8%</option>
-            <option value="0.10">+10%</option>
+            <option value="0.10" selected>Auto +10%</option>
+            <option value="0.12">+12%</option>
           </select>
         </label>
         <label class="field">Résolution production
@@ -90,7 +91,7 @@
 
       <section class="panel">
         <h2>Règles V01</h2>
-        <div class="small">Le sujet principal n’est jamais régénéré. Le headroom déplace réellement la caméra vers le haut pour laisser de l’air au-dessus de la tête. Les trous reliés aux bords sont reconstruits par extension de texture locale ; les trous intérieurs autour du sujet restent intacts pour éviter tout faux visage.</div>
+        <div class="small">Le sujet principal n’est jamais régénéré. Le headroom +10% est le réglage de production. Les bords ET les désocclusions transparentes derrière le sujet sont reconstruits depuis le côté fond, jamais depuis le visage/corps. Le profil 0,018 reste un test de relief renforcé ; la production par défaut est 0,012 pour limiter les artefacts.</div>
       </section>
     </aside>
 
@@ -144,17 +145,17 @@ function revokePreviews(){previewUrls.forEach(URL.revokeObjectURL);previewUrls=[
 function fmt(n,d=3){return Number(n).toLocaleString('fr-FR',{maximumFractionDigits:d})}
 function currentOptions(preview=false){
   return {
-    maxDisparity:Number($('disparity').value)||.018,
+    maxDisparity:Number($('disparity').value)||.012,
     focusDepth:Number($('focusDepth').value)||metadata?.depth?.focus||1,
     framingScale:Number($('framing').value)||1.22,
-    headroomRatio:Number($('headroom').value)||0.06,
+    headroomRatio:Number($('headroom').value)||0.10,
     repairBorders:true,
     maxEdge:preview?1024:Number($('resolution').value)||0,
     settleFrames:3
   };
 }
 function updatePresetButtons(){
-  const d=Number($('disparity').value)||.018;
+  const d=Number($('disparity').value)||.012;
   $('softPreset').classList.toggle('primary',Math.abs(d-.012)<.0005);
   $('strongPreset').classList.toggle('primary',Math.abs(d-.018)<.0005);
 }
@@ -199,17 +200,18 @@ function showRendered(data){
   for(const v of data.views){
     const url=URL.createObjectURL(v.blob);previewUrls.push(url);
     const card=document.createElement('div');card.className='viewCard';
-    const repair=v.qc.borderRepair?.repairedPercent??0;
+    const repair=v.qc.borderRepair||{};
     card.innerHTML='<img src="'+url+'" alt="'+v.name+'"><div class="viewMeta">Vue '+String(v.index).padStart(2,'0')+
-      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · cadrage +'+((v.framingScale-1)*100).toFixed(0)+'% · headroom +'+((v.headroomRatio||0)*100).toFixed(0)+'% · bords réparés '+repair.toFixed(2)+'%</div>';
+      ' · caméra '+(v.eyeX*1000).toFixed(1)+' mm · cadrage +'+((v.framingScale-1)*100).toFixed(0)+'% · headroom +'+((v.headroomRatio||0)*100).toFixed(0)+'% · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
     $('views').appendChild(card);
   }
   const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
-  const repaired=Math.max(...data.views.map(v=>v.qc.borderRepair?.repairedPercent||0));
-  $('qcStatus').className=worst<=.25?'status ok':'status warn';
-  $('qcStatus').textContent=worst<=.25
-    ?'FOND CENTRAL PROPRE · bords reconstruits jusqu’à '+repaired.toFixed(2)+'% de l’image · sujet non régénéré.'
-    :'FOND CENTRAL À SURVEILLER · bords reconstruits jusqu’à '+repaired.toFixed(2)+'% · aucune réparation appliquée au sujet.';
+  const repairedBorder=Math.max(...data.views.map(v=>v.qc.borderRepair?.borderRepairedPercent||0));
+  const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
+  $('qcStatus').className=(repairedInterior<=1.2&&worst<=.25)?'status ok':'status warn';
+  $('qcStatus').textContent=(repairedInterior<=1.2&&worst<=.25)
+    ?'FOND RECONSTRUIT · bords '+repairedBorder.toFixed(2)+'% · désocclusions intérieures '+repairedInterior.toFixed(2)+'% · sujet non régénéré.'
+    :'SCÈNE TROP FORTE POUR CE RÉGLAGE · désocclusions '+repairedInterior.toFixed(2)+'%. Passe en Production 0,012 si tu étais en 0,018.';
   if(data.views.length===9){
     $('simPanel').classList.remove('hidden');
     $('downloadZip').disabled=false;
@@ -294,10 +296,11 @@ async function run(mode){
     const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
     $('renderStatus').className=worst<=.25?'status ok':'status warn';
     const framePct=((Number(opts.framingScale)||1.22)-1)*100;
-    const headPct=(Number(opts.headroomRatio)||.06)*100;
-    const repairedMax=Math.max(...data.views.map(v=>v.qc.borderRepair?.repairedPercent||0));
+    const headPct=(Number(opts.headroomRatio)||.10)*100;
+    const repairedBorder=Math.max(...data.views.map(v=>v.qc.borderRepair?.borderRepairedPercent||0));
+    const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
     $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
-      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · cadrage +'+framePct.toFixed(0)+'% · headroom +'+headPct.toFixed(0)+'% · bords réparés '+repairedMax.toFixed(2)+'%';
+      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · cadrage +'+framePct.toFixed(0)+'% · headroom +'+headPct.toFixed(0)+'% · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%';
   }catch(err){
     console.error(err);
     $('renderStatus').className='status bad';$('renderStatus').textContent='RENDU BLOQUÉ — '+(err?.message||err);
