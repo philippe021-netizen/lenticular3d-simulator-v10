@@ -413,36 +413,48 @@ export class GaussianNineViewStudio{
     return metadata;
   }
 
-  setOutputSize(width,height,framingScale=1.22){
+  setOutputSize(width,height,framingScale=1){
     const w=Math.max(64,Math.round(width)),h=Math.max(64,Math.round(height));
     this.renderWidth=w;this.renderHeight=h;
     this.renderer.setSize(w,h,false);
+
+    // Rebuild the projection from the PLY intrinsics instead of approximating it
+    // with a centered PerspectiveCamera. This keeps view 05 on the native camera.
+    const intr=this.metadata?.intrinsics||{};
+    const srcW=Math.max(1,Number(this.metadata?.image?.width)||w);
+    const srcH=Math.max(1,Number(this.metadata?.image?.height)||h);
+    const sx=w/srcW,sy=h/srcH;
+    const fx=Math.max(1,(Number(intr.fx)||srcH*1.07)*sx);
+    const fy=Math.max(1,(Number(intr.fy)||srcH*1.07)*sy);
+    const cx=(Number.isFinite(Number(intr.cx))?Number(intr.cx):srcW/2)*sx;
+    const cy=(Number.isFinite(Number(intr.cy))?Number(intr.cy):srcH/2)*sy;
+    const safeScale=clamp(Number(framingScale)||1,1,1.30);
+    const near=.01;
+    const far=Math.max(100,Number(this.metadata?.depth?.far||50)*2);
+
+    const left=(-cx*near/fx)*safeScale;
+    const right=((w-cx)*near/fx)*safeScale;
+    const top=(cy*near/fy)*safeScale;
+    const bottom=(-(h-cy)*near/fy)*safeScale;
+
+    this.camera.near=near;
+    this.camera.far=far;
     this.camera.aspect=w/h;
-    const fy=this.metadata?.intrinsics?.fy||h*1.07;
-    const safeScale=clamp(Number(framingScale)||1.22,1,1.45);
-    // Safe framing: enlarge the virtual sensor instead of cropping/scaling the PNG afterwards.
-    // This keeps one identical camera framing for all 9 views and reveals extra Gaussian content
-    // around the original frame, especially above the head.
     this.camera.fov=2*Math.atan((h*safeScale)/(2*fy))*180/Math.PI;
-    this.camera.near=.01;
-    this.camera.far=Math.max(100,Number(this.metadata?.depth?.far||50)*2);
-    this.camera.updateProjectionMatrix();
+    this.camera.projectionMatrix.makePerspective(left,right,top,bottom,near,far);
+    this.camera.projectionMatrixInverse.copy(this.camera.projectionMatrix).invert();
     this.framingScale=safeScale;
   }
 
-  setCamera(eyeX,focusDepth,headroomRatio=0.06){
+  setCamera(eyeX,focusDepth,headroomRatio=0){
     const focus=Math.max(.05,Number(focusDepth)||1);
-    const ratio=clamp(Number(headroomRatio)||0,0,.15);
-    // Translate camera AND its Y target together: optical axis stays level.
-    // In OpenCV coordinates Y grows downward, so negative Y moves the camera up
-    // and moves the subject down in frame, creating real headroom on all views.
-    const fullHeightAtFocus=2*Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*focus;
-    const eyeY=-fullHeightAtFocus*ratio;
-    this.camera.position.set(Number(eyeX)||0,eyeY,0);
+    // Native PLY optical axis: no automatic vertical translation and no CSS-style
+    // cover/crop. Only the requested lateral camera displacement is applied.
+    this.camera.position.set(Number(eyeX)||0,0,0);
     this.camera.up.set(0,-1,0);
-    this.camera.lookAt(new THREE.Vector3(0,eyeY,focus));
+    this.camera.lookAt(new THREE.Vector3(0,0,focus));
     this.camera.updateMatrixWorld(true);
-    this.headroomRatio=ratio;
+    this.headroomRatio=0;
   }
 
   async settle(frames=2){
@@ -456,13 +468,17 @@ export class GaussianNineViewStudio{
   async snapshot(planView,focusDepth,options={}){
     if(!this.mesh||!this.metadata)throw new Error('Charge d’abord un scene.ply.');
     const maxEdge=Number(options.maxEdge)||0;
-    const framingScale=clamp(Number(options.framingScale)||1.22,1,1.45);
+    const maxSideMargin=clamp(Number(options.framingScale)||1.12,1,1.30);
+    // View 05 stays exactly on the native PLY projection. The safety margin is
+    // introduced progressively only as the camera moves toward views 01/09.
+    const sideFactor=Math.min(1,Math.abs(Number(planView.normal)||0));
+    const framingScale=1+(maxSideMargin-1)*sideFactor;
     let w=this.metadata.image.width,h=this.metadata.image.height;
     if(maxEdge>0&&Math.max(w,h)>maxEdge){
       const s=maxEdge/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);
     }
     if(w!==this.renderWidth||h!==this.renderHeight||Math.abs((this.framingScale||1)-framingScale)>1e-6)this.setOutputSize(w,h,framingScale);
-    this.setCamera(planView.eyeX,focusDepth,options.headroomRatio??0.06);
+    this.setCamera(planView.eyeX,focusDepth,0);
     await this.settle(options.settleFrames??3);
 
     const copy=document.createElement('canvas');
@@ -492,8 +508,8 @@ export class GaussianNineViewStudio{
         name:'view_'+String(index).padStart(2,'0')+'.png',
         normal:pv.normal,
         eyeX:pv.eyeX,
-        framingScale:clamp(Number(options.framingScale)||1.22,1,1.45),
-        headroomRatio:clamp(Number(options.headroomRatio)||0.06,0,.15),
+        framingScale:1+(clamp(Number(options.framingScale)||1.12,1,1.30)-1)*Math.min(1,Math.abs(Number(pv.normal)||0)),
+        headroomRatio:0,
         ...snap
       });
       await waitFrame();
@@ -505,9 +521,9 @@ export class GaussianNineViewStudio{
       options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
         ? Math.round(this.metadata.image.height*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
         : this.metadata.image.height,
-      clamp(Number(options.framingScale)||1.22,1,1.45)
+      1
     );
-    this.setCamera(0,plan.focusDepth,options.headroomRatio??0.06);
+    this.setCamera(0,plan.focusDepth,0);
     await this.settle(2);
     return {plan,views:out};
   }
@@ -584,10 +600,12 @@ export function buildManifest(metadata,rendered,profile){
       order:'left-to-right',
       centerView:5,
       profile,
-      safeFramingScale:center?.framingScale||1.22,
-      safeFramingMarginPercent:Number((((center?.framingScale||1.22)-1)*100).toFixed(1)),
-      headroomRatio:center?.headroomRatio??0.06,
-      headroomPercent:Number(((center?.headroomRatio??0.06)*100).toFixed(1)),
+      projectionMode:'native-ply-intrinsics',
+      centerViewNativeProjection:true,
+      maxSideFramingScale:Math.max(...rendered.views.map(v=>v.framingScale||1)),
+      maxSideFramingMarginPercent:Number(((Math.max(...rendered.views.map(v=>v.framingScale||1))-1)*100).toFixed(1)),
+      headroomRatio:0,
+      headroomPercent:0,
       borderRepairMode:center?.qc?.borderRepair?.mode||'unknown'
     },
     qc:{
