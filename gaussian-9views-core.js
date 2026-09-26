@@ -405,7 +405,7 @@ export class GaussianNineViewStudio{
       this.renderer.domElement.style.height='100%';
       this.renderer.domElement.style.display='block';
       this.renderer.domElement.style.objectFit='contain';
-      this.spark=new Spark.SparkRenderer({renderer:this.renderer});
+      this.spark=new Spark.SparkRenderer({renderer:this.renderer,sortRadial:false});
       this.scene.add(this.spark);
       this.container.appendChild(this.renderer.domElement);
     })();
