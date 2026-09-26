@@ -82,14 +82,17 @@ canvas{max-width:100%;background:white;border-radius:9px;display:block;margin:au
 </section>
 </main>
 
-<script>
+<script type="module">
+import { selectNineViewEntries } from './modules/lentiprint-zip-selection.js';
+import { millimetersToPixels, lenticulePitchPixels, viewIndexForColumn } from './modules/lentiprint-math.js';
 const $=id=>document.getElementById(id);
 const state={files:[],images:[],names:[],sourceW:0,sourceH:0,canvas:null,blob:null,manifest:null};
 const preview=$('preview');
 
 function n(id,fallback=0){const v=Number($(id).value);return Number.isFinite(v)?v:fallback}
-function mmToPx(mm){return Math.round(mm/25.4*n('dpi',600)*n('geometry',1))}
-function pitchPx(){return n('dpi',600)/Math.max(.001,n('lpi',50))}
+function mmToPx(mm){return millimetersToPixels(mm,n('dpi',600),n('geometry',1))}
+function pitchPx(){return lenticulePitchPixels(n('dpi',600),n('lpi',50))}
+function naturalCompare(a,b){return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:'base'})}
 function updateDims(){
  const w=mmToPx(n('widthMm',85.6)),h=mmToPx(n('heightMm',54));
  $('pxOut').textContent=w+' × '+h+' px';
@@ -102,8 +105,8 @@ function updateDims(){
 }
 ['lpi','dpi','geometry','widthMm','heightMm','phase','order'].forEach(id=>$(id).addEventListener('input',updateDims));
 
-function naturalCompare(a,b){return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:'base'})}
 function isSupportedImageName(name){return /\.(png|jpe?g|webp)$/i.test(name||'')}
+function baseName(path){return String(path||'').split('/').filter(Boolean).pop()||'image'}
 function guessMimeType(name){
  const lower=String(name||'').toLowerCase();
  if(lower.endsWith('.png'))return 'image/png';
@@ -111,15 +114,17 @@ function guessMimeType(name){
  if(lower.endsWith('.webp'))return 'image/webp';
  return 'application/octet-stream';
 }
-function baseName(path){return String(path||'').split('/').filter(Boolean).pop()||'image'}
 function loadImageFile(file){
  return new Promise((resolve,reject)=>{
    const url=URL.createObjectURL(file),img=new Image();
    img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=e=>{URL.revokeObjectURL(url);reject(e)};img.src=url;
  });
 }
-async function loadViews(files,sourceLabel='images'){
- const list=[...files].sort((a,b)=>naturalCompare(a.name,b.name));
+async function loadViews(files,sourceLabel='images',preserveOrder=false){
+ state.files=[];state.images=[];state.names=[];state.sourceW=state.sourceH=0;state.blob=null;state.manifest=null;
+ $('generate').disabled=true;$('downloadPng').disabled=$('downloadSvg').disabled=$('downloadZip').disabled=true;
+ $('thumbs').innerHTML='';
+ const list=preserveOrder?[...files]:[...files].sort((a,b)=>naturalCompare(a.name,b.name));
  if(list.length!==9){$('viewsStatus').className='status warn';$('viewsStatus').textContent='Il faut exactement 9 images. Reçu : '+list.length;state.files=[];$('generate').disabled=true;return}
  const images=[];
  try{for(const file of list)images.push(await loadImageFile(file))}
@@ -141,15 +146,7 @@ async function zipEntryToFile(entry){
  return new File([blob],name,{type:guessMimeType(name),lastModified:Date.now()});
 }
 function chooseZipEntries(allEntries,manifest){
- const sourceEntries=allEntries.filter(entry=>/^sources\//i.test(entry.name));
- let selected=sourceEntries.length?sourceEntries:allEntries;
- if(manifest&&Array.isArray(manifest.view_files)&&manifest.view_files.length===9){
-   const wanted=manifest.view_files.map(baseName);
-   const byBase=new Map(selected.map(entry=>[baseName(entry.name),entry]));
-   const ordered=wanted.map(name=>byBase.get(name)).filter(Boolean);
-   if(ordered.length===9)return ordered;
- }
- return [...selected].sort((a,b)=>naturalCompare(a.name,b.name));
+ return selectNineViewEntries(allEntries,manifest);
 }
 async function loadZipViews(zipFile){
  $('generate').disabled=true;
@@ -168,7 +165,7 @@ async function loadZipViews(zipFile){
    if(selected.length!==9)throw new Error(selected.length+' image(s) détectée(s), il en faut exactement 9');
    const files=[];
    for(const entry of selected)files.push(await zipEntryToFile(entry));
-   await loadViews(files,'ZIP '+zipFile.name);
+   await loadViews(files,'ZIP '+zipFile.name,true);
    if(state.files.length===9){
      const manifestText=manifest?' · manifest.json détecté':'';
      $('viewsStatus').textContent='ZIP valide : 9 vues chargées · '+state.sourceW+' × '+state.sourceH+' px'+manifestText+'.';
@@ -205,15 +202,21 @@ function buildInterlace(){
  if(state.images.length!==9)throw new Error('9 vues requises');
  const W=mmToPx(n('widthMm',85.6)),H=mmToPx(n('heightMm',54));
  if(W<50||H<50||W*H>30000000)throw new Error('Dimensions raster non raisonnables');
- const sourceCanvases=state.images.map(img=>{const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';x.drawImage(img,0,0,W,H);return x});
- const sourceData=sourceCanvases.map(c=>c.getContext('2d').getImageData(0,0,W,H).data);
- const out=document.createElement('canvas');out.width=W;out.height=H;const ctx=out.getContext('2d'),image=ctx.createImageData(W,H),dst=image.data;
+ const sourceCanvas=document.createElement('canvas');sourceCanvas.width=W;sourceCanvas.height=H;
+ const sourceCtx=sourceCanvas.getContext('2d',{willReadFrequently:true});
+ sourceCtx.imageSmoothingEnabled=true;sourceCtx.imageSmoothingQuality='high';
+ const out=document.createElement('canvas');out.width=W;out.height=H;const ctx=out.getContext('2d',{willReadFrequently:true}),image=ctx.createImageData(W,H),dst=image.data;
  const p=pitchPx(),phaseFraction=(Number($('phase').value)||0)/8,phasePx=p*phaseFraction,reverse=$('order').value==='reverse';
+ const columnsByView=Array.from({length:9},()=>[]);
  for(let x=0;x<W;x++){
-   let f=((x+phasePx)%p+p)%p/p;
-   let vi=Math.min(8,Math.floor(f*9));if(reverse)vi=8-vi;
-   const src=sourceData[vi];
-   for(let y=0;y<H;y++){const i=(y*W+x)*4;dst[i]=src[i];dst[i+1]=src[i+1];dst[i+2]=src[i+2];dst[i+3]=255}
+   const vi=viewIndexForColumn(x,p,phasePx,reverse);columnsByView[vi].push(x);
+ }
+ for(let vi=0;vi<9;vi++){
+   sourceCtx.clearRect(0,0,W,H);sourceCtx.drawImage(state.images[vi],0,0,W,H);
+   const src=sourceCtx.getImageData(0,0,W,H).data;
+   for(const x of columnsByView[vi])for(let y=0;y<H;y++){
+     const i=(y*W+x)*4;dst[i]=src[i];dst[i+1]=src[i+1];dst[i+2]=src[i+2];dst[i+3]=255;
+   }
  }
  ctx.putImageData(image,0,0);state.canvas=out;
  state.manifest={
@@ -275,9 +278,14 @@ async function productionSvgBlob(){
 $('downloadSvg').onclick=async()=>saveBlob(await productionSvgBlob(),'microplayer-lentiprint-a4.svg');
 $('downloadZip').onclick=async()=>{
  if(!state.blob)return;
- const zip=new JSZip();zip.file('lentiprint.png',state.blob);zip.file('manifest.json',JSON.stringify(state.manifest,null,2));zip.file('planche-a4.svg',await productionSvgBlob());
- state.files.forEach((f,i)=>zip.file('sources/vue-'+String(i+1).padStart(2,'0')+'-'+f.name,f));
- const blob=await zip.generateAsync({type:'blob'});saveBlob(blob,'microplayer-lentiprint-production.zip');
+ const button=$('downloadZip');button.disabled=true;
+ try{
+   const zip=new JSZip();zip.file('lentiprint.png',state.blob);zip.file('manifest.json',JSON.stringify(state.manifest,null,2));zip.file('planche-a4.svg',await productionSvgBlob());
+   state.files.forEach((f,i)=>zip.file('sources/vue-'+String(i+1).padStart(2,'0')+'-'+f.name,f));
+   const blob=await zip.generateAsync({type:'blob'});saveBlob(blob,'microplayer-lentiprint-production.zip');
+   $('renderStatus').className='status ok';$('renderStatus').textContent='ZIP de production prêt.';
+ }catch(error){$('renderStatus').className='status warn';$('renderStatus').textContent='Échec de création du ZIP : '+(error?.message||String(error))}
+ finally{button.disabled=false}
 };
 
 updateDims();
