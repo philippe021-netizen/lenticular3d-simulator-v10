@@ -1,6 +1,3 @@
-import * as THREE from 'three';
-import { SplatMesh } from '@sparkjsdev/spark';
-
 const TYPE_INFO = {
   char:{size:1,read:(v,o)=>v.getInt8(o)},
   uchar:{size:1,read:(v,o)=>v.getUint8(o)},
