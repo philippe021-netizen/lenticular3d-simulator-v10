@@ -370,28 +370,49 @@ export function assessTopCoverage(coverageBounds,height,thresholdPercent=12){
 export class GaussianNineViewStudio{
   constructor(container){
     this.container=container;
-    this.scene=new THREE.Scene();
-    this.camera=new THREE.PerspectiveCamera(45,4/3,.01,500);
-    this.camera.up.set(0,-1,0);
-    this.renderer=new THREE.WebGLRenderer({
-      antialias:true,
-      alpha:true,
-      preserveDrawingBuffer:true,
-      powerPreference:'high-performance'
-    });
-    this.renderer.setPixelRatio(1);
-    this.renderer.setClearColor(0x000000,0);
-    this.renderer.outputColorSpace=THREE.SRGBColorSpace;
-    this.renderer.domElement.style.width='100%';
-    this.renderer.domElement.style.height='100%';
-    this.renderer.domElement.style.display='block';
-    this.renderer.domElement.style.objectFit='contain';
-    container.appendChild(this.renderer.domElement);
+    this.scene=null;
+    this.camera=null;
+    this.renderer=null;
+    this.spark=null;
+    this.THREE=null;
     this.mesh=null;
     this.metadata=null;
     this.file=null;
     this.renderWidth=0;
     this.renderHeight=0;
+    this.rendererPromise=null;
+  }
+
+  async ensureRenderer(){
+    if(this.renderer)return;
+    if(this.rendererPromise)return this.rendererPromise;
+    this.rendererPromise=(async()=>{
+      const [THREE,Spark]=await Promise.all([
+        import('three'),
+        import('@sparkjsdev/spark')
+      ]);
+      this.THREE=THREE;
+      this.scene=new THREE.Scene();
+      this.camera=new THREE.PerspectiveCamera(45,4/3,.01,500);
+      this.camera.up.set(0,-1,0);
+      this.renderer=new THREE.WebGLRenderer({
+        antialias:false,
+        alpha:true,
+        preserveDrawingBuffer:true,
+        powerPreference:'high-performance'
+      });
+      this.renderer.setPixelRatio(1);
+      this.renderer.setClearColor(0x000000,0);
+      this.renderer.outputColorSpace=THREE.SRGBColorSpace;
+      this.renderer.domElement.style.width='100%';
+      this.renderer.domElement.style.height='100%';
+      this.renderer.domElement.style.display='block';
+      this.renderer.domElement.style.objectFit='contain';
+      this.spark=new Spark.SparkRenderer({renderer:this.renderer});
+      this.scene.add(this.spark);
+      this.container.appendChild(this.renderer.domElement);
+    })();
+    try{await this.rendererPromise;}catch(error){this.rendererPromise=null;throw error;}
   }
 
   async load(file,onStatus=()=>{}){
@@ -400,6 +421,7 @@ export class GaussianNineViewStudio{
     const buffer=await file.arrayBuffer();
     const metadata=inspectGaussianPly(buffer);
     onStatus('Métadonnées lues · '+metadata.gaussianCount.toLocaleString('fr-FR')+' Gaussians');
+    await this.ensureRenderer();
 
     if(this.mesh){
       this.scene.remove(this.mesh);
@@ -410,8 +432,8 @@ export class GaussianNineViewStudio{
     const blob=new Blob([buffer],{type:'application/octet-stream'});
     const url=URL.createObjectURL(blob);
     try{
-      onStatus('Chargement du renderer Gaussian…');
-      const mesh=new SplatMesh({url});
+      onStatus('Chargement des ellipsoïdes Gaussian avec SparkJS…');
+      const mesh=new (await import('@sparkjsdev/spark')).SplatMesh({url});
       this.scene.add(mesh);
       await mesh.initialized;
       this.mesh=mesh;
@@ -422,22 +444,19 @@ export class GaussianNineViewStudio{
     this.file=file;
     this.metadata=metadata;
     this.setOutputSize(metadata.image.width,metadata.image.height);
-    this.setCamera(0,metadata.depth.focus,0.06);
+    this.setCamera(0,metadata.depth.focus,0);
     await this.settle(3);
-    onStatus('Scène Gaussian prête.');
+    onStatus('Scène Gaussian prête avec rendu SparkJS.');
     return metadata;
   }
 
-  setOutputSize(width,height,framingScale=1.22){
+  setOutputSize(width,height,framingScale=1){
     const w=Math.max(64,Math.round(width)),h=Math.max(64,Math.round(height));
     this.renderWidth=w;this.renderHeight=h;
     this.renderer.setSize(w,h,false);
     this.camera.aspect=w/h;
     const fy=this.metadata?.intrinsics?.fy||h*1.07;
-    const safeScale=clamp(Number(framingScale)||1.22,1,1.45);
-    // Safe framing: enlarge the virtual sensor instead of cropping/scaling the PNG afterwards.
-    // This keeps one identical camera framing for all 9 views and reveals extra Gaussian content
-    // around the original frame, especially above the head.
+    const safeScale=clamp(Number(framingScale)||1,1,1.45);
     this.camera.fov=2*Math.atan((h*safeScale)/(2*fy))*180/Math.PI;
     this.camera.near=.01;
     this.camera.far=Math.max(100,Number(this.metadata?.depth?.far||50)*2);
@@ -445,12 +464,10 @@ export class GaussianNineViewStudio{
     this.framingScale=safeScale;
   }
 
-  setCamera(eyeX,focusDepth,headroomRatio=0.06){
+  setCamera(eyeX,focusDepth,headroomRatio=0){
+    const THREE=this.THREE;
     const focus=Math.max(.05,Number(focusDepth)||1);
     const ratio=clamp(Number(headroomRatio)||0,0,.15);
-    // Translate camera AND its Y target together: optical axis stays level.
-    // In OpenCV coordinates Y grows downward, so negative Y moves the camera up
-    // and moves the subject down in frame, creating real headroom on all views.
     const fullHeightAtFocus=2*Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*focus;
     const eyeY=-fullHeightAtFocus*ratio;
     this.camera.position.set(Number(eyeX)||0,eyeY,0);
@@ -471,13 +488,13 @@ export class GaussianNineViewStudio{
   async snapshot(planView,focusDepth,options={}){
     if(!this.mesh||!this.metadata)throw new Error('Charge d’abord un scene.ply.');
     const maxEdge=Number(options.maxEdge)||0;
-    const framingScale=clamp(Number(options.framingScale)||1.22,1,1.45);
+    const framingScale=clamp(Number(options.framingScale)||1,1,1.45);
     let w=this.metadata.image.width,h=this.metadata.image.height;
     if(maxEdge>0&&Math.max(w,h)>maxEdge){
       const s=maxEdge/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);
     }
     if(w!==this.renderWidth||h!==this.renderHeight||Math.abs((this.framingScale||1)-framingScale)>1e-6)this.setOutputSize(w,h,framingScale);
-    this.setCamera(planView.eyeX,focusDepth,options.headroomRatio??0.06);
+    this.setCamera(planView.eyeX,focusDepth,options.headroomRatio??0);
     await this.settle(options.settleFrames??3);
 
     const copy=document.createElement('canvas');
@@ -507,8 +524,8 @@ export class GaussianNineViewStudio{
         name:'view_'+String(index).padStart(2,'0')+'.png',
         normal:pv.normal,
         eyeX:pv.eyeX,
-        framingScale:clamp(Number(options.framingScale)||1.22,1,1.45),
-        headroomRatio:clamp(Number(options.headroomRatio)||0.06,0,.15),
+        framingScale:clamp(Number(options.framingScale)||1,1,1.45),
+        headroomRatio:clamp(Number(options.headroomRatio)||0,0,.15),
         ...snap
       });
       await waitFrame();
@@ -520,9 +537,9 @@ export class GaussianNineViewStudio{
       options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
         ? Math.round(this.metadata.image.height*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
         : this.metadata.image.height,
-      clamp(Number(options.framingScale)||1.22,1,1.45)
+      clamp(Number(options.framingScale)||1,1,1.45)
     );
-    this.setCamera(0,plan.focusDepth,options.headroomRatio??0.06);
+    this.setCamera(0,plan.focusDepth,options.headroomRatio??0);
     await this.settle(2);
     return {plan,views:out};
   }
@@ -537,10 +554,11 @@ export class GaussianNineViewStudio{
 
   dispose(){
     if(this.mesh){
-      this.scene.remove(this.mesh);
+      this.scene?.remove(this.mesh);
       try{this.mesh.dispose();}catch{}
     }
-    this.renderer.dispose();
+    this.spark?.dispose?.();
+    this.renderer?.dispose();
     this.container.innerHTML='';
   }
 }
@@ -584,7 +602,7 @@ export function buildManifest(metadata,rendered,profile){
       disparityMetadata:metadata.disparity
     },
     camera:{
-      model:'native-ply-lateral-off-axis-converged',
+      model:'sparkjs-gaussian-lateral-converged',
       maxDisparity:rendered.plan.maxDisparity,
       halfRangeMeters:rendered.plan.cameraHalfRangeMeters,
       halfRangeMillimeters:rendered.plan.cameraHalfRangeMillimeters,
@@ -599,7 +617,7 @@ export function buildManifest(metadata,rendered,profile){
       order:'left-to-right',
       centerView:5,
       profile,
-      projectionMode:'native-ply-direct-rasterizer',
+      projectionMode:'sparkjs-covariance-aware-gaussian-renderer',
       centerViewNativeProjection:true,
       autoFit:false,
       autoCenter:false,
