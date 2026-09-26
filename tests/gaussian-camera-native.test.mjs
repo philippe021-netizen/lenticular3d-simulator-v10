@@ -22,7 +22,7 @@ test('browser renderer lazily loads SparkJS and renders covariance aware Gaussia
   const core = await readFile(new URL('../gaussian-9views-core.js', import.meta.url), 'utf8');
   assert.match(core, /import\('three'\)/);
   assert.match(core, /import\('@sparkjsdev\/spark'\)/);
-  assert.match(core, /new Spark\\.SparkRenderer\\(\\{renderer:this\\.renderer,sortRadial:false\\}\\)/);
+  assert.match(core, /new Spark\.SparkRenderer\(\{renderer:this\.renderer,sortRadial:false\}\)/);
   assert.match(core, /new \(await import\('@sparkjsdev\/spark'\)\)\.SplatMesh\(\{url\}\)/);
   assert.match(core, /this\.scene\.add\(this\.spark\)/);
   assert.doesNotMatch(core, /NativeGaussianRenderer|gaussian-native-projection/);
