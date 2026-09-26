@@ -1,4 +1,5 @@
-import { NativeGaussianRenderer } from './gaussian-native-projection.js';
+import * as THREE from 'three';
+import { SplatMesh } from '@sparkjsdev/spark';
 
 const TYPE_INFO = {
   char:{size:1,read:(v,o)=>v.getInt8(o)},
@@ -369,9 +370,28 @@ export function assessTopCoverage(coverageBounds,height,thresholdPercent=12){
 export class GaussianNineViewStudio{
   constructor(container){
     this.container=container;
-    this.native=new NativeGaussianRenderer(container);
+    this.scene=new THREE.Scene();
+    this.camera=new THREE.PerspectiveCamera(45,4/3,.01,500);
+    this.camera.up.set(0,-1,0);
+    this.renderer=new THREE.WebGLRenderer({
+      antialias:true,
+      alpha:true,
+      preserveDrawingBuffer:true,
+      powerPreference:'high-performance'
+    });
+    this.renderer.setPixelRatio(1);
+    this.renderer.setClearColor(0x000000,0);
+    this.renderer.outputColorSpace=THREE.SRGBColorSpace;
+    this.renderer.domElement.style.width='100%';
+    this.renderer.domElement.style.height='100%';
+    this.renderer.domElement.style.display='block';
+    this.renderer.domElement.style.objectFit='contain';
+    container.appendChild(this.renderer.domElement);
+    this.mesh=null;
     this.metadata=null;
     this.file=null;
+    this.renderWidth=0;
+    this.renderHeight=0;
   }
 
   async load(file,onStatus=()=>{}){
@@ -381,42 +401,95 @@ export class GaussianNineViewStudio{
     const metadata=inspectGaussianPly(buffer);
     onStatus('Métadonnées lues · '+metadata.gaussianCount.toLocaleString('fr-FR')+' Gaussians');
 
-    // IMPORTANT: aucun SplatMesh, aucun auto-fit, aucun FOV recalculé.
-    // Le même buffer brut alimente directement le rasterizer natif.
-    this.native.load(buffer,metadata,onStatus);
+    if(this.mesh){
+      this.scene.remove(this.mesh);
+      try{this.mesh.dispose();}catch{}
+      this.mesh=null;
+    }
+
+    const blob=new Blob([buffer],{type:'application/octet-stream'});
+    const url=URL.createObjectURL(blob);
+    try{
+      onStatus('Chargement du renderer Gaussian…');
+      const mesh=new SplatMesh({url});
+      this.scene.add(mesh);
+      await mesh.initialized;
+      this.mesh=mesh;
+    }finally{
+      URL.revokeObjectURL(url);
+    }
+
     this.file=file;
     this.metadata=metadata;
-
-    // Vue centrale = projection native exacte du PLY.
-    this.native.render({
-      eyeX:0,
-      focusDepth:metadata.depth.focus,
-      width:metadata.image.width,
-      height:metadata.image.height
-    });
-    onStatus('Scène prête · vue centrale en projection native directe.');
+    this.setOutputSize(metadata.image.width,metadata.image.height);
+    this.setCamera(0,metadata.depth.focus,0.06);
+    await this.settle(3);
+    onStatus('Scène Gaussian prête.');
     return metadata;
   }
 
+  setOutputSize(width,height,framingScale=1.22){
+    const w=Math.max(64,Math.round(width)),h=Math.max(64,Math.round(height));
+    this.renderWidth=w;this.renderHeight=h;
+    this.renderer.setSize(w,h,false);
+    this.camera.aspect=w/h;
+    const fy=this.metadata?.intrinsics?.fy||h*1.07;
+    const safeScale=clamp(Number(framingScale)||1.22,1,1.45);
+    // Safe framing: enlarge the virtual sensor instead of cropping/scaling the PNG afterwards.
+    // This keeps one identical camera framing for all 9 views and reveals extra Gaussian content
+    // around the original frame, especially above the head.
+    this.camera.fov=2*Math.atan((h*safeScale)/(2*fy))*180/Math.PI;
+    this.camera.near=.01;
+    this.camera.far=Math.max(100,Number(this.metadata?.depth?.far||50)*2);
+    this.camera.updateProjectionMatrix();
+    this.framingScale=safeScale;
+  }
+
+  setCamera(eyeX,focusDepth,headroomRatio=0.06){
+    const focus=Math.max(.05,Number(focusDepth)||1);
+    const ratio=clamp(Number(headroomRatio)||0,0,.15);
+    // Translate camera AND its Y target together: optical axis stays level.
+    // In OpenCV coordinates Y grows downward, so negative Y moves the camera up
+    // and moves the subject down in frame, creating real headroom on all views.
+    const fullHeightAtFocus=2*Math.tan(THREE.MathUtils.degToRad(this.camera.fov/2))*focus;
+    const eyeY=-fullHeightAtFocus*ratio;
+    this.camera.position.set(Number(eyeX)||0,eyeY,0);
+    this.camera.up.set(0,-1,0);
+    this.camera.lookAt(new THREE.Vector3(0,eyeY,focus));
+    this.camera.updateMatrixWorld(true);
+    this.headroomRatio=ratio;
+  }
+
+  async settle(frames=2){
+    for(let i=0;i<frames;i++){
+      await waitFrame();
+      this.renderer.render(this.scene,this.camera);
+    }
+    this.renderer.render(this.scene,this.camera);
+  }
+
   async snapshot(planView,focusDepth,options={}){
-    if(!this.metadata)throw new Error('Charge d’abord un scene.ply.');
+    if(!this.mesh||!this.metadata)throw new Error('Charge d’abord un scene.ply.');
+    const maxEdge=Number(options.maxEdge)||0;
+    const framingScale=clamp(Number(options.framingScale)||1.22,1,1.45);
+    let w=this.metadata.image.width,h=this.metadata.image.height;
+    if(maxEdge>0&&Math.max(w,h)>maxEdge){
+      const s=maxEdge/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);
+    }
+    if(w!==this.renderWidth||h!==this.renderHeight||Math.abs((this.framingScale||1)-framingScale)>1e-6)this.setOutputSize(w,h,framingScale);
+    this.setCamera(planView.eyeX,focusDepth,options.headroomRatio??0.06);
+    await this.settle(options.settleFrames??3);
 
-    const copy=this.native.renderToCanvas({
-      eyeX:Number(planView.eyeX)||0,
-      focusDepth,
-      maxEdge:Number(options.maxEdge)||0,
-      pointGain:Number(options.pointGain)||2.35
-    });
-
-    // La reconstruction intervient APRÈS la projection. Elle ne peut donc pas
-    // modifier la caméra, la focale ou le cadrage du sujet.
+    const copy=document.createElement('canvas');
+    copy.width=this.renderWidth;copy.height=this.renderHeight;
     const ctx=copy.getContext('2d',{willReadFrequently:true});
-    const sourceCoverage=analyzeAlpha(ctx.getImageData(0,0,copy.width,copy.height));
+    ctx.clearRect(0,0,copy.width,copy.height);
+    ctx.drawImage(this.renderer.domElement,0,0,copy.width,copy.height);
     const repair=options.repairBorders===false
-      ? {repairedPixels:0,repairedPercent:0,borderRepairedPixels:0,borderRepairedPercent:0,interiorRepairedPixels:0,interiorRepairedPercent:0,remainingTransparentPercent:null,mode:'disabled'}
+      ? {repairedPixels:0,repairedPercent:0,remainingTransparentPercent:null,mode:'disabled'}
       : repairBorderTransparency(copy);
     const imageData=ctx.getImageData(0,0,copy.width,copy.height);
-    const qc={...analyzeAlpha(imageData),sourceCoverageBounds:sourceCoverage.coverageBounds,borderRepair:repair};
+    const qc={...analyzeAlpha(imageData),borderRepair:repair};
     const blob=await canvasBlob(copy,'image/png');
     return {blob,qc,width:copy.width,height:copy.height};
   }
@@ -425,11 +498,6 @@ export class GaussianNineViewStudio{
     if(!this.metadata)throw new Error('Aucune scène chargée.');
     const plan=cameraPlan(this.metadata,options.maxDisparity,options.focusDepth);
     const out=[];
-
-    // Contrôle central systématique : la vue 05 doit rester eyeX=0.
-    const center=plan.views[4];
-    if(Math.abs(center.eyeX)>1e-9)throw new Error('ÉCHEC CAMÉRA NATIVE — la vue 05 n’est pas centrée.');
-
     for(let n=0;n<indices.length;n++){
       const index=indices[n],pv=plan.views[index-1];
       onProgress({current:n+1,total:indices.length,index,planView:pv});
@@ -439,21 +507,23 @@ export class GaussianNineViewStudio{
         name:'view_'+String(index).padStart(2,'0')+'.png',
         normal:pv.normal,
         eyeX:pv.eyeX,
-        framingScale:1,
-        headroomRatio:0,
-        projectionMode:'native-ply-direct',
+        framingScale:clamp(Number(options.framingScale)||1.22,1,1.45),
+        headroomRatio:clamp(Number(options.headroomRatio)||0.06,0,.15),
         ...snap
       });
       await waitFrame();
     }
-
-    // Remet toujours l’aperçu sur la vraie caméra centrale.
-    this.native.render({
-      eyeX:0,
-      focusDepth:plan.focusDepth,
-      width:this.metadata.image.width,
-      height:this.metadata.image.height
-    });
+    this.setOutputSize(
+      options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
+        ? Math.round(this.metadata.image.width*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
+        : this.metadata.image.width,
+      options.maxEdge&&Math.max(this.metadata.image.width,this.metadata.image.height)>options.maxEdge
+        ? Math.round(this.metadata.image.height*(options.maxEdge/Math.max(this.metadata.image.width,this.metadata.image.height)))
+        : this.metadata.image.height,
+      clamp(Number(options.framingScale)||1.22,1,1.45)
+    );
+    this.setCamera(0,plan.focusDepth,options.headroomRatio??0.06);
+    await this.settle(2);
     return {plan,views:out};
   }
 
@@ -466,9 +536,12 @@ export class GaussianNineViewStudio{
   }
 
   dispose(){
-    this.native?.dispose();
-    this.metadata=null;
-    this.file=null;
+    if(this.mesh){
+      this.scene.remove(this.mesh);
+      try{this.mesh.dispose();}catch{}
+    }
+    this.renderer.dispose();
+    this.container.innerHTML='';
   }
 }
 
