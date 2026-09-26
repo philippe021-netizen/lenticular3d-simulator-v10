@@ -351,6 +351,21 @@ export function cameraPlan(metadata,maxDisparity=0.018,focusDepth){
   };
 }
 
+export function assessTopCoverage(coverageBounds,height,thresholdPercent=12){
+  const h=Number(height);
+  if(!coverageBounds||!Number.isFinite(h)||h<=0||!Number.isFinite(Number(coverageBounds.y)))
+    return {warning:false,upperBlankPercent:null,message:'Couverture haute non mesurable.'};
+  const upperBlankPercent=Number((Math.max(0,Number(coverageBounds.y))/h*100).toFixed(1));
+  const warning=upperBlankPercent>=thresholdPercent;
+  return {
+    warning,
+    upperBlankPercent,
+    message:warning
+      ? 'Aucun point géométrique PLY dans les '+upperBlankPercent+' % supérieurs du cadre. Si le sujet devait s’y trouver, ces données géométriques PLY absentes ne peuvent pas être recréées par MicroPlayer.'
+      : 'La géométrie PLY couvre la partie haute du cadre.'
+  };
+}
+
 export class GaussianNineViewStudio{
   constructor(container){
     this.container=container;
@@ -395,12 +410,13 @@ export class GaussianNineViewStudio{
 
     // La reconstruction intervient APRÈS la projection. Elle ne peut donc pas
     // modifier la caméra, la focale ou le cadrage du sujet.
+    const ctx=copy.getContext('2d',{willReadFrequently:true});
+    const sourceCoverage=analyzeAlpha(ctx.getImageData(0,0,copy.width,copy.height));
     const repair=options.repairBorders===false
       ? {repairedPixels:0,repairedPercent:0,borderRepairedPixels:0,borderRepairedPercent:0,interiorRepairedPixels:0,interiorRepairedPercent:0,remainingTransparentPercent:null,mode:'disabled'}
       : repairBorderTransparency(copy);
-    const ctx=copy.getContext('2d',{willReadFrequently:true});
     const imageData=ctx.getImageData(0,0,copy.width,copy.height);
-    const qc={...analyzeAlpha(imageData),borderRepair:repair};
+    const qc={...analyzeAlpha(imageData),sourceCoverageBounds:sourceCoverage.coverageBounds,borderRepair:repair};
     const blob=await canvasBlob(copy,'image/png');
     return {blob,qc,width:copy.width,height:copy.height};
   }
