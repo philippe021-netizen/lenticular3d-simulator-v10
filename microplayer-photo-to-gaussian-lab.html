@@ -9,7 +9,7 @@
   {
     "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
-      "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/0.1.10/spark.module.js"
+      "@sparkjsdev/spark": "https://sparkjs.dev/releases/spark/2.2.0/spark.module.js"
     }
   }
   </script>
@@ -59,7 +59,7 @@
         </label>
         <input id="framing" type="hidden" value="1">
         <input id="headroom" type="hidden" value="0">
-        <div class="status ok">NOUVEAU MOTEUR NATIF · aucun Spark/SplatMesh pour les exports · aucun auto-fit · aucun zoom · vue 05 = projection directe x/y/z du PLY.</div>
+        <div class="status ok">Rendu Gaussian SparkJS · ellipsoïdes orientés, opacité et tri de profondeur · exports depuis la même scène.</div>
         <label class="field">Résolution production
           <select id="resolution">
             <option value="0">Source PLY</option>
@@ -69,7 +69,7 @@
           </select>
         </label>
         <div id="cameraInfo" class="status">Les valeurs métriques apparaîtront après chargement.</div>
-        <div class="small">Forward = 0 · Z offset = 0 · focale constante · 9 translations X régulières. La vue 05 utilise exactement fx/fy/cx/cy du PLY. Les vues 01→09 utilisent une convergence off-axis : le point de convergence reste fixe sans changer la focale ni grossir l’image.</div>
+        <div class="small">Forward = 0 · Z offset = 0 · focale constante · 9 translations X régulières. La caméra garde la focale et le cadrage source. Les vues 01→09 déplacent la caméra latéralement autour du point de convergence.</div>
       </section>
 
       <section class="panel">
@@ -171,7 +171,7 @@ function updateCameraInfo(){
   $('cameraInfo').textContent=
     'Amplitude caméra : ±'+fmt(p.cameraHalfRangeMillimeters,2)+' mm\n'+
     'Convergence off-axis : '+fmt(p.focusDepth,3)+' m\n'+
-    'Vue 05 : projection PLY native · zoom 0%\n'+
+    'Vue 05 : rendu SparkJS · cadrage source\n'+
     'Focale : fx/fy inchangés\n'+
     'Vue 01 → 09 : translation X '+fmt(-p.cameraHalfRangeMillimeters,2)+' à +'+fmt(p.cameraHalfRangeMillimeters,2)+' mm';
 }
@@ -208,7 +208,7 @@ function showRendered(data){
     const card=document.createElement('div');card.className='viewCard';
     const repair=v.qc.borderRepair||{};
     card.innerHTML='<img src="'+url+'" alt="'+v.name+'"><div class="viewMeta">Vue '+String(v.index).padStart(2,'0')+
-      ' · translation X '+(v.eyeX*1000).toFixed(1)+' mm · zoom 0% · projection native · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
+      ' · translation X '+(v.eyeX*1000).toFixed(1)+' mm · cadrage source · ellipsoïdes Gaussian · bord '+(repair.borderRepairedPercent||0).toFixed(2)+'% · désocc. '+(repair.interiorRepairedPercent||0).toFixed(2)+'%</div>';
     $('views').appendChild(card);
   }
   const worst=Math.max(...data.views.map(v=>v.qc.transparentCenterPercent));
@@ -278,7 +278,7 @@ async function loadGaussianFile(file,label='scene.ply'){
       (sourceFrameWarning?.warning?'\n⚠️ '+sourceFrameWarning.message:'');
     $('viewer').style.aspectRatio=metadata.image.width+'/'+metadata.image.height;
     $('focusDepth').value=metadata.depth.focus.toFixed(3);
-    $('viewerBadge').textContent='PLY natif · vue 05 · zoom 0%';
+    $('viewerBadge').textContent='Gaussian SparkJS · vue 05';
     $('diagPanel').classList.remove('hidden');renderDiag();updateCameraInfo();
     $('resultPanel').classList.add('hidden');$('simPanel').classList.add('hidden');
     rendered=null;$('downloadZip').disabled=true;
@@ -416,7 +416,7 @@ async function run(mode){
     const repairedBorder=Math.max(...data.views.map(v=>v.qc.borderRepair?.borderRepairedPercent||0));
     const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
     $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
-      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · rendu PLY natif · zoom 0% · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%'+
+      ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · rendu Gaussian SparkJS · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%'+
       (topCoverage.warning?' · ATTENTION : '+topCoverage.message:'');
   }catch(err){
     console.error(err);
