@@ -8,7 +8,7 @@ const metadata = {
   diagonal: 1.25
 };
 
-test('nine Gaussian cameras translate laterally at fixed focus, with view 05 exactly central', () => {
+test('nine Gaussian cameras translate laterally around the selected focus', () => {
   const plan = cameraPlan(metadata, 0.018, 2.4);
   assert.equal(plan.views.length, 9);
   assert.equal(plan.views[4].eyeX, 0);
@@ -18,16 +18,17 @@ test('nine Gaussian cameras translate laterally at fixed focus, with view 05 exa
   for (let i = 1; i < 9; i++) assert.ok(plan.views[i].eyeX > plan.views[i - 1].eyeX);
 });
 
-test('native shader preserves focal intrinsics and changes projection only through lateral eyeX', async () => {
-  const shader = await readFile(new URL('../gaussian-native-projection.js', import.meta.url), 'utf8');
-  assert.match(shader, /float xn=\(a_position\.x-u_eyeX\)\/z \+ u_eyeX\/max\(u_focusDepth,0\.05\)/);
-  assert.match(shader, /float px=u_fx\*xn\+u_cx/);
-  assert.match(shader, /float py=u_fy\*yn\+u_cy/);
-  assert.doesNotMatch(shader, /u_eyeZ|u_zoom|autoFit/i);
-  assert.match(shader, /uniform1f\(this\.uniform\.u_fx,Number\(intr\.fx\)\*sx\)/);
+test('browser renderer lazily loads SparkJS and renders covariance aware Gaussian splats', async () => {
+  const core = await readFile(new URL('../gaussian-9views-core.js', import.meta.url), 'utf8');
+  assert.match(core, /import\('three'\)/);
+  assert.match(core, /import\('@sparkjsdev\/spark'\)/);
+  assert.match(core, /new Spark\.SparkRenderer\(\{renderer:this\.renderer\}\)/);
+  assert.match(core, /new \(await import\('@sparkjsdev\/spark'\)\)\.SplatMesh\(\{url\}\)/);
+  assert.match(core, /this\.scene\.add\(this\.spark\)/);
+  assert.doesNotMatch(core, /NativeGaussianRenderer|gaussian-native-projection/);
 });
 
-test('warns when the native PLY has no projected points across a substantial upper-frame band', () => {
+test('warns when the Gaussian scene has no projected points across a substantial upper-frame band', () => {
   const assessment = assessTopCoverage({ y: 180 }, 480);
   assert.equal(assessment.warning, true);
   assert.equal(assessment.upperBlankPercent, 37.5);
@@ -35,13 +36,14 @@ test('warns when the native PLY has no projected points across a substantial upp
   assert.equal(assessTopCoverage(null, 480).warning, false);
 });
 
-test('measures native PLY coverage before border repair can fill the alpha gaps', async () => {
-  const core = await readFile(new URL('../gaussian-9views-core.js', import.meta.url), 'utf8');
-  assert.match(core, /sourceCoverage=analyzeAlpha\(ctx\.getImageData[\s\S]*?repairBorderTransparency\(copy\)/);
-  assert.match(core, /sourceCoverageBounds:sourceCoverage\.coverageBounds/);
+test('page pins the matching SparkJS renderer and identifies it accurately', async () => {
+  const page = await readFile(new URL('../microplayer-photo-to-gaussian-lab.html', import.meta.url), 'utf8');
+  assert.match(page, /releases\/spark\/2\.2\.0\/spark\.module\.js/);
+  assert.match(page, /Rendu Gaussian SparkJS · ellipsoïdes orientés, opacité et tri de profondeur/);
+  assert.doesNotMatch(page, /NOUVEAU MOTEUR NATIF|projection PLY native|projection native/);
 });
 
-test('blocks production when the source photo and PLY have materially different framing ratios', async () => {
+test('warns when the source photo and PLY have materially different framing ratios', async () => {
   const page = await readFile(new URL('../microplayer-photo-to-gaussian-lab.html', import.meta.url), 'utf8');
   assert.match(page, /assessPhotoFrameMatch\(sourcePhotoDimensions,metadata\.image\)/);
   assert.match(page, /RENDU BLOQUÉ — '\+sourceFrameWarning\.message/);
