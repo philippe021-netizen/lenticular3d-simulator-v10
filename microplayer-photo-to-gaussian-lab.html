@@ -126,7 +126,7 @@
 <script type="module">
 import { GaussianNineViewStudio, cameraPlan, makeMontage, buildManifest, assessTopCoverage } from './gaussian-9views-core.js';
 import { infiniErrorMessage } from './modules/infini-error.js';
-import { normalizePhotoForInfiniSplat } from './modules/photo-input.js';
+import { assessPhotoFrameMatch, normalizePhotoForInfiniSplat, readPhotoDimensions } from './modules/photo-input.js';
 import { Client, handle_file } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
 
 const $=id=>document.getElementById(id);
@@ -137,6 +137,8 @@ let previewUrls=[];
 let playTimer=null;
 let playDir=1;
 let sourcePhotoFile=null;
+let sourcePhotoDimensions=null;
+let sourceFrameWarning=null;
 let generatedPlyFile=null;
 let generatedPlyUrl=null;
 let infiniClient=null;
@@ -267,9 +269,13 @@ async function loadGaussianFile(file,label='scene.ply'){
       if(msg.includes('Métadonnées'))setProgress($('progress'),.35);
       if(msg.includes('renderer'))setProgress($('progress'),.6);
     });
+    sourceFrameWarning=sourcePhotoFile&&sourcePhotoDimensions
+      ? assessPhotoFrameMatch(sourcePhotoDimensions,metadata.image)
+      : null;
     setProgress($('progress'),1);
-    $('loadStatus').className='status ok';
-    $('loadStatus').textContent='SCÈNE PRÊTE · '+metadata.gaussianCount.toLocaleString('fr-FR')+' Gaussians · '+metadata.image.width+'×'+metadata.image.height;
+    $('loadStatus').className=sourceFrameWarning?.warning?'status warn':'status ok';
+    $('loadStatus').textContent='SCÈNE PRÊTE · '+metadata.gaussianCount.toLocaleString('fr-FR')+' Gaussians · '+metadata.image.width+'×'+metadata.image.height+
+      (sourceFrameWarning?.warning?'\n⚠️ '+sourceFrameWarning.message:'');
     $('viewer').style.aspectRatio=metadata.image.width+'/'+metadata.image.height;
     $('focusDepth').value=metadata.depth.focus.toFixed(3);
     $('viewerBadge').textContent='PLY natif · vue 05 · zoom 0%';
@@ -290,8 +296,10 @@ $('plyFile').addEventListener('change',async e=>{
   try{await loadGaussianFile(file,file.name);}catch{}
 });
 
-$('photoFile').addEventListener('change',e=>{
+$('photoFile').addEventListener('change',async e=>{
   sourcePhotoFile=e.target.files?.[0]||null;
+  const selectedPhoto=sourcePhotoFile;
+  sourcePhotoDimensions=null;sourceFrameWarning=null;
   generatedPlyFile=null;
   if(generatedPlyUrl){URL.revokeObjectURL(generatedPlyUrl);generatedPlyUrl=null;}
   $('downloadGeneratedPly').disabled=true;
@@ -302,9 +310,14 @@ $('photoFile').addEventListener('change',e=>{
     setProgress($('photoProgress'),0);
     return;
   }
+  $('generateGaussian').disabled=true;
+  $('photoStatus').className='status';$('photoStatus').textContent='Lecture des dimensions photo…';
+  try{sourcePhotoDimensions=await readPhotoDimensions(sourcePhotoFile)}catch{}
+  if(sourcePhotoFile!==selectedPhoto)return;
   $('generateGaussian').disabled=false;
   $('photoStatus').className='status ok';
-  $('photoStatus').textContent='PHOTO PRÊTE · '+sourcePhotoFile.name+' · '+(sourcePhotoFile.size/1024/1024).toFixed(1)+' Mo\nLance Générer scene.ply.';
+  $('photoStatus').textContent='PHOTO PRÊTE · '+sourcePhotoFile.name+' · '+(sourcePhotoFile.size/1024/1024).toFixed(1)+' Mo'+
+    (sourcePhotoDimensions?' · '+sourcePhotoDimensions.width+'×'+sourcePhotoDimensions.height:' · cadrage source non mesuré')+'\nLance Générer scene.ply.';
   setProgress($('photoProgress'),.05);
 });
 
@@ -378,6 +391,12 @@ async function run(mode){
   if(!metadata)return;
   stopPlay();setButtons(true);$('downloadZip').disabled=true;setProgress($('renderProgress'),0);
   $('renderStatus').className='status';
+  if(sourceFrameWarning?.warning){
+    $('renderStatus').className='status bad';
+    $('renderStatus').textContent='RENDU BLOQUÉ — '+sourceFrameWarning.message+' Charge un PLY dont le cadrage correspond à la photo avant de produire les vues.';
+    setButtons(false);
+    return;
+  }
   const isNine=mode==='nine',opts=currentOptions(!isNine);
   $('renderStatus').textContent=(isNine?'PRODUCTION 9 VUES':'TEST 3 VUES')+' · démarrage…';
   try{

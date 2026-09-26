@@ -1,10 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizePhotoForInfiniSplat } from '../modules/photo-input.js';
+import { assessPhotoFrameMatch, normalizePhotoForInfiniSplat } from '../modules/photo-input.js';
 
 test('le JPEG iOS déjà compatible est envoyé sans réencodage', async () => {
   const photo = { name: 'portrait.jpg', type: 'image/jpeg' };
   assert.equal(await normalizePhotoForInfiniSplat(photo, {}), photo);
+});
+
+test('signale un scene.ply paysage issu d’une photo portrait sans cacher la perte de cadrage', () => {
+  const result = assessPhotoFrameMatch({ width: 1152, height: 1536 }, { width: 1536, height: 1152 });
+  assert.equal(result.warning, true);
+  assert.match(result.message, /cadrage différent/i);
+});
+
+test('accepte des dimensions PLY différentes lorsque le ratio portrait est conservé', () => {
+  const result = assessPhotoFrameMatch({ width: 1152, height: 1536 }, { width: 900, height: 1200 });
+  assert.equal(result.warning, false);
 });
 
 test('HEIC retombe sur le décodeur Image natif si createImageBitmap échoue', async () => {

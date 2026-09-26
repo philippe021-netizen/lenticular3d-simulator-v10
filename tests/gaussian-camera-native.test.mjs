@@ -40,3 +40,10 @@ test('measures native PLY coverage before border repair can fill the alpha gaps'
   assert.match(core, /sourceCoverage=analyzeAlpha\(ctx\.getImageData[\s\S]*?repairBorderTransparency\(copy\)/);
   assert.match(core, /sourceCoverageBounds:sourceCoverage\.coverageBounds/);
 });
+
+test('blocks production when the source photo and PLY have materially different framing ratios', async () => {
+  const page = await readFile(new URL('../microplayer-photo-to-gaussian-lab.html', import.meta.url), 'utf8');
+  assert.match(page, /assessPhotoFrameMatch\(sourcePhotoDimensions,metadata\.image\)/);
+  assert.match(page, /RENDU BLOQUÉ — '\+sourceFrameWarning\.message/);
+  assert.match(page, /Charge un PLY dont le cadrage correspond à la photo/);
+});
