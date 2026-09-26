@@ -389,6 +389,9 @@ $('downloadGeneratedPly').addEventListener('click',()=>{
 
 async function run(mode){
   if(!metadata)return;
+  sourceFrameWarning=sourcePhotoFile&&sourcePhotoDimensions
+    ? assessPhotoFrameMatch(sourcePhotoDimensions,metadata.image)
+    : sourceFrameWarning;
   stopPlay();setButtons(true);$('downloadZip').disabled=true;setProgress($('renderProgress'),0);
   $('renderStatus').className='status';
   if(sourceFrameWarning?.warning){
