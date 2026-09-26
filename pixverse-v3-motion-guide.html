@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>MicroPlayer — PixVerse V3 Motion Guide Consolidated</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#f5f5f2}*{box-sizing:border-box}body{margin:0}.bar{position:sticky;top:0;background:#111;color:#fff;padding:13px 16px;display:flex;justify-content:space-between;align-items:center;z-index:5}.badge{background:#a7f3d0;color:#073b2a;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:850}.wrap{max-width:980px;margin:auto;padding:16px}.card{background:#fff;border:1px solid #ddd;border-radius:16px;padding:16px;margin-bottom:14px}h2{margin:0 0 6px}.sub{font-size:12px;color:#666;line-height:1.45}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:720px){.grid{grid-template-columns:1fr}}label{display:block;font-size:12px;font-weight:800;margin:10px 0 5px}input,select,button{width:100%;font:inherit;border-radius:11px}input,select{border:1px solid #ccd1d5;padding:11px;background:#fff}button{border:0;padding:13px;background:#111;color:#fff;font-weight:850;margin-top:10px}button:disabled{opacity:.42}.status{margin-top:10px;padding:11px;border-radius:11px;background:#f1f2f3;font-size:12px;white-space:pre-wrap;line-height:1.45}.ok{background:#e7f7eb;color:#17652c}.bad{background:#ffe9e7;color:#8b1f17}.info{background:#eef6ff;color:#20496d}.warn{background:#fff7d6;color:#6d5200}.warning{padding:10px;border:1px solid #eed47a;background:#fff8d6;border-radius:11px;font-size:12px;line-height:1.4}video{display:none;width:100%;margin-top:12px;border-radius:12px;background:#111}.frames{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.frames img{width:100%;border-radius:9px;border:1px solid #ddd}.frameMeta{font-size:10px;color:#555;margin-top:3px}.lockCard{display:none}.compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.compare img{width:100%;max-height:360px;object-fit:contain;background:#111;border-radius:10px}.lockStage{margin-top:12px;background:#111;padding:8px;border-radius:12px;touch-action:none}.lockStage canvas{display:block;width:100%;height:auto;max-height:620px;object-fit:contain;touch-action:none}.checkrow{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:10px;border:1px solid #ddd;border-radius:11px}.checkrow input{width:auto;margin-top:3px}.checkrow label{margin:0;font-weight:700}.simulator{display:none}.simStage{background:#111;border-radius:14px;padding:10px;overflow:hidden}.simStage img{display:block;width:100%;max-height:720px;object-fit:contain;border-radius:10px;background:#111}.simMeta{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:#555}.simControls{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:end;margin-top:10px}.simControls button{min-width:150px}.simControls label{margin:0}.simAngle{width:100%}.simReadout{font-weight:800}@media(max-width:720px){.simControls{grid-template-columns:1fr}.simControls button{min-width:0}.compare{grid-template-columns:1fr}}
 </style>
@@ -20,7 +21,7 @@
 <section class="card">
 <h2>1. Génération Mimic</h2>
 <div class="grid">
-<div><label>Photo client</label><input id="photo" type="file" accept="image/png,image/jpeg,image/webp"></div>
+<div><label>Photo client</label><input id="photo" type="file" accept="image/*,.heic,.heif"></div>
 <div><label>Vidéo guide</label><input id="guide" type="file" accept="video/mp4,video/quicktime,video/webm"></div>
 </div>
 <div class="grid">
@@ -37,6 +38,9 @@
 <h2>2. 9 vues MicroPlayer</h2>
 <div class="sub">La sélection utilise la progression visuelle réelle et conserve le premier passage A→B. Les téléchargements restent désactivés jusqu’au QC identité final.</div>
 <button id="extract" disabled>Analyser et extraire les 9 PNG</button>
+<div class="grid" style="margin-top:10px"><div><label>Ou importer un MP4 PixVerse déjà généré</label><input id="manualMp4" type="file" accept="video/mp4,video/quicktime,video/webm"></div><div><label>&nbsp;</label><button id="analyzeManualMp4" disabled>Analyser ce MP4 dans MicroPlayer</button></div></div>
+<button id="exportZip" disabled>Télécharger ZIP 9 vues · 60 LPI</button>
+<div id="exportStatus" class="status info">L’export ZIP s’activera après validation du QC identité.</div>
 <div id="qc" class="status">Aucune extraction.</div>
 <div id="frames" class="frames"></div>
 </section>
@@ -71,6 +75,7 @@
 </div>
 
 <script type="module">
+import { createMotionExportManifest } from './modules/pixverse-export.js';
 
 const SHARE_TOKEN = new URLSearchParams(location.search).get('_vercel_share') || '';
 const NATIVE_FETCH = window.fetch.bind(window);
@@ -1807,7 +1812,7 @@ function assessLockedRegionMetrics(before, after, {
 
 
 const $=id=>document.getElementById(id);
-let extraction=null,catalog=null,locked=null,lockMetrics=null,lockRegion=null,lockImage=null,sourcePreviewUrl='';
+let extraction=null,catalog=null,locked=null,lockMetrics=null,lockRegion=null,lockImage=null,sourcePreviewUrl='',manualMp4Url='';
 let simRAF=0,simPlaying=false,simStartedAt=0,simFrames=[];
 let dragging=false,dragStart=null;
 
@@ -1848,6 +1853,23 @@ function renderFrames(frames, exportAllowed=false){
     d.append(img,m,b);$('frames').appendChild(d);
   }
 }
+
+$('manualMp4').addEventListener('change',()=>{
+  $('analyzeManualMp4').disabled=!$('manualMp4').files?.[0];
+});
+$('analyzeManualMp4').onclick=async()=>{
+  const photo=$('photo').files?.[0],file=$('manualMp4').files?.[0];
+  if(!photo||!file){tone($('status'),'Choisis la photo client et le MP4 PixVerse à analyser.','bad');return}
+  $('analyzeManualMp4').disabled=true;$('extract').disabled=true;$('exportZip').disabled=true;
+  try{
+    if(manualMp4Url)URL.revokeObjectURL(manualMp4Url);
+    manualMp4Url=URL.createObjectURL(file);const video=$('result');video.src=manualMp4Url;video.style.display='block';video.load();
+    await new Promise((resolve,reject)=>{if(video.readyState>=1)return resolve();video.onloadedmetadata=resolve;video.onerror=()=>reject(new Error('MP4 importé illisible dans Safari.'))});
+    $('extract').disabled=false;
+    tone($('status'),'MP4 PixVerse chargé localement · '+video.videoWidth+'×'+video.videoHeight+' · '+video.duration.toFixed(2)+' s · aucune requête PixVerse lancée.','ok');
+  }catch(error){tone($('status'),'Lecture locale du MP4 impossible : '+error.message,'bad')}
+  finally{$('analyzeManualMp4').disabled=!$('manualMp4').files?.[0]}
+};
 
 async function loadCatalog(){
   catalog=BUNDLED_CATALOG;$('action').innerHTML='';
@@ -1912,15 +1934,38 @@ function refreshFinalQC(){
   const frames=locked?.frames||extraction.frames;
   if(qc.passed){
     tone($('lockQc'),`✅ QC FINAL VERT · identité confirmée · dérive tête après verrou ${Number(metrics.headDrift||0).toFixed(4)} · dérive fond ${Number(metrics.backgroundDrift||0).toFixed(4)} · export autorisé.`,'ok');
-    renderFrames(frames,true);installSimulator(frames);
+    renderFrames(frames,true);installSimulator(frames);$('exportZip').disabled=frames.length!==9;
   }else{
     const labels={ 'identity-confirmed':'identité non confirmée','head-drift':'tête non mesurée ou instable','background':'fond non mesuré ou instable','head-correction':'correction tête trop importante','return':'retour B→A détecté' };
-    tone($('lockQc'),'❌ QC FINAL BLOQUÉ · '+qc.hardFailures.map(x=>labels[x]||x).join(' · '),'bad');
+    $('exportZip').disabled=true;tone($('lockQc'),'❌ QC FINAL BLOQUÉ · '+qc.hardFailures.map(x=>labels[x]||x).join(' · '),'bad');
     renderFrames(frames,false);installSimulator(frames);
   }
   return qc;
 }
 $('identityConfirmed').addEventListener('change',refreshFinalQC);
+
+$('exportZip').onclick=async()=>{
+  const button=$('exportZip');button.disabled=true;$('exportStatus').className='status info';$('exportStatus').textContent='Préparation du ZIP 60 LPI…';
+  try{
+    const qc=refreshFinalQC(),frames=locked?.frames||extraction?.frames;
+    if(!qc?.passed)throw new Error('QC identité non validé.');
+    if(!window.JSZip)throw new Error('Bibliothèque ZIP indisponible : vérifie la connexion puis recharge la page.');
+    const manifest=createMotionExportManifest(frames,qc,{
+      action:currentPreset()?.id||null,
+      lockedRegion:locked?.region||null,
+      extraction:extraction?.extractionWindow||null
+    });
+    const zip=new JSZip();
+    for(let i=0;i<9;i++)zip.file(manifest.view_files[i],frames[i].blob,{binary:true});
+    zip.file('manifest.json',JSON.stringify(manifest,null,2));
+    const blob=await zip.generateAsync({type:'blob',compression:'STORE'},progress=>{
+      $('exportStatus').textContent='Création ZIP · '+Math.round(progress.percent)+'%';
+    });
+    const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='MicroPlayer-PixVerse-V3-9-vues-60LPI.zip';link.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
+    $('exportStatus').className='status ok';$('exportStatus').textContent='ZIP prêt · 9 vues PNG 01 → 09 · 60 LPI · manifest.json inclus.';
+  }catch(error){$('exportStatus').className='status bad';$('exportStatus').textContent='Export ZIP impossible : '+(error?.message||String(error))}
+  finally{$('exportZip').disabled=!refreshFinalQC()?.passed}
+};
 
 $('applyLock').onclick=async()=>{
   if(!extraction||!lockRegion)return;
@@ -1941,7 +1986,7 @@ $('applyLock').onclick=async()=>{
 $('run').onclick=async()=>{
   const photo=$('photo').files?.[0],guide=$('guide').files?.[0];
   if(!photo||!guide){tone($('status'),'Choisis la photo client ET la vidéo guide.','bad');return}
-  $('run').disabled=true;$('extract').disabled=true;$('result').style.display='none';$('frames').innerHTML='';$('lockCard').style.display='none';locked?.revoke?.();locked=null;extraction?.revoke?.();extraction=null;stopSimulator();simFrames=[];$('simulatorCard').style.display='none';
+  $('run').disabled=true;$('extract').disabled=true;$('exportZip').disabled=true;$('result').style.display='none';$('frames').innerHTML='';$('lockCard').style.display='none';locked?.revoke?.();locked=null;extraction?.revoke?.();extraction=null;stopSimulator();simFrames=[];$('simulatorCard').style.display='none';
   try{
     const labels={'safe-framing':'Préparation du cadrage de sécurité…','safe-framing-done':'Cadrage de sécurité prêt.','upload-photo':'1/4 — Upload photo identité…','upload-guide':'2/4 — Upload vidéo guide…','create-mimic':'3/4 — Lancement Motion Control / Mimic…','processing':'4/4 — PixVerse génère la vidéo…','done':'Vidéo Mimic reçue.'};
     const preset=currentPreset();
@@ -1953,7 +1998,7 @@ $('run').onclick=async()=>{
 };
 
 $('extract').onclick=async()=>{
-  $('extract').disabled=true;$('frames').innerHTML='';locked?.revoke?.();locked=null;lockMetrics=null;
+  $('extract').disabled=true;$('exportZip').disabled=true;$('frames').innerHTML='';locked?.revoke?.();locked=null;lockMetrics=null;
   try{
     tone($('qc'),'Analyse de la progression puis extraction…');extraction?.revoke?.();
     extraction=await extractVideoFrames($('result'),{count:9,type:'image/png',quality:1,progressiveOnly:true,actionAware:true,actionHint:$('action').selectedOptions?.[0]?.textContent||'motion guide',analysisSamples:30,onProgress:p=>tone($('qc'),p.phase==='analysis'?`Analyse mouvement ${p.index+1}/${p.count}`:`Extraction PNG ${p.index+1}/${p.count}`)});

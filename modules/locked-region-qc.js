@@ -2,6 +2,10 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, Number(value) || 0));
 }
 
+function stableFraction(value) {
+  return Number(value.toFixed(6));
+}
+
 export function normalizeLockedRegion(region = {}) {
   const x = clamp01(region.x);
   const y = clamp01(region.y);
@@ -10,7 +14,13 @@ export function normalizeLockedRegion(region = {}) {
   if (maxWidth < 0.04 || maxHeight < 0.04) throw new Error('Zone verrouillée hors cadre.');
   const width = Math.min(maxWidth, Math.max(0.04, Number(region.width) || 0));
   const height = Math.min(maxHeight, Math.max(0.04, Number(region.height) || 0));
-  return { x, y, width, height };
+  const stableX = stableFraction(x), stableY = stableFraction(y);
+  return {
+    x: stableX,
+    y: stableY,
+    width: stableFraction(Math.min(width, 1 - stableX)),
+    height: stableFraction(Math.min(height, 1 - stableY))
+  };
 }
 
 function regionPixels(region, width, height) {

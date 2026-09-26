@@ -9,25 +9,30 @@ test("le redressement lit la photo propre et jamais le canvas avec les poignées
 });
 
 test("le manifeste ZIP conserve les dimensions et les diagnostics de rendu", async () => {
-  const html = await readFile(new URL("../microplayer-card-v32-studio.html", import.meta.url), "utf8");
-  assert.match(html, /schema:'microplayer\.card-v32'/);
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
+  assert.match(html, /schema:'microplayer\.card-v33'/);
   assert.match(html, /dimensions:\{width:state\.width,height:state\.height\}/);
-  assert.match(html, /holesBeforeFill:rendered\.holesBeforeFill/);
+  assert.match(html, /centerViewPixelPerfect:true/);
+  if (/async function exportViewsZip\(/.test(html)) {
+    assert.match(html, /view_files:state\.views\.length===9\?viewFiles:\[\]/);
+  } else {
+    assert.match(html, /state\.blobs\.forEach\(\(blob,index\)=>zip\.file\(`vue-/);
+  }
 });
 
 
 test("le bouton relief autonome appelle le serveur puis applique les profondeurs avant les 9 vues", async () => {
-  const html = await readFile(new URL("../microplayer-card-v32-studio.html", import.meta.url), "utf8");
-  assert.match(html, /Créer le relief automatiquement/);
+  const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
   assert.match(html, /fetch\('\/api\/card-layer-analyze'/);
   assert.match(html, /corrected\.get\(String\(group\.id\)\)/);
-  assert.match(html, /await generateViews\(\)/);
+  assert.match(html, /await rebuildMasterWithMigan\(\)/);
+  assert.match(html, /qcMasterScene\(\)/);
 });
 
 
 test("V33 master scene élargit le retrait quand un masque sémantique est faible", async () => {
   const html = await readFile(new URL("../microplayer-card-v33-master-scene.html", import.meta.url), "utf8");
-  assert.match(html, /maskIsWeak\(group\).*addBoxToMask\(removalSeed,group\.bbox/);
+  assert.match(html, /if\(weak\)addBoxToMask\(removalSeed,group\.bbox/);
   assert.match(html, /productionMask=deriveLayerMask\(group,cleanPx\)/);
 });
 

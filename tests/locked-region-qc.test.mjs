@@ -10,6 +10,10 @@ test('locked region is normalized and constrained', () => {
   const clipped = normalizeLockedRegion({ x: .9, y: .9, width: .5, height: .5 });
   assert.equal(clipped.width, .1);
   assert.equal(clipped.height, .1);
+  assert.deepEqual(clipped, { x: .9, y: .9, width: .1, height: .1 });
+  const edge = normalizeLockedRegion({ x: .12345678, y: .23456789, width: 1, height: 1 });
+  assert.ok(edge.x + edge.width <= 1);
+  assert.ok(edge.y + edge.height <= 1);
 });
 
 test('aligned drift detects a small translation without reporting identity drift', () => {
