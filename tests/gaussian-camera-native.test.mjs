@@ -40,12 +40,15 @@ test('page pins the matching SparkJS renderer and identifies it accurately', asy
   const page = await readFile(new URL('../microplayer-photo-to-gaussian-lab.html', import.meta.url), 'utf8');
   assert.match(page, /releases\/spark\/2\.2\.0\/spark\.module\.js/);
   assert.match(page, /Rendu Gaussian SparkJS · ellipsoïdes orientés, opacité et tri de profondeur/);
+  assert.match(page, /maxEdge:preview\?1536/);
   assert.doesNotMatch(page, /NOUVEAU MOTEUR NATIF|projection PLY native|projection native/);
 });
 
 test('warns when the source photo and PLY have materially different framing ratios', async () => {
   const page = await readFile(new URL('../microplayer-photo-to-gaussian-lab.html', import.meta.url), 'utf8');
   assert.match(page, /assessPhotoFrameMatch\(sourcePhotoDimensions,metadata\.image\)/);
-  assert.match(page, /RENDU BLOQUÉ — '\+sourceFrameWarning\.message/);
+  assert.match(page, /PRODUCTION 9 VUES BLOQUÉE — '\+sourceFrameWarning\.message/);
+  assert.match(page, /TEST COMPARATIF AUTORISÉ/);
+  assert.match(page, /cadrage source \/ PLY différent/);
   assert.match(page, /Charge un PLY dont le cadrage correspond à la photo/);
 });
