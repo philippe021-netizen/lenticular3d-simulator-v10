@@ -154,7 +154,7 @@ function currentOptions(preview=false){
     framingScale:1,
     headroomRatio:0,
     repairBorders:true,
-    maxEdge:preview?1024:Number($('resolution').value)||0,
+    maxEdge:preview?1536:Number($('resolution').value)||0,
     settleFrames:3
   };
 }
@@ -394,13 +394,18 @@ async function run(mode){
     : sourceFrameWarning;
   stopPlay();setButtons(true);$('downloadZip').disabled=true;setProgress($('renderProgress'),0);
   $('renderStatus').className='status';
-  if(sourceFrameWarning?.warning){
+  const isNine=mode==='nine';
+  if(sourceFrameWarning?.warning&&isNine){
     $('renderStatus').className='status bad';
-    $('renderStatus').textContent='RENDU BLOQUÉ — '+sourceFrameWarning.message+' Charge un PLY dont le cadrage correspond à la photo avant de produire les vues.';
+    $('renderStatus').textContent='PRODUCTION 9 VUES BLOQUÉE — '+sourceFrameWarning.message+' Charge un PLY dont le cadrage correspond à la photo avant de produire les vues.';
     setButtons(false);
     return;
   }
-  const isNine=mode==='nine',opts=currentOptions(!isNine);
+  if(sourceFrameWarning?.warning){
+    $('renderStatus').className='status warn';
+    $('renderStatus').textContent='TEST COMPARATIF AUTORISÉ · '+sourceFrameWarning.message+' Le cadrage étiré restera visible pendant ce test.';
+  }
+  const opts=currentOptions(!isNine);
   $('renderStatus').textContent=(isNine?'PRODUCTION 9 VUES':'TEST 3 VUES')+' · démarrage…';
   try{
     const fn=isNine?'renderNine':'renderThree';
@@ -417,12 +422,13 @@ async function run(mode){
     const repairedInterior=Math.max(...data.views.map(v=>v.qc.borderRepair?.interiorRepairedPercent||0));
     $('renderStatus').textContent=(isNine?'9 VUES CALCULÉES':'3 VUES CALCULÉES')+
       ' · amplitude ±'+data.plan.cameraHalfRangeMillimeters.toFixed(2)+' mm · rendu Gaussian SparkJS · bord '+repairedBorder.toFixed(2)+'% · désocc. '+repairedInterior.toFixed(2)+'%'+
-      (topCoverage.warning?' · ATTENTION : '+topCoverage.message:'');
+      (topCoverage.warning?' · ATTENTION : '+topCoverage.message:'')+
+      (sourceFrameWarning?.warning?' · TEST COMPARATIF SEULEMENT : cadrage source / PLY différent.':'');
   }catch(err){
     console.error(err);
     $('renderStatus').className='status bad';$('renderStatus').textContent='RENDU BLOQUÉ — '+(err?.message||err);
   }finally{
-    $('viewerBadge').textContent='PLY natif · vue 05 · zoom 0%';
+    $('viewerBadge').textContent='Gaussian SparkJS · vue 05';
     setButtons(false);
   }
 }
