@@ -126,6 +126,7 @@
 <script type="module">
 import { GaussianNineViewStudio, cameraPlan, makeMontage, buildManifest, assessTopCoverage } from './gaussian-9views-core.js';
 import { infiniErrorMessage } from './modules/infini-error.js';
+import { normalizePhotoForInfiniSplat } from './modules/photo-input.js';
 import { Client, handle_file } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
 
 const $=id=>document.getElementById(id);
@@ -314,24 +315,6 @@ function gradioPayload(result){
 function absoluteInfiniUrl(url){
   if(!url)throw new Error('InfiniSplat n’a pas renvoyé le fichier PLY.');
   return new URL(url,INFINISPLAT_BASE).href;
-}
-
-async function normalizePhotoForInfiniSplat(file){
-  if(!file)return file;
-  const name=file.name||'photo';
-  if(!/\.(heic|heif)$/i.test(name)&&/^(image\/(jpeg|png|webp))$/i.test(file.type||''))return file;
-  let bitmap;
-  try{
-    if(typeof createImageBitmap!=='function')throw new Error('Décodage HEIC indisponible dans ce Safari.');
-    bitmap=await createImageBitmap(file);
-    const canvas=document.createElement('canvas');canvas.width=bitmap.width;canvas.height=bitmap.height;
-    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas de conversion indisponible.');
-    ctx.drawImage(bitmap,0,0);
-    const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error('Conversion JPEG impossible.')),'image/jpeg',.94));
-    const safeName=name.replace(/\.(heic|heif)$/i,'')+'.jpg';
-    return new File([blob],safeName,{type:'image/jpeg',lastModified:Date.now()});
-  }catch(error){throw new Error('Conversion de la photo iPhone impossible dans Safari · '+(error?.message||error))}
-  finally{bitmap?.close?.()}
 }
 
 $('generateGaussian').addEventListener('click',async()=>{
