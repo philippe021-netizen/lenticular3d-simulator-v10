@@ -93,16 +93,41 @@ export function interlacePixelRows(views, width, height, {
   const pitchPx = dpi / calibratedLpi;
   if (!Number.isFinite(axisOffsetPx)) throw new RangeError('Décalage d’axe invalide.');
   const rowBytes = width * 4;
-  for (let y = 0; y < height; y++) {
-    const rowStart = y * rowBytes;
-    for (let x = 0; x < width; x++) {
-      const axis = lensOrientation === 'vertical' ? x : y + axisOffsetPx;
-      const rawCycle = ((axis + 0.5 + phasePx) / pitchPx) % 1;
-      const cycle = (rawCycle + 1) % 1;
-      let viewIndex = Math.min(8, Math.floor(cycle * 9));
-      if (reverseOrder) viewIndex = 8 - viewIndex;
-      const offset = rowStart + x * 4;
-      output.set(views[viewIndex].data.subarray(offset, offset + 4), offset);
+  const indexForAxis = axis => {
+    const rawCycle = ((axis + 0.5 + phasePx) / pitchPx) % 1;
+    const cycle = (rawCycle + 1) % 1;
+    const index = Math.min(8, Math.floor(cycle * 9));
+    return reverseOrder ? 8 - index : index;
+  };
+
+  if (lensOrientation === 'vertical') {
+    // Lens phase varies only across columns. Calculate it once, then copy the
+    // four RGBA channels directly; allocating a subarray for every pixel made
+    // the full 600-DPI card needlessly slow on mobile browsers.
+    const viewByColumn = new Uint8Array(width);
+    for (let x = 0; x < width; x++) viewByColumn[x] = indexForAxis(x);
+    for (let y = 0; y < height; y++) {
+      const rowStart = y * rowBytes;
+      for (let x = 0; x < width; x++) {
+        const offset = rowStart + x * 4;
+        const data = views[viewByColumn[x]].data;
+        output[offset] = data[offset];
+        output[offset + 1] = data[offset + 1];
+        output[offset + 2] = data[offset + 2];
+        output[offset + 3] = data[offset + 3];
+      }
+    }
+  } else {
+    for (let y = 0; y < height; y++) {
+      const viewData = views[indexForAxis(y + axisOffsetPx)].data;
+      const rowStart = y * rowBytes;
+      for (let x = 0; x < width; x++) {
+        const offset = rowStart + x * 4;
+        output[offset] = viewData[offset];
+        output[offset + 1] = viewData[offset + 1];
+        output[offset + 2] = viewData[offset + 2];
+        output[offset + 3] = viewData[offset + 3];
+      }
     }
   }
   return output;
