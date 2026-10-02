@@ -15,6 +15,7 @@ import {
   sortNineViewFiles,
   validateSharedAspectRatio
 } from './lenticular-print-browser.js';
+import { buildStoredZip } from './lenticular-print-zip.js';
 
 const $ = id => document.getElementById(id);
 const state = {
@@ -329,11 +330,19 @@ $('downloadPdf').addEventListener('click', async () => {
   } finally { $('downloadPdf').disabled = !state.result; }
 });
 $('downloadBundle').addEventListener('click', async () => {
-  if (!state.resultBlob || !state.manifest || !window.JSZip) return;
-  const zip = new window.JSZip();
-  zip.file(`${filenameStem()}-interlace.png`, state.resultBlob);
-  zip.file('manifest-impression.json', JSON.stringify(state.manifest, null, 2));
-  triggerDownload(await zip.generateAsync({ type: 'blob' }), `${filenameStem()}-pour-impression.zip`);
+  if (!state.resultBlob || !state.manifest) return;
+  $('downloadBundle').disabled = true;
+  setStatus($('exportStatus'), 'Préparation du ZIP PNG + paramètres…');
+  try {
+    const zip = await buildStoredZip([
+      { name: `${filenameStem()}-interlace.png`, data: state.resultBlob },
+      { name: 'manifest-impression.json', data: JSON.stringify(state.manifest, null, 2) }
+    ]);
+    triggerDownload(zip, `${filenameStem()}-pour-impression.zip`);
+    setStatus($('exportStatus'), 'ZIP prêt : PNG interlacé + manifeste de paramètres.', 'good');
+  } catch (error) {
+    setStatus($('exportStatus'), `Échec de l’export ZIP : ${error.message}`, 'error');
+  } finally { $('downloadBundle').disabled = !state.resultBlob; }
 });
 
 $('makeCalibration').addEventListener('click', async () => {
