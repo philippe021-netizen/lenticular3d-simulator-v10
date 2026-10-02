@@ -33,7 +33,7 @@ const families=[
 {id:'local-actions',label:'Actions locales',title:'Actions locales',help:'Personne, animal, véhicule, objet et logo',src:'./relief3d-test-v31.html?embed=1&v=411',target:'#happyHoloSelectionControls'}]},
 {id:'products',icon:'▣',label:'Produits',hint:'Supports & cartes',routes:[
 {id:'supports',label:'Supports',title:'Supports et cadrage',help:'Porte-clé, médaillon, carte et verso',src:'./relief3d-test-v31.html?embed=1&v=406',target:'.support-card'},
-{id:'card',label:'Carte / souvenir',title:'Scanner de carte V32',help:'4 coins, OCR local précis, groupes sémantiques, Pencil, 9 vues et ZIP de contrôle',src:'./microplayer-card-v32-scanner.html?v=432'},
+{id:'card',label:'Carte / souvenir',title:'Carte V33 — recadrage et simulateur',help:'4 coins, perspective corrigée, OCR, Pencil et scène maître avec simulateur 9 vues',src:'./microplayer-card-v33.html?v=433'},
 {id:'simulator',label:'Simulateur 9 vues',title:'Simulateur lenticulaire universel',help:'Lecture fluide, tactile et contrôle des écarts',src:'./happyholo-simulator.html?v=400'}]},
 {id:'machines',icon:'⚙',label:'Machines',hint:'ExplodeView',routes:[
 {id:'explode',label:'Créer ExplodeView',title:'ExplodeView — machines',help:'Démontage progressif des grosses pièces seulement',src:'./relief3d-test-v31.html?embed=1&v=406',target:'#pieceSelectionStart'},
@@ -51,7 +51,7 @@ function activate(id,force=false){const found=routeById(id),r=found.route;active
 frame.addEventListener('load',()=>{loading.hidden=true;tuneEmbedded();scrollInside(routeById(activeRoute).route.target)});frame.addEventListener('error',()=>{loading.hidden=false;loading.firstElementChild.textContent='Le module ne répond pas. Utilise ↻ pour réessayer.'});
 $('reload').onclick=()=>activate(activeRoute,true);$('open').onclick=()=>window.open(routeById(activeRoute).route.src,'_blank','noopener');$('focus').onclick=()=>document.body.classList.add('focus');$('focusExit').onclick=()=>document.body.classList.remove('focus');document.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('focus')});
 async function health(){try{const r=await fetch('./api/happyholo-health',{cache:'no-store'}),d=await r.json();const ready=[d.services?.pixverse,d.services?.analysis,d.services?.explodeview].filter(Boolean).length;$('healthDot').className='dot '+(ready===3?'ok':'warn');$('healthText').textContent=ready===3?'Tous les services connectés':`${ready}/3 services IA connectés`;}catch(_){$('healthDot').className='dot warn';$('healthText').textContent='Fonctions locales disponibles'}}
-const initial=sessionStorage.getItem('happyholo:hub-route')||location.hash.slice(1)||'photo';activate(initial);health();
+const initial=location.hash.slice(1)||sessionStorage.getItem('happyholo:hub-route')||'photo';activate(initial);health();
 })();
 </script>
 </body>
