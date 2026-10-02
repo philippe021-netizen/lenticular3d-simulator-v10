@@ -6,6 +6,7 @@ const status=$('#status');
 const buildBtn=$('#build');
 const exportBtn=$('#export');
 const downloadBtn=$('#download');
+const printBtn=$('#openLenticularPrint');
 const framesEl=$('#frames');
 
 const subjectDepth=$('#subjectDepth');
@@ -314,7 +315,7 @@ function startPreview(){
 }
 
 async function loadSourceFile(nextFile){
-  sourceFile=nextFile||null; exported=[]; exportBtn.disabled=true; downloadBtn.disabled=true; framesEl.innerHTML='';
+  sourceFile=nextFile||null; exported=[]; exportBtn.disabled=true; downloadBtn.disabled=true; printBtn.disabled=true; framesEl.innerHTML='';
   window.HappyHoloReliefState=null;
   if(!sourceFile) return;
   sourceImg=await fileToImage(sourceFile);
@@ -329,7 +330,7 @@ file.addEventListener('change',()=>loadSourceFile(file.files?.[0]||null));
 
 async function buildRelief(){
   if(!sourceFile){ setStatus('Choisis d’abord une photo.'); return; }
-  buildBtn.disabled=true; exportBtn.disabled=true; downloadBtn.disabled=true;
+  buildBtn.disabled=true; exportBtn.disabled=true; downloadBtn.disabled=true; printBtn.disabled=true;
   try{
     /* V3.27 : le détourage et la sélection des pièces s'ouvrent avant l'analyse de profondeur. */
     setStatus('Ouverture de la sélection des pièces…');
@@ -369,7 +370,27 @@ exportBtn.addEventListener('click',async()=>{
     renderAt(poses[i],c); const b=await canvasToBlob(c); exported.push(b);
     const im=new Image(); im.src=URL.createObjectURL(b); framesEl.appendChild(im); await sleep(25);
   }
-  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.25 prêtes.');
+  downloadBtn.disabled=false; printBtn.disabled=false; startPreview(); setStatus('9 vues V3.25 prêtes. Tu peux les conserver en ZIP ou les envoyer au module Impression lenticulaire.');
+});
+
+printBtn.addEventListener('click',()=>{
+  if(exported.length!==9) return;
+  let printWindow=null;
+  const onReady=event=>{
+    if(event.origin!==location.origin||event.source!==printWindow||event.data?.type!=='microplayer-lenticular-print-ready') return;
+    window.removeEventListener('message',onReady);
+    event.source.postMessage({type:'microplayer-lenticular-print-views',views:exported.slice()},location.origin);
+    setStatus('Les 9 vues sont envoyées au module Impression lenticulaire.');
+  };
+  window.addEventListener('message',onReady);
+  printWindow=window.open('./microplayer-lenticular-print.html?v=1','_blank');
+  if(!printWindow){
+    window.removeEventListener('message',onReady);
+    setStatus('Le navigateur a bloqué le nouvel onglet. Ouvre Impression lenticulaire depuis le menu MicroPlayer et importe le ZIP des 9 vues.');
+    return;
+  }
+  setStatus('Ouverture du module Impression…');
+  setTimeout(()=>window.removeEventListener('message',onReady),20000);
 });
 
 downloadBtn.addEventListener('click',async()=>{

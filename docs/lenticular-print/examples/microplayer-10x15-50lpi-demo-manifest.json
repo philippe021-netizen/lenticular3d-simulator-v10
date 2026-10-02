@@ -1,0 +1,55 @@
+{
+  "generator": "MicroPlayer Lenticular Print",
+  "appVersion": "HappyHolo V4.6 / MicroPlayer impression lenticulaire 0.1",
+  "printerProfile": "Canon PIXMA PRO-200S",
+  "generatedAt": "2026-10-02T15:42:59.592Z",
+  "physicalSize": {
+    "widthMm": 100,
+    "heightMm": 150
+  },
+  "orientation": "portrait",
+  "aspectRatio": 0.6666666666666666,
+  "aspectRatioLabel": "2:3",
+  "raster": {
+    "widthPx": 2362,
+    "heightPx": 3543,
+    "dpi": 600
+  },
+  "lpi": {
+    "nominal": 50,
+    "calibrated": 50
+  },
+  "viewCount": 9,
+  "viewOrder": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "lensOrientation": "vertical",
+  "phaseOffsetPx": 0,
+  "reverseOrder": false,
+  "crop": {
+    "zoom": 1,
+    "panX": 0,
+    "panY": 0
+  },
+  "sourceNames": [
+    "vue-01.webp",
+    "vue-02.webp",
+    "vue-03.webp",
+    "vue-04.webp",
+    "vue-05.webp",
+    "vue-06.webp",
+    "vue-07.webp",
+    "vue-08.webp",
+    "vue-09.webp"
+  ],
+  "printScale": "100% — taille réelle; désactiver « ajuster à la page »",
+  "sampleNote": "Échantillon de test basé sur la démonstration Rocket existante; pitch 50 LPI non calibré physiquement."
+}

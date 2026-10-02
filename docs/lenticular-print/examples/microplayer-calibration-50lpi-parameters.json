@@ -1,0 +1,25 @@
+{
+  "generator": "MicroPlayer Pitch Calibration",
+  "printerProfile": "Canon PIXMA PRO-200S",
+  "generatedAt": "2026-10-02T15:43:00.762Z",
+  "physicalSize": {
+    "widthMm": 150,
+    "heightMm": 100
+  },
+  "dpi": 600,
+  "nominalLpi": 50,
+  "testPitchLpi": [
+    49.5,
+    49.6,
+    49.7,
+    49.8,
+    49.9,
+    50,
+    50.1,
+    50.2,
+    50.3,
+    50.4,
+    50.5
+  ],
+  "note": "Échantillon logiciel uniquement; mesurer le résultat réel avec imprimante, papier et film."
+}
