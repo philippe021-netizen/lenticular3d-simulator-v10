@@ -125,9 +125,12 @@ export async function renderInterlacedPng(images, spec, cropOptions = {}, onProg
   output.imageSmoothingQuality = 'high';
 
   const stripCanvas = document.createElement('canvas');
+  stripCanvas.width = spec.width;
   const stripContext = stripCanvas.getContext('2d', { willReadFrequently: true });
   if (!stripContext) throw new Error('Le navigateur ne peut pas préparer le tampon de calcul.');
-  const stripHeight = 32;
+  // A larger band cuts the number of animation-frame handoffs on mobile while
+  // keeping the nine temporary RGBA rows under 11 MiB at postcard resolution.
+  const stripHeight = 128;
   const cropRectangles = images.map(image => calculateCropRect(
     image.naturalWidth || image.width,
     image.naturalHeight || image.height,
@@ -138,7 +141,6 @@ export async function renderInterlacedPng(images, spec, cropOptions = {}, onProg
   for (let startY = 0; startY < spec.height; startY += stripHeight) {
     if (!shouldContinue()) throw new Error('Rendu interrompu : les paramètres ont changé (superseded).');
     const height = Math.min(stripHeight, spec.height - startY);
-    stripCanvas.width = spec.width;
     stripCanvas.height = height;
     stripContext.imageSmoothingEnabled = true;
     stripContext.imageSmoothingQuality = 'high';
