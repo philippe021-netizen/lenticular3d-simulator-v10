@@ -201,6 +201,44 @@ export function mapDepthForParallax(value, zero, relief, stabilityBand = 0, plan
   return Math.sign(normalized) * clamp(remapped, 0, 1);
 }
 
+/**
+ * Mesure une différence GEOMETRIQUE de parallaxe entre les deux extrêmes 01/09.
+ * Contrairement à une comparaison de couleurs, les variations de texture (sable,
+ * feuillage) ne peuvent pas créer un faux résultat positif.
+ */
+export function analyzeParallaxPotential(depth, width, options = {}) {
+  if (!depth?.length || !Number.isFinite(width) || width < 1) {
+    return { valid: false, reason: "Carte de profondeur absente" };
+  }
+  const histogram = new Uint32Array(256);
+  for (const value of depth) histogram[value] += 1;
+  function percentile(frac) {
+    const target = Math.floor((depth.length - 1) * frac);
+    let running = 0;
+    for (let i = 0; i < 256; i += 1) {
+      running += histogram[i];
+      if (running > target) return i;
+    }
+    return 255;
+  }
+  const p10 = percentile(0.10);
+  const p50 = percentile(0.50);
+  const p90 = percentile(0.90);
+  const zero = clamp(Number(options.zero ?? 128), 0, 255);
+  const relief = clamp(Number(options.relief ?? 1.2), 0.5, 2.5);
+  const band = clamp(Number(options.stabilityBand ?? 0), 0, 64);
+  const separation = clamp(Number(options.planeSeparation ?? 1), 1, 2.5);
+  const parallaxPercent = clamp(Number(options.parallaxPercent ?? 2.4), 0, 8);
+  // Entre 01 (position -1) et 09 (position +1), le même plan parcourt
+  // largeur * pourcentage / 100 ; le relief utile dépend de deux plans distincts.
+  const mappedFar = mapDepthForParallax(p10, zero, relief, band, separation);
+  const mappedNear = mapDepthForParallax(p90, zero, relief, band, separation);
+  const relativeShiftPx = Math.abs(mappedNear - mappedFar) * width * parallaxPercent / 100;
+  const weak = p90 - p10 < 12 || relativeShiftPx < Math.max(6, width * 0.008);
+  return { valid: true, weak, p10, p50, p90, depthSpan: p90 - p10,
+    relativeShiftPx: Math.round(relativeShiftPx * 10) / 10 };
+}
+
 export function renderNovelView(source, depth, width, height, position, options = {}) {
   if (source.length !== width * height * 4 || depth.length !== width * height) {
     throw new Error("Dimensions de rendu incohérentes");
