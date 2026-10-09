@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MicroPlayer — Départ impression et calibrage</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f3f6fa;color:#192e40}*{box-sizing:border-box}body{margin:0;padding-bottom:env(safe-area-inset-bottom)}header{background:#102a43;color:white;padding:18px max(14px,env(safe-area-inset-left))}header h1{font-size:23px;margin:0 0 5px}header p{margin:0;font-size:14px;color:#e1edf6;line-height:1.4}.wrap{max-width:1100px;margin:15px auto;padding:0 12px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.card{background:#fff;border:1px solid #d4e0ea;border-radius:16px;padding:16px;min-width:0;margin-bottom:12px}h2{font-size:18px;margin:0 0 12px}h3{font-size:15px;margin:12px 0 6px}.hint{font-size:13px;line-height:1.5;color:#536879}.field{margin:10px 0}label{font-weight:700;font-size:13px;display:block;margin:0 0 5px}input,select,button{font:inherit}input,select{width:100%;min-height:44px;border:1px solid #9bb1c0;border-radius:9px;padding:8px 10px;background:white;color:#142a3e}button{border:0;border-radius:10px;min-height:46px;background:#075e9b;color:white;padding:10px;font-weight:750;cursor:pointer}button.secondary{background:#e6eef4;color:#183348}button:disabled{opacity:.5}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions>*{flex:1 1 160px}.metric{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.metric>div{background:#eaf2f8;border-radius:12px;padding:12px}.metric b{display:block;font-size:20px;color:#064d80;margin:5px 0}.metric span{font-size:12px;color:#526b7f}table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:9px 7px;border-bottom:1px solid #e0e9ef}th{background:#edf3f7}td.num{text-align:right;font-variant-numeric:tabular-nums}ul{font-size:13px;line-height:1.55;padding-left:21px}.notice{font-size:13px;border-left:4px solid #dba330;background:#fff7de;padding:12px;border-radius:8px;line-height:1.5}.status{font-size:13px;color:#124b37;min-height:24px}.muted{opacity:.75}a{color:#075e9b}.full{grid-column:1/-1}@media(max-width:740px){.grid{grid-template-columns:1fr}.row{grid-template-columns:1fr}.metric{grid-template-columns:1fr 1fr}header h1{font-size:20px}}
+</style>
+</head>
+<body>
+<header><h1>MicroPlayer · Préparer l'impression</h1><p>Roland VersaUV LEF-20 · Canon PIXMA PRO-200S · HP OfficeJet Pro 8720</p></header>
+<main class="wrap">
+  <div class="notice">Préparation expérimentale. La résolution maximale annoncée d'une imprimante n'est pas la résolution raster du fichier. Le pilote ou le RIP peut rééchantillonner. Seules les mires sur le matériel réel valident un couple imprimante / papier / lenticulaire.</div>
+  <div class="grid" style="margin-top:12px">
+    <section class="card">
+      <h2>1. Imprimante et profil</h2>
+      <div class="field"><label for="printerId">Imprimante</label><select id="printerId"></select></div><div id="printerDetails" class="notice" style="background:#edf4fa;border-left-color:#075e9b;margin:10px 0"></div>
+      <div class="field"><label for="printerModel">Modèle précis / identification</label><input id="printerModel" placeholder="Ex. Roland modèle exact chez mon ami"></div>
+      <div class="field"><label for="driverMode">Pilote / RIP / qualité (pour distinguer les calibrages)</label><input id="driverMode" placeholder="Ex. VersaWorks, qualité élevée, support blanc"></div>
+      <p id="printerSpecs" class="hint"></p>
+      <div id="maxSizes" class="notice" aria-live="polite" style="background:#eaf2fa;border-left-color:#075e9b;margin-bottom:12px"></div>
+      <div class="field"><label for="printMode">Mode de sortie / résolution du raster (vérification RIP ou pilote obligatoire)</label><select id="printMode"></select></div>
+      <div class="row">
+        <div class="field"><label for="rasterDpiX">DPI raster horizontal X</label><input id="rasterDpiX" type="number" min="72" max="2400" step="1" value="600"></div>
+        <div class="field"><label for="rasterDpiY">DPI raster vertical Y</label><input id="rasterDpiY" type="number" min="72" max="2400" step="1" value="600"></div>
+      </div>
+      <p class="hint">Calculs effectués sur le DPI transversal aux lentilles : <b>lentilles verticales → X ; horizontales → Y</b>. Les DPI constructeur désignent généralement le positionnement des gouttes, et non une résolution d'image 1:1. Modifier X/Y manuellement demande un test RIP.</p>
+    </section>
+    <section class="card">
+      <h2>2. Lenticulaire et format</h2>
+      <div class="row">
+        <div class="field"><label for="nominalLpi">Feuille lenticulaire</label><select id="nominalLpi"><option value="50">50 LPI</option><option value="60">60 LPI</option></select></div>
+        <div class="field"><label for="calibratedLpi">Pitch mesuré (LPI)</label><input type="number" id="calibratedLpi" min="10" max="200" step="0.01" inputmode="decimal"></div>
+      </div>
+      <div class="field"><label for="lensOrientation">Direction des lentilles</label><select id="lensOrientation"><option value="vertical">Verticales · alternance de vues gauche/droite</option><option value="horizontal">Horizontales · alternance haut/bas</option></select></div>
+      <div class="field"><label for="format">Format final — 10 × 15, A4, A3, A3+ ou personnalisé</label><select id="format"></select></div>
+      <div class="field"><label for="feedSource">Source papier / plateau</label><select id="feedSource"></select></div>
+      <div class="field"><label for="mediaThicknessMm">Épaisseur du papier ou support (mm, facultatif)</label>
+        <input id="mediaThicknessMm" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Ex. 0,26 mm"></div>
+      <div class="notice" id="formatCheck" role="status" aria-live="polite"></div>
+      <div class="row">
+        <div class="field"><label for="widthMm">Largeur physique (mm)</label><input id="widthMm" type="number" min="1" max="2000" step="0.1" inputmode="decimal"></div>
+        <div class="field"><label for="heightMm">Hauteur physique (mm)</label><input id="heightMm" type="number" min="1" max="2000" step="0.1" inputmode="decimal"></div>
+      </div>
+      <div class="field"><label for="effect">Effet souhaité</label><select id="effect"><option value="relief">Relief / 3D</option><option value="flip">Flip / mouvement</option></select></div>
+    </section>
+    <section class="card full">
+      <h2>3. Calcul selon l'imprimante et la feuille</h2>
+      <div id="metrics" class="metric"></div>
+      <h3>Comparatif du nombre de vues</h3>
+      <table><thead><tr><th>Vues</th><th>Pixels raster / vue</th><th>Bandes entières ?</th><th>Analyse</th></tr></thead><tbody id="viewRows"></tbody></table>
+      <div id="recommendations"></div>
+      <p class="hint" id="recommendedViews"></p><p class="hint">Le nombre conseillé est une hypothèse de départ, pas une validation optique. Une répartition fractionnaire est possible, mais le résultat dépend du RIP, du pitch réel et du support.</p>
+    </section>
+    <section class="card">
+      <h2>4. Profils réutilisables</h2>
+      <div class="field"><label for="profileName">Nom du profil matériel</label><input id="profileName" placeholder="Ex. Canon + PET 50 LPI / papier brillant"></div>
+      <div class="actions"><button id="saveProfile">Enregistrer le profil</button><button id="exportProfile" class="secondary">Exporter JSON</button></div>
+      <div class="field"><label for="savedProfiles">Profils enregistrés sur cet appareil</label><select id="savedProfiles"><option value="">— Charger un profil —</option></select></div>
+      <div id="status" class="status" role="status"></div>
+      <p class="hint">Les réglages sont enregistrés localement sur cet iPad ou ce PC. Ils ne se synchronisent pas automatiquement entre appareils.</p>
+    </section>
+    <section class="card">
+      <h2>5. Suite du parcours</h2>
+      <p class="hint"><b>Moteur actuel :</b> 9 vues, fichier 600 × 600 DPI, carte 10 × 15 cm, 50 ou 60 LPI, profil Canon uniquement. La Roland et la HP disposent désormais de vrais profils d'analyse, mais leur export final dédié reste à développer et à valider physiquement.</p>
+      <button id="launchLegacy">Ouvrir l'atelier actuel (9 vues, 600 DPI)</button>
+      <div id="handoffStatus" class="status" role="status"></div>
+      <p class="hint">Nous conservons le moteur actuel : pas de modification de Photo V02.3, Carte V33 ou de la branche stable. Pour Roland, confirmer le modèle et le réglage RIP avant export final.</p>
+    </section>
+  </div>
+</main>
+<script type="module">
+import { PRINTER_PRESETS, FORMAT_PRESETS, assessMediaDimensions, evaluatePrintSetup } from './modules/microplayer-print-planner.js';
+const $ = id => document.getElementById(id);
+const activeKey='microplayer:print-setup:v1', profilesKey='microplayer:saved-print-profiles:v1';
+const fields=['printerId','printerModel','driverMode','printMode','rasterDpiX','rasterDpiY','nominalLpi','calibratedLpi','lensOrientation','widthMm','heightMm','effect','format','feedSource','mediaThicknessMm','profileName'];
+function safeRead(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}}
+function safeWrite(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}}
+function config(){const result={};for(const id of fields)result[id]=$(id).value;return result}
+function hydrate(x){
+ if(x.printerId){
+  const legacyPrinter={'roland-custom':'roland-lef-20','hp-custom':'hp-officejet-pro-8720'}[x.printerId];
+  const printerId=legacyPrinter || x.printerId;
+  $('printerId').value=PRINTER_PRESETS.some(p=>p.id===printerId)?printerId:'canon-pro-200s';
+ }
+ changePrinter(false);
+ for(const id of fields) if(id!=='printerId' && x[id]!==undefined) $(id).value=String(x[id]); 
+ if(!FORMAT_PRESETS.some(p=>p.id===$('format').value)) $('format').value='custom';
+ if(x.rasterDpi!==undefined && x.rasterDpiX===undefined){
+  const p=PRINTER_PRESETS.find(p=>p.id===$('printerId').value);
+  const mode=p.supportedModes.find(m=>m.x===Number(x.rasterDpi));
+  if(mode){$('rasterDpiX').value=mode.x;$('rasterDpiY').value=mode.y}
+  else {$('rasterDpiX').value=x.rasterDpi;$('rasterDpiY').value=x.rasterDpi}
+ }
+ refresh();
+}
+function changePrinter(updateModel=true){
+ const p=PRINTER_PRESETS.find(p=>p.id===$('printerId').value);if(!p)return;
+ if(updateModel){$('printerModel').value=p.label;$('driverMode').value=p.printModeLabel}
+ $('printMode').replaceChildren(...p.supportedModes.map((m,i)=>new Option(m.label,String(i))));
+ $('printMode').value='0';
+ const oldFeed=$('feedSource').value;
+ $('feedSource').replaceChildren(new Option('Automatique — choisir la source compatible','auto'),
+   ...p.mediaSources.map(src=>new Option(src.label,src.id)));
+ $('feedSource').value= p.mediaSources.some(src=>src.id===oldFeed)?oldFeed:'auto';
+ applyPrintMode(false);
+}
+function applyPrintMode(doRefresh=true){
+ const p=PRINTER_PRESETS.find(p=>p.id===$('printerId').value);
+ const mode=p?.supportedModes[Number($('printMode').value)] || p?.supportedModes[0];
+ if(!mode)return;
+ $('rasterDpiX').value=mode.x;$('rasterDpiY').value=mode.y;
+ if(doRefresh)refresh();
+}
+function applyFormat(){
+ const selected=FORMAT_PRESETS.find(p=>p.id===$('format').value);
+ if(selected?.widthMm){$('widthMm').value=selected.widthMm;$('heightMm').value=selected.heightMm}
+ refresh();
+}
+function refreshFormatOptions(printer) {
+ const selection=$('format').value;
+ $('format').replaceChildren(...FORMAT_PRESETS.map(option=>{
+   const el=new Option(option.label,option.id);
+   if(option.id!=='custom'){
+     const test=assessMediaDimensions({printerId:printer.id,widthMm:option.widthMm,heightMm:option.heightMm,
+       feedSource:$('feedSource').value,mediaThicknessMm:$('mediaThicknessMm').value});
+     if(!test.compatible){
+       el.disabled=true;el.textContent=option.label+' — incompatible avec source/support';
+     }
+   }
+   return el;
+ }));
+ $('format').value=FORMAT_PRESETS.some(p=>p.id===selection)?selection:'custom';
+}
+function drawSizeLimits(printer,media) {
+ const container=$('maxSizes');container.replaceChildren();
+ const title=document.createElement('strong');title.textContent='Dimensions maximales acceptées';container.append(title);
+ for(const source of printer.mediaSources){
+   const line=document.createElement('p');line.style.margin='6px 0';
+   line.textContent=source.label+' : '+source.minWidthMm+' × '+source.minHeightMm+
+     ' mm minimum ; '+source.maxWidthMm+' × '+source.maxHeightMm+' mm maximum'+
+     (source.maxThicknessMm?' · épaisseur jusqu’à '+source.maxThicknessMm+' mm':'');
+   container.append(line);
+ }
+ const caveat=document.createElement('p');caveat.style.margin='8px 0 0';
+ caveat.textContent=printer.kind==='uv'?
+   'Roland : ces limites décrivent la ZONE IMPRIMÉE. Taille maximale du support physique : 538 × 360 mm ; hauteur 100 mm et poids 5 kg.' :
+   'Canon / HP : limites de TAILLE DE PAPIER, et non une promesse de zone imprimable sans marges. Les marges dépendent du pilote et du support.';
+ container.append(caveat);
+ const result=$('formatCheck');
+ result.textContent=media.compatible?
+   'Format '+$('widthMm').value+' × '+$('heightMm').value+' mm accepté. Source : '+media.feedLabel+
+   (media.mediaThicknessMm===null?' · épaisseur non contrôlée.':' · épaisseur vérifiée.') :
+   'Format '+$('widthMm').value+' × '+$('heightMm').value+' mm INCOMPATIBLE avec la machine, la source ou l’épaisseur sélectionnée.';
+ result.style.background=media.compatible?'#e6f6ec':'#fff0ed';
+ result.style.borderLeftColor=media.compatible?'#22834e':'#bf382b';
+}
+function refresh(){
+ const input=config();
+ const printer=PRINTER_PRESETS.find(p=>p.id===input.printerId);
+ let currentMedia;
+ try{currentMedia=assessMediaDimensions(input);drawSizeLimits(printer,currentMedia);
+      refreshFormatOptions(printer)}
+ catch(e){$('formatCheck').textContent=e.message;$('formatCheck').style.background='#fff0ed';}
+ $('printerSpecs').textContent=printer.resolutionLabel + '. ' + printer.inputRasterLabel;
+ $('printerDetails').replaceChildren();
+ for(const txt of [printer.technology,printer.areaLabel,printer.feedLabel,printer.mediaLabel,printer.limitation]){
+  const p=document.createElement('p');p.textContent=txt;p.style.margin='5px 0';$('printerDetails').append(p);
+ }
+ const pLinks=document.createElement('p');pLinks.style.margin='8px 0 0';
+ for(const [i,url] of printer.sourceUrls.entries()){const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Source constructeur '+(i+1);pLinks.append(a);pLinks.append(document.createTextNode('  ·  '))}
+ $('printerDetails').append(pLinks);
+ try{
+  const data=evaluatePrintSetup(input);
+  $('metrics').innerHTML=[
+   ['Pas transversal',data.pixelsPerLens.toFixed(3)+' px','Par lentille en '+data.effectiveDpi+' DPI · axe '+data.axisOfInterlace],
+   ['Format raster',data.outWidthPx+' × '+data.outHeightPx,'Fichier '+data.rasterDpiX+' × '+data.rasterDpiY+' DPI'],
+   ['Mémoire RGBA',Math.round(data.totalPixels*4/1048576)+' Mio','Pour UNE image brute']
+  ].map(x=>'<div><span>'+x[0]+'</span><b>'+x[1]+'</b><span>'+x[2]+'</span></div>').join('');
+  $('viewRows').replaceChildren(...data.candidates.map(row=>{
+   const tr=document.createElement('tr');
+   [String(row.viewCount),row.pixelsPerView.toFixed(3),row.exactIntegerStripes?'Oui':'Non',row.assessment].forEach((v,i)=>{
+    const td=document.createElement('td');td.textContent=v;if(i===1)td.className='num';tr.append(td)});
+   if(row.viewCount===data.suggestedViewCount)tr.style.fontWeight='700';return tr;
+  }));
+  $('recommendedViews').textContent='Suggestion prudente : '+data.suggestedViewCount+' vues pour '+data.effect+
+   (data.suggestedAlternatives.length?' · options à bandes entières : '+data.suggestedAlternatives.join(' ou ')+' vues':'')+
+   '. Validation obligatoire sur mire avant production.';
+  $('recommendations').replaceChildren();
+  const heading=document.createElement('h3');heading.textContent='Précautions';$('recommendations').append(heading);
+  const ul=document.createElement('ul');
+  for(const message of data.recommendations){const li=document.createElement('li');li.textContent=message;ul.append(li)}
+  $('recommendations').append(ul);
+  $('launchLegacy').disabled=!(data.existingEngineSupportsNineViews && data.paperFits);
+  $('handoffStatus').textContent=$('launchLegacy').disabled?
+   'Profil sauvegardable, mais moteur de production adapté à cette configuration non encore validé. Ne pas exporter une autre imprimante sous profil Canon.' :
+   'Canon + 10 × 15 cm + raster 600 × 600 DPI : profil LPI transmissible au moteur actuel.';
+  safeWrite(activeKey,{...input,savedAt:new Date().toISOString()});
+ }catch(e){
+  $('metrics').textContent='';$('viewRows').replaceChildren();$('recommendations').textContent=e.message;
+  $('launchLegacy').disabled=true;$('handoffStatus').textContent='Corrige les paramètres avant de poursuivre.';
+ }
+}
+function populateSaved(){
+ const p=safeRead(profilesKey,[]);$('savedProfiles').replaceChildren(new Option('— Charger un profil —',''));
+ p.forEach((x,i)=>$('savedProfiles').add(new Option(x.profileName || ('Profil '+(i+1)),String(i))));
+}
+function download(text,name){const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+PRINTER_PRESETS.forEach(p=>$('printerId').add(new Option(p.label,p.id)));
+FORMAT_PRESETS.forEach(p=>$('format').add(new Option(p.label,p.id)));
+$('printerId').value='canon-pro-200s';changePrinter(true);
+$('nominalLpi').value='50';$('calibratedLpi').value='50';$('format').value='postcard-landscape';$('widthMm').value='150';$('heightMm').value='100';$('effect').value='relief';
+const existing=safeRead(activeKey,null);if(existing){hydrate(existing)}
+for(const id of fields){$(id).addEventListener('change',()=>{
+ if(id==='printerId'){changePrinter(true)}
+ else if(id==='printMode'){applyPrintMode(false)}
+ if(id==='nominalLpi')$('calibratedLpi').value=$('nominalLpi').value;
+ if(id==='widthMm'||id==='heightMm')$('format').value='custom';
+ refresh();
+});if(['calibratedLpi','printerModel','driverMode','profileName','rasterDpiX','rasterDpiY','mediaThicknessMm'].includes(id))$(id).addEventListener('input',refresh)}
+$('format').addEventListener('change',applyFormat);
+$('saveProfile').addEventListener('click',()=>{
+ const entry=config();if(!entry.profileName.trim()){$('status').textContent='Donne un nom au profil avant de l’enregistrer.';return}
+ let profiles=safeRead(profilesKey,[]);profiles=profiles.filter(p=>p.profileName!==entry.profileName);profiles.push(entry);
+ $('status').textContent=safeWrite(profilesKey,profiles.slice(-30))?'Profil enregistré sur cet appareil.':'Stockage indisponible : exporte le JSON.';
+ populateSaved();refresh();
+});
+$('savedProfiles').addEventListener('change',()=>{const x=safeRead(profilesKey,[])[$('savedProfiles').value];if(x){hydrate(x);refresh();$('status').textContent='Profil chargé.'}});
+$('exportProfile').addEventListener('click',()=>{try{const c=config();const a=evaluatePrintSetup(c);download(JSON.stringify({version:1,settings:c,calculation:a},null,2),'microplayer-profil-impression.json');$('status').textContent='JSON exporté.'}catch(e){$('status').textContent=e.message}});
+$('launchLegacy').addEventListener('click',()=>{
+ try{
+  const s=config(),e=evaluatePrintSetup(s);if(!(e.existingEngineSupportsNineViews&&e.paperFits))return;
+  const orientation=e.widthMm>e.heightMm?'landscape':'portrait';
+  const legacy={orientation,widthMm:100,heightMm:150,nominalLpi:e.nominalLpi,calibratedLpi:e.calibratedLpi,lensOrientation:e.lensOrientation,phasePx:0,reverseOrder:false,dpi:600,viewCount:9,printer:'Canon PIXMA PRO-200S'};
+  if(!safeWrite('microplayer:lenticular-print:canon-pro-200s:v1',legacy)){$('handoffStatus').textContent='Impossible de transmettre le profil (stockage indisponible).';return}
+  location.href='./microplayer-lenticular-print.html';
+ }catch(err){$('handoffStatus').textContent=err.message}
+});
+populateSaved();refresh();
+</script>
+</body>
+</html>
