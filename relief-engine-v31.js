@@ -399,7 +399,7 @@ exportBtn.addEventListener('click',async()=>{
     setStatus(`CONTRÔLE REFUSÉ — vues presque identiques : ${tooSimilar.join(', ')}. Augmente l’amplitude ou refais le relief avant d’exporter.`);
     return;
   }
-  downloadBtn.disabled=false; setStatus('9 vues distinctes — contrôle automatique réussi.');
+  downloadBtn.disabled=false; setStatus('9 rendus 2,5D distincts — contrôle automatique réussi.');
 });
 
 downloadBtn.addEventListener('click',async()=>{
