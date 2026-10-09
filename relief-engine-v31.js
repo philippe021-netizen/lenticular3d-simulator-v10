@@ -61,12 +61,15 @@ function canvasToBlob(canvas){
 async function meanFrameDifference(blobA,blobB){
   const [imgA,imgB]=await Promise.all([blobToImage(blobA),blobToImage(blobB)]);
   if(imgA.naturalWidth!==imgB.naturalWidth||imgA.naturalHeight!==imgB.naturalHeight) return 255;
-  const c=document.createElement('canvas');c.width=imgA.naturalWidth;c.height=imgA.naturalHeight;
+  const scale=Math.min(1,160/Math.max(imgA.naturalWidth,imgA.naturalHeight));
+  const c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(imgA.naturalWidth*scale));
+  c.height=Math.max(1,Math.round(imgA.naturalHeight*scale));
   const x=c.getContext('2d',{willReadFrequently:true});
-  x.drawImage(imgA,0,0);const a=x.getImageData(0,0,c.width,c.height).data;
-  x.clearRect(0,0,c.width,c.height);x.drawImage(imgB,0,0);const b=x.getImageData(0,0,c.width,c.height).data;
+  x.drawImage(imgA,0,0,c.width,c.height);const a=x.getImageData(0,0,c.width,c.height).data;
+  x.clearRect(0,0,c.width,c.height);x.drawImage(imgB,0,0,c.width,c.height);const b=x.getImageData(0,0,c.width,c.height).data;
   let sum=0,count=0;
-  for(let p=0;p<a.length;p+=16){
+  for(let p=0;p<a.length;p+=4){
     sum+=Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2]);
     count+=3;
   }
