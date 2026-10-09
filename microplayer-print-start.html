@@ -19,6 +19,7 @@
       <div class="field"><label for="printerModel">Modèle précis / identification</label><input id="printerModel" placeholder="Ex. Roland modèle exact chez mon ami"></div>
       <div class="field"><label for="driverMode">Pilote / RIP / qualité (pour distinguer les calibrages)</label><input id="driverMode" placeholder="Ex. VersaWorks, qualité élevée, support blanc"></div>
       <p id="printerSpecs" class="hint"></p>
+      <div id="maxSizes" class="notice" aria-live="polite" style="background:#eaf2fa;border-left-color:#075e9b;margin-bottom:12px"></div>
       <div class="field"><label for="printMode">Mode de sortie / résolution du raster (vérification RIP ou pilote obligatoire)</label><select id="printMode"></select></div>
       <div class="row">
         <div class="field"><label for="rasterDpiX">DPI raster horizontal X</label><input id="rasterDpiX" type="number" min="72" max="2400" step="1" value="600"></div>
@@ -33,7 +34,11 @@
         <div class="field"><label for="calibratedLpi">Pitch mesuré (LPI)</label><input type="number" id="calibratedLpi" min="10" max="200" step="0.01" inputmode="decimal"></div>
       </div>
       <div class="field"><label for="lensOrientation">Direction des lentilles</label><select id="lensOrientation"><option value="vertical">Verticales · alternance de vues gauche/droite</option><option value="horizontal">Horizontales · alternance haut/bas</option></select></div>
-      <div class="field"><label for="format">Format final</label><select id="format"><option value="postcard-landscape">Carte postale 150 × 100 mm (paysage)</option><option value="postcard-portrait">Carte postale 100 × 150 mm (portrait)</option><option value="a4-portrait">A4 210 × 297 mm</option><option value="custom">Personnalisé / grand format</option></select></div>
+      <div class="field"><label for="format">Format final — 10 × 15, A4, A3, A3+ ou personnalisé</label><select id="format"></select></div>
+      <div class="field"><label for="feedSource">Source papier / plateau</label><select id="feedSource"></select></div>
+      <div class="field"><label for="mediaThicknessMm">Épaisseur du papier ou support (mm, facultatif)</label>
+        <input id="mediaThicknessMm" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Ex. 0,26 mm"></div>
+      <div class="notice" id="formatCheck" role="status" aria-live="polite"></div>
       <div class="row">
         <div class="field"><label for="widthMm">Largeur physique (mm)</label><input id="widthMm" type="number" min="1" max="2000" step="0.1" inputmode="decimal"></div>
         <div class="field"><label for="heightMm">Hauteur physique (mm)</label><input id="heightMm" type="number" min="1" max="2000" step="0.1" inputmode="decimal"></div>
@@ -66,10 +71,10 @@
   </div>
 </main>
 <script type="module">
-import { PRINTER_PRESETS, evaluatePrintSetup } from './modules/microplayer-print-planner.js';
+import { PRINTER_PRESETS, FORMAT_PRESETS, assessMediaDimensions, evaluatePrintSetup } from './modules/microplayer-print-planner.js';
 const $ = id => document.getElementById(id);
 const activeKey='microplayer:print-setup:v1', profilesKey='microplayer:saved-print-profiles:v1';
-const fields=['printerId','printerModel','driverMode','printMode','rasterDpiX','rasterDpiY','nominalLpi','calibratedLpi','lensOrientation','widthMm','heightMm','effect','format','profileName'];
+const fields=['printerId','printerModel','driverMode','printMode','rasterDpiX','rasterDpiY','nominalLpi','calibratedLpi','lensOrientation','widthMm','heightMm','effect','format','feedSource','mediaThicknessMm','profileName'];
 function safeRead(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch{return fallback}}
 function safeWrite(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}}
 function config(){const result={};for(const id of fields)result[id]=$(id).value;return result}
@@ -80,7 +85,8 @@ function hydrate(x){
   $('printerId').value=PRINTER_PRESETS.some(p=>p.id===printerId)?printerId:'canon-pro-200s';
  }
  changePrinter(false);
- for(const id of fields) if(id!=='printerId' && x[id]!==undefined) $(id).value=String(x[id]);
+ for(const id of fields) if(id!=='printerId' && x[id]!==undefined) $(id).value=String(x[id]); 
+ if(!FORMAT_PRESETS.some(p=>p.id===$('format').value)) $('format').value='custom';
  if(x.rasterDpi!==undefined && x.rasterDpiX===undefined){
   const p=PRINTER_PRESETS.find(p=>p.id===$('printerId').value);
   const mode=p.supportedModes.find(m=>m.x===Number(x.rasterDpi));
@@ -94,6 +100,10 @@ function changePrinter(updateModel=true){
  if(updateModel){$('printerModel').value=p.label;$('driverMode').value=p.printModeLabel}
  $('printMode').replaceChildren(...p.supportedModes.map((m,i)=>new Option(m.label,String(i))));
  $('printMode').value='0';
+ const oldFeed=$('feedSource').value;
+ $('feedSource').replaceChildren(new Option('Automatique — choisir la source compatible','auto'),
+   ...p.mediaSources.map(src=>new Option(src.label,src.id)));
+ $('feedSource').value= p.mediaSources.some(src=>src.id===oldFeed)?oldFeed:'auto';
  applyPrintMode(false);
 }
 function applyPrintMode(doRefresh=true){
@@ -103,10 +113,56 @@ function applyPrintMode(doRefresh=true){
  $('rasterDpiX').value=mode.x;$('rasterDpiY').value=mode.y;
  if(doRefresh)refresh();
 }
-function applyFormat(){const v=$('format').value;const specs={'postcard-landscape':[150,100],'postcard-portrait':[100,150],'a4-portrait':[210,297]};if(specs[v]){[$('widthMm').value,$('heightMm').value]=specs[v]}refresh()}
+function applyFormat(){
+ const selected=FORMAT_PRESETS.find(p=>p.id===$('format').value);
+ if(selected?.widthMm){$('widthMm').value=selected.widthMm;$('heightMm').value=selected.heightMm}
+ refresh();
+}
+function refreshFormatOptions(printer) {
+ const selection=$('format').value;
+ $('format').replaceChildren(...FORMAT_PRESETS.map(option=>{
+   const el=new Option(option.label,option.id);
+   if(option.id!=='custom'){
+     const test=assessMediaDimensions({printerId:printer.id,widthMm:option.widthMm,heightMm:option.heightMm,
+       feedSource:$('feedSource').value,mediaThicknessMm:$('mediaThicknessMm').value});
+     if(!test.compatible){
+       el.disabled=true;el.textContent=option.label+' — incompatible avec source/support';
+     }
+   }
+   return el;
+ }));
+ $('format').value=FORMAT_PRESETS.some(p=>p.id===selection)?selection:'custom';
+}
+function drawSizeLimits(printer,media) {
+ const container=$('maxSizes');container.replaceChildren();
+ const title=document.createElement('strong');title.textContent='Dimensions maximales acceptées';container.append(title);
+ for(const source of printer.mediaSources){
+   const line=document.createElement('p');line.style.margin='6px 0';
+   line.textContent=source.label+' : '+source.minWidthMm+' × '+source.minHeightMm+
+     ' mm minimum ; '+source.maxWidthMm+' × '+source.maxHeightMm+' mm maximum'+
+     (source.maxThicknessMm?' · épaisseur jusqu’à '+source.maxThicknessMm+' mm':'');
+   container.append(line);
+ }
+ const caveat=document.createElement('p');caveat.style.margin='8px 0 0';
+ caveat.textContent=printer.kind==='uv'?
+   'Roland : ces limites décrivent la ZONE IMPRIMÉE. Taille maximale du support physique : 538 × 360 mm ; hauteur 100 mm et poids 5 kg.' :
+   'Canon / HP : limites de TAILLE DE PAPIER, et non une promesse de zone imprimable sans marges. Les marges dépendent du pilote et du support.';
+ container.append(caveat);
+ const result=$('formatCheck');
+ result.textContent=media.compatible?
+   'Format '+$('widthMm').value+' × '+$('heightMm').value+' mm accepté. Source : '+media.feedLabel+
+   (media.mediaThicknessMm===null?' · épaisseur non contrôlée.':' · épaisseur vérifiée.') :
+   'Format '+$('widthMm').value+' × '+$('heightMm').value+' mm INCOMPATIBLE avec la machine, la source ou l’épaisseur sélectionnée.';
+ result.style.background=media.compatible?'#e6f6ec':'#fff0ed';
+ result.style.borderLeftColor=media.compatible?'#22834e':'#bf382b';
+}
 function refresh(){
  const input=config();
  const printer=PRINTER_PRESETS.find(p=>p.id===input.printerId);
+ let currentMedia;
+ try{currentMedia=assessMediaDimensions(input);drawSizeLimits(printer,currentMedia);
+      refreshFormatOptions(printer)}
+ catch(e){$('formatCheck').textContent=e.message;$('formatCheck').style.background='#fff0ed';}
  $('printerSpecs').textContent=printer.resolutionLabel + '. ' + printer.inputRasterLabel;
  $('printerDetails').replaceChildren();
  for(const txt of [printer.technology,printer.areaLabel,printer.feedLabel,printer.mediaLabel,printer.limitation]){
@@ -152,6 +208,7 @@ function populateSaved(){
 }
 function download(text,name){const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 PRINTER_PRESETS.forEach(p=>$('printerId').add(new Option(p.label,p.id)));
+FORMAT_PRESETS.forEach(p=>$('format').add(new Option(p.label,p.id)));
 $('printerId').value='canon-pro-200s';changePrinter(true);
 $('nominalLpi').value='50';$('calibratedLpi').value='50';$('format').value='postcard-landscape';$('widthMm').value='150';$('heightMm').value='100';$('effect').value='relief';
 const existing=safeRead(activeKey,null);if(existing){hydrate(existing)}
@@ -161,7 +218,7 @@ for(const id of fields){$(id).addEventListener('change',()=>{
  if(id==='nominalLpi')$('calibratedLpi').value=$('nominalLpi').value;
  if(id==='widthMm'||id==='heightMm')$('format').value='custom';
  refresh();
-});if(['calibratedLpi','printerModel','driverMode','profileName','rasterDpiX','rasterDpiY'].includes(id))$(id).addEventListener('input',refresh)}
+});if(['calibratedLpi','printerModel','driverMode','profileName','rasterDpiX','rasterDpiY','mediaThicknessMm'].includes(id))$(id).addEventListener('input',refresh)}
 $('format').addEventListener('change',applyFormat);
 $('saveProfile').addEventListener('click',()=>{
  const entry=config();if(!entry.profileName.trim()){$('status').textContent='Donne un nom au profil avant de l’enregistrer.';return}
