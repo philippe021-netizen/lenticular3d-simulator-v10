@@ -23,6 +23,31 @@ const state = {
   manifest: null, calibrationBlob: null, calibrationManifest: null,
   renderGeneration: 0, isRendering: false
 };
+const preparationKey = 'microplayer:print-setup:v1';
+// Respect printer and output dimensions selected BEFORE image generation.
+// This 600-DPI engine is valid only for the current Canon 10×15 workflow.
+function printerSetupAllowsLegacy() {
+  let chosen=null;
+  try { chosen=JSON.parse(localStorage.getItem(preparationKey)||'null'); }
+  catch { return {ok:true,reason:''}; }
+  if(!chosen) return {ok:true,reason:''}; // standalone older flow remains accessible
+  const width=Number(chosen.widthMm),height=Number(chosen.heightMm);
+  const card=(Math.abs(width-150)<0.001 && Math.abs(height-100)<0.001) ||
+    (Math.abs(width-100)<0.001 && Math.abs(height-150)<0.001);
+  const dpiX=Number(chosen.rasterDpiX??chosen.rasterDpi??600);
+  const dpiY=Number(chosen.rasterDpiY??chosen.rasterDpi??600);
+  const ok=chosen.printerId==='canon-pro-200s' && card && dpiX===600 && dpiY===600;
+  return {ok,reason:ok?'':
+    'Le profil actif demande '+(chosen.printerModel||chosen.printerId||'une autre imprimante')+
+    ', '+width+' × '+height+' mm et un raster '+dpiX+' × '+dpiY+
+    ' DPI. Ce moteur produit UNIQUEMENT du 10 × 15 cm Canon à 600 DPI. Reviens à « Préparer l’impression » pour éviter un fichier au mauvais format.'};
+}
+const activePrintCompatibility=printerSetupAllowsLegacy();
+const compatibilityMessage=$('profileCompatibility');
+if(compatibilityMessage && !activePrintCompatibility.ok){
+  compatibilityMessage.textContent=activePrintCompatibility.reason;
+  compatibilityMessage.style.display='block';
+}
 const profileKey = 'microplayer:lenticular-print:canon-pro-200s:v1';
 const profile = loadProfile();
 const cropCanvas = $('cropPreview');
@@ -33,7 +58,7 @@ const renderControlIds = ['viewFiles', 'viewZip', 'orientation', 'nominalLpi', '
 function setRenderingControls(disabled) {
   state.isRendering = disabled;
   for (const id of renderControlIds) $(id).disabled = disabled;
-  $('render').disabled = disabled || state.images.length !== 9;
+  $('render').disabled = disabled || state.images.length !== 9 || !activePrintCompatibility.ok;
 }
 
 function loadProfile() {
@@ -132,7 +157,7 @@ function updateControls() {
     $('downloadBundle').disabled = true;
     setStatus($('renderStatus'), 'Un réglage a changé. Vérifie le cadrage puis relance l’interlacement.', 'good');
   }
-  $('render').disabled = state.isRendering || state.images.length !== 9;
+  $('render').disabled = state.isRendering || state.images.length !== 9 || !activePrintCompatibility.ok;
   if (state.images.length) cropPreview();
   saveProfile();
 }
@@ -228,6 +253,10 @@ for (const id of ['orientation', 'nominalLpi', 'calibratedLpi', 'phasePx', 'lens
 }
 
 $('render').addEventListener('click', async () => {
+  if (!activePrintCompatibility.ok) {
+    setStatus($('renderStatus'), activePrintCompatibility.reason, 'error');
+    return;
+  }
   if (state.isRendering || state.images.length !== 9) return;
   const generation = ++state.renderGeneration;
   const images = state.images.slice();
