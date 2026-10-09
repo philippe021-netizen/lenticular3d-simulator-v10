@@ -22,29 +22,29 @@
 (()=>{
 const families=[
 {id:'create',icon:'✦',label:'Créer',hint:'Photo, GLB & détourage',routes:[
-{id:'photo',label:'Photo & relief',title:'Photo & relief 3D',help:'Détourage local, profondeur et export de 9 vues',src:'./relief3d-test-v31.html?embed=1&v=408',target:'.card.grid'},
-{id:'tiefling15',label:'3D avancé + détourage',title:'Tiefling V15 — photo vers 9 vues',help:'Une photo : détourage du sujet, reconstruction du fond, profondeur Tiefling et sol protégé',src:'./happyholo-tiefling-v15.html?v=481'},
-{id:'glb',label:'GLB → 9 vues',title:'GLB 3D → 9 vues lenticulaires',help:'Import GLB Tripo 4K, rotation 3D réelle et export vue-01 à vue-09',src:'./glb-3d-studio.html?v=471'},
-{id:'depthflow-v42',label:'DepthFlow V42',title:'DepthFlow V42 — profondeur 3D',help:'Photo, estimation de profondeur, plan de convergence et contrôle du relief',src:'./depthflow-v42-convergence.html?v=421'},
-{id:'photo-v02',label:'Photo V02 continue',title:'Photo V02 — profondeur continue',help:'Photo vers profondeur continue, contrôle qualité et export de 9 vues',src:'./microplayer-photo-v02-continuous-depth.html?v=231'},
-{id:'photo-v03',label:'Spatial Scene V03',title:'Photo V03 — Spatial Scene',help:'Photo vers scène spatiale 2.5D texturée et export lenticulaire',src:'./microplayer-photo-v03-spatial-scene.html?v=302'},
-{id:'gaussian-v01',label:'Gaussian · scène PLY',title:'Gaussian 9 vues — scène 3D',help:'Charge une scène Gaussian .ply déjà créée, puis génère et contrôle 9 vues',src:'./microplayer-photo-gaussian-v01.html?v=102'},
-{id:'cutout',label:'Détourage & fonds',title:'Détourage, fonds et composition',help:'Plusieurs zones au doigt ou Apple Pencil, fond reconstruit et placement libre',src:'./relief3d-test-v31.html?embed=1&v=408',target:'#happyHoloCustomBackgrounds'},
-{id:'analysis',label:'Analyser un visuel',title:'Analyse du visuel',help:'Résolution, netteté, contraste et cadrage support',src:'./happyholo-analysis.html?v=401'}]},
+{id:'photo',label:'Photo & relief',title:'Photo & relief 3D',help:'Détourage local, profondeur et export de 9 vues',src:'./relief3d-test-v31.html?embed=1&v=409',target:'.card.grid'},
+{id:'tiefling15',label:'3D avancé + détourage',title:'Tiefling V15 — photo vers 9 vues',help:'Une photo : détourage du sujet, reconstruction du fond, profondeur Tiefling et sol protégé',src:'./happyholo-tiefling-v15.html?v=482'},
+{id:'glb',label:'GLB → 9 vues',title:'GLB 3D → 9 vues lenticulaires',help:'Import GLB Tripo 4K, rotation 3D réelle et export vue-01 à vue-09',src:'./glb-3d-studio.html?v=472'},
+{id:'depthflow-v42',label:'DepthFlow V42',title:'DepthFlow V42 — profondeur 3D',help:'Photo, estimation de profondeur, plan de convergence et contrôle du relief',src:'./depthflow-v42-convergence.html?v=422'},
+{id:'photo-v02',label:'Photo V02 continue',title:'Photo V02 — profondeur continue',help:'Photo vers profondeur continue, contrôle qualité et export de 9 vues',src:'./microplayer-photo-v02-continuous-depth.html?v=232'},
+{id:'photo-v03',label:'Spatial Scene V03',title:'Photo V03 — Spatial Scene',help:'Photo vers scène spatiale 2.5D texturée et export lenticulaire',src:'./microplayer-photo-v03-spatial-scene.html?v=303'},
+{id:'gaussian-v01',label:'Gaussian · scène PLY',title:'Gaussian 9 vues — scène 3D',help:'Charge une scène Gaussian .ply déjà créée, puis génère et contrôle 9 vues',src:'./microplayer-photo-gaussian-v01.html?v=103'},
+{id:'cutout',label:'Détourage & fonds',title:'Détourage, fonds et composition',help:'Plusieurs zones au doigt ou Apple Pencil, fond reconstruit et placement libre',src:'./relief3d-test-v31.html?embed=1&v=409',target:'#happyHoloCustomBackgrounds'},
+{id:'analysis',label:'Analyser un visuel',title:'Analyse du visuel',help:'Résolution, netteté, contraste et cadrage support',src:'./happyholo-analysis.html?v=402'}]},
 {id:'animate',icon:'▶',label:'Animer',hint:'PixVerse & local',routes:[
-{id:'pixverse',label:'PixVerse — Actions',title:'PixVerse — Actions V6',help:'Aperçu local sans PixVerse ou génération IA : individu, couple, groupe, animal et logo',src:'./happyholo-pixverse-actions-test.html?v=412'},
-{id:'pixverse-free',label:'PixVerse — Prompt libre',title:'PixVerse — Prompt libre universel',help:'Une phrase, une ou plusieurs zones, puis 9 vues avec réinjection protégée',src:'./happyholo-pixverse-free.html?v=411'},
-{id:'local-actions',label:'Actions locales',title:'Actions locales',help:'Personne, animal, véhicule, objet et logo',src:'./relief3d-test-v31.html?embed=1&v=412',target:'#happyHoloSelectionControls'}]},
+{id:'pixverse',label:'PixVerse — Actions',title:'PixVerse — Actions V6',help:'Aperçu local sans PixVerse ou génération IA : individu, couple, groupe, animal et logo',src:'./happyholo-pixverse-actions-test.html?v=413'},
+{id:'pixverse-free',label:'PixVerse — Prompt libre',title:'PixVerse — Prompt libre universel',help:'Une phrase, une ou plusieurs zones, puis 9 vues avec réinjection protégée',src:'./happyholo-pixverse-free.html?v=412'},
+{id:'local-actions',label:'Actions locales',title:'Actions locales',help:'Personne, animal, véhicule, objet et logo',src:'./relief3d-test-v31.html?embed=1&v=413',target:'#happyHoloSelectionControls'}]},
 {id:'products',icon:'▣',label:'Produits',hint:'Supports & cartes',routes:[
-{id:'supports',label:'Supports',title:'Supports et cadrage',help:'Porte-clé, médaillon, carte et verso',src:'./relief3d-test-v31.html?embed=1&v=408',target:'.support-card'},
-{id:'card',label:'Carte / souvenir',title:'Carte de visite et photo souvenir',help:'Analyse IA, texte protégé, 9 vues et ZIP impression',src:'./happyholo-business-card-studio.html?v=410'},
-{id:'simulator',label:'Simulateur 9 vues',title:'Simulateur lenticulaire universel',help:'Lecture fluide, tactile et contrôle des écarts',src:'./happyholo-simulator.html?v=401'}]},
+{id:'supports',label:'Supports',title:'Supports et cadrage',help:'Porte-clé, médaillon, carte et verso',src:'./relief3d-test-v31.html?embed=1&v=409',target:'.support-card'},
+{id:'card',label:'Carte / souvenir',title:'Carte de visite et photo souvenir',help:'Analyse IA, texte protégé, 9 vues et ZIP impression',src:'./happyholo-business-card-studio.html?v=411'},
+{id:'simulator',label:'Simulateur 9 vues',title:'Simulateur lenticulaire universel',help:'Lecture fluide, tactile et contrôle des écarts',src:'./happyholo-simulator.html?v=402'}]},
 {id:'machines',icon:'⚙',label:'Machines',hint:'ExplodeView',routes:[
-{id:'explode',label:'Créer ExplodeView',title:'ExplodeView — machines',help:'Démontage progressif des grosses pièces seulement',src:'./relief3d-test-v31.html?embed=1&v=408',target:'#pieceSelectionStart'},
-{id:'explode-demo',label:'Démo Rocket 9 vues',title:'ExplodeView — démonstration',help:'Simulation fluide de la Rocket en 9 étapes cumulatives',src:'./explodeview-rocket-demo/index.html?v=401'}]},
+{id:'explode',label:'Créer ExplodeView',title:'ExplodeView — machines',help:'Démontage progressif des grosses pièces seulement',src:'./relief3d-test-v31.html?embed=1&v=409',target:'#pieceSelectionStart'},
+{id:'explode-demo',label:'Démo Rocket 9 vues',title:'ExplodeView — démonstration',help:'Simulation fluide de la Rocket en 9 étapes cumulatives',src:'./explodeview-rocket-demo/index.html?v=402'}]},
 {id:'control',icon:'✓',label:'Contrôler',hint:'Qualité & services',routes:[
-{id:'quality',label:'Qualité des 9 vues',title:'Contrôle des 9 vues',help:'Doublons, sauts, fluidité et support final',src:'./happyholo-simulator.html?mode=analysis&v=401'},
-{id:'services',label:'État des services',title:'État des services HappyHolo',help:'IA, PixVerse, ExplodeView et fonctionnement hors ligne',src:'./happyholo-analysis.html?mode=services&v=401'}]}];
+{id:'quality',label:'Qualité des 9 vues',title:'Contrôle des 9 vues',help:'Doublons, sauts, fluidité et support final',src:'./happyholo-simulator.html?mode=analysis&v=402'},
+{id:'services',label:'État des services',title:'État des services HappyHolo',help:'IA, PixVerse, ExplodeView et fonctionnement hors ligne',src:'./happyholo-analysis.html?mode=services&v=402'}]}];
 const $=id=>document.getElementById(id),frame=$('serviceFrame'),loading=$('loading');let activeFamily='create',activeRoute='photo',loadedSrc='';
 function routeById(id){for(const f of families){const r=f.routes.find(x=>x.id===id);if(r)return{family:f,route:r}}return{family:families[0],route:families[0].routes[0]}}
 function drawFamilies(){$('families').innerHTML=families.map(f=>`<button class="family${f.id===activeFamily?' active':''}" data-family="${f.id}"><span class="ico">${f.icon}</span><span>${f.label}<small>${f.hint}</small></span></button>`).join('');document.querySelectorAll('[data-family]').forEach(b=>b.onclick=()=>{const f=families.find(x=>x.id===b.dataset.family);activate(f.routes[0].id)})}
