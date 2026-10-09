@@ -38,6 +38,17 @@ test('Hub exposes the print module directly and service worker caches its app fi
 test('nine loaded views make the interlace action directly available with a clear next step', async () => {
   const [page, ui] = await Promise.all([read('../microplayer-lenticular-print.html'), read('../modules/lenticular-print-ui.js')]);
   assert.doesNotMatch(page, /id="cropReviewed"/);
-  assert.match(ui, /\$\('render'\)\.disabled = state\.isRendering \|\| state\.images\.length !== 9;/);
+  assert.match(ui, /\$\('render'\)\.disabled = state\.isRendering \|\| state\.images\.length !== 9 \|\| !activePrintCompatibility\.ok;/);
   assert.match(ui, /setStatus\(\$\('renderStatus'\), '9 vues prêtes[\s\S]*?Interlacer les 9 vues/);
+});
+
+test('selected A4 / Roland / HP settings prevent unintentional Canon 10×15 exports', async () => {
+  const [hub, print, ui] = await Promise.all([
+    read('../index.html'), read('../microplayer-lenticular-print.html'), read('../modules/lenticular-print-ui.js')
+  ]);
+  assert.match(hub,/id:'print-setup'/);
+  assert.match(hub,/microplayer-print-start\.html/);
+  assert.match(print,/id="profileCompatibility"/);
+  assert.match(ui,/function printerSetupAllowsLegacy\(/);
+  assert.match(ui,/!activePrintCompatibility\.ok/);
 });
