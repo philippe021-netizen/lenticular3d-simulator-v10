@@ -85,11 +85,19 @@ export function evaluatePrintSetup(input={}) {
   });
   // Conservative *guidance*, not a verified maximum number of optical views.
   const viable = candidates.filter(c=>c.pixelsPerView>=1.5);
-  const preferred = effect==='relief' ? [9,8,6,12] : [8,6,9,12];
-  const suggestedViewCount=preferred.find(n=>viable.some(v=>v.viewCount===n)) ?? 6;
+  // Prefer full-pixel stripes when they remain at least 1.5 pixels wide.
+  // Example: Roland HQ 1440 (X)/60 LPI => 24 px/lens; 8 and 12 fit, 9 does not.
+  const clean = viable.filter(c=>c.exactIntegerStripes);
+  const priorities = effect==='relief' ? [8,12,6,9] : [8,6,12,9];
+  const suggestedViewCount = clean.length ?
+    (priorities.find(n=>clean.some(c=>c.viewCount===n)) ?? clean[0].viewCount) :
+    ([9,8,6,12].find(n=>viable.some(c=>c.viewCount===n && c.pixelsPerView>=2)) ??
+     [8,9,6,12].find(n=>viable.some(c=>c.viewCount===n)) ?? 6);
+  const suggestedAlternatives = clean.filter(c=>c.viewCount!==suggestedViewCount).map(c=>c.viewCount);
   const warnings=[];
   if(!paperFits) warnings.push('FORMAT HORS ZONE : dimensions supérieures à la zone constructeur, même après rotation. Ne pas envoyer au pilote.');
   if(pixelsPerLens<9) warnings.push('Moins de 9 pixels raster/lentille : 9 vues risquent des lacunes de détail.');
+  if(pixelsPerLens/9<1.5) warnings.push('9 vues produiraient moins de 1,5 pixel par vue et par lentille sur le raster. Envisager moins de vues pour gagner en netteté.');
   if(totalPixels>40e6) warnings.push('Fichier volumineux : le travail sur iPad/Safari peut manquer de mémoire.');
   if(totalPixels>100e6) warnings.push('Grand raster : calcul/export sur PC recommandé après vérification du RIP.');
   if(Math.abs(calibratedLpi-nominalLpi)>1) warnings.push('Pitch mesuré éloigné du nominal : revérifier feuille et mesure.');
@@ -111,7 +119,7 @@ export function evaluatePrintSetup(input={}) {
     rasterDpiX,rasterDpiY,nominalLpi,calibratedLpi,widthMm,heightMm,lensOrientation,effect,
     axisOfInterlace:lensOrientation==='vertical'?'horizontal (X)':'vertical (Y)',
     effectiveDpi,pixelsPerLens:round(pixelsPerLens),outWidthPx,outHeightPx,totalPixels,
-    candidates,suggestedViewCount,paperFits,
+    candidates,suggestedViewCount,suggestedAlternatives,paperFits,
     existingEngineSupportsNineViews,warnings,recommendations:warnings
   };
 }
