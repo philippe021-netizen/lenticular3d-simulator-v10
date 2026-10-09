@@ -59,6 +59,94 @@ const d=frame.contentDocument;if(!d)return;
 d.documentElement.classList.add('hh-embedded');
 let common=d.getElementById('happyHoloHubScrollStyle');
 if(!common){common=d.createElement('style');common.id='happyHoloHubScrollStyle';common.textContent='html.hh-embedded{min-height:100%;height:auto!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}html.hh-embedded body{min-height:100%!important;height:auto!important;overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}html.hh-embedded .stage,html.hh-embedded .preview,html.hh-embedded .viewer{scroll-margin:12px}';d.head.appendChild(common)}
+// Photo V02: use a shrinkable single-column iframe layout on iPad.
+// Do not modify the validated Photo V02 document or its image-processing engine.
+if(frame.src.includes('microplayer-photo-v02-continuous-depth.html')){
+  d.documentElement.classList.add('hh-embedded-photo-v02');
+  let photoStyle=d.getElementById('happyHoloHubPhotoV02IpadFix');
+  if(!photoStyle){
+    photoStyle=d.createElement('style');
+    photoStyle.id='happyHoloHubPhotoV02IpadFix';
+    photoStyle.textContent=`
+      html.hh-embedded-photo-v02,html.hh-embedded-photo-v02 body {
+        width:100%!important;min-width:0!important;max-width:100%!important;
+        overflow-x:clip!important
+      }
+      html.hh-embedded-photo-v02 .top {
+        width:100%!important;min-width:0!important;max-width:100%!important;
+        display:flex;flex-wrap:wrap;justify-content:flex-start;overflow-wrap:anywhere
+      }
+      html.hh-embedded-photo-v02 .top>* {min-width:0;max-width:100%;white-space:normal}
+      html.hh-embedded-photo-v02 .wrap {
+        width:100%!important;min-width:0!important;max-width:100%!important;
+        margin:0!important;padding:12px!important
+      }
+      html.hh-embedded-photo-v02 .grid,
+      html.hh-embedded-photo-v02 .grid.sidebar-collapsed {
+        display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+        width:100%!important;min-width:0!important;max-width:100%!important;
+        height:auto!important;min-height:0!important;overflow:visible!important
+      }
+      html.hh-embedded-photo-v02 .sidebar,
+      html.hh-embedded-photo-v02 .workspace,
+      html.hh-embedded-photo-v02 .panel {
+        box-sizing:border-box;min-width:0!important;max-width:100%!important;
+        width:100%!important;height:auto!important;overflow-x:clip!important
+      }
+      html.hh-embedded-photo-v02 .sidebar,
+      html.hh-embedded-photo-v02 .workspace {overflow-y:visible!important}
+      html.hh-embedded-photo-v02 .sidebarToggle {position:static}
+      html.hh-embedded-photo-v02 .stage,
+      html.hh-embedded-photo-v02 .sim {
+        box-sizing:border-box;min-width:0;max-width:100%;width:100%
+      }
+      html.hh-embedded-photo-v02 .actions,
+      html.hh-embedded-photo-v02 .controls,
+      html.hh-embedded-photo-v02 .views,
+      html.hh-embedded-photo-v02 .simtools,
+      html.hh-embedded-photo-v02 .simnav {
+        min-width:0;max-width:100%;width:100%
+      }
+      html.hh-embedded-photo-v02 .actions,
+      html.hh-embedded-photo-v02 .simtools {
+        grid-template-columns:repeat(2,minmax(0,1fr))
+      }
+      html.hh-embedded-photo-v02 .controls,
+      html.hh-embedded-photo-v02 .views {
+        grid-template-columns:repeat(3,minmax(0,1fr))
+      }
+      html.hh-embedded-photo-v02 .simnav {
+        grid-template-columns:45px minmax(0,1fr) 45px 80px
+      }
+      html.hh-embedded-photo-v02 button,
+      html.hh-embedded-photo-v02 input,
+      html.hh-embedded-photo-v02 select {
+        min-width:0;max-width:100%;overflow-wrap:anywhere
+      }
+      @media(max-width:640px){
+        html.hh-embedded-photo-v02 .controls,
+        html.hh-embedded-photo-v02 .views,
+        html.hh-embedded-photo-v02 .simtools {
+          grid-template-columns:minmax(0,1fr)!important
+        }
+      }
+    `;
+    d.head.appendChild(photoStyle);
+  }
+  // Safari sometimes retains a horizontal iframe offset after a submodule switch.
+  // Reset only horizontal scroll, preserving the user's vertical position.
+  const resetHorizontal=()=>{
+    try{
+      const win=d.defaultView;
+      if(win)win.scrollTo(0,win.scrollY);
+      d.documentElement.scrollLeft=0;
+      d.body.scrollLeft=0;
+    }catch(_){}
+  };
+  resetHorizontal();
+  d.defaultView?.requestAnimationFrame(resetHorizontal);
+  return;
+}
 if(!frame.src.includes('relief3d-test'))return;
 d.documentElement.classList.add('hh-embedded-relief');
 let style=d.getElementById('happyHoloHubIpadStyle');
