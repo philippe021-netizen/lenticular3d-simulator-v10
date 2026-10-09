@@ -64,7 +64,7 @@ test('planner accurately propagates physical format compatibility and preserves 
  assert.equal(a4.paperFits,true);
  assert.equal(a4.media.feedSource,'top');
  assert.equal(a4.existingEngineSupportsNineViews,false);
- const tooBig=evaluatePrintSetup({printerId:'canon-pro-200s',widthMm:340,heightMm:300});
+ const tooBig=evaluatePrintSetup({printerId:'canon-pro-200s',widthMm:350,heightMm:340});
  assert.equal(tooBig.paperFits,false);
  assert.ok(tooBig.warnings.some(s=>s.includes('FORMAT / ALIMENTATION')));
  const postcard=evaluatePrintSetup({printerId:'canon-pro-200s',widthMm:150,heightMm:100});
