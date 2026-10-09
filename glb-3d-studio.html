@@ -9,6 +9,16 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.177.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.177.0/examples/jsm/"}}</script>
+<style id="hh-scroll-actions">
+
+@media(max-width:1400px),(max-height:900px){
+  .layout{grid-template-columns:1fr}
+  .controls{order:-1}
+  .viewer{min-height:clamp(240px,44dvh,420px)}
+}
+#viewport{max-height:min(48dvh,460px)}
+
+</style>
 </head>
 <body>
 <div class="wrap">
