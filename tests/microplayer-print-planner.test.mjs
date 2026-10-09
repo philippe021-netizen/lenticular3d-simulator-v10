@@ -17,6 +17,8 @@ test('Canon 600 DPI + 50 LPI creates 12 raster pixels per lens on the 10×15 for
   assert.equal(result.pixelsPerLens,12);
   assert.equal(result.candidates.find(v=>v.viewCount===9).pixelsPerView,12/9);
   assert.equal(result.existingEngineSupportsNineViews,true);
+  assert.equal(result.suggestedViewCount,6);
+  assert.ok(result.warnings.some(x=>x.includes('1,5 pixel')));
   assert.equal(result.paperFits,true);
   assert.equal(result.outWidthPx,3543);
   assert.equal(result.outHeightPx,2362);
@@ -28,12 +30,15 @@ test('Roland 1440×720 dpi and 60 LPI: 8 or 12 integer stripes only across X',()
  assert.equal(x.pixelsPerLens,24);
  assert.equal(x.candidates.find(v=>v.viewCount===8).exactIntegerStripes,true);
  assert.equal(x.candidates.find(v=>v.viewCount===12).exactIntegerStripes,true);
+ assert.equal(x.suggestedViewCount,8);
+ assert.ok(x.suggestedAlternatives.includes(12));
  const y=evaluatePrintSetup({printerId:'roland-lef-20',rasterDpiX:1440,rasterDpiY:720,nominalLpi:60,calibratedLpi:60,lensOrientation:'horizontal'});
  assert.equal(y.effectiveDpi,720);
  assert.equal(y.pixelsPerLens,12);
  assert.equal(y.candidates.find(v=>v.viewCount===8).exactIntegerStripes,false);
  assert.equal(y.candidates.find(v=>v.viewCount===6).exactIntegerStripes,true);
  assert.equal(y.candidates.find(v=>v.viewCount===12).exactIntegerStripes,true);
+ assert.equal(y.suggestedViewCount,6);
 });
 
 test('Roland 1440×720 and 50 LPI: x=28.8, y=14.4 pixels/lens',()=>{
