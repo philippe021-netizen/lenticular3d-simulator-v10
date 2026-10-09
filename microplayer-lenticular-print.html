@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#102a43">
+<title>MicroPlayer — Impression lenticulaire</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17212b;background:#f2f5f7;--blue:#075e9b;--dark:#102a43;--line:#d5dfe5;--yellow:#fff2b2}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}header{position:sticky;top:0;z-index:4;background:var(--dark);color:#fff;padding:14px max(16px,env(safe-area-inset-left));box-shadow:0 2px 12px #122a3d33}header h1{font-size:21px;margin:0}header p{font-size:13px;opacity:.82;margin:4px 0 0}.wrap{max-width:1120px;margin:auto;padding:14px}.flow{background:#fff;border:1px solid var(--line);border-radius:15px;padding:13px;margin:0 0 12px;font-size:14px;line-height:1.5}.flow b{color:var(--blue)}.grid{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.2fr);gap:12px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:12px;min-width:0}h2{font-size:18px;margin:0 0 6px}.hint{color:#5e6b75;font-size:13px;line-height:1.5;margin:5px 0 12px}label{display:block;font-size:14px;font-weight:750;margin:13px 0 6px}input,select,button{font:inherit}input[type=file],select{width:100%;min-height:48px;border:1px solid #aebdc7;border-radius:11px;background:#fff;padding:9px}input[type=range]{width:100%;height:34px;accent-color:var(--blue);touch-action:pan-y}.control{margin:11px 0}.label-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:700}.value{color:var(--blue);font-variant-numeric:tabular-nums}button{width:100%;min-height:50px;border:0;border-radius:12px;background:var(--blue);color:#fff;font-weight:800;padding:12px;margin-top:10px;touch-action:manipulation}button.secondary{background:#e6edf2;color:#152a3a}button:disabled{opacity:.45}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.status{min-height:48px;margin-top:10px;padding:11px;border-radius:10px;background:#edf2f5;font-size:13px;line-height:1.45;white-space:pre-wrap}.status.good{background:#e6f6ec;color:#14552c}.status.error{background:#fff0ed;color:#922e1e}.warning{background:var(--yellow);border:1px solid #e4c555;border-radius:12px;padding:12px 13px;font-size:14px;font-weight:850;line-height:1.4;margin-bottom:12px}.preview{width:100%;max-height:58vh;object-fit:contain;display:block;background:#101820;border-radius:12px;touch-action:none}.crop-preview{width:100%;aspect-ratio:2/3;background:#111;border-radius:12px;display:block;object-fit:contain}.count{display:inline-block;background:#e9f3f9;color:#13466a;padding:5px 9px;border-radius:99px;font-size:12px;font-weight:800;margin:5px 0}.fine{font-size:12px;color:#596874;line-height:1.45}.check{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;margin:12px 0}.check input{width:22px;height:22px;accent-color:var(--blue)}progress{width:100%;height:16px;accent-color:var(--blue)}.zoom-wrap{height:min(65vh,650px);overflow:auto;background:#18222a;border-radius:12px;padding:12px;touch-action:pan-x pan-y}.zoom-wrap canvas{display:block;image-rendering:pixelated;transform-origin:top left}.result-meta{font-size:12px;line-height:1.5;color:#52616a;margin:9px 0}.hidden{display:none!important}.divider{border:0;border-top:1px solid var(--line);margin:14px 0}.print-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:10px 0}.print-steps span{background:#eaf0f4;border-radius:9px;padding:8px;font-size:12px;text-align:center;font-weight:750}@media(max-width:760px){.grid{grid-template-columns:1fr}.wrap{padding:10px}.card{padding:13px}.print-steps{grid-template-columns:1fr}.zoom-wrap{height:55vh}header{position:relative}}
+</style>
+</head>
+<body>
+<header><h1>Impression lenticulaire</h1><p>Interlacer les 9 vues MicroPlayer et préparer le fichier à taille réelle.</p></header>
+<main class="wrap">
+  <div class="flow"><b>Photo → 9 vues → validation → interlacement → calibration → impression.</b><br>Ce module conserve les vues d’origine. Le nouveau fichier est calculé au pixel près à partir du pitch réglé.</div>
+  <div class="warning">IMPRESSION : 100 % / TAILLE RÉELLE. Désactive « Ajuster à la page » dans le pilote Canon.</div>
+  <div id="profileCompatibility" class="warning" style="display:none;background:#fff0ed;border-color:#d6533d" role="alert"></div>
+  <p class="fine"><a href="./microplayer-print-start.html">Changer d’imprimante, de format ou de lenticulaire</a></p>
+  <div class="print-steps"><span>1 · Charger ou recevoir 9 vues</span><span>2 · Cadrer et régler le pitch</span><span>3 · Interlacer et exporter</span></div>
+  <div class="grid">
+    <section class="card">
+      <h2>1. Vues source</h2>
+      <p class="hint">L’ordre attendu est vue 1 à vue 9. Le ZIP MicroPlayer est accepté; les noms vue-01.png à vue-09.png sont triés automatiquement.</p>
+      <label for="viewFiles">Charger 9 images PNG</label><input id="viewFiles" type="file" accept="image/png,image/jpeg" multiple>
+      <label for="viewZip">Ou charger le ZIP MicroPlayer</label><input id="viewZip" type="file" accept=".zip,application/zip">
+      <div id="viewCount" class="count">Aucune série chargée</div>
+      <div id="sourceStatus" class="status">En attente des 9 vues.</div>
+      <hr class="divider">
+      <h2>2. Format et lenticulaire</h2>
+      <label for="orientation">Carte postale 10 × 15 cm</label><select id="orientation"><option value="portrait">Portrait · 100 × 150 mm</option><option value="landscape">Paysage · 150 × 100 mm</option></select>
+      <label for="nominalLpi">LPI nominal du matériau</label><select id="nominalLpi"><option value="50" selected>50 LPI — prototype actuel</option><option value="60">60 LPI — profil futur mouvement</option></select>
+      <div class="control"><div class="label-row"><label for="calibratedLpi">Pitch calibré</label><span id="lpiValue" class="value">50,00 LPI</span></div><input id="calibratedLpi" type="range" min="49" max="51" step="0.01" value="50"></div>
+      <div class="control"><div class="label-row"><label for="phasePx">Décalage horizontal</label><span id="phaseValue" class="value">0,00 px</span></div><input id="phasePx" type="range" min="-6" max="6" step="0.01" value="0"></div>
+      <label for="lensOrientation">Orientation des lentilles</label><select id="lensOrientation"><option value="vertical" selected>Verticales · interlacement gauche/droite</option><option value="horizontal">Horizontales · interlacement haut/bas</option></select>
+      <label class="check"><input id="reverseOrder" type="checkbox">Inverser l’ordre des vues</label>
+      <p class="fine">Résolution de sortie : 600 DPI. Le pitch reste modifiable de ±1,00 LPI autour du nominal; la valeur définitive attend la mesure du matériau réel.</p>
+    </section>
+    <section class="card">
+      <h2>3. Cadrage commun aux 9 vues</h2>
+      <p class="hint">Le cadrage s’applique pareil aux neuf vues. Les proportions ne sont jamais étirées; le cadre est ajusté avant l’interlacement.</p>
+      <canvas id="cropPreview" class="crop-preview" width="600" height="900"></canvas>
+      <p class="fine"><b>Contour bleu :</b> limite réelle de découpe, 100 × 150 mm. <b>Cadre jaune pointillé :</b> repère de sécurité à 3 mm du bord; garde les sujets importants à l’intérieur.</p>
+      <div class="control"><div class="label-row"><label for="zoom">Zoom cadrage</label><span id="zoomValue" class="value">1,00×</span></div><input id="zoom" type="range" min="1" max="3" step="0.01" value="1"></div>
+      <div class="control"><div class="label-row"><label for="panX">Déplacement horizontal</label><span id="panXValue" class="value">0</span></div><input id="panX" type="range" min="-1" max="1" step="0.01" value="0"></div>
+      <div class="control"><div class="label-row"><label for="panY">Déplacement vertical</label><span id="panYValue" class="value">0</span></div><input id="panY" type="range" min="-1" max="1" step="0.01" value="0"></div>
+      <p class="fine">Après le chargement des neuf vues, le bouton devient actif. Vérifie le cadrage affiché, puis lance le calcul.</p>
+      <button id="render" disabled>Interlacer les 9 vues</button>
+      <progress id="progress" class="hidden" max="100" value="0"></progress>
+      <div id="renderStatus" class="status">Charge les 9 vues pour commencer.</div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Aperçu technique du fichier interlacé</h2>
+    <p class="hint">Zoom sur les bandes de pixels du vrai fichier exporté. À fort grossissement, l’affichage pixelisé sert à vérifier la périodicité et l’absence de trous.</p>
+    <div class="control"><div class="label-row"><label for="techZoom">Zoom de contrôle</label><span id="techZoomValue" class="value">1×</span></div><input id="techZoom" type="range" min="1" max="8" step="1" value="1"></div>
+    <div class="zoom-wrap" id="zoomWrap"><canvas id="outputCanvas" class="hidden"></canvas><div id="emptyOutput" class="fine" style="color:#fff;padding:18px">L’aperçu interlacé apparaîtra après le calcul.</div></div>
+    <div id="resultMeta" class="result-meta"></div>
+    <div class="row"><button id="downloadPng" disabled>Exporter PNG interlacé</button><button id="downloadPdf" class="secondary" disabled>PDF exact 10 × 15 cm</button></div>
+    <button id="downloadBundle" class="secondary" disabled>Exporter pour impression · PNG + paramètres</button>
+    <div id="exportStatus" class="status">La calibration définitive reste à faire avec l’imprimante, le papier et la feuille 50 LPI.</div>
+  </section>
+
+  <section class="card">
+    <h2>Planche de calibration 50 LPI</h2>
+    <p class="hint">Onze bandes autour du nominal, de 49,5 à 50,5 LPI par pas de 0,1. Imprime à taille réelle, pose le PET dessus, puis incline doucement. Note la bande où l’image reste la plus stable et nette.</p>
+    <button id="makeCalibration" class="secondary">Générer la planche de calibration 50 LPI · 10 × 15 cm</button>
+    <button id="downloadCalibration" disabled>Exporter la planche PNG à taille réelle</button>
+    <div id="calibrationStatus" class="status">Cette planche aide à mesurer le pitch; elle ne fixe aucune calibration permanente.</div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="module" src="./modules/lenticular-print-ui.js"></script>
+</body>
+</html>
