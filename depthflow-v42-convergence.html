@@ -102,13 +102,14 @@
         </div>
         <div class="row">
           <button id="anchorBtn" class="secondary" disabled>◎ Ancrer le sujet / groupe</button>
+          <button id="confirmZeroBtn" class="secondary" disabled>✓ Valider le zéro actuel</button>
         </div>
         <div class="controls">
           <label for="stabilityBand">Zone stable du sujet</label>
           <input id="stabilityBand" type="range" min="0" max="48" step="1" value="30">
           <output id="stabilityBandOut">±30</output>
         </div>
-        <p class="tiny">Touchez un visage pour placer le zéro. La zone stable absorbe les petites différences entre les visages d’un groupe, sans supprimer leur micro-relief.</p>
+        <p class="tiny">Après le calcul, touchez un visage directement sur la photo plus bas ou cliquez sur « Valider le zéro actuel ». La zone stable absorbe les petites différences entre les visages d’un groupe, sans supprimer leur micro-relief.</p>
       </div>
       <div class="setting-block">
         <div class="controls">
@@ -460,7 +461,7 @@
       state.anchorPicking = true;
       byId("anchorBtn").classList.add("active");
       const seconds = (state.depthPerformance.milliseconds / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
-      setStatus(`Profondeur prête ✓ en ${seconds} s · ${state.depthPerformance.mode} · interface active pendant ${state.depthPerformance.frames} rafraîchissements. Touchez maintenant un visage du sujet ou du groupe.`, "ok");
+      setStatus(`Profondeur prête ✓ en ${seconds} s · ${state.depthPerformance.mode} · interface active pendant ${state.depthPerformance.frames} rafraîchissements. Étape 2 : touchez le sujet sur la photo, ou cliquez sur « Valider le zéro actuel ».`, "ok");
     } catch (error) {
       if (error?.name === "AbortError") return;
       console.error(error);
@@ -478,7 +479,7 @@
   }
 
   function setEditorEnabled(enabled) {
-    for (const id of ["anchorBtn", "paintBtn", "eraseBtn", "mapBtn", "resetBtn"]) byId(id).disabled = !enabled;
+    for (const id of ["anchorBtn", "confirmZeroBtn", "paintBtn", "eraseBtn", "mapBtn", "resetBtn"]) byId(id).disabled = !enabled;
   }
 
   byId("paintBtn").addEventListener("click", () => setMode("paint"));
@@ -493,9 +494,20 @@
 
   byId("anchorBtn").addEventListener("click", () => {
     if (!state.baseDepth) return;
-    state.anchorPicking = !state.anchorPicking;
-    byId("anchorBtn").classList.toggle("active", state.anchorPicking);
-    setStatus(state.anchorPicking ? "Touchez maintenant un visage du sujet ou du groupe à stabiliser." : "Ancrage annulé.");
+    // Réappuyer sur « Ancrer » ne doit pas annuler silencieusement l’étape obligatoire.
+    state.anchorPicking = true;
+    byId("anchorBtn").classList.add("active");
+    setStatus("Touchez maintenant un visage sur la photo ci-dessous, ou validez le zéro actuel.", "ok");
+    depthOverlay.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  byId("confirmZeroBtn").addEventListener("click", () => {
+    if (!state.baseDepth) return;
+    state.anchorConfirmed = true;
+    state.anchorPicking = false;
+    byId("anchorBtn").classList.remove("active");
+    generateBtn.disabled = false;
+    setStatus(`Plan zéro ${byId("zero").value} validé ✓ — vous pouvez générer les 9 vues.`, "ok");
   });
 
   byId("mapBtn").addEventListener("click", () => {
