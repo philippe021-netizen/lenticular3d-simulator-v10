@@ -28,11 +28,26 @@
   .stage{overflow-x:hidden}
   .service-frame{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
 </style>
+<style id="microplayer-print-status-bar">
+  .print-preflight{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%;padding:9px 10px 1px;border-top:1px solid #e0e5e9;margin-top:9px}
+  .print-preflight-info{min-width:0;flex:1;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;line-height:1.35}
+  .print-preflight-info strong{color:#112b43;font-size:13px;white-space:nowrap}
+  .print-preflight-info span{color:#3f5869;font-size:12px;overflow-wrap:anywhere}
+  .print-preflight button{min-height:39px;border-radius:10px;padding:7px 12px;white-space:nowrap;font-size:12px;font-weight:800;cursor:pointer}
+  .print-preflight .print-config{background:#102a43;color:#fff;border:1px solid #102a43}
+  .print-preflight .print-resume{background:#edf4f8;color:#102a43;border:1px solid #b7cad6}
+  .print-preflight button[hidden]{display:none}
+  @media(max-width:760px){
+    .print-preflight{flex-wrap:wrap;padding:7px 2px 1px;gap:6px}
+    .print-preflight-info{flex-basis:100%}
+    .print-preflight button{min-height:39px}
+  }
+</style>
 </head>
 <body>
 <div class="app">
   <aside class="rail" aria-label="Familles HappyHolo"><div class="brand"><div class="brand-row"><strong>HappyHolo</strong><span class="version">V4.8</span></div><div class="tagline">Un seul accès pour créer, animer, produire et contrôler.</div></div><nav class="families" id="families"></nav><div class="rail-foot"><div class="health"><span class="dot" id="healthDot"></span><span id="healthText">Contrôle des services…</span></div></div></aside>
-  <main class="workspace"><header class="toolbar"><div class="toolbar-top"><div class="title"><h1 id="routeTitle">Studio 3D</h1><p id="routeHelp">Photo, relief et 9 vues lenticulaires</p></div><div class="tool-actions"><button class="icon-btn reload" id="reload" title="Recharger ce module">↻</button><button class="icon-btn" id="open" title="Ouvrir ce module seul">↗</button><button class="icon-btn" id="focus" title="Plein écran">⛶</button></div></div><nav class="subnav" id="subnav"></nav></header><section class="stage"><div class="loading" id="loading"><div>Ouverture du module…</div></div><iframe class="service-frame" id="serviceFrame" title="Module HappyHolo" allow="clipboard-read; clipboard-write" scrolling="yes"></iframe></section></main>
+  <main class="workspace"><header class="toolbar"><div class="toolbar-top"><div class="title"><h1 id="routeTitle">Studio 3D</h1><p id="routeHelp">Photo, relief et 9 vues lenticulaires</p></div><div class="tool-actions"><button class="icon-btn reload" id="reload" title="Recharger ce module">↻</button><button class="icon-btn" id="open" title="Ouvrir ce module seul">↗</button><button class="icon-btn" id="focus" title="Plein écran">⛶</button></div></div><nav class="subnav" id="subnav"></nav><div id="printPreflight" class="print-preflight" role="region" aria-label="Préparation de l'impression"><div class="print-preflight-info"><strong>Imprimante et lenticulaire</strong><span id="printProfileStatus">Vérification du matériel sélectionné…</span></div><button type="button" id="printConfig" class="print-config">Choisir l’imprimante</button><button type="button" id="printResume" class="print-resume" hidden>Retour à la création</button></div></header><section class="stage"><div class="loading" id="loading"><div>Ouverture du module…</div></div><iframe class="service-frame" id="serviceFrame" title="Module HappyHolo" allow="clipboard-read; clipboard-write" scrolling="yes"></iframe></section></main>
 </div>
 <button class="focus-exit" id="focusExit">×</button>
 <script>
@@ -272,10 +287,60 @@ function resetStudioHorizontalFrame(){
     window.scrollTo(0,window.scrollY);
   }catch(_){}
 }
-function activate(id,force=false){const found=routeById(id),r=found.route;activeFamily=found.family.id;activeRoute=r.id;drawFamilies();drawSubnav(found.family);$('routeTitle').textContent=r.title;$('routeHelp').textContent=r.help;sessionStorage.setItem('happyholo:hub-route',r.id);const absolute=new URL(r.src,location.href).href;resetStudioHorizontalFrame();if(force||loadedSrc!==absolute){loading.hidden=false;loading.firstElementChild.textContent='Ouverture du module…';loadedSrc=absolute;frame.src=r.src}else{tuneEmbedded();scrollInside(r.target)}}
-frame.addEventListener('load',()=>{loading.hidden=true;tuneEmbedded();resetStudioHorizontalFrame();scrollInside(routeById(activeRoute).route.target)});frame.addEventListener('error',()=>{loading.hidden=false;loading.firstElementChild.textContent='Le module ne répond pas. Utilise ↻ pour réessayer.'});
+function activate(id,force=false){const found=routeById(id),r=found.route;activeFamily=found.family.id;activeRoute=r.id;drawFamilies();drawSubnav(found.family);$('routeTitle').textContent=r.title;$('routeHelp').textContent=r.help;sessionStorage.setItem('happyholo:hub-route',r.id);updatePrintBar();const absolute=new URL(r.src,location.href).href;resetStudioHorizontalFrame();if(force||loadedSrc!==absolute){loading.hidden=false;loading.firstElementChild.textContent='Ouverture du module…';loadedSrc=absolute;frame.src=r.src}else{tuneEmbedded();scrollInside(r.target)}}
+frame.addEventListener('load',()=>{loading.hidden=true;tuneEmbedded();resetStudioHorizontalFrame();updatePrintBar();scrollInside(routeById(activeRoute).route.target)});frame.addEventListener('error',()=>{loading.hidden=false;loading.firstElementChild.textContent='Le module ne répond pas. Utilise ↻ pour réessayer.'});
 $('reload').onclick=()=>activate(activeRoute,true);$('open').onclick=()=>window.open(routeById(activeRoute).route.src,'_blank','noopener');$('focus').onclick=()=>document.body.classList.add('focus');$('focusExit').onclick=()=>document.body.classList.remove('focus');document.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('focus')});
 async function health(){try{const r=await fetch('./api/happyholo-health',{cache:'no-store'}),d=await r.json();const ready=[d.services?.pixverse,d.services?.analysis,d.services?.explodeview].filter(Boolean).length;$('healthDot').className='dot '+(ready===3?'ok':'warn');$('healthText').textContent=ready===3?'Tous les services connectés':`${ready}/3 services IA connectés`;}catch(_){$('healthDot').className='dot warn';$('healthText').textContent='Fonctions locales disponibles'}}
+const printSetupKey='microplayer:print-setup:v1';
+const printReturnRouteKey='microplayer:printer-return-route:v1';
+const printerNames={
+  'canon-pro-200s':'Canon PIXMA PRO-200S',
+  'roland-lef-20':'Roland VersaUV LEF-20',
+  'roland-custom':'Roland VersaUV LEF-20',
+  'hp-officejet-pro-8720':'HP OfficeJet Pro 8720',
+  'hp-custom':'HP OfficeJet Pro 8720'
+};
+function readPrintSetup(){
+  try{
+    const data=JSON.parse(localStorage.getItem(printSetupKey));
+    if(!data||typeof data!=='object'||!data.printerId)return null;
+    return data;
+  }catch(_){return null}
+}
+function updatePrintBar(){
+  const profile=readPrintSetup();
+  if(!profile){
+    $('printProfileStatus').textContent='Non configuré · choisir une imprimante, le format et le LPI avant l’impression.';
+    $('printConfig').textContent='Choisir l’imprimante';
+  }else{
+    const name=printerNames[profile.printerId]||String(profile.printerModel||profile.printerId);
+    const width=Number(profile.widthMm),height=Number(profile.heightMm);
+    const dimension=Number.isFinite(width)&&width>0&&Number.isFinite(height)&&height>0
+      ?width.toLocaleString('fr-FR')+' × '+height.toLocaleString('fr-FR')+' mm'
+      :'format à préciser';
+    const nominal=Number(profile.nominalLpi),pitch=Number(profile.calibratedLpi);
+    const lens=Number.isFinite(nominal)&&nominal>0?(Number.isFinite(pitch)&&pitch>0&&Math.abs(pitch-nominal)>.001
+      ?pitch.toLocaleString('fr-FR')+' LPI calibrés'
+      :nominal.toLocaleString('fr-FR')+' LPI'):'LPI à préciser';
+    $('printProfileStatus').textContent=name+' · '+dimension+' · '+lens;
+    $('printConfig').textContent='Modifier les réglages';
+  }
+  $('printResume').hidden=activeRoute!=='print-setup';
+}
+$('printConfig').addEventListener('click',()=>{
+  if(activeRoute==='print-setup')return;
+  try{sessionStorage.setItem(printReturnRouteKey,activeRoute)}catch(_){}
+  activate('print-setup');
+});
+$('printResume').addEventListener('click',()=>{
+  let destination='photo';
+  try{destination=sessionStorage.getItem(printReturnRouteKey)||'photo'}catch(_){}
+  if(destination==='print-setup'||!families.some(f=>f.routes.some(r=>r.id===destination)))destination='photo';
+  activate(destination);
+});
+window.addEventListener('storage',event=>{
+  if(!event.key||event.key===printSetupKey)updatePrintBar();
+});
 // Printer and lenticular format are selected before creating print assets on first visit.
 let hasPrintProfile=false;
 try { hasPrintProfile=Boolean(localStorage.getItem('microplayer:print-setup:v1')); } catch (_) {}
