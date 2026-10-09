@@ -2,50 +2,72 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PRINTER_PRESETS, evaluatePrintSetup } from '../modules/microplayer-print-planner.js';
 
-test('Canon and Epson keep distinct manufacturer maximum droplet resolutions', () => {
-  const canon = PRINTER_PRESETS.find(p => p.id === 'canon-pro-200s');
-  const epson = PRINTER_PRESETS.find(p => p.id === 'epson-et-2850');
-  assert.deepEqual([canon.maxPrinterDpiX, canon.maxPrinterDpiY], [4800, 2400]);
-  assert.deepEqual([epson.maxPrinterDpiX, epson.maxPrinterDpiY], [5760, 1440]);
+test('three exact machine models and verified manufacturer specifications', () => {
+  assert.deepEqual(PRINTER_PRESETS.map(p=>p.id),['canon-pro-200s','roland-lef-20','hp-officejet-pro-8720']);
+  assert.deepEqual(PRINTER_PRESETS.map(p=>[p.maxPrinterDpiX,p.maxPrinterDpiY]),[
+    [4800,2400],[1440,720],[4800,1200]
+  ]);
+  assert.deepEqual([PRINTER_PRESETS[1].maxPrintWidthMm,PRINTER_PRESETS[1].maxPrintHeightMm],[508,330]);
+  assert.equal(PRINTER_PRESETS[0].supportedModes[0].x,600);
+  assert.equal(PRINTER_PRESETS[2].supportedModes[1].x,1200);
 });
 
-test('600 DPI and 50 LPI give 12 source pixels per lenticule', () => {
-  const plan = evaluatePrintSetup({ printerId: 'canon-pro-200s', rasterDpi: 600, nominalLpi: 50, calibratedLpi: 50, widthMm: 150, heightMm: 100 });
-  assert.equal(plan.pixelsPerLens, 12);
-  assert.equal(plan.candidates.find(x => x.viewCount === 9).pixelsPerView, 12 / 9);
-  assert.equal(plan.existingEngineSupportsNineViews, true);
+test('Canon 600 DPI + 50 LPI creates 12 raster pixels per lens on the 10×15 format', () => {
+  const result=evaluatePrintSetup({printerId:'canon-pro-200s',rasterDpiX:600,rasterDpiY:600,nominalLpi:50,calibratedLpi:50});
+  assert.equal(result.pixelsPerLens,12);
+  assert.equal(result.candidates.find(v=>v.viewCount===9).pixelsPerView,12/9);
+  assert.equal(result.existingEngineSupportsNineViews,true);
+  assert.equal(result.paperFits,true);
+  assert.equal(result.outWidthPx,3543);
+  assert.equal(result.outHeightPx,2362);
 });
 
-test('at 1440/60 exactly 8 and 12 views fit integer stripes, at 1440/50 not', () => {
-  const exact = evaluatePrintSetup({ printerId: 'roland-custom', rasterDpi: 1440, nominalLpi: 60, calibratedLpi: 60 });
-  assert.equal(exact.pixelsPerLens, 24);
-  assert.equal(exact.candidates.find(x => x.viewCount === 8).exactIntegerStripes, true);
-  assert.equal(exact.candidates.find(x => x.viewCount === 12).exactIntegerStripes, true);
-  const fractional = evaluatePrintSetup({ printerId: 'roland-custom', rasterDpi: 1440, nominalLpi: 50, calibratedLpi: 50 });
-  assert.ok(Math.abs(fractional.pixelsPerLens - 28.8) < 1e-10);
-  assert.ok(fractional.candidates.every(x => !x.exactIntegerStripes));
+test('Roland 1440×720 dpi and 60 LPI: 8 or 12 integer stripes only across X',()=>{
+ const x=evaluatePrintSetup({printerId:'roland-lef-20',rasterDpiX:1440,rasterDpiY:720,nominalLpi:60,calibratedLpi:60,lensOrientation:'vertical'});
+ assert.equal(x.effectiveDpi,1440);
+ assert.equal(x.pixelsPerLens,24);
+ assert.equal(x.candidates.find(v=>v.viewCount===8).exactIntegerStripes,true);
+ assert.equal(x.candidates.find(v=>v.viewCount===12).exactIntegerStripes,true);
+ const y=evaluatePrintSetup({printerId:'roland-lef-20',rasterDpiX:1440,rasterDpiY:720,nominalLpi:60,calibratedLpi:60,lensOrientation:'horizontal'});
+ assert.equal(y.effectiveDpi,720);
+ assert.equal(y.pixelsPerLens,12);
+ assert.equal(y.candidates.find(v=>v.viewCount===8).exactIntegerStripes,false);
+ assert.equal(y.candidates.find(v=>v.viewCount===6).exactIntegerStripes,true);
+ assert.equal(y.candidates.find(v=>v.viewCount===12).exactIntegerStripes,true);
 });
 
-test('calibrated pitch is used, not nominal material LPI', () => {
-  const result = evaluatePrintSetup({ calibratedLpi: 50.2, nominalLpi: 50, rasterDpi: 600 });
-  assert.equal(result.pixelsPerLens, 600 / 50.2);
-  assert.equal(result.candidates.find(x => x.viewCount === 9).exactIntegerStripes, false);
+test('Roland 1440×720 and 50 LPI: x=28.8, y=14.4 pixels/lens',()=>{
+ const settings={printerId:'roland-lef-20',rasterDpiX:1440,rasterDpiY:720,nominalLpi:50,calibratedLpi:50};
+ assert.equal(evaluatePrintSetup({...settings,lensOrientation:'vertical'}).pixelsPerLens,28.8);
+ assert.equal(evaluatePrintSetup({...settings,lensOrientation:'horizontal'}).pixelsPerLens,14.4);
 });
 
-test('high resolution A4 warns about memory and does not promise legacy support', () => {
-  const big = evaluatePrintSetup({ printerId: 'roland-custom', rasterDpi: 1440, nominalLpi: 60, calibratedLpi: 60, widthMm: 210, heightMm: 297 });
-  assert.ok(big.totalPixels > 100_000_000);
-  assert.ok(big.recommendations.some(x => x.includes('mémoire')));
-  assert.equal(big.existingEngineSupportsNineViews, false);
+test('pitch calibration applied to measured pitch rather than nominal',()=>{
+ const x=evaluatePrintSetup({calibratedLpi:50.2});
+ assert.ok(Math.abs(x.pixelsPerLens-600/50.2)<1e-6);
 });
 
-test('interlacing axis follows the lens direction', () => {
-  assert.equal(evaluatePrintSetup({ lensOrientation: 'vertical' }).axisOfInterlace, 'horizontal (X)');
-  assert.equal(evaluatePrintSetup({ lensOrientation: 'horizontal' }).axisOfInterlace, 'vertical (Y)');
+test('Roland accepts A3 and refuses oversize, even if rotated',()=>{
+ assert.equal(evaluatePrintSetup({printerId:'roland-lef-20',widthMm:420,heightMm:297}).paperFits,true);
+ const big=evaluatePrintSetup({printerId:'roland-lef-20',widthMm:509,heightMm:331});
+ assert.equal(big.paperFits,false);
+ assert.ok(big.warnings.some(x=>x.includes('HORS ZONE')));
 });
 
-test('invalid numerical and physical inputs are refused', () => {
-  assert.throws(() => evaluatePrintSetup({ rasterDpi: 0 }), /résolution raster ou pitch/i);
-  assert.throws(() => evaluatePrintSetup({ widthMm: -1 }), /dimensions physiques/i);
-  assert.throws(() => evaluatePrintSetup({ calibratedLpi: Number.NaN }), /numériques/i);
+test('HP borderless A4 size fits, oversize does not',()=>{
+ assert.equal(evaluatePrintSetup({printerId:'hp-officejet-pro-8720',widthMm:210,heightMm:297}).paperFits,true);
+ assert.equal(evaluatePrintSetup({printerId:'hp-officejet-pro-8720',widthMm:330,heightMm:500}).paperFits,false);
+});
+
+test('the legacy 9-view printer/export remains exclusively Canon 600 × 600',()=>{
+ assert.equal(evaluatePrintSetup({printerId:'hp-officejet-pro-8720'}).existingEngineSupportsNineViews,false);
+ assert.equal(evaluatePrintSetup({printerId:'roland-lef-20'}).existingEngineSupportsNineViews,false);
+ assert.equal(evaluatePrintSetup({printerId:'canon-pro-200s',rasterDpiX:1200,rasterDpiY:1200}).existingEngineSupportsNineViews,false);
+ assert.equal(evaluatePrintSetup({printerId:'canon-pro-200s',widthMm:210,heightMm:297}).existingEngineSupportsNineViews,false);
+});
+
+test('reject invalid dimensions, anisotropic DPI and material pitch',()=>{
+ assert.throws(()=>evaluatePrintSetup({rasterDpiX:0}),/résolution raster/i);
+ assert.throws(()=>evaluatePrintSetup({rasterDpiY:NaN}),/numériques/i);
+ assert.throws(()=>evaluatePrintSetup({widthMm:-1}),/dimensions physiques/i);
 });
