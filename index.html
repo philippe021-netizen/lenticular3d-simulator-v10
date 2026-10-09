@@ -135,8 +135,58 @@ if(frame.src.includes('microplayer-photo-v02-continuous-depth.html')){
         max-width:100%!important;
         max-height:100%!important
       }
-      html.hh-embedded-photo-v02 .sim {
-        box-sizing:border-box;min-width:0;max-width:100%;width:100%
+      /* The source and simulated 2D image must share the same intrinsic ratio.
+         A fixed max-height on a full-width .sim3d distorted faces on iPad. */
+      html.hh-embedded-photo-v02 .sim,
+      html.hh-embedded-photo-v02 .sim.sim3d {
+        box-sizing:border-box!important;
+        position:relative!important;
+        display:block!important;
+        min-width:0!important;
+        width:min(100%, calc(var(--source-aspect,1.545) * 66dvh), calc(var(--source-aspect,1.545) * 700px))!important;
+        max-width:100%!important;
+        height:auto!important;
+        max-height:none!important;
+        min-height:0!important;
+        aspect-ratio:var(--source-aspect,1.545)!important;
+        padding:0!important;
+        margin-left:auto!important;
+        margin-right:auto!important;
+        overflow:hidden!important
+      }
+      html.hh-embedded-photo-v02 .sim.sim3d > canvas {
+        position:absolute!important;
+        inset:4%!important;
+        width:92%!important;
+        height:92%!important;
+        min-width:0!important;
+        max-width:92%!important;
+        max-height:92%!important;
+        object-fit:contain!important;
+        display:block!important
+      }
+      html.hh-embedded-photo-v02 .sim .simRig {
+        position:absolute!important;
+        inset:4%!important;
+        width:92%!important;
+        height:92%!important;
+        max-width:92%!important;
+        max-height:92%!important
+      }
+      html.hh-embedded-photo-v02 .sim .simRig canvas {
+        width:100%!important;
+        height:100%!important;
+        object-fit:contain!important
+      }
+      html.hh-embedded-photo-v02 .view {
+        aspect-ratio:var(--source-aspect,1.545)!important;
+        min-width:0!important;
+        overflow:hidden!important
+      }
+      html.hh-embedded-photo-v02 .view img {
+        width:100%!important;
+        height:100%!important;
+        object-fit:contain!important
       }
       html.hh-embedded-photo-v02 .actions,
       html.hh-embedded-photo-v02 .controls,
