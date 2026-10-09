@@ -54,7 +54,8 @@
     .view canvas { width: 100%; display: block; }
     .view.center { outline: 2px solid var(--accent); outline-offset: -2px; }
     .badge { position: absolute; top: 6px; left: 6px; padding: 5px 8px; border-radius: 8px; background: #000d; font-size: 12px; line-height: 1; }
-    .quality { color: #a6f2d4; font-size: 13px; margin-top: 9px; min-height: 19px; }
+    .quality { color: #a6f2d4; font-size: 13px; margin-top: 9px; min-height: 19px; line-height: 1.5; }
+    .quality.warning { color: #ffd190; }
     .tiny { font-size: 12px; color: var(--muted); }
     @media (max-width: 760px) {
       .settings { grid-template-columns: 1fr; gap: 4px; }
@@ -124,10 +125,10 @@
         </div>
         <div class="controls">
           <label for="parallax">Parallaxe totale 01↔09</label>
-          <input id="parallax" type="range" min="0.5" max="8" step="0.1" value="3.2">
+          <input id="parallax" type="range" min="0.5" max="8" step="0.1" value="5.0">
           <output id="parallaxOut">3,2 %</output>
         </div>
-        <p class="tiny">La séparation amplifie progressivement les plans intermédiaires hors de la zone stable. La courbe reste continue aux contours : le sujet demeure calme tandis que le décor gagne réellement en profondeur.</p>
+        <p class="tiny">Pour bien voir le relief, comparez surtout les vues extrêmes 01 et 09 : les vues voisines 04, 05 et 06 sont volontairement proches. La séparation agit sur les plans hors de la zone stable.</p>
       </div>
     </div>
   </section>
@@ -167,9 +168,11 @@
     <div class="row">
       <h2 style="margin:0;flex:1">Simulateur lenticulaire</h2>
       <button id="autoBtn" class="secondary">▶ Aller-retour</button>
+      <button id="compareBtn" class="secondary" disabled>Comparer 01 ↔ 09</button>
     </div>
     <div class="simstage"><canvas id="simCanvas"></canvas></div>
     <input id="simRange" class="simbar" type="range" min="0" max="8" step="0.01" value="4">
+    <p class="tiny">Utilisez « Comparer 01 ↔ 09 » pour alterner les deux vues les plus éloignées. Le curseur permet aussi d'inspecter les neuf positions.</p>
   </section>
 
   <div id="grid" class="grid"></div>
@@ -177,6 +180,7 @@
 
 <script type="module">
   import {
+    analyzeParallaxPotential,
     comparePixels,
     composeEditedDepth,
     depthAt,
@@ -228,7 +232,8 @@
     auto: false,
     autoFrame: 0,
     autoDirection: 1,
-    autoTime: 0
+    autoTime: 0,
+    comparisonView: 0
   };
 
   function setStatus(message, type = "") {
@@ -286,6 +291,8 @@
     grid.innerHTML = "";
     simulator.classList.remove("ready");
     quality.textContent = "";
+    quality.classList.remove("warning");
+    byId("compareBtn").disabled = true;
     depthBtn.disabled = false;
     generateBtn.disabled = true;
     setEditorEnabled(false);
@@ -412,6 +419,8 @@
     generateBtn.disabled = true;
     setEditorEnabled(false);
     quality.textContent = "";
+    quality.classList.remove("warning");
+    byId("compareBtn").disabled = true;
     const stopMonitoring = monitorUiFrames();
     try {
       const photoContext = photoCanvas.getContext("2d", { willReadFrequently: true });
@@ -703,6 +712,7 @@
     state.frames = [];
     simulator.classList.remove("ready");
     quality.textContent = "";
+    byId("compareBtn").disabled = true;
     const options = {
       zero: Number(byId("zero").value),
       stabilityBand: Number(byId("stabilityBand").value),
@@ -710,6 +720,7 @@
       planeSeparation: Number(byId("planeSeparation").value) / 100,
       parallaxPercent: Number(byId("parallax").value)
     };
+    const parallaxCheck = analyzeParallaxPotential(depth, targetWidth, options);
     let stablePixels = 0;
     for (const value of depth) {
       if (Math.abs(value - options.zero) <= options.stabilityBand) stablePixels += 1;
@@ -744,6 +755,9 @@
       simRange.value = 4;
       drawSimulator(4);
       simulator.classList.add("ready");
+      byId("compareBtn").disabled = false;
+      state.comparisonView = 0;
+      byId("compareBtn").textContent = "Comparer 01 ↔ 09";
       const centerPixels = state.frames[4].getContext("2d", { willReadFrequently: true }).getImageData(0, 0, targetWidth, targetHeight).data;
       const centerCheck = comparePixels(source, centerPixels);
       const memoryMegabytes = Math.round((targetWidth * targetHeight * 4 * 12) / 1048576);
@@ -752,8 +766,14 @@
       const workerQuality = state.depthPerformance
         ? ` · profondeur ${state.depthPerformance.mode} : ${state.depthPerformance.frames} rafraîchissements UI en ${(state.depthPerformance.milliseconds / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} s`
         : "";
-      quality.textContent = `Contrôle : vue 05 ${centerCheck.equal ? "strictement identique ✓" : `${centerCheck.different} octets différents`} · zone stable ${stablePercent} % de l’image · désocclusions rebouchées ${totalHoles.toLocaleString("fr-FR")} px · budget image ≈ ${memoryMegabytes} Mo${workerQuality}.`;
-      setStatus(`9 vues prêtes ✓ — zéro ${options.zero}, zone stable ±${options.stabilityBand}, séparation ${Math.round(options.planeSeparation * 100)} %, relief ${Math.round(options.relief * 100)} %, parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
+      const relative = parallaxCheck.relativeShiftPx.toLocaleString("fr-FR");
+      quality.classList.toggle("warning", parallaxCheck.weak);
+      quality.textContent = `Différence de plans estimée 01↔09 : ${relative} px sur ${targetWidth} px · profondeur P10/P90 : ${parallaxCheck.p10}/${parallaxCheck.p90} · vue 05 ${centerCheck.equal ? "identique à la photo ✓" : `modifiée (${centerCheck.different} octets)`} · zone stable ${stablePercent} % · désocclusions ${totalHoles.toLocaleString("fr-FR")} px · budget ≈ ${memoryMegabytes} Mo${workerQuality}.`;
+      if (parallaxCheck.weak) {
+        setStatus("Attention : les neuf images sont produites, mais la carte de profondeur ou la parallaxe ne sépare pas assez les plans. Affichez la carte, corrigez la profondeur au Pencil puis régénérez. N'imprimez pas encore ce résultat.", "error");
+      } else {
+        setStatus(`9 vues prêtes ✓ · écart réel entre plans 01↔09 ≈ ${relative} px. Cliquez sur « Comparer 01 ↔ 09 » dans le simulateur. Zéro ${options.zero} · parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
+      }
       if (scrollToSimulator) simulator.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
       console.error(error);
@@ -766,6 +786,16 @@
   simRange.addEventListener("input", () => {
     stopAuto();
     drawSimulator(Number(simRange.value));
+  });
+  byId("compareBtn").addEventListener("click", () => {
+    if (state.frames.length !== 9) return;
+    stopAuto();
+    state.comparisonView = state.comparisonView === 0 ? 8 : 0;
+    simRange.value = String(state.comparisonView);
+    drawSimulator(state.comparisonView);
+    byId("compareBtn").textContent = state.comparisonView === 0
+      ? "Vue 01 affichée · voir 09"
+      : "Vue 09 affichée · voir 01";
   });
   byId("autoBtn").addEventListener("click", () => {
     state.auto = !state.auto;
