@@ -83,10 +83,12 @@ export function assessMediaDimensions({
     throw new RangeError('Source papier/plateau invalide pour cette imprimante.');
   const candidates=sources.map(source=>{
     const lowerW=Math.min(w,h), upperH=Math.max(w,h);
-    const sizeFits=lowerW>=source.minWidthMm-1e-6 &&
-      upperH>=source.minHeightMm-1e-6 &&
-      lowerW<=source.maxWidthMm+1e-6 &&
-      upperH<=source.maxHeightMm+1e-6;
+    const sizeFits=printer.kind==='uv'
+      ? fitsRotated(w,h,source.maxWidthMm,source.maxHeightMm)
+      : lowerW>=source.minWidthMm-1e-6 &&
+        upperH>=source.minHeightMm-1e-6 &&
+        lowerW<=source.maxWidthMm+1e-6 &&
+        upperH<=source.maxHeightMm+1e-6;
     const thicknessFits=thick===null||source.maxThicknessMm===undefined||thick<=source.maxThicknessMm+1e-6;
     return {...source,sizeFits,thicknessFits,compatible:sizeFits&&thicknessFits};
   });
