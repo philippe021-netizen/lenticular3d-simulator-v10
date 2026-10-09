@@ -56,7 +56,7 @@ test('Roland accepts A3 and refuses oversize, even if rotated',()=>{
  assert.equal(evaluatePrintSetup({printerId:'roland-lef-20',widthMm:420,heightMm:297}).paperFits,true);
  const big=evaluatePrintSetup({printerId:'roland-lef-20',widthMm:509,heightMm:331});
  assert.equal(big.paperFits,false);
- assert.ok(big.warnings.some(x=>x.includes('HORS ZONE')));
+ assert.ok(big.warnings.some(x=>x.includes('INCOMPATIBLE')));
 });
 
 test('HP borderless A4 size fits, oversize does not',()=>{
