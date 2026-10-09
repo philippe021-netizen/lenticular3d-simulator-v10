@@ -6,6 +6,7 @@ const status=$('#status');
 const buildBtn=$('#build');
 const exportBtn=$('#export');
 const downloadBtn=$('#download');
+const printBtn=$('#openLenticularPrint');
 const framesEl=$('#frames');
 
 const subjectDepth=$('#subjectDepth');
@@ -379,7 +380,7 @@ window.HappyHoloLoadSourceBlob=async(blob,{autoBuild=true,name='happyholo-bord-r
 
 exportBtn.addEventListener('click',async()=>{
   if(!subjectImg||!backgroundImg) return;
-  cancelAnimationFrame(anim); exported=[]; framesEl.innerHTML='';
+  cancelAnimationFrame(anim); exported=[]; framesEl.innerHTML=''; printBtn.disabled=true;
   const poses=[-1,-.75,-.5,-.25,0,.25,.5,.75,1];
   for(let i=0;i<9;i++){
     setStatus(`Export vue ${i+1}/9…`);
@@ -395,11 +396,34 @@ exportBtn.addEventListener('click',async()=>{
   startPreview();
   if(tooSimilar.length){
     exported=[];
-    downloadBtn.disabled=true;
+    downloadBtn.disabled=true; printBtn.disabled=true;
     setStatus(`CONTRÔLE REFUSÉ — vues presque identiques : ${tooSimilar.join(', ')}. Augmente l’amplitude ou refais le relief avant d’exporter.`);
     return;
   }
-  downloadBtn.disabled=false; setStatus('9 rendus 2,5D distincts — contrôle automatique réussi.');
+  downloadBtn.disabled=false; printBtn.disabled=false; setStatus('9 vues validées. ZIP disponible ou transfert direct vers l’atelier d’impression 10 × 15 cm.');
+});
+
+
+printBtn.addEventListener('click',()=>{
+  if(exported.length!==9) return;
+  // The print module performs its own image decoding and pitch checks.
+  // Transfer is only allowed from a real user click and after quality gating.
+  let printWindow=null;
+  const onReady=event=>{
+    if(event.origin!==location.origin || event.source!==printWindow || event.data?.type!=='microplayer-lenticular-print-ready')return;
+    window.removeEventListener('message',onReady);
+    event.source.postMessage({type:'microplayer-lenticular-print-views',views:exported.slice()},location.origin);
+    setStatus('9 vues transférées. Termine le calibrage 50/60 LPI dans l’atelier d’impression.');
+  };
+  window.addEventListener('message',onReady);
+  printWindow=window.open('./microplayer-lenticular-print.html?v=3','_blank');
+  if(!printWindow){
+    window.removeEventListener('message',onReady);
+    setStatus('Le navigateur a bloqué l’onglet d’impression. Utilise Impression → Interlacer 9 vues et charge ton ZIP.');
+    return;
+  }
+  setStatus('Ouverture de l’atelier d’impression…');
+  setTimeout(()=>window.removeEventListener('message',onReady),20000);
 });
 
 downloadBtn.addEventListener('click',async()=>{
