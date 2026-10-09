@@ -74,15 +74,24 @@ function safeRead(key,fallback){try{return JSON.parse(localStorage.getItem(key))
 function safeWrite(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch{return false}}
 function config(){const result={};for(const id of fields)result[id]=$(id).value;return result}
 function hydrate(x){
- if(x.printerId) $('printerId').value=String(x.printerId);
+ if(x.printerId){
+  const legacyPrinter={'roland-custom':'roland-lef-20','hp-custom':'hp-officejet-pro-8720'}[x.printerId];
+  const printerId=legacyPrinter || x.printerId;
+  $('printerId').value=PRINTER_PRESETS.some(p=>p.id===printerId)?printerId:'canon-pro-200s';
+ }
  changePrinter(false);
  for(const id of fields) if(id!=='printerId' && x[id]!==undefined) $(id).value=String(x[id]);
- if(x.rasterDpi!==undefined && x.rasterDpiX===undefined){$('rasterDpiX').value=x.rasterDpi;$('rasterDpiY').value=x.rasterDpi}
+ if(x.rasterDpi!==undefined && x.rasterDpiX===undefined){
+  const p=PRINTER_PRESETS.find(p=>p.id===$('printerId').value);
+  const mode=p.supportedModes.find(m=>m.x===Number(x.rasterDpi));
+  if(mode){$('rasterDpiX').value=mode.x;$('rasterDpiY').value=mode.y}
+  else {$('rasterDpiX').value=x.rasterDpi;$('rasterDpiY').value=x.rasterDpi}
+ }
  refresh();
 }
 function changePrinter(updateModel=true){
  const p=PRINTER_PRESETS.find(p=>p.id===$('printerId').value);if(!p)return;
- if(updateModel)$('printerModel').value=p.label;
+ if(updateModel){$('printerModel').value=p.label;$('driverMode').value=p.printModeLabel}
  $('printMode').replaceChildren(...p.supportedModes.map((m,i)=>new Option(m.label,String(i))));
  $('printMode').value='0';
  applyPrintMode(false);
@@ -119,7 +128,9 @@ function refresh(){
     const td=document.createElement('td');td.textContent=v;if(i===1)td.className='num';tr.append(td)});
    if(row.viewCount===data.suggestedViewCount)tr.style.fontWeight='700';return tr;
   }));
-  $('recommendedViews').textContent='Suggestion prudente : '+data.suggestedViewCount+' vues ('+data.effect+') ; à confirmer par un test réel de finesse, netteté et amplitude.';
+  $('recommendedViews').textContent='Suggestion prudente : '+data.suggestedViewCount+' vues pour '+data.effect+
+   (data.suggestedAlternatives.length?' · options à bandes entières : '+data.suggestedAlternatives.join(' ou ')+' vues':'')+
+   '. Validation obligatoire sur mire avant production.';
   $('recommendations').replaceChildren();
   const heading=document.createElement('h3');heading.textContent='Précautions';$('recommendations').append(heading);
   const ul=document.createElement('ul');
