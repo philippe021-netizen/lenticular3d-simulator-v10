@@ -113,7 +113,28 @@ if(frame.src.includes('microplayer-photo-v02-continuous-depth.html')){
       html.hh-embedded-photo-v02 .sidebar,
       html.hh-embedded-photo-v02 .workspace {overflow-y:visible!important}
       html.hh-embedded-photo-v02 .sidebarToggle {position:static}
-      html.hh-embedded-photo-v02 .stage,
+      /* Never set a CSS height cap on a 100%-wide canvas: doing so squashes
+         portrait images. Keep the rendered stage at its real source aspect. */
+      html.hh-embedded-photo-v02 .stage {
+        box-sizing:border-box;
+        min-width:0!important;
+        width:min(100%, calc(var(--source-aspect,1.545) * 70dvh), calc(var(--source-aspect,1.545) * 700px))!important;
+        max-width:100%!important;
+        max-height:none!important;
+        height:auto!important;
+        aspect-ratio:var(--source-aspect,1.545)!important;
+        margin-left:auto!important;
+        margin-right:auto!important;
+        overflow:hidden!important
+      }
+      html.hh-embedded-photo-v02 .stage canvas {
+        position:absolute!important;
+        inset:0!important;
+        width:100%!important;
+        height:100%!important;
+        max-width:100%!important;
+        max-height:100%!important
+      }
       html.hh-embedded-photo-v02 .sim {
         box-sizing:border-box;min-width:0;max-width:100%;width:100%
       }
@@ -160,6 +181,27 @@ if(frame.src.includes('microplayer-photo-v02-continuous-depth.html')){
       d.body.scrollLeft=0;
     }catch(_){}
   };
+  // Allow users to inspect the original photo without the cyan editing mask.
+  // No change to the image pixels, group masks, depth map or export pipeline.
+  const v02EditPanel=d.getElementById('editPanel');
+  const v02Mask=d.getElementById('mask');
+  if(v02EditPanel && v02Mask && !d.getElementById('happyHoloPhotoV02ToggleMask')){
+    const maskButton=d.createElement('button');
+    maskButton.id='happyHoloPhotoV02ToggleMask';
+    maskButton.type='button';
+    maskButton.textContent='Masquer la sélection turquoise';
+    maskButton.setAttribute('aria-pressed','false');
+    maskButton.style.cssText='display:block;width:100%;margin-top:9px;background:#242b35;color:#fff;border:1px solid #5b6573;';
+    const actionRow=v02EditPanel.querySelector('.actions');
+    (actionRow||v02EditPanel).after(maskButton);
+    maskButton.addEventListener('click',()=>{
+      const hidden=maskButton.getAttribute('aria-pressed')!=='true';
+      maskButton.setAttribute('aria-pressed',String(hidden));
+      maskButton.textContent=hidden?'Afficher la sélection pour corriger au Pencil':'Masquer la sélection turquoise';
+      v02Mask.style.opacity=hidden?'0':'1';
+      v02Mask.style.pointerEvents=hidden?'none':'auto';
+    });
+  }
   resetHorizontal();
   d.defaultView?.requestAnimationFrame(resetHorizontal);
   return;
