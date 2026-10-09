@@ -39,6 +39,9 @@ const families=[
 {id:'supports',label:'Supports',title:'Supports et cadrage',help:'Porte-clé, médaillon, carte et verso',src:'./relief3d-test-v31.html?embed=1&v=409',target:'.support-card'},
 {id:'card',label:'Carte / souvenir',title:'Carte de visite et photo souvenir',help:'Analyse IA, texte protégé, 9 vues et ZIP impression',src:'./happyholo-business-card-studio.html?v=411'},
 {id:'simulator',label:'Simulateur 9 vues',title:'Simulateur lenticulaire universel',help:'Lecture fluide, tactile et contrôle des écarts',src:'./happyholo-simulator.html?v=402'}]},
+{id:'printing',icon:'▤',label:'Impression',hint:'Calibrage & formats',routes:[
+{id:'print-setup',label:'1 · Matériel et format',title:'Préparer l’impression · Canon / Roland / HP',help:'Imprimante, bac ou plateau, 10 × 15 à A3+, 50/60 LPI et calcul des vues',src:'./microplayer-print-start.html?v=2'},
+{id:'print',label:'2 · Interlacer 9 vues',title:'Atelier d’impression lenticulaire · 10 × 15 cm',help:'9 PNG ou ZIP, interlacement 600 DPI, mire 50 LPI et export PNG/PDF ; production A4 encore à développer',src:'./microplayer-lenticular-print.html?v=2'}]},
 {id:'machines',icon:'⚙',label:'Machines',hint:'ExplodeView',routes:[
 {id:'explode',label:'Créer ExplodeView',title:'ExplodeView — machines',help:'Démontage progressif des grosses pièces seulement',src:'./relief3d-test-v31.html?embed=1&v=409',target:'#pieceSelectionStart'},
 {id:'explode-demo',label:'Démo Rocket 9 vues',title:'ExplodeView — démonstration',help:'Simulation fluide de la Rocket en 9 étapes cumulatives',src:'./explodeview-rocket-demo/index.html?v=402'}]},
@@ -66,7 +69,11 @@ function activate(id,force=false){const found=routeById(id),r=found.route;active
 frame.addEventListener('load',()=>{loading.hidden=true;tuneEmbedded();scrollInside(routeById(activeRoute).route.target)});frame.addEventListener('error',()=>{loading.hidden=false;loading.firstElementChild.textContent='Le module ne répond pas. Utilise ↻ pour réessayer.'});
 $('reload').onclick=()=>activate(activeRoute,true);$('open').onclick=()=>window.open(routeById(activeRoute).route.src,'_blank','noopener');$('focus').onclick=()=>document.body.classList.add('focus');$('focusExit').onclick=()=>document.body.classList.remove('focus');document.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('focus')});
 async function health(){try{const r=await fetch('./api/happyholo-health',{cache:'no-store'}),d=await r.json();const ready=[d.services?.pixverse,d.services?.analysis,d.services?.explodeview].filter(Boolean).length;$('healthDot').className='dot '+(ready===3?'ok':'warn');$('healthText').textContent=ready===3?'Tous les services connectés':`${ready}/3 services IA connectés`;}catch(_){$('healthDot').className='dot warn';$('healthText').textContent='Fonctions locales disponibles'}}
-const initial=sessionStorage.getItem('happyholo:hub-route')||location.hash.slice(1)||'photo';activate(initial);health();
+// Printer and lenticular format are selected before creating print assets on first visit.
+let hasPrintProfile=false;
+try { hasPrintProfile=Boolean(localStorage.getItem('microplayer:print-setup:v1')); } catch (_) {}
+const initial=location.hash.slice(1)||sessionStorage.getItem('happyholo:hub-route')||(hasPrintProfile?'photo':'print-setup');
+activate(initial);health();
 })();
 </script>
 </body>
