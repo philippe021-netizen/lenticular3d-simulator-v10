@@ -58,6 +58,21 @@ function canvasToBlob(canvas){
   });
 }
 
+async function meanFrameDifference(blobA,blobB){
+  const [imgA,imgB]=await Promise.all([blobToImage(blobA),blobToImage(blobB)]);
+  if(imgA.naturalWidth!==imgB.naturalWidth||imgA.naturalHeight!==imgB.naturalHeight) return 255;
+  const c=document.createElement('canvas');c.width=imgA.naturalWidth;c.height=imgA.naturalHeight;
+  const x=c.getContext('2d',{willReadFrequently:true});
+  x.drawImage(imgA,0,0);const a=x.getImageData(0,0,c.width,c.height).data;
+  x.clearRect(0,0,c.width,c.height);x.drawImage(imgB,0,0);const b=x.getImageData(0,0,c.width,c.height).data;
+  let sum=0,count=0;
+  for(let p=0;p<a.length;p+=16){
+    sum+=Math.abs(a[p]-b[p])+Math.abs(a[p+1]-b[p+1])+Math.abs(a[p+2]-b[p+2]);
+    count+=3;
+  }
+  return count?sum/count:0;
+}
+
 function fitContain(img,W,H){
   const s=Math.min(W/img.naturalWidth,H/img.naturalHeight);
   const w=img.naturalWidth*s, h=img.naturalHeight*s;
@@ -280,7 +295,7 @@ function renderAt(norm,target=view){
   const protect=Number(edgeProtect.value)/100;
   const customBg=window.HappyHoloCustomBackground?.draw?.(x,norm,W,H,{x:0,y:0,w:W,h:H});
   if(!customBg){
-    const fb=fitCover(backgroundImg,W,H); const bgShift=norm*6*amplitude*bgK;
+    const fb=fitCover(backgroundImg,W,H); const bgShift=norm*9*amplitude*bgK;
     x.drawImage(backgroundImg,fb.x+bgShift,fb.y,fb.w,fb.h);
   }
   const textDepth=Number(window.happyHoloTextLayer?.depth)||0;
@@ -288,7 +303,7 @@ function renderAt(norm,target=view){
   const tmp=document.createElement('canvas'); tmp.width=W;tmp.height=H; const tx=tmp.getContext('2d');
   const fs=window.HappyHoloSubjectPlacement?.rect?.(subjectImg,W,H,{x:0,y:0,w:W,h:H})||fitCover(subjectImg,W,H);
   tx.drawImage(subjectImg,fs.x,fs.y,fs.w,fs.h);
-  const subShift=norm*18*amplitude*subK; const strips=96;
+  const subShift=norm*28*amplitude*subK; const strips=96;
   let depthData=null;
   try{ const dctx=subjectDepthCanvas.getContext('2d',{willReadFrequently:true}); depthData=dctx.getImageData(0,0,subjectDepthCanvas.width,subjectDepthCanvas.height).data; }catch{}
   for(let i=0;i<strips;i++){
@@ -299,10 +314,10 @@ function renderAt(norm,target=view){
       const dy=Math.floor(subjectDepthCanvas.height*.52);
       d=depthData[(dy*subjectDepthCanvas.width+dx)*4]/255;
     }
-    const local=(d-.5)*2; const internal=subShift*local*(0.10*(1-protect)+0.025);
+    const local=(d-.5)*2; const internal=subShift*local*(0.22*(1-protect)+0.08);
     x.drawImage(tmp,sx,0,ww,H,sx+subShift+internal,0,ww+1,H);
   }
-  x.globalAlpha=0.24+protect*0.28; x.drawImage(tmp,subShift,0); x.globalAlpha=1;
+  // Ne pas reposer le sujet fixe sur chaque pose : ce fantôme annulait une grande partie du relief.
   if(textDepth>=0) window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
 }
 window.renderAt=renderAt;
@@ -369,7 +384,19 @@ exportBtn.addEventListener('click',async()=>{
     renderAt(poses[i],c); const b=await canvasToBlob(c); exported.push(b);
     const im=new Image(); im.src=URL.createObjectURL(b); framesEl.appendChild(im); await sleep(25);
   }
-  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.25 prêtes.');
+  const minDifference=0.35, tooSimilar=[];
+  for(let i=1;i<exported.length;i++){
+    const difference=await meanFrameDifference(exported[i-1],exported[i]);
+    if(difference<minDifference)tooSimilar.push(`${String(i).padStart(2,'0')}–${String(i+1).padStart(2,'0')} (${difference.toFixed(2)})`);
+  }
+  startPreview();
+  if(tooSimilar.length){
+    exported=[];
+    downloadBtn.disabled=true;
+    setStatus(`CONTRÔLE REFUSÉ — vues presque identiques : ${tooSimilar.join(', ')}. Augmente l’amplitude ou refais le relief avant d’exporter.`);
+    return;
+  }
+  downloadBtn.disabled=false; setStatus('9 vues distinctes — contrôle automatique réussi.');
 });
 
 downloadBtn.addEventListener('click',async()=>{
