@@ -100,17 +100,17 @@
   }
 
   function drawBackground(ctx,norm,W,H,api){if(window.HappyHoloCustomBackground?.draw?.(ctx,norm,W,H,{x:0,y:0,w:W,h:H}))return;const bg=api.bgImage?.();if(!bg)return;const f=api.fitCoverLocal(bg,W,H);const amplitude=Number(document.querySelector('#angle')?.value||7)/4,bgDepth=Number(document.querySelector('#bgDepth')?.value||.10);ctx.drawImage(bg,f.x+norm*6*amplitude*(bgDepth/.10),f.y,f.w,f.h);}
-  function explodeRender(norm,target,baseRender){
-    const selections=plan(),parts=explodeSelections(),api=renderer(),fx=engine();if(parts.length<2||!api||typeof fx?.buildExplodeFrame!=='function')return baseRender?.(norm,target);target=target||window.HappyHoloReliefState?.view;if(!target)return;
+  function explodeRender(norm,target,next){
+    const selections=plan(),parts=explodeSelections(),api=renderer(),fx=engine();if(parts.length<2||!api||typeof fx?.buildExplodeFrame!=='function')return next?.(norm,target);target=target||window.HappyHoloReliefState?.view;if(!target)return next?.(norm,target);
     const W=target.width,H=target.height,ctx=target.getContext('2d');ctx.clearRect(0,0,W,H);drawBackground(ctx,norm,W,H,api);const textDepth=Number(window.happyHoloTextLayer?.depth)||0;if(textDepth<0)window.HappyHoloTextLayer?.draw?.(ctx,norm,{x:0,y:0,w:W,h:H});
-    const layers=new Map();selections.forEach((_,i)=>layers.set(i,api.getExclusiveLayer(i,W,H)));const valid=[...layers.values()].filter(Boolean);if(valid.length<2)return baseRender?.(norm,target);
+    const layers=new Map();selections.forEach((_,i)=>layers.set(i,api.getExclusiveLayer(i,W,H)));const valid=[...layers.values()].filter(Boolean);if(valid.length<2)return next?.(norm,target);
     const phase=clamp((Number(norm)||0)+1,0,2)/2,amplitude=Number(document.querySelector('#angle')?.value||7)/4,subjectDepth=Number(document.querySelector('#subjectDepth')?.value||.48),commonShift=Number(norm||0)*18*amplitude*(subjectDepth/.30);
     const boxes=selections.map((s,i)=>i>0&&s.action==='explodeview'?fx.alphaBounds?.(layers.get(i)):null).filter(Boolean);const groupCenter=boxes.length?{x:boxes.reduce((a,b)=>a+b.cx,0)/boxes.length,y:boxes.reduce((a,b)=>a+b.cy,0)/boxes.length}:{x:W/2,y:H/2};
     const ordered=selections.map((s,i)=>({s,i,d:Number(s.depth)||0})).sort((a,b)=>a.d-b.d);
     for(const item of ordered){const layer=layers.get(item.i);if(!layer)continue;const intensity=clamp(Number(item.s.intensity||50)/100,.1,1);if(item.i>0&&item.s.action==='explodeview'){const moved=fx.buildExplodeFrame({layer,phase,intensity,W,H,selection:item.s,index:item.i,selections,layers,groupCenter});ctx.drawImage(moved,commonShift,0);continue;}const depthShift=Number(norm||0)*18*amplitude*clamp((Number(item.s.depth)||.02)/.30,.05,3);if(item.s.action&&item.s.action!=='none'){const rendered=document.createElement('canvas');rendered.width=W;rendered.height=H;fx.renderAction(rendered.getContext('2d'),layer,item.s,phase,W,H,{index:item.i,selections,layers});ctx.drawImage(rendered,depthShift,0);}else ctx.drawImage(layer,depthShift,0);}
     if(textDepth>=0)window.HappyHoloTextLayer?.draw?.(ctx,norm,{x:0,y:0,w:W,h:H});
   }
-  const baseRender=window.renderAt;if(typeof baseRender==='function')window.renderAt=(norm,target)=>explodeRender(norm,target,baseRender);
+  window.HappyHoloRenderPipeline?.register('explodeview',explodeRender,{priority:40,enabled:()=>explodeSelections().length>=2});
   function serialize(){const parts=explodeSelections();if(parts.length<2)return null;return{effect:'explodeview',mode:state.mode,direction:'assembled-to-exploded',views:9,parts:parts.map((s,i)=>({name:s.name||`Pièce ${i+1}`,order:Number(s.explodeOrder)||i+1,direction:s.explodeDirection||'auto',intensity:Number(s.intensity)||65})),notes:'Déplacement progressif des grands sous-ensembles, sans vis ni micro-pièces. La simulation est continue ; l’impression reste composée de neuf vues.'};}
   window.HappyHoloExplodeView={state,configureAutomatically,disable,serialize,render:explodeRender,selectWithAI:async()=>{const api=await loadSlimSAM();return api.open();}};
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(ensurePanel,40));window.addEventListener('happyholo-action-plan-changed',updatePanel);window.addEventListener('happyholo-relief-ready',()=>setTimeout(ensurePanel,60));

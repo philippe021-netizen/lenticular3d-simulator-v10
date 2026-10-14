@@ -113,10 +113,9 @@ bg.draw=function(ctx,norm,W,H,rect={x:0,y:0,w:W,h:H}){
 };
 
 /* ---------- rendu avancé pour vignette et appels externes ---------- */
-const baseRender=window.renderAt;
 function fitCover(img,W,H){const iw=img?.naturalWidth||img?.width||1,ih=img?.naturalHeight||img?.height||1,s=Math.max(W/iw,H/ih);return{x:(W-iw*s)/2,y:(H-ih*s)/2,w:iw*s,h:ih*s};}
-function advancedRender(norm,target){
- const rs=window.HappyHoloReliefState;if(!rs?.subjectImg||!rs?.backgroundImg||!target)return baseRender?.(norm,target);
+function advancedRender(norm,target,next){
+ const rs=window.HappyHoloReliefState;if(!rs?.subjectImg||!rs?.backgroundImg||!target)return next?.(norm,target);
  const x=target.getContext('2d'),W=target.width,H=target.height;x.clearRect(0,0,W,H);
  const amplitude=Number($('#angle')?.value||7)/4,bgK=Number($('#bgDepth')?.value||.10)/.10,subK=Number($('#subjectDepth')?.value||.48)/.30,protect=Number($('#edgeProtect')?.value||84)/100;
  const custom=bg.draw?.(x,norm,W,H,{x:0,y:0,w:W,h:H});
@@ -141,12 +140,12 @@ function advancedRender(norm,target){
  x.globalAlpha=.24+protect*.28;x.drawImage(tmp,subShift,0);x.globalAlpha=1;
  if(textDepth>=0)window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
 }
-window.renderAt=advancedRender;
+window.HappyHoloRenderPipeline?.register('advanced-composition',advancedRender,{priority:20});
 
 /* ---------- UI ---------- */
 let preview=null,previewRAF=0,previewLoop=0,previewT0=0;
-function requestPreview(){if(previewRAF)return;previewRAF=requestAnimationFrame(()=>{previewRAF=0;if(preview)advancedRender(0,preview);});}
-function startStickyAnimation(){cancelAnimationFrame(previewLoop);previewT0=performance.now();const loop=t=>{if(preview&&window.HappyHoloReliefState){const n=Math.sin((t-previewT0)/4200*Math.PI*2);advancedRender(n,preview);}previewLoop=requestAnimationFrame(loop);};previewLoop=requestAnimationFrame(loop);}
+function requestPreview(){if(previewRAF)return;previewRAF=requestAnimationFrame(()=>{previewRAF=0;if(preview)window.renderAt?.(0,preview);});}
+function startStickyAnimation(){cancelAnimationFrame(previewLoop);previewT0=performance.now();const loop=t=>{if(preview&&window.HappyHoloReliefState){const n=Math.sin((t-previewT0)/4200*Math.PI*2);window.renderAt?.(n,preview);}previewLoop=requestAnimationFrame(loop);};previewLoop=requestAnimationFrame(loop);}
 function notify(){window.dispatchEvent(new CustomEvent('happyholo-background-changed'));window.dispatchEvent(new CustomEvent('happyholo-subject-placement-changed'));requestPreview();}
 function control(label,min,max,value,onInput,suffix='°'){
  const wrap=document.createElement('label');wrap.style.cssText='display:grid;grid-template-columns:165px 1fr 52px;align-items:center;gap:8px;font-size:12px;font-weight:700';
