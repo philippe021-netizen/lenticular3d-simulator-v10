@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>MicroPlayer — Profondeur 3D Test</title>
+  <style>
+    :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:dark;background:#0c0d10;color:#f5f7fb}
+    *{box-sizing:border-box} body{margin:0;background:#0c0d10} .wrap{max-width:980px;margin:auto;padding:18px}
+    h1{font-size:24px;margin:8px 0 4px}.sub{opacity:.72;margin:0 0 18px}.card{background:#17191f;border:1px solid #2a2e37;border-radius:18px;padding:16px;margin:14px 0}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:700px){.row{grid-template-columns:1fr}}
+    label{display:block;font-size:14px;margin-bottom:7px}.control{width:100%} input[type=file]{width:100%;padding:12px;border-radius:12px;background:#101217;border:1px solid #343945}
+    input[type=range]{width:100%}.value{float:right;opacity:.75}.preview{width:100%;max-height:54vh;object-fit:contain;border-radius:14px;background:#0a0b0d;display:none}
+    button{appearance:none;border:0;border-radius:14px;padding:14px 16px;font-weight:700;font-size:16px;background:#fff;color:#111;width:100%} button:disabled{opacity:.45}
+    .secondary{background:#252932;color:#fff;border:1px solid #3a404b}.status{min-height:24px;margin-top:10px;font-size:14px;opacity:.82}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}@media(max-width:700px){.grid{grid-template-columns:repeat(3,1fr)}}
+    .view{background:#0b0c0f;border:1px solid #2b3039;border-radius:12px;overflow:hidden;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;position:relative}.view img{width:100%;height:100%;object-fit:contain}.badge{position:absolute;top:6px;left:6px;background:#000a;padding:4px 6px;border-radius:8px;font-size:11px}
+    .note{font-size:13px;line-height:1.45;opacity:.68}.ok{color:#8ee2a8}.err{color:#ff9f9f}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Profondeur 3D — TEST</h1>
+  <p class="sub">Prototype isolé. Aucun fichier du studio principal n’est modifié.</p>
+
+  <section class="card">
+    <label for="photo">1. Charger une photo</label>
+    <input id="photo" type="file" accept="image/*" />
+    <img id="preview" class="preview" alt="Aperçu" />
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <div>
+        <label>2. Intensité de profondeur <span id="depthVal" class="value">0.55</span></label>
+        <input id="depth" class="control" type="range" min="0.10" max="1.00" value="0.55" step="0.05" />
+      </div>
+      <div>
+        <label>3. Amplitude caméra <span id="angleVal" class="value">0.18</span></label>
+        <input id="angle" class="control" type="range" min="0.04" max="0.35" value="0.18" step="0.01" />
+      </div>
+    </div>
+    <p class="note">Règle MicroPlayer : vue 05 = photo originale ; vues 01→04 = caméra progressivement à gauche ; vues 06→09 = caméra progressivement à droite.</p>
+  </section>
+
+  <section class="card">
+    <button id="generate" disabled>Générer les 9 vues</button>
+    <div id="status" class="status"></div>
+  </section>
+
+  <section class="card">
+    <div id="grid" class="grid"></div>
+  </section>
+</div>
+<script>
+const $=s=>document.querySelector(s);
+const photo=$('#photo'), preview=$('#preview'), generate=$('#generate'), grid=$('#grid'), status=$('#status');
+const depth=$('#depth'), angle=$('#angle'), depthVal=$('#depthVal'), angleVal=$('#angleVal');
+let dataUrl='';
+function sync(){depthVal.textContent=Number(depth.value).toFixed(2);angleVal.textContent=Number(angle.value).toFixed(2)}
+depth.oninput=angle.oninput=sync;sync();
+photo.onchange=()=>{
+  const file=photo.files?.[0]; if(!file) return;
+  const r=new FileReader(); r.onload=()=>{dataUrl=r.result;preview.src=dataUrl;preview.style.display='block';generate.disabled=false;status.textContent='Photo prête.'};r.readAsDataURL(file);
+};
+function renderViews(views){
+  grid.innerHTML='';
+  views.forEach((src,i)=>{const d=document.createElement('div');d.className='view';d.innerHTML=`<span class="badge">Vue ${String(i+1).padStart(2,'0')}</span><img alt="Vue ${i+1}">`;d.querySelector('img').src=src;grid.appendChild(d)});
+}
+generate.onclick=async()=>{
+  if(!dataUrl) return;
+  generate.disabled=true; status.className='status'; status.textContent='Calcul de la profondeur et génération des 9 vues…';
+  try{
+    const res=await fetch('/api/depthflow-proxy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({image:dataUrl,depth_strength:Number(depth.value),camera_amplitude:Number(angle.value),views:9,center_original:true})});
+    const body=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(body.error||`Erreur ${res.status}`);
+    if(!Array.isArray(body.views)||body.views.length!==9) throw new Error('Le service n’a pas renvoyé exactement 9 vues.');
+    renderViews(body.views); status.className='status ok'; status.textContent='9 vues reçues. Vue 05 doit correspondre à l’originale.';
+  }catch(e){status.className='status err';status.textContent=e.message+' — configure DEPTHFLOW_SERVICE_URL côté Vercel pour activer le moteur.'}
+  finally{generate.disabled=false}
+};
+</script>
+</body>
+</html>
