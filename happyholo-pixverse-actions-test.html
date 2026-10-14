@@ -15,11 +15,20 @@
 .local-tools{margin-top:12px;padding:12px;border:2px solid #1683c7;border-radius:12px;background:#f1f9ff}.local-tools>label{margin-top:0}.localbtn{background:#0877b8}.repairbtn{background:#fff3cd;color:#5f4900;border:1px solid #ddb931}.local-note{font-size:11px;color:#456;line-height:1.35;margin-top:7px}
 @media(max-width:850px){.audience-tabs{grid-template-columns:repeat(2,1fr)}}
 </style>
+<style id="hh-scroll-actions">
+
+@media(max-width:1400px),(max-height:900px){
+  .layout{grid-template-columns:1fr;min-height:0}
+  .layout iframe{height:min(42dvh,360px);max-height:min(42dvh,360px)}
+  .side{max-height:none}
+}
+
+</style>
 </head>
 <body>
 <div class="bar"><b>HappyHolo — Animer</b><span class="badge">LOCAL + PIXVERSE V6</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=411" title="HappyHolo"></iframe>
+  <iframe id="hhApp" src="./relief3d-test-v31.html?v=409" title="HappyHolo"></iframe>
   <aside class="side">
     <h2>Choisir une action</h2>
     <p>Prépare l’image à gauche, choisis l’action et la personne ciblée, puis teste-la localement sans PixVerse. PixVerse reste disponible pour les mouvements qui demandent une génération IA.</p>
