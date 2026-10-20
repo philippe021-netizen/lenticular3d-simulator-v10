@@ -224,16 +224,17 @@ async function ensureMetadata(video) {
   await once(video, 'loadedmetadata');
 }
 
-async function waitForDecodedFrame(video, targetTime) {
+export async function waitForDecodedFrame(video, targetTime, timeoutMs = 900) {
   if (typeof video.requestVideoFrameCallback === 'function') {
     await new Promise(resolve => {
       const started = performance.now();
-      let done = false;
-      const finish = () => { if (!done) { done = true; resolve(); } };
+      let done = false, callbackId = null;
+      const finish = () => { if (!done) { done = true; clearTimeout(timer); if(callbackId!==null)video.cancelVideoFrameCallback?.(callbackId); resolve(); } };
+      const timer = setTimeout(finish, timeoutMs);
       const tick = () => {
         if (done) return;
-        if (performance.now() - started > 900) return finish();
-        video.requestVideoFrameCallback((_now, meta) => {
+        if (performance.now() - started > timeoutMs) return finish();
+        callbackId=video.requestVideoFrameCallback((_now, meta) => {
           const mediaTime = Number(meta?.mediaTime);
           if (Number.isFinite(mediaTime) && Math.abs(mediaTime - targetTime) <= 0.065) finish();
           else requestAnimationFrame(tick);

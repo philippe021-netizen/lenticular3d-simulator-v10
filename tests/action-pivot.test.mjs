@@ -1,0 +1,77 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
+
+const window = {};
+vm.runInNewContext(readFileSync(new URL('../action-preview-engine.js', import.meta.url), 'utf8'), { window, console: { log() {} } });
+const engine = window.HappyHoloActionPreviewEngine;
+function rotation(phase) {
+  let angle;
+  const ctx = {save(){},restore(){},translate(){},scale(){},drawImage(){},rotate(value){angle=value;}};
+  engine.renderAction(ctx, {}, {action:'pivot',intensity:75}, phase, 600, 900);
+  return angle;
+}
+test('pivot traverses both sides symmetrically with a neutral midpoint', () => {
+  assert.ok(rotation(0) < 0);
+  assert.ok(rotation(1) > 0);
+  assert.ok(Math.abs(rotation(0) + rotation(1)) < 1e-12);
+  assert.ok(Math.abs(rotation(.5)) < 1e-12);
+});
+test('default preview cycle reaches both sides and closes without a jump', () => {
+  const angles = Array.from(engine.PHASES, rotation);
+  assert.ok(angles.some(a=>a<0) && angles.some(a=>a>0));
+  assert.equal(angles[0], angles.at(-1));
+});
+
+function parallaxX(depth, intensity, phase) {
+  let offset;
+  const ctx = {drawImage(layer,x){offset=x;}};
+  engine.renderAction(ctx, {}, {action:'parallax',depth,intensity}, phase, 1000, 700);
+  return offset;
+}
+test('parallax foreground moves more than middle plane without rotating', () => {
+  const near = parallaxX(.65,75,1);
+  const middle = parallaxX(.48,35,1);
+  assert.ok(near > 20);
+  assert.ok(middle > 0 && near > middle * 3);
+  assert.equal(parallaxX(.65,75,.5),0);
+  assert.equal(parallaxX(.65,75,0),-near);
+  assert.equal(parallaxX(0,75,1),0);
+});
+
+test('combined motion keeps rotation and depth-dependent translation on both sides', () => {
+  function sample(depth,intensity,phase){
+    const result={};
+    const ctx={save(){},restore(){},translate(x){result.x=x-500;},rotate(a){result.angle=a;},drawImage(){}};
+    engine.renderAction(ctx,{}, {action:'parallax-pivot',depth,intensity},phase,1000,700);
+    return result;
+  }
+  const near=sample(.65,75,1), middle=sample(.48,35,1), left=sample(.65,75,0), center=sample(.65,75,.5);
+  assert.ok(near.x>middle.x*3);
+  assert.ok(near.angle>middle.angle && middle.angle>0);
+  assert.ok(Math.abs(left.x+near.x)<1e-10);
+  assert.ok(Math.abs(left.angle+near.angle)<1e-10);
+  assert.equal(center.x,0);
+  assert.equal(center.angle,0);
+});
+
+test('dual-axis projection responds independently to horizontal and vertical tilt',()=>{
+  const p=engine.projectDualAxisPoint;
+  assert.equal(typeof p,'function');
+  const neutral=p(100,80,600,400,0,0);
+  assert.ok(Math.abs(neutral.x-100)<1e-10 && Math.abs(neutral.y-80)<1e-10);
+  const horizontal=p(100,80,600,400,15,0);
+  const vertical=p(100,80,600,400,0,8);
+  const combined=p(100,80,600,400,15,8);
+  assert.notEqual(horizontal.x,neutral.x);
+  assert.notEqual(vertical.y,neutral.y);
+  assert.notEqual(combined.x,vertical.x);
+  assert.notEqual(combined.y,horizontal.y);
+});
+
+test('preview clock never requests a negative frame after expensive generation',()=>{
+  assert.equal(engine.previewCycle(90,100,2000),0);
+  assert.equal(engine.previewCycle(1100,100,2000),.5);
+  assert.equal(engine.previewCycle(2100,100,2000),0);
+});

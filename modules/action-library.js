@@ -1,3 +1,4 @@
+import { hardenPixVersePrompts } from './pixverse-motion-policy.js';
 const DB_NAME = 'happyholo-actions';
 const DB_VERSION = 1;
 const STORE = 'library';
@@ -107,7 +108,8 @@ export function getActionVariant(library, actionId, family = null, variantId = n
   if (!variant && variantFamily) variant = action.variants?.find(v => v.family === variantFamily);
   if (!variant) variant = action.variants?.find(v => v.id === action.defaultVariantId) || action.variants?.[0];
   if (!variant) throw new Error(`Aucune variante pour ${resolvedActionId}`);
-  return { action, variant };
+  const hardened=hardenPixVersePrompts(variant.prompt,variant.negativePrompt);
+  return { action, variant:{...variant,prompt:hardened.prompt,negativePrompt:hardened.negativePrompt,promptPolicy:hardened.policy} };
 }
 
 export function exportActionLibrary(library) {

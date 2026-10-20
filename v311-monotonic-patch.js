@@ -15,6 +15,11 @@
   const DEFAULT_LPI = 75;
 
   const PROFILES = {
+    'photo-card-15x10': {
+      support:'photo-card-15x10',label:'Carte horizontale 15 × 10 cm — test',
+      widthPx:1800,heightPx:1200,widthMm:150,heightMm:100,lpi:50.20,lpiCalibrated:false,
+      resizeMode:'center-cover-no-distortion',cropShape:'rect',filename:'9-vues-carte-15x10cm-lpi-a-calibrer.zip'
+    },
     'keychain-vertical': {
       support: 'keychain-vertical',
       label: 'Porte-clé rectangle vertical',
@@ -116,7 +121,7 @@
     }
     profile ||= PROFILES['keychain-vertical'];
     const explode = window.HappyHoloExplodeView?.serialize?.();
-    if (!explode) return profile;
+    if (!explode || profile.support==='photo-card-15x10') return profile;
     return {
       ...profile,
       lpi: 60,
@@ -256,6 +261,7 @@
         heightMm: profile.heightMm,
         diameterMm: profile.diameterMm ?? null,
         lpi: profile.lpi,
+        lpiCalibrated: profile.lpiCalibrated ?? null,
         pngPixelsPerMeterX: ppmX,
         pngPixelsPerMeterY: ppmY,
         resizeMode: profile.resizeMode,

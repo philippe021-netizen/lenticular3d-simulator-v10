@@ -92,7 +92,7 @@ export default async function handler(req, res) {
     const instructions = `You write concise English image-to-video prompts for a 2-second, nine-view lenticular sequence.
 Transform the operator's request into ONE action only. Do not invent a second action or a new subject.
 The uploaded image is the exact visual reference. Preserve every person's identity and anatomy, and preserve every animal, vehicle, machine, product, object or logo's exact appearance, proportions, colors and geometry.
-The action must progress continuously in one direction, reach its final state by 65% of the clip, and then hold completely still. It must never reverse, repeat, bounce, oscillate, loop or return.
+The action must progress continuously in one direction, progress across nine sampleable intermediate states, reach its final state at 95% of the clip, and hold only for the last 5%. It must never reverse, repeat, bounce, oscillate, loop or return.
 Every animated subject must remain entirely inside the original frame with a clear safety margin from first frame to last frame. No hand, foot, paw, tail, wheel, bodywork, machine part or contour may touch or cross an edge. Never zoom or move a subject toward the camera.
 The camera and background are frozen. Animate only the explicitly requested subject or part.
 Return only valid JSON: {"prompt":"...","negativePrompt":"...","interpretedAction":"..."}.`;

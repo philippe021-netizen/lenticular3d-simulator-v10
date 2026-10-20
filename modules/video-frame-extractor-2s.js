@@ -1,9 +1,10 @@
+import { completeExtraction } from './video-extraction-contract.js';
 import {
   extractVideoFrames as baseExtractVideoFrames,
   downloadExtractedFrame,
   showPixVerseFramesInSimulator,
   stopPixVerseSimulatorPreview
-} from './video-frame-extractor.js?v=409';
+} from './video-frame-extractor.js?v=415';
 
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -15,7 +16,7 @@ function waitEvent(target,event,timeoutMs=8000){return new Promise((resolve,reje
 async function ensureMetadata(v){if(Number.isFinite(v.duration)&&v.duration>0&&v.videoWidth>0)return;await waitEvent(v,'loadedmetadata',10000);}
 async function safeSeek(v,t){const d=Number(v.duration)||0,target=Math.max(0,Math.min(Math.max(0,d-.02),t));if(Math.abs((Number(v.currentTime)||0)-target)>.004){const p=waitEvent(v,'seeked',3500);v.currentTime=target;await p;}await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));await delay(35);}
 function canvasDataUrl(v){const w=Math.max(2,v.videoWidth||0),h=Math.max(2,v.videoHeight||0);if(w<=2||h<=2)throw new Error('Dimensions vidéo invalides.');const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d',{alpha:false}).drawImage(v,0,0,w,h);return c.toDataURL('image/jpeg',.96);}
-async function extractShortClip(v,o={}){await ensureMetadata(v);const d=Number(v.duration);if(!Number.isFinite(d)||d<=0)throw new Error('Durée vidéo invalide.');const count=Math.max(2,Math.min(9,Number(o.count)||9)),edge=Math.min(.06,Math.max(.025,d*.02)),start=edge,end=Math.max(start,d-edge),dataUrls=[],frames=[];for(let i=0;i<count;i++){const t=start+(end-start)*(i/(count-1));await safeSeek(v,t);const u=canvasDataUrl(v);dataUrls.push(u);frames.push({index:i+1,time:t,dataUrl:u,url:u});o.onProgress?.({current:i+1,total:count,time:t});}return{dataUrls,frames,duration:d,extractionWindow:{mode:'pixverse-2s-ipad-direct-9',start,end,count,progressiveOnly:true,calculatedBeforeExtraction:true}};}
+async function extractShortClip(v,o={}){const result=await baseExtractVideoFrames(v,{...o,count:o.count??9,type:o.type||'image/png',analysisSamples:o.analysisSamples??18});return completeExtraction(result);}
 async function extractFromVideo(v,o={}){await ensureMetadata(v);const d=Number(v.duration);if(Number.isFinite(d)&&d>0&&d<=2.35)return extractShortClip(v,{...o,count:o.count??9});return baseExtractVideoFrames(v,o);}
 async function fetchAsObjectUrl(src){const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),90000);try{const r=await fetch(src,{cache:'no-store',signal:ctl.signal});if(!r.ok){const msg=await r.text().catch(()=>'');throw new Error(`Chargement vidéo HTTP ${r.status}${msg?` — ${msg.slice(0,120)}`:''}`);}const b=await r.blob();if(!b.size)throw new Error('Vidéo vide reçue depuis HappyHolo.');return URL.createObjectURL(b);}finally{clearTimeout(timer);}}
 

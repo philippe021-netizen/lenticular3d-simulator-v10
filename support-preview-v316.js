@@ -16,7 +16,7 @@
     <div class="support-head"><div><h2>Rendu support</h2><p>Simulation lenticulaire — couches de profondeur + actions locales.</p></div><span class="support-badge">Aperçu 3D</span></div>
     <div class="support-grid">
       <div class="support-controls">
-        <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round-25">Médaillon rond Ø25 mm</option><option value="medallion-round">Médaillon rond Ø30 mm</option><option value="business-card">Carte de visite 85,60 × 53,98 mm</option><option value="business-card-88">Carte 88 × 56 mm</option></select>
+        <label>Support</label><select id="supportType"><option value="keychain-vertical">Porte-clé rectangle vertical</option><option value="keychain-horizontal">Porte-clé rectangle horizontal</option><option value="medallion-round-25">Médaillon rond Ø25 mm</option><option value="medallion-round">Médaillon rond Ø30 mm</option><option value="business-card">Carte de visite 85,60 × 53,98 mm</option><option value="business-card-88">Carte 88 × 56 mm</option><option value="photo-card-15x10">Carte horizontale 15 × 10 cm — test</option></select>
         <label>Cadrage</label><select id="supportFit"><option value="preserve">Préserver le sujet</option><option value="contain" selected>Placement maître — recommandé</option><option value="cover">Remplir — plein cadre</option></select>
         <label><span>Marge autour du sujet</span><b id="marginOut">0%</b></label><input id="supportMargin" type="range" min="0" max="30" value="0">
         <label><span>Zoom</span><b id="zoomOut">100%</b></label><input id="supportZoom" type="range" min="60" max="180" value="100">
@@ -97,6 +97,10 @@
       $('#supportRecommendation').textContent='Médaillon rond Ø25 mm — découpe finale exacte à 25 mm.';
     }else if(state.support==='medallion-round'){
       $('#supportRecommendation').textContent='Médaillon rond Ø30 mm — découpe finale exacte à 30 mm.';
+    }else if(state.support==='photo-card-15x10'){
+      shell.style.width='300px';shell.style.height='200px';shell.style.borderRadius='4px';
+      if(ring)ring.style.display='none';if(link)link.style.display='none';
+      $('#supportRecommendation').textContent='Carte horizontale — 150 × 100 mm. Format de test 3:2, bandes verticales ; 50,20 LPI à calibrer.';
     }else if(state.support==='business-card'){
       // Ratio ISO 85,60 / 53,98 = 1,5858
       shell.style.width='300px';
@@ -137,7 +141,7 @@
   }
 
   function isCardSupport(){
-    return state.support==='business-card' || state.support==='business-card-88';
+    return state.support==='business-card' || state.support==='business-card-88' || state.support==='photo-card-15x10';
   }
 
   function drawCardGuides(){
@@ -342,8 +346,19 @@
     if(face==='back'){ drawBackFace(); return; }
     draw(norm, actionPulse);
   }
+  let synchronizedActionCanvas=null;
+  function drawSynchronizedAction(norm){
+    if(!synchronizedActionCanvas)synchronizedActionCanvas=document.createElement('canvas');
+    const used=window.HappyHoloSupportActionSync?.render({state:window.HappyHoloReliefState,plan:window.happyHoloSelectionPlan,canvas:synchronizedActionCanvas,norm,renderActionFrame:window.HappyHoloSelectionRenderer?.renderActionFrame});
+    if(!used)return false;
+    const r=frontRect(synchronizedActionCanvas.width,synchronizedActionCanvas.height,canvas.width,canvas.height);
+    ctx.drawImage(synchronizedActionCanvas,r.x,r.y,r.w,r.h);
+    $('#supportHint').textContent='Même rendu que l’aperçu principal : actions, profondeur et sélections synchronisées.';
+    drawCardGuides();return true;
+  }
   function drawOriginalOrChosenBackground(source,subject,norm=0,actionPulse=0){
     if(!source)return;
+    if(drawSynchronizedAction(norm))return;
     const full={x:0,y:0,w:canvas.width,h:canvas.height};
     const customBg=subject&&window.HappyHoloCustomBackground?.draw?.(ctx,norm,canvas.width,canvas.height,full);
     const visual=customBg?subject:source;
@@ -437,7 +452,7 @@
   backBtn.addEventListener('click',showBack);
   demo360Btn.addEventListener('click',demo360);
   $('#supportPlay').addEventListener('click',play);$('#supportStop').addEventListener('click',stop);
-  file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
+  file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(objectUrl)URL.revokeObjectURL(objectUrl);objectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{uploadedImage=im;reliefLayers=null;empty.style.display='none';const rr=im.naturalWidth/im.naturalHeight;if(state.support==='photo-card-15x10'){apply();return;}if(rr>1.12){type.value='keychain-horizontal';state.support=type.value;$('#supportRecommendation').textContent='Paysage → porte-clé horizontal recommandé.';}else{type.value='keychain-vertical';state.support=type.value;$('#supportRecommendation').textContent='Portrait → porte-clé vertical recommandé.';}apply();};im.src=objectUrl;});
   backFile.addEventListener('change',()=>{const f=backFile.files?.[0];if(!f)return;if(backObjectUrl)URL.revokeObjectURL(backObjectUrl);backObjectUrl=URL.createObjectURL(f);const im=new Image();im.onload=()=>{backImage=im;backStatus.textContent=`✓ ${f.name}`;renderFaceByState(0,0);};im.src=backObjectUrl;});
   window.addEventListener('happyholo-relief-ready',rebuildReliefLayers);
   window.addEventListener('happyholo-action-plan-changed',()=>{headlightCache=null;glintCache=null;transformCache=null;renderFaceByState(0,0);});
