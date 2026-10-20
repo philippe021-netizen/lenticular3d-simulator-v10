@@ -19,3 +19,11 @@ test('text stays on one plane and the central view is exactly the original', () 
   const source=Uint8ClampedArray.from({length:16},(_,i)=>i);
   assert.deepEqual(renderNovelView(source,out,4,1,0).data,source);
 });
+test('continuous surfaces do not expose background pinholes when expanded',()=>{
+  const width=200,height=1,depth=Uint8ClampedArray.from({length:width},(_,x)=>Math.round(x*255/(width-1)));
+  const source=new Uint8ClampedArray(width*4).fill(255);
+  const options={parallaxPercent:8,relief:1,planeSeparation:1,continuousSurface:true,projectedFill:true};
+  const result=renderNovelView(source,depth,width,height,-1,options);
+  // Only the outer image border can be uncovered; the continuous interior is rasterized.
+  assert.equal(result.holesBeforeFill,0);
+});

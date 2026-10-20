@@ -7,9 +7,17 @@ export function composeCardDepth(base,width,height,layers){
   const output=new Uint8ClampedArray(base);
   const sorted=layers.filter(l=>l.enabled!==false).slice().sort((a,b)=>(Number(a.type==='text')-Number(b.type==='text'))||b.bbox[2]*b.bbox[3]-a.bbox[2]*a.bbox[3]);
   for(const layer of sorted){
-    const [bx,by,bw,bh]=layer.bbox;
-    const x0=clamp(Math.floor(bx*width),0,width),y0=clamp(Math.floor(by*height),0,height);
-    const x1=clamp(Math.ceil((bx+bw)*width),0,width),y1=clamp(Math.ceil((by+bh)*height),0,height);
+    let [bx,by,bw,bh]=layer.bbox;
+    if(layer.type==='text'){
+      // Align protected rows in the same text column. Vision boxes sometimes
+      // omit the last letters of a short footer; the column supplies their plane.
+      const peers=sorted.filter(l=>l.type==='text'&&l.bbox[0]<bx+bw&&l.bbox[0]+l.bbox[2]>bx);
+      const right=Math.max(bx+bw,...peers.map(l=>l.bbox[0]+l.bbox[2]));
+      bx=Math.min(bx,...peers.map(l=>l.bbox[0]));bw=right-bx;
+    }
+    const pad=layer.type==='text'?.018:0;
+    const x0=clamp(Math.floor((bx-pad)*width),0,width),y0=clamp(Math.floor((by-pad)*height),0,height);
+    const x1=clamp(Math.ceil((bx+bw+pad)*width),0,width),y1=clamp(Math.ceil((by+bh+pad)*height),0,height);
     const shift=clamp(Number(layer.depth)||0,-100,100)*.8;
     const feather=Math.max(1,Math.min(x1-x0,y1-y0)*.08);
     for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){

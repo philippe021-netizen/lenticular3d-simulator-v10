@@ -68,7 +68,7 @@ async function buildDepthViews(){
   finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];
   for(let i=0;i<9;i++){
     status(`Rendu de profondeur ${i+1}/9…`,'warn');
-    const rendered=renderNovelView(original.data,depth,W,H,(i-4)/4,{zero:128,relief:1,planeSeparation:1.8,parallaxPercent:amplitude});
+    const rendered=renderNovelView(original.data,depth,W,H,(i-4)/4,{zero:128,relief:1,planeSeparation:1.8,parallaxPercent:amplitude,continuousSurface:true,projectedFill:true});
     ctx.putImageData(new ImageData(rendered.data,W,H),0,0);
     const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));finalBlobs.push(blob);finalUrls.push(URL.createObjectURL(blob));
     await new Promise(r=>setTimeout(r,0));

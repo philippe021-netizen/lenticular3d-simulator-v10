@@ -281,6 +281,24 @@ export function renderNovelView(source, depth, width, height, position, options 
       output[targetColor + 3] = 255;
       depthBuffer[targetIndex] = depth[sourceIndex];
       valid[targetIndex] = 1;
+      // Rasterize a continuous surface between samples instead of leaving
+      // pinholes when its projected footprint expands. Never bridge a depth edge.
+      if (options.continuousSurface && x + 1 < width && Math.abs(depth[sourceIndex + 1] - depth[sourceIndex]) <= 12) {
+        const nextDisparity = position * mapDepthForParallax(depth[sourceIndex + 1], zero, relief, stabilityBand, planeSeparation) * halfRangePixels;
+        const nextX = Math.round(x + 1 - nextDisparity);
+        const span = nextX - targetX;
+        if (span > 1 && span <= 16) for (let step = 1; step < span; step++) {
+          const xx = targetX + step;
+          if (xx < 0 || xx >= width) continue;
+          const mix = step / span, index = y * width + xx;
+          const z = depth[sourceIndex] * (1 - mix) + depth[sourceIndex + 1] * mix;
+          if (valid[index] && depthBuffer[index] > z) continue;
+          for (let channel = 0; channel < 3; channel++) output[index * 4 + channel] = source[sourceColor + channel] * (1 - mix) + source[sourceColor + 4 + channel] * mix;
+          output[index * 4 + 3] = 255;
+          depthBuffer[index] = Math.round(z);
+          valid[index] = 1;
+        }
+      }
     }
   }
 
@@ -359,7 +377,7 @@ export function renderNovelView(source, depth, width, height, position, options 
       if (chosenIndex < 0) continue;
       const targetColor = index * 4;
       const chosenDepth = depthBuffer[chosenIndex];
-      const sourceIsBackground = depth[index] <= chosenDepth + 8;
+      const sourceIsBackground = !options.projectedFill && depth[index] <= chosenDepth + 8;
       const chosenColor = sourceIsBackground ? targetColor : chosenIndex * 4;
       const chosenPixels = sourceIsBackground ? source : output;
       output[targetColor] = chosenPixels[chosenColor];
