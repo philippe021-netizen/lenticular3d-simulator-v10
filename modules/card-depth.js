@@ -5,7 +5,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function composeCardDepth(base,width,height,layers){
   if(base.length!==width*height)throw new Error('Dimensions de profondeur incohérentes');
   const output=new Uint8ClampedArray(base);
-  const sorted=layers.filter(l=>l.enabled!==false).slice().sort((a,b)=>b.bbox[2]*b.bbox[3]-a.bbox[2]*a.bbox[3]);
+  const sorted=layers.filter(l=>l.enabled!==false).slice().sort((a,b)=>(Number(a.type==='text')-Number(b.type==='text'))||b.bbox[2]*b.bbox[3]-a.bbox[2]*a.bbox[3]);
   for(const layer of sorted){
     const [bx,by,bw,bh]=layer.bbox;
     const x0=clamp(Math.floor(bx*width),0,width),y0=clamp(Math.floor(by*height),0,height);

@@ -49,6 +49,8 @@ function rectPxBbox(b,W,H){const[x,y,w,h]=b;return{x:Math.round(x*W),y:Math.roun
 function eraseRect(ctx,r,W,H){const p=Math.max(4,Math.round(Math.min(W,H)*.006)),sx=clamp(r.x-p,0,W-1),sy=clamp(r.y-p,0,H-1),sw=clamp(r.w+p*2,1,W-sx),sh=clamp(r.h+p*2,1,H-sy),tmp=document.createElement('canvas');tmp.width=sw;tmp.height=sh;const t=tmp.getContext('2d');t.drawImage(ctx.canvas,sx,sy,sw,sh,0,0,sw,sh);t.filter='blur(12px)';t.drawImage(tmp,0,0,sw,sh);ctx.save();ctx.beginPath();ctx.rect(r.x,r.y,r.w,r.h);ctx.clip();ctx.drawImage(tmp,0,0,sw,sh,sx,sy,sw,sh);ctx.restore()}
 async function buildViews(){if(!srcImg)return;const W=srcImg.naturalWidth,H=srcImg.naturalHeight,sel=selectedAnimLayers(),animImgs=animatedFrames.length===9?await Promise.all(animatedFrames.map(loadImage)):[];finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];for(let i=0;i<9;i++){const phase=(i-4)/4,c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d');ctx.drawImage(srcImg,0,0,W,H);const staticMoved=layers.filter(l=>l.enabled&&l.depth!==0&&!animatedIds.has(l.id));for(const l of staticMoved)eraseRect(ctx,rectPxBbox(l.bbox,W,H),W,H);if(sel.length&&animImgs[i]&&animatedCropBbox)eraseRect(ctx,rectPxBbox(animatedCropBbox,W,H),W,H);for(const l of staticMoved){const r=rectPxBbox(l.bbox,W,H),shift=Math.round((l.depth/100)*phase*W*.012);ctx.drawImage(srcImg,r.x,r.y,r.w,r.h,r.x+shift,r.y,r.w,r.h)}if(sel.length&&animImgs[i]&&animatedCropBbox){const r=rectPxBbox(animatedCropBbox,W,H),avgDepth=sel.reduce((a,l)=>a+l.depth,0)/sel.length,shift=Math.round((avgDepth/100)*phase*W*.012);ctx.drawImage(animImgs[i],r.x+shift,r.y,r.w,r.h)}else{for(const l of sel){if(l.depth===0)continue;const r=rectPxBbox(l.bbox,W,H),shift=Math.round((l.depth/100)*phase*W*.012);eraseRect(ctx,r,W,H);ctx.drawImage(srcImg,r.x,r.y,r.w,r.h,r.x+shift,r.y,r.w,r.h)}}const blob=await new Promise(res=>c.toBlob(res,'image/png'));finalBlobs.push(blob);finalUrls.push(URL.createObjectURL(blob))}renderResult()}
 async function buildDepthViews(){
+  const amplitude=Number($('cardParallax').value);
+  const layerSnapshot=layers.map(l=>({...l,bbox:[...l.bbox]}));
   const scale=Math.min(1,1400/srcImg.naturalWidth,1400/srcImg.naturalHeight);
   const W=Math.round(srcImg.naturalWidth*scale),H=Math.round(srcImg.naturalHeight*scale);
   const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
@@ -59,14 +61,14 @@ async function buildDepthViews(){
     cachedCardDepth=await estimateCardDepth(canvas.toDataURL('image/png'),original.data,W,H,(stage,p)=>status(`${stage} ${p??''} %`,'warn'));
     depthSource=imageData;
   }
-  const depth=composeCardDepth(cachedCardDepth,W,H,layers);
+  const depth=composeCardDepth(cachedCardDepth,W,H,layerSnapshot);
   const dc=$('cardDepthCanvas');dc.width=W;dc.height=H;
   const gray=new ImageData(W,H);for(let i=0;i<depth.length;i++){gray.data[i*4]=gray.data[i*4+1]=gray.data[i*4+2]=depth[i];gray.data[i*4+3]=255}
   dc.getContext('2d').putImageData(gray,0,0);$('showCardDepth').disabled=false;
   finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];
   for(let i=0;i<9;i++){
     status(`Rendu de profondeur ${i+1}/9…`,'warn');
-    const rendered=renderNovelView(original.data,depth,W,H,(i-4)/4,{zero:128,relief:1,planeSeparation:1.8,parallaxPercent:Number($('cardParallax').value)});
+    const rendered=renderNovelView(original.data,depth,W,H,(i-4)/4,{zero:128,relief:1,planeSeparation:1.8,parallaxPercent:amplitude});
     ctx.putImageData(new ImageData(rendered.data,W,H),0,0);
     const blob=await new Promise(r=>canvas.toBlob(r,'image/png'));finalBlobs.push(blob);finalUrls.push(URL.createObjectURL(blob));
     await new Promise(r=>setTimeout(r,0));

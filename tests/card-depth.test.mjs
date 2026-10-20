@@ -14,6 +14,8 @@ test('text stays on one plane and the central view is exactly the original', () 
   const depth=Uint8ClampedArray.from([20,80,180,230]);
   const out=composeCardDepth(depth,4,1,[{type:'text',bbox:[0,0,1,1],depth:0}]);
   assert.deepEqual([...out],[128,128,128,128]);
+  const overlap=composeCardDepth(depth,4,1,[{type:'text',bbox:[0,0,1,1],depth:0},{type:'object',bbox:[.5,0,.5,1],depth:30}]);
+  assert.deepEqual([...overlap],[128,128,128,128],'text wins over nested detections');
   const source=Uint8ClampedArray.from({length:16},(_,i)=>i);
   assert.deepEqual(renderNovelView(source,out,4,1,0).data,source);
 });
