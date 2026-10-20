@@ -30,7 +30,7 @@
 <video id="video" controls playsinline loop></video>
 </aside></div>
 <script type="module">
-import { runPixVerseAction } from './modules/pixverse-client.js?v=406';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=414';
 import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor-2s.js?v=409';
 const $=id=>document.getElementById(id),iframe=$('hhApp'),idea=$('idea'),zoneMode=$('zoneMode'),selectionWrap=$('selectionWrap'),selectionList=$('selectionList'),zoneInfo=$('zoneInfo'),promptBox=$('prompt'),run=$('run'),status=$('status'),video=$('video'),frames=$('frames'),grid=$('grid'),diag=$('diag'),zipExport=$('zipExport');
 let subject='person',lastFrames=null,lastCompositeUrls=[],chosenIndices=new Set(),finalExportFrames=[];
