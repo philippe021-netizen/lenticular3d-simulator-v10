@@ -81,6 +81,34 @@
     return c;
   }
 
+  function projectDualAxisPoint(x,y,W,H,yawDegrees,pitchDegrees){
+    const yaw=yawDegrees*Math.PI/180,pitch=pitchDegrees*Math.PI/180;
+    const px=x-W/2,py=y-H/2,rx=px*Math.cos(yaw),rz=-px*Math.sin(yaw);
+    const ry=py*Math.cos(pitch)-rz*Math.sin(pitch),z=py*Math.sin(pitch)+rz*Math.cos(pitch);
+    const camera=Math.max(W,H)*2,scale=camera/(camera-z);
+    return{x:W/2+rx*scale,y:H/2+ry*scale};
+  }
+
+  function buildDualAxisFrame({layer,selection,phase=.5,W,H}){
+    const c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d');
+    const signed=Math.sin((clamp(phase,0,1)-.5)*Math.PI),k=clamp(Number(selection.intensity)/100||0,0,1);
+    const yaw=clamp(Number(selection.rotationH??12),0,25)*signed*k,pitch=clamp(Number(selection.rotationV??5),0,15)*signed*k;
+    const dx=parallaxOffset(selection,phase,W),steps=8;
+    function triangle(src,dst){
+      const [s0,s1,s2]=src,[p0,p1,p2]=dst,ux=s1.x-s0.x,uy=s1.y-s0.y,vx=s2.x-s0.x,vy=s2.y-s0.y,det=ux*vy-uy*vx;
+      const dx1=p1.x-p0.x,dx2=p2.x-p0.x,dy1=p1.y-p0.y,dy2=p2.y-p0.y;
+      const a=(dx1*vy-dx2*uy)/det,b=(dy1*vy-dy2*uy)/det,cc=(dx2*ux-dx1*vx)/det,d=(dy2*ux-dy1*vx)/det;
+      ctx.save();ctx.beginPath();ctx.moveTo(p0.x,p0.y);ctx.lineTo(p1.x,p1.y);ctx.lineTo(p2.x,p2.y);ctx.closePath();ctx.clip();
+      ctx.transform(a,b,cc,d,p0.x-a*s0.x-cc*s0.y,p0.y-b*s0.x-d*s0.y);ctx.drawImage(layer,0,0);ctx.restore();
+    }
+    for(let row=0;row<steps;row++)for(let col=0;col<steps;col++){
+      const x=col*W/steps,y=row*H/steps,x1=(col+1)*W/steps,y1=(row+1)*H/steps;
+      const src=[{x,y},{x:x1,y},{x:x1,y:y1},{x,y:y1}],dst=src.map(p=>{const q=projectDualAxisPoint(p.x,p.y,W,H,yaw,pitch);q.x+=dx;return q;});
+      triangle([src[0],src[1],src[2]],[dst[0],dst[1],dst[2]]);triangle([src[0],src[2],src[3]],[dst[0],dst[2],dst[3]]);
+    }
+    return c;
+  }
+
   function drawYaw3D(ctx,layer,phase,intensity,W,H){
     ctx.drawImage(buildYawFrame({layer,phase,intensity,W,H}),0,0);
   }
@@ -381,6 +409,7 @@
   function renderAction(ctx,layer,s,phase,W,H,meta={}){
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
+    if(action==='dual-axis')return ctx.drawImage(buildDualAxisFrame({layer,selection:s,phase,W,H}),0,0);
     if(action==='parallax'||action==='parallax-pivot') return drawParallax(ctx,layer,s,phase,W,H);
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
     if(action==='yaw3d') return drawYaw3D(ctx,layer,phase,intensity,W,H);
@@ -419,6 +448,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildParallaxFrame,buildExplodeFrame,explodeProgress,alphaBounds};
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildParallaxFrame,buildDualAxisFrame,projectDualAxisPoint,buildExplodeFrame,explodeProgress,alphaBounds};
   console.log('[HAPPYHOLO] action-preview-engine V3.8.0 OFFLINE · ExplodeView machines actif');
 })();

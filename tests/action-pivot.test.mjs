@@ -55,3 +55,17 @@ test('combined motion keeps rotation and depth-dependent translation on both sid
   assert.equal(center.x,0);
   assert.equal(center.angle,0);
 });
+
+test('dual-axis projection responds independently to horizontal and vertical tilt',()=>{
+  const p=engine.projectDualAxisPoint;
+  assert.equal(typeof p,'function');
+  const neutral=p(100,80,600,400,0,0);
+  assert.ok(Math.abs(neutral.x-100)<1e-10 && Math.abs(neutral.y-80)<1e-10);
+  const horizontal=p(100,80,600,400,15,0);
+  const vertical=p(100,80,600,400,0,8);
+  const combined=p(100,80,600,400,15,8);
+  assert.notEqual(horizontal.x,neutral.x);
+  assert.notEqual(vertical.y,neutral.y);
+  assert.notEqual(combined.x,vertical.x);
+  assert.notEqual(combined.y,horizontal.y);
+});

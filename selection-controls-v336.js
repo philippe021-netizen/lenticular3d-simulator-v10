@@ -13,7 +13,8 @@
     ['Sujet — rotation 3D verticale légère','yaw3d'],
     ['Objet rigide — pivot léger','pivot'],
     ['Parallaxe — déplacement selon la profondeur','parallax'],
-    ['Rotation + parallaxe selon la profondeur','parallax-pivot']
+    ['Rotation + parallaxe selon la profondeur','parallax-pivot'],
+    ['Rotation horizontale + verticale','dual-axis']
   ];
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const plan=()=>Array.isArray(window.happyHoloSelectionPlan)?window.happyHoloSelectionPlan:[];
@@ -65,6 +66,7 @@
   function actionLayer(s,layer,norm,W,H,index=0,selections=plan()){
     if(!layer)return layer;const engine=window.HappyHoloActionPreviewEngine,signedNorm=clamp(Number(norm)||0,-1,1),phase=(signedNorm+1)/2,intensity=clamp(Number(s.intensity||50)/100,.1,1);
     if(s?.action==='yaw3d'&&typeof engine?.buildYawFrame==='function')return engine.buildYawFrame({layer,phase,intensity,W,H});
+    if(s?.action==='dual-axis'&&typeof engine?.buildDualAxisFrame==='function')return engine.buildDualAxisFrame({layer,selection:s,phase,W,H});
     if((s?.action==='parallax'||s?.action==='parallax-pivot')&&typeof engine?.buildParallaxFrame==='function')return engine.buildParallaxFrame({layer,selection:s,phase,W,H});
     if(s?.action==='explodeview'&&typeof engine?.buildExplodeFrame==='function')return engine.buildExplodeFrame({layer,phase,intensity,W,H,selection:s,index,selections});
     return layer;
@@ -82,9 +84,9 @@
     const textDepth=Number(window.happyHoloTextLayer?.depth)||0;if(textDepth<0)window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
     const order=selections.map((s,i)=>({s,i,d:Number(s.depth)||0})).sort((a,b)=>a.d-b.d);
     for(const it of order){
-      const layer=getExclusiveLayer(it.i,W,H);if(!layer)continue;const k=clamp((Number(it.s.depth)||.02)/.30,.05,3),shift=(it.s.action==='parallax'||it.s.action==='parallax-pivot')?0:norm*18*amplitude*k;
+      const layer=getExclusiveLayer(it.i,W,H);if(!layer)continue;const k=clamp((Number(it.s.depth)||.02)/.30,.05,3),shift=['parallax','parallax-pivot','dual-axis'].includes(it.s.action)?0:norm*18*amplitude*k;
       const rendered=actionLayer(it.s,layer,norm,W,H,it.i,selections);x.drawImage(rendered,shift,0);
-      if(it.s.action!=='yaw3d'&&it.s.action!=='explodeview'&&it.s.action!=='parallax'&&it.s.action!=='parallax-pivot'){x.globalAlpha=.18;x.drawImage(layer,shift*.985,0);x.globalAlpha=1;}
+      if(!['yaw3d','explodeview','parallax','parallax-pivot','dual-axis'].includes(it.s.action)){x.globalAlpha=.18;x.drawImage(layer,shift*.985,0);x.globalAlpha=1;}
       drawGlintForSelection(x,it.s,layer,norm,W,H,shift);
     }
     if(textDepth>=0)window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
@@ -118,6 +120,18 @@
     const frame=now=>{if(mainActionPreviewModal.style.display==='none')return;const cycle=((now-start)%speed)/speed,t=isExplode?(1-Math.cos(cycle*Math.PI*2))*.5:cycle,pos=t*(frames.length-1),lo=Math.floor(pos),hi=Math.min(frames.length-1,lo+1),mix=pos-lo,x=mainActionPreviewCtx;x.clearRect(0,0,W,H);x.globalAlpha=1;x.drawImage(frames[lo],0,0,W,H);if(hi!==lo&&mix>.001){x.globalAlpha=mix;x.drawImage(frames[hi],0,0,W,H);x.globalAlpha=1;}mainActionPreviewRAF=requestAnimationFrame(frame);};mainActionPreviewRAF=requestAnimationFrame(frame);
   }
 
+  function appendAxisControls(parent,s,select,index){
+    const box=document.createElement('div');
+    for(const [key,label,max,fallback] of [['rotationH','Rotation horizontale',25,12],['rotationV','Rotation verticale',15,5]]){
+      const line=document.createElement('label'),caption=document.createElement('span'),input=document.createElement('input');
+      input.type='range';input.min='0';input.max=String(max);input.step='1';input.value=String(s[key]??fallback);
+      input.setAttribute('aria-label',`${label} — plan ${index+1}`);input.style.width='100%';
+      const update=()=>{s[key]=Number(input.value);caption.textContent=`${label} : ±${input.value}°`;};update();
+      input.addEventListener('input',()=>{update();notifyActionPlan();});line.append(caption,input);box.appendChild(line);
+    }
+    const show=()=>{box.style.display=s.action==='dual-axis'?'block':'none';};select.addEventListener('change',show);show();parent.appendChild(box);
+  }
+
   function ensureControlPanel(){
     const selections=plan();if(!selections.length)return;let card=document.getElementById('happyHoloSelectionControls');if(!card){card=document.createElement('div');card.id='happyHoloSelectionControls';Object.assign(card.style,{background:'#fff',border:'2px solid #111',borderRadius:'18px',padding:'16px',margin:'16px 0'});const main=document.querySelector('.card.grid');if(main?.parentNode)main.parentNode.insertBefore(card,main.nextSibling);else document.body.appendChild(card);}card.innerHTML='';
     const head=document.createElement('div');Object.assign(head.style,{display:'flex',justifyContent:'space-between',gap:'12px',alignItems:'center',marginBottom:'8px'});const title=document.createElement('div');title.innerHTML='<div style="font-size:19px;font-weight:850">Réglages par sélection</div><div style="font-size:12px;color:#666;margin-top:2px">Les profondeurs, actions et placement du sujet restent alignés dans les 9 vues.</div>';head.appendChild(title);const badge=document.createElement('span');badge.textContent=`${selections.length} plan${selections.length>1?'s':''}`;Object.assign(badge.style,{background:'#e7f7eb',color:'#17652c',padding:'6px 9px',borderRadius:'999px',fontSize:'12px',fontWeight:'800'});head.appendChild(badge);card.appendChild(head);
@@ -136,7 +150,7 @@
       zoneBtn.addEventListener('click',async()=>{if(typeof window.HappyHoloChooseActionZone!=='function'){alert('Outil de zone indisponible. Recharge la page.');return;}s.actionZones=Array.isArray(s.actionZones)?s.actionZones:[];if(s.actionZones.length>=4){alert('4 zones maximum.');return;}const z=await window.HappyHoloChooseActionZone({actionZone:null},`${s.action==='glint'?'Zone reflet':'Zone plein phare'} ${s.actionZones.length+1}`);if(z)s.actionZones.push(z);updateZone();notifyActionPlan();});removeZone.addEventListener('click',()=>{if(Array.isArray(s.actionZones)&&s.actionZones.length)s.actionZones.pop();updateZone();notifyActionPlan();});asel.addEventListener('change',()=>{s.action=asel.value;if(s.action==='explodeview'){s.explodeOrder=Number(s.explodeOrder)||i+1;s.explodeDirection=s.explodeDirection||'auto';explodeOrder.value=String(Math.min(12,s.explodeOrder));explodeDirection.value=s.explodeDirection;}if(s.action!=='headlight'&&s.action!=='glint')s.actionZones=[];updateZone();notifyActionPlan();});awrap.append(zoneBtn,removeZone);
       const intensityLine=document.createElement('div');Object.assign(intensityLine.style,{display:'flex',alignItems:'center',gap:'8px',marginTop:'7px'});const intensityLabel=document.createElement('span');intensityLabel.textContent='Intensité';Object.assign(intensityLabel.style,{fontSize:'10px',color:'#666',minWidth:'48px'});const intensity=document.createElement('input');intensity.type='range';intensity.min='10';intensity.max='100';intensity.step='5';intensity.value=Number(s.intensity||50);intensity.style.flex='1';const intensityOut=document.createElement('b');intensityOut.textContent=`${Number(s.intensity||50)}%`;Object.assign(intensityOut.style,{fontSize:'10px',minWidth:'34px',textAlign:'right'});intensity.addEventListener('input',()=>{s.intensity=Number(intensity.value);intensityOut.textContent=`${s.intensity}%`;notifyActionPlan();});intensityLine.append(intensityLabel,intensity,intensityOut);awrap.appendChild(intensityLine);
       const actionButtons=document.createElement('div');Object.assign(actionButtons.style,{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'7px',marginTop:'8px'});const oneBtn=document.createElement('button');oneBtn.type='button';oneBtn.textContent='▶ Voir cette action';const allBtn=document.createElement('button');allBtn.type='button';allBtn.textContent='▶ Voir toutes';for(const b of[oneBtn,allBtn])Object.assign(b.style,{minHeight:'38px',padding:'8px 10px',borderRadius:'10px',border:'1px solid #222',fontWeight:'800',fontSize:'11px',cursor:'pointer'});Object.assign(oneBtn.style,{background:'#111',color:'#fff'});Object.assign(allBtn.style,{background:'#f1f1f1',color:'#111'});oneBtn.addEventListener('click',()=>openMainActionPreview([i],`Aperçu — ${s.name||`Sélection ${i+1}`}`));allBtn.addEventListener('click',()=>openMainActionPreview(selections.map((_,j)=>j),'Aperçu — toutes les actions'));actionButtons.append(oneBtn,allBtn);awrap.appendChild(actionButtons);
-      const sub=document.createElement('div');sub.textContent='Aperçu local immédiat avant génération des 9 vues.';Object.assign(sub.style,{fontSize:'10px',color:'#777',marginTop:'5px'});awrap.appendChild(sub);updateZone();row.appendChild(awrap);card.appendChild(row);
+      const sub=document.createElement('div');sub.textContent='Aperçu local immédiat avant génération des 9 vues.';Object.assign(sub.style,{fontSize:'10px',color:'#777',marginTop:'5px'});awrap.appendChild(sub);updateZone();appendAxisControls(awrap,s,asel,i);row.appendChild(awrap);card.appendChild(row);
     });
     if(window.innerWidth<850){for(const row of card.children){if(row.style?.display==='grid')row.style.gridTemplateColumns='1fr';}}
   }
