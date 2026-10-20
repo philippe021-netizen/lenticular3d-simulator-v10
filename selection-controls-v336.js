@@ -11,7 +11,8 @@
     ['Moto/voiture — appel de phare','headlight'],
     ['Reflet lumineux local','glint'],
     ['Sujet — rotation 3D verticale légère','yaw3d'],
-    ['Objet rigide — pivot léger','pivot']
+    ['Objet rigide — pivot léger','pivot'],
+    ['Parallaxe — déplacement selon la profondeur','parallax']
   ];
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
   const plan=()=>Array.isArray(window.happyHoloSelectionPlan)?window.happyHoloSelectionPlan:[];
@@ -63,6 +64,7 @@
   function actionLayer(s,layer,norm,W,H,index=0,selections=plan()){
     if(!layer)return layer;const engine=window.HappyHoloActionPreviewEngine,signedNorm=clamp(Number(norm)||0,-1,1),phase=(signedNorm+1)/2,intensity=clamp(Number(s.intensity||50)/100,.1,1);
     if(s?.action==='yaw3d'&&typeof engine?.buildYawFrame==='function')return engine.buildYawFrame({layer,phase,intensity,W,H});
+    if(s?.action==='parallax'&&typeof engine?.buildParallaxFrame==='function')return engine.buildParallaxFrame({layer,selection:s,phase,W,H});
     if(s?.action==='explodeview'&&typeof engine?.buildExplodeFrame==='function')return engine.buildExplodeFrame({layer,phase,intensity,W,H,selection:s,index,selections});
     return layer;
   }
@@ -79,9 +81,9 @@
     const textDepth=Number(window.happyHoloTextLayer?.depth)||0;if(textDepth<0)window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});
     const order=selections.map((s,i)=>({s,i,d:Number(s.depth)||0})).sort((a,b)=>a.d-b.d);
     for(const it of order){
-      const layer=getExclusiveLayer(it.i,W,H);if(!layer)continue;const k=clamp((Number(it.s.depth)||.02)/.30,.05,3),shift=norm*18*amplitude*k;
+      const layer=getExclusiveLayer(it.i,W,H);if(!layer)continue;const k=clamp((Number(it.s.depth)||.02)/.30,.05,3),shift=it.s.action==='parallax'?0:norm*18*amplitude*k;
       const rendered=actionLayer(it.s,layer,norm,W,H,it.i,selections);x.drawImage(rendered,shift,0);
-      if(it.s.action!=='yaw3d'&&it.s.action!=='explodeview'){x.globalAlpha=.18;x.drawImage(layer,shift*.985,0);x.globalAlpha=1;}
+      if(it.s.action!=='yaw3d'&&it.s.action!=='explodeview'&&it.s.action!=='parallax'){x.globalAlpha=.18;x.drawImage(layer,shift*.985,0);x.globalAlpha=1;}
       drawGlintForSelection(x,it.s,layer,norm,W,H,shift);
     }
     if(textDepth>=0)window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});

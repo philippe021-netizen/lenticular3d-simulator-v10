@@ -23,3 +23,19 @@ test('default preview cycle reaches both sides and closes without a jump', () =>
   assert.ok(angles.some(a=>a<0) && angles.some(a=>a>0));
   assert.equal(angles[0], angles.at(-1));
 });
+
+function parallaxX(depth, intensity, phase) {
+  let offset;
+  const ctx = {drawImage(layer,x){offset=x;}};
+  engine.renderAction(ctx, {}, {action:'parallax',depth,intensity}, phase, 1000, 700);
+  return offset;
+}
+test('parallax foreground moves more than middle plane without rotating', () => {
+  const near = parallaxX(.65,75,1);
+  const middle = parallaxX(.48,35,1);
+  assert.ok(near > 20);
+  assert.ok(middle > 0 && near > middle * 3);
+  assert.equal(parallaxX(.65,75,.5),0);
+  assert.equal(parallaxX(.65,75,0),-near);
+  assert.equal(parallaxX(0,75,1),0);
+});

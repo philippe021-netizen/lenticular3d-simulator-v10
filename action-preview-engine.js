@@ -32,6 +32,18 @@
     ctx.restore();
   }
 
+  function parallaxOffset(selection,phase,W){
+    const depth=clamp(Number(selection.depth)||0,0,.8)/.8;
+    const intensity=clamp(Number(selection.intensity)/100||0,0,1);
+    return Math.sin((clamp(phase,0,1)-.5)*Math.PI)*W*.08*depth*depth*intensity;
+  }
+
+  function buildParallaxFrame({layer,selection,phase=.5,W,H}){
+    const c=document.createElement('canvas');c.width=W;c.height=H;
+    c.getContext('2d').drawImage(layer,parallaxOffset(selection,phase,W),0,W,H);
+    return c;
+  }
+
   function buildYawFrame({layer,phase=.5,intensity=.5,W,H}){
     const c=document.createElement('canvas');c.width=W;c.height=H;
     const x=c.getContext('2d');
@@ -357,6 +369,7 @@
   function renderAction(ctx,layer,s,phase,W,H,meta={}){
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
+    if(action==='parallax') return ctx.drawImage(layer,parallaxOffset(s,phase,W),0,W,H);
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
     if(action==='yaw3d') return drawYaw3D(ctx,layer,phase,intensity,W,H);
     if(action==='explodeview'){
@@ -394,6 +407,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildExplodeFrame,explodeProgress,alphaBounds};
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildParallaxFrame,buildExplodeFrame,explodeProgress,alphaBounds};
   console.log('[HAPPYHOLO] action-preview-engine V3.8.0 OFFLINE · ExplodeView machines actif');
 })();
