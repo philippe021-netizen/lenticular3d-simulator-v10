@@ -27,3 +27,9 @@ test('continuous surfaces do not expose background pinholes when expanded',()=>{
   // Only the outer image border can be uncovered; the continuous interior is rasterized.
   assert.equal(result.holesBeforeFill,0);
 });
+test('padding of a nearby text row cannot overwrite another detected row',()=>{
+  const base=new Uint8ClampedArray(10000).fill(30);
+  const out=composeCardDepth(base,100,100,[{type:'text',bbox:[.2,.2,.4,.02],depth:0},{type:'text',bbox:[.2,.23,.4,.02],depth:50}]);
+  assert.equal(out[20*100+30],128);assert.equal(out[21*100+30],128);
+  assert.equal(out[23*100+30],168);assert.equal(out[24*100+30],168);
+});

@@ -29,6 +29,12 @@ export function composeCardDepth(base,width,height,layers){
       }
     }
   }
+  // A neighbouring row's safety padding must never change a detected glyph plane.
+  for(const layer of sorted.filter(l=>l.type==='text')){
+    const [x,y,w,h]=layer.bbox,value=clamp(128+(Number(layer.depth)||0)*.8,0,255);
+    const x0=clamp(Math.floor(x*width),0,width),x1=clamp(Math.ceil((x+w)*width),0,width);
+    for(let yy=clamp(Math.floor(y*height),0,height);yy<clamp(Math.ceil((y+h)*height),0,height);yy++) output.fill(value,yy*width+x0,yy*width+x1);
+  }
   return output;
 }
 
