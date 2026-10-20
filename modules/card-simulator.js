@@ -1,0 +1,40 @@
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+export function cardPose(index){const i=clamp(Math.round(Number(index)||0),0,8);return {index:i,angle:(i-4)*3}}
+export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/3+4),0,8)}
+
+export function createCardSimulator({canvas,range,output,getUrls}){
+  const stage=canvas.parentElement,controls=document.createElement('div');
+  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Basculer automatiquement</button><p class="small">Même image que le ZIP, parmi les 9 vues, sans fondu ni retouche. Décoche pour inspecter les images à plat. Bascule illustrative ±12° : la lentille, la distance de lecture et l’impression ne sont pas encore calibrées.</p>';
+  stage.before(controls);
+  stage.style.background='#e9e9e5';stage.style.perspective='1400px';
+  canvas.style.transformOrigin='50% 50%';canvas.style.backfaceVisibility='hidden';
+  const tilt=controls.querySelector('#cardPhysicalTilt'),play=controls.querySelector('#cardTiltPlay');
+  let current=4,angle=0,running=false,animation=0,request=0,lastImage=null,lastUrl='',imageCache=new Map();
+  function stop(){running=false;cancelAnimationFrame(animation);play.textContent='▶ Basculer automatiquement'}
+  async function show(index,physicalAngle=cardPose(index).angle){
+    const pose=cardPose(index),url=getUrls()[pose.index];if(!url)return;
+    current=pose.index;angle=physicalAngle;
+    range.value=String(current);output.textContent=`${current+1} / 9 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'}`;
+    canvas.style.transform=tilt.checked?`scale(.91) rotateY(${angle}deg)`:'none';
+    const token=++request;
+    const urls=getUrls();for(const key of imageCache.keys())if(!urls.includes(key))imageCache.delete(key);
+    if(!imageCache.has(url))imageCache.set(url,new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>{imageCache.delete(url);reject(new Error('Vue illisible'))};image.src=url}));
+    const image=await imageCache.get(url);if(token!==request)return;
+    // Natural export pixels are the only image source. CSS rotates the support,
+    // never individual text/logo elements and never the exported PNG files.
+    if(lastImage!==image||lastUrl!==url){
+      canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;
+      canvas.getContext('2d').drawImage(image,0,0);lastImage=image;lastUrl=url;
+    }
+  }
+  range.oninput=()=>{stop();void show(Number(range.value))};
+  tilt.onchange=()=>{stop();void show(current)};
+  play.onclick=()=>{
+    if(running){stop();return}if(getUrls().length!==9)return;
+    running=true;tilt.checked=true;play.textContent='■ Arrêter la bascule';const start=performance.now();
+    const tick=now=>{if(!running)return;const value=12*Math.sin((now-start)/6000*2*Math.PI);void show(viewAtAngle(value),value);animation=requestAnimationFrame(tick)};
+    animation=requestAnimationFrame(tick);
+  };
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
+  return {show,stop};
+}
