@@ -200,7 +200,19 @@
   window.addEventListener('happyholo:selection-plan',()=>{clearCaches();setTimeout(ensureControlPanel,0);});
   window.addEventListener('happyholo-relief-ready',()=>{clearCaches();ensureControlPanel();});
   window.addEventListener('happyholo-subject-placement-changed',()=>{clearCaches();try{window.renderAt?.(0,window.HappyHoloReliefState?.view);}catch(_){} });
-  window.HappyHoloSelectionRenderer={getExclusiveLayer,getMaskTarget,fitCoverLocal,sourceImage,bgImage,plan,placementSig,clearCaches};
+  function renderActionFrame(norm,target){
+    const selections=plan(),src=sourceImage(),engine=window.HappyHoloActionPreviewEngine;
+    if(!src||!target||!selections.length||!engine?.generateActionFrames)return false;
+    const W=target.width,H=target.height,base=document.createElement('canvas');base.width=W;base.height=H;
+    const bx=base.getContext('2d'),bg=bgImage()||src;
+    if(!window.HappyHoloCustomBackground?.draw?.(bx,0,W,H,{x:0,y:0,w:W,h:H})){const r=fitCoverLocal(bg,W,H);bx.drawImage(bg,r.x,r.y,r.w,r.h)}
+    const layers=new Map();selections.forEach((s,i)=>layers.set(i,getExclusiveLayer(i,W,H)));
+    const activeIndices=selections.map((s,i)=>s.action&&s.action!=='none'?i:-1).filter(i=>i>=0);
+    const frames=engine.generateActionFrames({base,layers,selections,activeIndices,W,H,phases:[clamp((Number(norm)||0)+1,0,2)/2]});
+    const x=target.getContext('2d');x.clearRect(0,0,W,H);x.drawImage(frames[0],0,0);
+    window.HappyHoloTextLayer?.draw?.(x,norm,{x:0,y:0,w:W,h:H});return true;
+  }
+  window.HappyHoloSelectionRenderer={getExclusiveLayer,getMaskTarget,fitCoverLocal,sourceImage,bgImage,plan,placementSig,clearCaches,renderActionFrame};
   window.HappyHoloEdgeSafety={inspect:inspectSubjectEdges};
   window.HappyHoloLocalActions={preview:previewExternalAction,supportedActionIds:Object.keys(externalActionMap)};
   setTimeout(ensureControlPanel,300);

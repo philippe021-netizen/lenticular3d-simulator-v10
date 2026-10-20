@@ -1,4 +1,4 @@
-function supportSpec(doc) {
+export function supportSpec(doc) {
   const support = doc?.getElementById('supportType')?.value || 'keychain-vertical';
   const map = {
     'keychain-vertical': { id:'keychain-vertical', label:'porte-cle-vertical', width:1024, height:1536 },
@@ -6,7 +6,8 @@ function supportSpec(doc) {
     'medallion-round-25': { id:'medallion-round-25', label:'medaillon-rond-25mm', width:1024, height:1024, diameterMm:25 },
     'medallion-round': { id:'medallion-round', label:'medaillon-rond-30mm', width:1024, height:1024, diameterMm:30 },
     'business-card': { id:'business-card', label:'carte-85x54', width:1536, height:969 },
-    'business-card-88': { id:'business-card-88', label:'carte-88x56', width:1536, height:978 }
+    'business-card-88': { id:'business-card-88', label:'carte-88x56', width:1536, height:978 },
+    'photo-card-15x10': { id:'photo-card-15x10', label:'carte-15x10cm', width:1800, height:1200, widthMm:150, heightMm:100 }
   };
   return map[support] || map['keychain-vertical'];
 }
@@ -101,6 +102,8 @@ export function installPixVerseZipBridge(iframe, getPayload, onStatus = () => {}
         sourceHeight: payload.height,
         support: spec.id,
         diameterMm: spec.diameterMm || null,
+        widthMm: spec.widthMm || null,
+        heightMm: spec.heightMm || null,
         outputWidth: spec.width,
         outputHeight: spec.height,
         fit: 'cover-center',

@@ -366,7 +366,9 @@ exportBtn.addEventListener('click',async()=>{
   const poses=[-1,-.75,-.5,-.25,0,.25,.5,.75,1];
   for(let i=0;i<9;i++){
     setStatus(`Export vue ${i+1}/9…`);
-    const c=document.createElement('canvas'); c.width=view.width; c.height=view.height;
+    const c=document.createElement('canvas');
+    const testFormat=document.getElementById('supportType')?.value==='photo-card-15x10';
+    c.width=testFormat?1800:view.width;c.height=testFormat?1200:view.height;
     renderAt(poses[i],c); const b=await canvasToBlob(c); exported.push(b);
     const im=new Image(); im.src=URL.createObjectURL(b); framesEl.appendChild(im); await sleep(25);
   }
@@ -379,6 +381,8 @@ downloadBtn.addEventListener('click',async()=>{
   zip.file('manifest.json',JSON.stringify({
     generator:'HappyHolo Relief 3D V3.25 ExplodeView',localSegmentation:true,externalPaidApi:false,views:9,
     depthInference:'single-512-with-local-fallback',
+    support:document.getElementById('supportType')?.value||null,
+    printSize:document.getElementById('supportType')?.value==='photo-card-15x10'?{widthMm:150,heightMm:100,widthPx:1800,heightPx:1200}:null,
     angle:Number(angle.value),subjectDepth:Number(subjectDepth.value),backgroundDepth:Number(bgDepth.value),edgeProtection:Number(edgeProtect.value),
     textLayer:window.HappyHoloTextLayer?.serialize?.()||null,
     customBackground:window.HappyHoloCustomBackground?.serialize?.()||null,

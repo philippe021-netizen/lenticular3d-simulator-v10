@@ -206,7 +206,8 @@ function currentSupportSpec(){
     'medallion-round-25':{id,label:'medaillon-rond-25mm',width:1024,height:1024,diameterMm:25},
     'medallion-round':{id,label:'medaillon-rond-30mm',width:1024,height:1024,diameterMm:30},
     'business-card':{id,label:'carte-85x54',width:1536,height:969},
-    'business-card-88':{id,label:'carte-88x56',width:1536,height:978}
+    'business-card-88':{id,label:'carte-88x56',width:1536,height:978},
+    'photo-card-15x10':{id,label:'carte-15x10cm',width:1800,height:1200,widthMm:150,heightMm:100}
   };
   return map[id]||map['keychain-vertical'];
 }
@@ -246,7 +247,7 @@ async function downloadStaticSupportZip(){
     const raw=await urlToBlob(imgs[i].src);const fitted=await fitFrameToSupport(raw,spec,placement);
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo static support print',source:'happyholo-static-9-views',views:9,support:spec.id,diameterMm:spec.diameterMm||null,outputWidth:spec.width,outputHeight:spec.height,placement},null,2));
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo static support print',source:'happyholo-static-9-views',views:9,support:spec.id,diameterMm:spec.diameterMm||null,widthMm:spec.widthMm||null,heightMm:spec.heightMm||null,outputWidth:spec.width,outputHeight:spec.height,placement},null,2));
   const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`9-vues-statique-${spec.label}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);
 }
 async function downloadPixVerseZip(){
@@ -260,7 +261,7 @@ async function downloadPixVerseZip(){
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
   const distinct=extracted.distinctFingerprints ?? new Set(extracted.frames.map(f=>f.fingerprint)).size;
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,customRequest:lastActionContext?.customRequest||null,promptProvider:lastActionContext?.promptProvider||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:9,distinctFrames:distinct,qualityGate:extracted.qualityGate,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,diameterMm:spec.diameterMm||null,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,customRequest:lastActionContext?.customRequest||null,promptProvider:lastActionContext?.promptProvider||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:9,distinctFrames:distinct,qualityGate:extracted.qualityGate,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,diameterMm:spec.diameterMm||null,widthMm:spec.widthMm||null,heightMm:spec.heightMm||null,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
   const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
 }
 async function launch(selectionOverride=null){
