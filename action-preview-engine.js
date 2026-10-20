@@ -432,6 +432,7 @@
     ctx.drawImage(layer,0,0,W,H);
   }
 
+  function previewCycle(now,start,speed){return (Math.max(0,now-start)%speed)/speed;}
   function generateActionFrames({base, layers, selections, activeIndices, W, H, phases=PHASES, phaseForSelection=null}){
     const out=[];
     for(const phase of phases){
@@ -448,6 +449,6 @@
     return out;
   }
 
-  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildParallaxFrame,buildDualAxisFrame,projectDualAxisPoint,buildExplodeFrame,explodeProgress,alphaBounds};
+  window.HappyHoloActionPreviewEngine={PHASES,generateActionFrames,renderAction,fitCover,buildGlintOverlay,buildYawFrame,buildParallaxFrame,buildDualAxisFrame,projectDualAxisPoint,previewCycle,buildExplodeFrame,explodeProgress,alphaBounds};
   console.log('[HAPPYHOLO] action-preview-engine V3.8.0 OFFLINE · ExplodeView machines actif');
 })();

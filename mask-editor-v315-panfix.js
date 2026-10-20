@@ -1639,6 +1639,7 @@
     editCtx=editCanvas.getContext('2d');
 
     const lw=el('div',{style:{
+      display:'none',
       position:'absolute',
       right:'14px',
       top:'14px',

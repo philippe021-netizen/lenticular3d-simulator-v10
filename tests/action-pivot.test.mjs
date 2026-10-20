@@ -69,3 +69,9 @@ test('dual-axis projection responds independently to horizontal and vertical til
   assert.notEqual(combined.x,vertical.x);
   assert.notEqual(combined.y,horizontal.y);
 });
+
+test('preview clock never requests a negative frame after expensive generation',()=>{
+  assert.equal(engine.previewCycle(90,100,2000),0);
+  assert.equal(engine.previewCycle(1100,100,2000),.5);
+  assert.equal(engine.previewCycle(2100,100,2000),0);
+});
