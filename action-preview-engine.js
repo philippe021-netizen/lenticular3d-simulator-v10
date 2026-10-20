@@ -40,8 +40,20 @@
 
   function buildParallaxFrame({layer,selection,phase=.5,W,H}){
     const c=document.createElement('canvas');c.width=W;c.height=H;
-    c.getContext('2d').drawImage(layer,parallaxOffset(selection,phase,W),0,W,H);
+    drawParallax(c.getContext('2d'),layer,selection,phase,W,H);
     return c;
+  }
+
+  function drawParallax(ctx,layer,selection,phase,W,H){
+    const dx=parallaxOffset(selection,phase,W);
+    if(selection.action!=='parallax-pivot')return ctx.drawImage(layer,dx,0,W,H);
+    const signed=Math.sin((clamp(phase,0,1)-.5)*Math.PI);
+    const intensity=clamp(Number(selection.intensity)/100||0,0,1);
+    ctx.save();
+    ctx.translate(W/2+dx,H/2);
+    ctx.rotate(6*intensity*signed*Math.PI/180);
+    ctx.drawImage(layer,-W/2,-H/2,W,H);
+    ctx.restore();
   }
 
   function buildYawFrame({layer,phase=.5,intensity=.5,W,H}){
@@ -369,7 +381,7 @@
   function renderAction(ctx,layer,s,phase,W,H,meta={}){
     const intensity=clamp(Number(s.intensity||50)/100,.1,1);
     const action=s.action||'none';
-    if(action==='parallax') return ctx.drawImage(layer,parallaxOffset(s,phase,W),0,W,H);
+    if(action==='parallax'||action==='parallax-pivot') return drawParallax(ctx,layer,s,phase,W,H);
     if(action==='pivot') return drawRotate(ctx,layer,phase,intensity,W,H);
     if(action==='yaw3d') return drawYaw3D(ctx,layer,phase,intensity,W,H);
     if(action==='explodeview'){
