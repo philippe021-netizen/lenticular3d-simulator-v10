@@ -20,6 +20,7 @@ export function createCardSimulator({canvas,range,output,getUrls}){
     const urls=getUrls();for(const key of imageCache.keys())if(!urls.includes(key))imageCache.delete(key);
     if(!imageCache.has(url))imageCache.set(url,new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>{imageCache.delete(url);reject(new Error('Vue illisible'))};image.src=url}));
     const image=await imageCache.get(url);if(token!==request)return;
+    stage.style.aspectRatio=`${image.naturalWidth} / ${image.naturalHeight}`;
     // Natural export pixels are the only image source. CSS rotates the support,
     // never individual text/logo elements and never the exported PNG files.
     if(lastImage!==image||lastUrl!==url){
