@@ -19,7 +19,8 @@
   }
 
   function drawRotate(ctx,layer,phase,intensity,W,H){
-    const signed=Math.sin(phase*Math.PI/2);
+    // Phase 0 → gauche, .5 → centre, 1 → droite ; même amplitude des deux côtés.
+    const signed=Math.sin((clamp(phase,0,1)-.5)*Math.PI);
     const rot=6*intensity*signed;
     const sx=1-Math.abs(signed)*.045*intensity;
     const dx=10*intensity*signed;
