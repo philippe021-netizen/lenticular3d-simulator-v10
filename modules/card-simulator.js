@@ -4,13 +4,13 @@ export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/3+
 
 export function createCardSimulator({canvas,range,output,getUrls}){
   const stage=canvas.parentElement,controls=document.createElement('div');
-  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Basculer automatiquement</button><p class="small">Même image que le ZIP, parmi les 9 vues, sans fondu ni retouche. Décoche pour inspecter les images à plat. Bascule illustrative ±12° : la lentille, la distance de lecture et l’impression ne sont pas encore calibrées.</p>';
+  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Play — rotation en boucle</button><p class="small">Même image que le ZIP, parmi les 9 vues, sans fondu ni retouche. Décoche pour inspecter les images à plat. Bascule illustrative ±12° : la lentille, la distance de lecture et l’impression ne sont pas encore calibrées.</p>';
   stage.before(controls);
   stage.style.background='#e9e9e5';stage.style.perspective='1400px';
   canvas.style.transformOrigin='50% 50%';canvas.style.backfaceVisibility='hidden';
   const tilt=controls.querySelector('#cardPhysicalTilt'),play=controls.querySelector('#cardTiltPlay');
   let current=4,angle=0,running=false,animation=0,request=0,lastImage=null,lastUrl='',imageCache=new Map();
-  function stop(){running=false;cancelAnimationFrame(animation);play.textContent='▶ Basculer automatiquement'}
+  function stop(){running=false;cancelAnimationFrame(animation);play.textContent='▶ Play — rotation en boucle'}
   async function show(index,physicalAngle=cardPose(index).angle){
     const pose=cardPose(index),url=getUrls()[pose.index];if(!url)return;
     current=pose.index;angle=physicalAngle;
@@ -32,8 +32,8 @@ export function createCardSimulator({canvas,range,output,getUrls}){
   tilt.onchange=()=>{stop();void show(current)};
   play.onclick=()=>{
     if(running){stop();return}if(getUrls().length!==9)return;
-    running=true;tilt.checked=true;play.textContent='■ Arrêter la bascule';const start=performance.now();
-    const tick=now=>{if(!running)return;const value=12*Math.sin((now-start)/6000*2*Math.PI);void show(viewAtAngle(value),value);animation=requestAnimationFrame(tick)};
+    running=true;tilt.checked=true;play.textContent='⏸ Pause';const start=performance.now();
+    const tick=now=>{if(!running)return;const value=12*Math.sin((now-start)/10000*2*Math.PI);void show(viewAtAngle(value),value);animation=requestAnimationFrame(tick)};
     animation=requestAnimationFrame(tick);
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
