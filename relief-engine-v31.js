@@ -325,6 +325,7 @@ async function loadSourceFile(nextFile){
   setStatus('Photo chargée. Clique sur « Créer le relief 3D local ».');
 }
 
+window.HappyHoloGetSourceFile=()=>sourceFile;
 file.addEventListener('change',()=>loadSourceFile(file.files?.[0]||null));
 
 async function buildRelief(){

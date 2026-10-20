@@ -4,7 +4,7 @@ import {
   downloadExtractedFrame,
   showPixVerseFramesInSimulator,
   stopPixVerseSimulatorPreview
-} from './video-frame-extractor.js?v=409';
+} from './video-frame-extractor.js?v=415';
 
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));

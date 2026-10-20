@@ -19,10 +19,18 @@
 <body>
 <div class="bar"><b>HappyHolo — Animer</b><span class="badge">LOCAL + PIXVERSE V6</span></div>
 <div class="layout">
-  <iframe id="hhApp" src="./relief3d-test-v31.html?v=411" title="HappyHolo"></iframe>
+  <section style="padding:16px;min-width:0">
+    <h2>Photo originale pour PixVerse</h2>
+    <p>Choisis la photo, puis l’action. Aucun détourage ni calcul de profondeur n’est nécessaire.</p>
+    <input id="pixverseSourceFile" type="file" accept="image/*" aria-label="Photo originale pour PixVerse">
+    <img id="pixverseSourcePreview" alt="Photo originale envoyée à PixVerse" style="display:none;width:100%;height:auto;margin-top:16px;border-radius:12px">
+    <details style="margin-top:16px"><summary>Outils locaux facultatifs — relief et sélections</summary>
+      <iframe id="hhApp" src="./relief3d-test-v31.html?v=415" title="HappyHolo"></iframe>
+    </details>
+  </section>
   <aside class="side">
     <h2>Choisir une action</h2>
-    <p>Prépare l’image à gauche, choisis l’action et la personne ciblée, puis teste-la localement sans PixVerse. PixVerse reste disponible pour les mouvements qui demandent une génération IA.</p>
+    <p>PixVerse anime la photo originale. Choisis un sujet et une action ; le relief local reste facultatif.</p>
     <label>Sujet ou mode</label>
     <div id="audienceTabs" class="audience-tabs" role="group" aria-label="Sujet ou mode">
       <button type="button" class="audience-tab active" data-family="person" aria-pressed="true">Individu</button>
@@ -72,8 +80,9 @@
 <script type="module">
 import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=414';
 import { runPixVerseAction } from './modules/pixverse-client.js?v=414';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor-2s.js?v=412';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor-2s.js?v=415';
 import { requireExportableFrames } from './modules/video-extraction-contract.js';
+import { getOriginalPixVerseFile } from './modules/pixverse-source.js';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -87,7 +96,7 @@ const run=document.getElementById('run');
 const status=document.getElementById('status');
 const video=document.getElementById('video');
 let actionBusy=false;
-function setActionBusy(value){actionBusy=value;run.disabled=value;rerun.disabled=value;recovery.querySelector('#recoverVideo').disabled=value;repairEdge.disabled=value}
+function setActionBusy(value){actionBusy=value;run.disabled=value;rerun.disabled=value;recovery.querySelector('#recoverVideo').disabled=value;repairEdge.disabled=value;document.getElementById('pixverseSourceFile').disabled=value}
 const recovery=document.createElement('details');
 recovery.innerHTML='<summary>Réextraire une vidéo existante — sans génération PixVerse</summary><label for="recoverVideoUrl">Lien du MP4 déjà généré</label><input id="recoverVideoUrl" type="url" placeholder="https://…" style="width:100%"><button id="recoverVideo" type="button">Réextraire les 9 vues</button>';
 video.after(recovery);
@@ -113,6 +122,14 @@ let extracted=null;
 let lastVideoId=null;
 let lastActionContext=null;
 let lastLaunchSelection=null;
+let sourcePreviewUrl='';
+document.getElementById('pixverseSourceFile').onchange=()=>{
+  const file=document.getElementById('pixverseSourceFile').files?.[0];if(!file)return;
+  if(sourcePreviewUrl)URL.revokeObjectURL(sourcePreviewUrl);sourcePreviewUrl=URL.createObjectURL(file);
+  const preview=document.getElementById('pixverseSourcePreview');preview.src=sourcePreviewUrl;preview.style.display='block';
+  clearFrames();video.pause();video.removeAttribute('src');video.style.display='none';rerun.style.display='none';
+  setStatus('Photo originale prête. Choisis l’action puis lance PixVerse — aucun relief préalable.',false,true);
+};
 
 function setStatus(text,error=false,ok=false){status.textContent=text;status.style.background=error?'#ffe9e7':ok?'#e7f7eb':'#f2f2f2';status.style.color=error?'#8b1f17':ok?'#17652c':'#333'}
 function cleanCustomIdea(){return customAction.value.replace(/\s+/g,' ').trim().slice(0,800)}
@@ -252,7 +269,7 @@ async function launch(selectionOverride=null){
   let s=selectionOverride||selection();if(!s)return;setActionBusy(true);video.style.display='none';rerun.style.display='none';clearFrames();
   try{
     if(s.customRequest&&!selectionOverride){setStatus('Création du prompt PixVerse avec les contraintes HappyHolo…');s=await prepareCustomSelection(s);renderPrompt(s)}
-    lastLaunchSelection=s;setStatus('Préparation de l’image finale HappyHolo…');const doc=iframe.contentDocument;const canvas=doc?.getElementById('view');const file=await canvasToFile(canvas);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,customRequest:s.customRequest||null,promptProvider:s.promptProvider||null,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(!views.qualityGate?.passed)setStatus('Vidéo récupérée, mais export bloqué : retour brutal à la pose initiale confirmé.',true);else if(views.qualityGate?.warning)setStatus(`Vidéo #${result.videoId} prête — export autorisé avec contrôle visuel conseillé.`,false,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues calculées sur la première action, sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,qualityGate:views.qualityGate,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}
+    lastLaunchSelection=s;setStatus('Préparation de la photo originale, sans détourage…');const file=getOriginalPixVerseFile(iframe,document.getElementById('pixverseSourceFile').files?.[0]);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,customRequest:s.customRequest||null,promptProvider:s.promptProvider||null,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(!views.qualityGate?.passed)setStatus('Vidéo récupérée, mais export bloqué : retour brutal à la pose initiale confirmé.',true);else if(views.qualityGate?.warning)setStatus(`Vidéo #${result.videoId} prête — export autorisé avec contrôle visuel conseillé.`,false,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues calculées sur la première action, sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,qualityGate:views.qualityGate,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}
   }catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{setActionBusy(false)}
 }
 
