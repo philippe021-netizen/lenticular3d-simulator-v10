@@ -28,6 +28,23 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 .mode-switch{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;margin-bottom:4px}.mode-switch button{min-width:170px;background:#e8e8e8;color:#111;border:2px solid transparent}.mode-switch button.mode-active{background:#111;color:#fff;border-color:#111}.mode-switch-note{font-size:12px;color:#666;margin-top:6px}
 .piece-start{margin:0 0 16px;padding:18px;border:3px solid #28a8ee;border-radius:18px;background:linear-gradient(145deg,#071018,#102536);color:#fff;box-shadow:0 12px 32px #00111f26}.piece-start h2{margin:0 0 6px;font-size:22px}.piece-start p{margin:0;color:#d8e7f1;font-size:14px;line-height:1.45}.piece-start button{width:100%;margin:14px 0 0;background:#28a8ee;color:#00121d;font-size:18px;min-height:54px}.piece-start-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.piece-start-steps span{padding:9px;border-radius:10px;background:#ffffff12;font-size:12px;line-height:1.35}.piece-start-steps b{color:#62c7ff}@media(max-width:700px){.piece-start-steps{grid-template-columns:1fr}.piece-start h2{font-size:20px}}
 .piece-auto-toggle{display:flex;align-items:center;gap:10px;margin-top:12px;padding:11px 12px;border:2px solid #62c7ff;border-radius:12px;background:#ffffff12;font-size:14px;font-weight:850}.piece-auto-toggle input{width:24px;height:24px;flex:0 0 auto;accent-color:#28a8ee}
+
+/* Simulation expérimentale photo (onglet 1) — ne touche ni aux PNG ni au ZIP */
+.photo3d-panel{margin-top:18px;background:#fff;border:2px solid #188dad;border-radius:18px;padding:16px}
+.photo3d-panel h2{margin:0 0 6px;font-size:19px}
+.photo3d-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:15px;margin-top:12px;align-items:start}
+.photo3d-stage{background:#e9e9e5;position:relative;aspect-ratio:4/3;overflow:hidden;border-radius:13px;min-height:170px}
+.photo3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;background:#e9e9e5;border-radius:0;aspect-ratio:auto}
+.photo3d-stage canvas[hidden],.photo3d-stage:not(.photo3d-ready) canvas{display:none!important}
+.photo3d-stage p{position:absolute;left:8%;right:8%;top:43%;margin:0;text-align:center;color:#42515b;font-size:13px;line-height:1.4}
+.photo3d-control label{margin:10px 0 5px}
+.photo3d-control button{display:block;width:100%;margin:8px 0 0;min-height:44px}
+.photo3d-panel #photo3dStatus{font-size:12px;line-height:1.45;margin-top:9px}
+.photo3d-panel #photo3dStatus[data-kind="warn"]{background:#fff4d6}
+.photo3d-panel #photo3dStatus[data-kind="bad"]{background:#ffe9e7;color:#8a221e}
+.photo3d-panel #photo3dStatus[data-kind="ok"]{background:#e6f6eb;color:#16662b}
+.photo3d-control input{width:100%;min-height:36px}
+@media(max-width:750px){.photo3d-grid{grid-template-columns:1fr}.photo3d-stage{min-height:180px}.photo3d-panel{padding:12px}}
 </style>
 </head>
 <body>
@@ -80,6 +97,26 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 </section>
 <section><canvas id="view" width="1024" height="768"></canvas><div id="frames" class="frames"></div></section>
 </div>
+<section id="photo3dPreview" class="photo3d-panel">
+  <h2>Simulation 3D photo — essai</h2>
+  <div class="small">Aperçu indépendant : même détourage que « Créer le relief 3D local », mais sujet et fond affichés sur des plans séparés. Rotation lente sans effet élastique. Les neuf vues et le ZIP ne changent pas.</div>
+  <div class="photo3d-grid">
+    <div id="photo3dStage" class="photo3d-stage">
+      <p id="photo3dPlaceholder">Charge une photo puis crée le relief pour tester cette simulation.</p>
+      <canvas id="photo3dCanvas2D" hidden aria-label="Aperçu 2D de secours"></canvas>
+      <canvas id="photo3dCanvas3D" hidden aria-label="Simulation 3D de la photo"></canvas>
+    </div>
+    <div class="photo3d-control">
+      <label for="photo3dAngle">Angle de vue <b id="photo3dAngleOut">0°</b></label>
+      <input id="photo3dAngle" type="range" min="-32" max="32" step="1" value="0" disabled>
+      <label for="photo3dStrength">Écart entre les plans <b id="photo3dStrengthOut">1,8×</b></label>
+      <input id="photo3dStrength" type="range" min="0.5" max="3.2" step=".1" value="1.8" disabled>
+      <button id="photo3dPlay" type="button" disabled>▶ Rotation lente</button>
+      <button id="photo3dRefresh" type="button" class="secondary" disabled>Actualiser la simulation</button>
+      <div id="photo3dStatus" class="status">Le relief doit d’abord être calculé.</div>
+    </div>
+  </div>
+</section>
 </div>
 <script src="./relief-engine-v31.js?v=329"></script>
 <script src="./action-preview-engine.js?v=330"></script>
@@ -132,5 +169,6 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 })();
 window.addEventListener('load',()=>{const ok=!!window.HappyHoloActionPreviewEngine;console.log('[HAPPYHOLO] intégration moteur actions :',ok?'OK':'ABSENTE');if(!ok){const s=document.querySelector('#status');if(s)s.textContent='ERREUR : moteur actions OFFLINE non chargé. Vérifie action-preview-engine.js.';}});
 </script>
+<script type="module" src="./modules/photo-floating-preview.js?v=1"></script>
 </body>
 </html>
