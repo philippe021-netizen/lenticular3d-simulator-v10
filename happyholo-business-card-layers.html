@@ -401,14 +401,23 @@ function renderLayers(){const root=$('layers');root.innerHTML='';layers.forEach(
 function renderBoxes(){
   const ov=$('overlay');updateOverlayGeometry();ov.innerHTML='';
   ov.classList.toggle('draw-mode',selectionDrawMode);
+  ov.classList.toggle('brush-mode',!!maskBrushMode);
   for(const l of layers){
     const box=document.createElement('div');
     box.className='box '+l.type+(l.id===activeId?' active':'')+(animatedIds.has(l.id)?' grouped':'')+(l.id===activeId&&selectionPositioning?' positioning':'');
     setBoxStyle(box,l.bbox);
-    box.innerHTML='<span class="tag">'+esc(l.label)+'</span><span class="move-handle" aria-label="Glisser pour déplacer le cadre">✥ Déplacer</span><span class="resize-handle" title="Redimensionner"></span>';
+    box.innerHTML='<span class="tag">'+esc(l.label)+'</span><canvas class="mask-preview" aria-hidden="true"></canvas><span class="move-handle" aria-label="Glisser pour déplacer le cadre">✥ Déplacer</span><span class="resize-handle" title="Redimensionner"></span>';
+    if(l.mask?.alpha)renderMaskPreview(box.querySelector('.mask-preview'),l.mask);
     box.addEventListener('pointerdown',e=>{
       if(selectionDrawMode)return;
-      e.preventDefault();e.stopPropagation();const changedSelection=activeId!==l.id;activeId=l.id;
+      e.preventDefault();e.stopPropagation();
+      if(maskBrushMode&&l.id===activeId&&l.mask?.alpha){
+        maskGesture={pointerId:e.pointerId,id:l.id,last:0};
+        box.setPointerCapture(e.pointerId);
+        brushMaskPoint(l,overlayPoint(e),box.querySelector('.mask-preview'));
+        return;
+      }
+      maskBrushMode='';const changedSelection=activeId!==l.id;activeId=l.id;
       if(changedSelection)selectionPositioning=true;
       const p=overlayPoint(e);selectedBoxGesture={id:l.id,pointerId:e.pointerId,
         start:p,box:[...l.bbox],resize:e.target.classList.contains('resize-handle'),moved:false};
@@ -417,6 +426,10 @@ function renderBoxes(){
       renderLayers();syncSelectionFields();
     });
     box.addEventListener('pointermove',e=>{
+      if(maskGesture?.pointerId===e.pointerId&&maskGesture.id===l.id){
+        const now=performance.now();if(now-maskGesture.last<24)return;maskGesture.last=now;
+        brushMaskPoint(l,overlayPoint(e),box.querySelector('.mask-preview'));return;
+      }
       const g=selectedBoxGesture;if(!g||g.id!==l.id||e.pointerId!==g.pointerId)return;
       const p=overlayPoint(e),dx=p.x-g.start.x,dy=p.y-g.start.y;
       if(Math.abs(dx)+Math.abs(dy)<.001)return;
@@ -424,6 +437,10 @@ function renderBoxes(){
       setBoxStyle(box,l.bbox);syncSelectionFields();
     });
     box.addEventListener('pointerup',e=>{
+      if(maskGesture?.pointerId===e.pointerId&&maskGesture.id===l.id){
+        maskGesture=null;invalidateCardOutputs();renderBoxes();syncSelectionFields();
+        status('Contour corrigé. Vérifie le masque cyan avant de modifier.','ok');return;
+      }
       const g=selectedBoxGesture;if(!g||g.id!==l.id||e.pointerId!==g.pointerId)return;
       selectedBoxGesture=null;
       if(box.hasPointerCapture(e.pointerId))box.releasePointerCapture(e.pointerId);
@@ -431,6 +448,7 @@ function renderBoxes(){
       else{renderBoxes();renderLayers();syncSelectionFields()}
     });
     box.addEventListener('pointercancel',e=>{
+      if(maskGesture?.pointerId===e.pointerId){maskGesture=null;return}
       const g=selectedBoxGesture;if(!g||g.id!==l.id||e.pointerId!==g.pointerId)return;
       l.bbox=g.box;selectedBoxGesture=null;renderBoxes();renderLayers();syncSelectionFields();
     });
