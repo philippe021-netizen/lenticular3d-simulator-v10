@@ -17,6 +17,7 @@
 .selectionEditor .selectionWarning{color:#725022}
 .overlay.draw-mode{pointer-events:auto;touch-action:none;cursor:crosshair}
 .overlay.draw-mode .box{pointer-events:none}
+.overlay .box{touch-action:none}
 .overlay .box.active{cursor:move;touch-action:none}
 .overlay .box .resize-handle{position:absolute;right:-10px;bottom:-10px;width:24px;height:24px;border-radius:7px;border:2px solid #151515;background:#ffd60a;pointer-events:auto;touch-action:none}
 .overlay .box.drawing{border:2px dashed #ffd60a;background:#ffd60a25;pointer-events:none}
@@ -188,7 +189,11 @@ $('deleteSelectionLayer').onclick=()=>{
 };
 $('eraseSelectionImage').onclick=async()=>{
   const l=selectedCardLayer();if(!l||!srcImg)return;
-  if(!confirm('Effacer les pixels de « '+(l.label||'la zone')+' » sur la copie de travail ? Le fond sera estimé ; tu pourras annuler ce dernier effacement.'))return;
+  const overlaps=layers.filter(other=>other.id!==l.id&&other.bbox&&
+    l.bbox[0]<other.bbox[0]+other.bbox[2]&&l.bbox[0]+l.bbox[2]>other.bbox[0]&&
+    l.bbox[1]<other.bbox[1]+other.bbox[3]&&l.bbox[1]+l.bbox[3]>other.bbox[1]).length;
+  const warning=overlaps?' Attention : '+overlaps+' autre(s) calque(s) se chevauchent et leurs pixels peuvent aussi être affectés.':'';
+  if(!confirm('Effacer les pixels de « '+(l.label||'la zone')+' » sur la copie de travail ? Le fond sera estimé et tu pourras annuler.'+warning))return;
   const btn=$('eraseSelectionImage');btn.disabled=true;
   try{
     const undo={imageData,srcImg,layers:layers.map(item=>({...item,bbox:[...item.bbox]})),
@@ -245,7 +250,7 @@ cropCanvas.addEventListener('pointerup',()=>{preCropDragging=-1});
 cropCanvas.addEventListener('pointercancel',()=>{preCropDragging=-1});
 $('resetPreCrop').onclick=()=>{initialisePreCropPoints();paintPreCrop();$('applyPreCrop').disabled=false};
 $('keepFullImage').onclick=()=>{$('preCropCard').classList.add('hidden');$('analyze').disabled=false;status('Image complète conservée sans redressement. Lance le repérage automatique.','ok')};
-$('applyPreCrop').onclick=async()=>{if(preCropPoints.length!==4)return;const corners=preCropPoints.map(p=>({x:p.x/preCropScale,y:p.y/preCropScale}));$('applyPreCrop').disabled=true;try{const corrected=preprocessBusinessCard(srcImg,{corners,maxWidth:Math.min(1536,srcImg.naturalWidth),enhance:false,forceRatio:true,autoDetect:false});imageData=corrected.toDataURL('image/png');srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';cachedCardDepth=null;depthSource='';layers=[];activeId='';selectionDrawMode=false;$('startCardSelection').textContent='+ Tracer une zone sur la carte';syncSelectionFields();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');$('preCropCard').classList.add('hidden');$('analyze').disabled=false;status('Carte redressée à partir des quatre coins. Le repérage analysera cette image corrigée.','ok')}catch(e){status('Redressement impossible : '+e.message,'bad');$('applyPreCrop').disabled=false}};
+$('applyPreCrop').onclick=async()=>{if(preCropPoints.length!==4)return;const corners=preCropPoints.map(p=>({x:p.x/preCropScale,y:p.y/preCropScale}));$('applyPreCrop').disabled=true;try{const corrected=preprocessBusinessCard(srcImg,{corners,maxWidth:Math.min(1536,srcImg.naturalWidth),enhance:false,forceRatio:true,autoDetect:false});imageData=corrected.toDataURL('image/png');srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';cachedCardDepth=null;depthSource='';layers=[];activeId='';selectionDrawMode=false;selectionUndo=null;$('undoSelectionErase').disabled=true;$('startCardSelection').textContent='+ Tracer une zone sur la carte';syncSelectionFields();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');$('preCropCard').classList.add('hidden');$('analyze').disabled=false;status('Carte redressée à partir des quatre coins. Le repérage analysera cette image corrigée.','ok')}catch(e){status('Redressement impossible : '+e.message,'bad');$('applyPreCrop').disabled=false}};
 const demoButton=document.createElement('button');demoButton.id='loadCardDemo';demoButton.className='secondary';demoButton.textContent='Charger la carte de démonstration MicroPlayer';$('file').after(demoButton);
 demoButton.onclick=async()=>{demoButton.disabled=true;try{const response=await fetch('./assets/microplayer-carte-demo.jpg');if(!response.ok)throw new Error('Image indisponible');await importCard(await response.blob())}catch(e){status(e.message,'bad')}finally{demoButton.disabled=false}};
 $('prepare').addEventListener('click',()=>cardSimulator.stop());
