@@ -51,6 +51,7 @@ function createWebGLScene(canvas,base,planes,width,height){
   const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
   const perspective=(fov,aspect,near,far)=>{const f=1/Math.tan(fov/2),out=new Float32Array(16);out[0]=f/aspect;out[5]=f;out[10]=(far+near)/(near-far);out[11]=-1;out[14]=2*far*near/(near-far);return out};
   const lookAt=(eye,target,up)=>{const z=normalize([eye[0]-target[0],eye[1]-target[1],eye[2]-target[2]]),x=normalize(cross(up,z)),y=cross(z,x),out=new Float32Array([x[0],y[0],z[0],0,x[1],y[1],z[1],0,x[2],y[2],z[2],0,0,0,0,1]);out[12]=-(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]);out[13]=-(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]);out[14]=-(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]);return out};
+  let firstFrameChecked=false;
   const draw=(angle,strength,currentLayers)=>{
     const dpr=Math.min(1.5,window.devicePixelRatio||1),cw=canvas.clientWidth||800,ch=canvas.clientHeight||Math.round(cw*height/width),vw=Math.max(1,Math.round(cw*dpr)),vh=Math.max(1,Math.round(ch*dpr));if(canvas.width!==vw||canvas.height!==vh){canvas.width=vw;canvas.height=vh}
     gl.viewport(0,0,vw,vh);gl.clearColor(.94,.94,.92,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(program);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
@@ -58,6 +59,19 @@ function createWebGLScene(canvas,base,planes,width,height){
     const depths=new Map((currentLayers||[]).map((layer,index)=>[layer.id||String(index),clamp(Number(layer.depth)||0,-100,100)])),ordered=planes.map(plane=>({...plane,depth:depths.get(plane.id)??plane.depth})).sort((a,b)=>a.depth-b.depth),min=Math.min(0,...ordered.map(p=>p.depth)),max=Math.max(0,...ordered.map(p=>p.depth)),span=Math.max(1,max-min),relief=clamp(Number(strength)||1.8,.25,3.2);
     const renderPlane=(source,z,cut)=>{gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,textures.get(source));gl.uniform1f(zLoc,z);gl.uniform1f(cutLoc,cut);gl.drawArrays(gl.TRIANGLES,0,6)};
     gl.depthMask(true);renderPlane(base,0,0);for(const plane of ordered)renderPlane(plane.canvas,.035+((plane.depth-min)/span)*.305*relief/1.8,.025);
+    if(gl.isContextLost?.()||gl.getError()!==gl.NO_ERROR)return false;
+    if(!firstFrameChecked){
+      firstFrameChecked=true;
+      // Safari may silently draw only the grey clear colour.
+      const px=new Uint8Array(4),points=[[.5,.5],[.3,.4],[.7,.4],[.3,.6],[.7,.6],[.5,.3],[.5,.7]];
+      let visible=false;
+      for(const [u,v] of points){
+        gl.readPixels(Math.min(vw-1,Math.floor(u*vw)),Math.min(vh-1,Math.floor(v*vh)),1,1,gl.RGBA,gl.UNSIGNED_BYTE,px);
+        if(Math.abs(px[0]-240)>8||Math.abs(px[1]-240)>8||Math.abs(px[2]-235)>8){visible=true;break}
+      }
+      if(gl.getError()!==gl.NO_ERROR||!visible)return false;
+    }
+    return true;
   };
   return draw;
 }
@@ -116,7 +130,13 @@ export function createCardFloatingPlanesPreview(pixels,width,height,layers){
   try{webglDraw=createWebGLScene(document.getElementById('sim3dCanvas'),base,planes,width,height)}catch(error){console.warn('Aperçu WebGL indisponible, repli 2D :',error)}
   return{
     planes:planes.length,
-    draw3D(angle=0,strength=1.8,currentLayers=cleanLayers){if(!webglDraw)return false;webglDraw(angle,strength,currentLayers);return true},
+    draw3D(angle=0,strength=1.8,currentLayers=cleanLayers){
+      if(!webglDraw)return false;
+      try{if(webglDraw(angle,strength,currentLayers))return true}
+      catch(error){console.warn('WebGL interrompu :',error)}
+      console.warn('WebGL ne dessine pas la carte. Retour à l’aperçu 2D.');
+      webglDraw=null;return false;
+    },
     render(angle=0,strength=1.8,currentLayers=cleanLayers){
       ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,width,height);ctx.fillStyle='#efefec';ctx.fillRect(0,0,width,height);
       const marginX=width*.065,marginY=height*.10,cardW=width-marginX*2,cardH=height-marginY*2,cx=width/2;
