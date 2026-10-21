@@ -14,20 +14,24 @@
 </aside><main>
 <section class="card"><h2>Carte et zones détectées</h2><div id="canvasWrap" class="canvasWrap"><img id="cardImg"><div id="overlay" class="overlay"></div></div><p class="small">Bleu = texte · jaune = logo · vert = objet/sujet · halo vert = inclus dans l’animation groupée.</p></section>
 <section id="resultCard" class="card hidden"><h2>4. Simulation des 9 vues</h2><div class="sim"><canvas id="simCanvas"></canvas></div><label>Vue <b id="viewOut">5 / 9</b></label><input id="viewRange" type="range" min="0" max="8" step="1" value="4"><div id="frames" class="frames"></div><button id="download" class="pix">Télécharger ZIP 9 vues</button><div id="finalStatus" class="status" style="margin-top:9px">9 vues prêtes.</div></section>
+<section id="meshPreviewCard" class="card hidden"><h2>Relief 3D par maillage</h2><p class="small">La carte est reconstruite sur un maillage déformé par la carte de profondeur. Augmente le relief pour mieux voir les écarts de hauteur, puis déplace le curseur Vue pour faire pivoter la surface. Cette amplification sert à visualiser le relief ; elle ne change pas les 9 vues ni le ZIP.</p><label>Relief visuel <b id="meshReliefOut">100 %</b></label><input id="meshRelief" type="range" min="20" max="240" step="5" value="100" style="width:100%"><div class="sim"><canvas id="meshCanvas"></canvas></div><div id="meshStatus" class="status" style="margin-top:9px">Aperçu 3D prêt.</div></section>
 </main></div></div>
 <script type="module">
 import { extractVideoFrames } from './modules/video-frame-extractor-2s.js?v=410';
 import { composeCardDepth, estimateCardDepth } from './modules/card-depth.js?v=506';
 import { renderNovelView } from './depthflow-v42-core.js';
 import { createCardSimulator } from './modules/card-simulator.js?v=507';
+import { createCardMeshPreview } from './modules/card-mesh-preview.js?v=1';
 import { detectDocumentQuad, preprocessBusinessCard } from './modules/microplayer-image-preprocess-v1.js';
 let cachedCardDepth=null, depthSource='', depthMode='ai',livePreviewState=null,livePreviewPending=false,livePreviewTimer=0;
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
+let meshPreview=null,meshPreviewError='';try{meshPreview=createCardMeshPreview($('meshCanvas'))}catch(error){meshPreviewError=error?.message||'WebGL indisponible.';$('meshStatus').textContent=meshPreviewError;$('meshStatus').className='status warn'}
 const depthOptions=document.createElement('div');
 depthOptions.innerHTML='<label for="cardParallax">Amplitude du relief : <b id="cardParallaxOut">4 %</b></label><input id="cardParallax" type="range" min="0" max="8" step="0.5" value="4" style="width:100%"><p class="small">Profondeur calculée par pixel. Les curseurs des éléments corrigent leur position ; les textes restent sur des plans lisibles. Régénère les vues après un réglage.</p><button id="showCardDepth" class="secondary" disabled>Voir la carte de profondeur</button><canvas id="cardDepthCanvas" class="hidden" style="width:100%;margin-top:8px"></canvas>';
 $('prepare').before(depthOptions);
 $('cardParallax').oninput=()=>{$('cardParallaxOut').textContent=$('cardParallax').value+' %';if(livePreviewState){livePreviewState.amplitude=Number($('cardParallax').value);scheduleLivePreview()}};
 $('showCardDepth').onclick=()=>$('cardDepthCanvas').classList.toggle('hidden');
+$('meshRelief').oninput=()=>{$('meshReliefOut').textContent=$('meshRelief').value+' %';if(livePreviewState)renderLivePreview(Number($('viewRange').value),(Number($('viewRange').value)-4)*12)};
 let imageData='',srcImg=null,layers=[],suggestedDepths=new Map(),activeId='',animatedIds=new Set(),animatedFrames=[],animatedCropBbox=null,finalBlobs=[],finalUrls=[];
 const cardSimulator=createCardSimulator({canvas:$('simCanvas'),range:$('viewRange'),output:$('viewOut'),getUrls:()=>finalUrls});
 const setStep=n=>steps.forEach((s,i)=>s.classList.toggle('on',i<n));
@@ -50,12 +54,13 @@ function renderLivePreview(index,angle){
  const s=livePreviewState,depth=composeCardDepth(s.baseDepth,s.width,s.height,s.layers);
  const rendered=renderNovelView(s.pixels,depth,s.width,s.height,clamp(angle/48,-1,1),{zero:128,relief:1,planeSeparation:1.8,parallaxPercent:s.amplitude,continuousSurface:true,projectedFill:true});
  cardSimulator.showLive(rendered.data,s.width,s.height,index,angle);
+ if(meshPreview){try{meshPreview.draw(s.pixels,depth,s.width,s.height,angle,Number($('meshRelief').value)/100);$('meshStatus').textContent=`Vue ${index+1}/9 · angle ${Number(angle).toFixed(0)}° · relief ${$('meshRelief').value} %`;$('meshStatus').className='status ok'}catch(error){$('meshStatus').textContent=`Aperçu 3D indisponible : ${error?.message||error}`;$('meshStatus').className='status warn'}}
 }
 function scheduleLivePreview(){
  if(!livePreviewState||livePreviewPending)return;livePreviewPending=true;
  requestAnimationFrame(()=>{const now=performance.now(),wait=Math.max(0,35-(now-livePreviewTimer)),run=()=>{livePreviewPending=false;livePreviewTimer=performance.now();if(livePreviewState)renderLivePreview(Number($('viewRange').value),(Number($('viewRange').value)-4)*12)};if(wait)setTimeout(run,wait);else run()});
 }
-async function importCard(f){if(!f)return;cardSimulator.stop();cardSimulator.setLiveRenderer(null);livePreviewState=null;try{imageData=await readFile(f);cachedCardDepth=null;depthSource='';depthMode='ai';srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=true;$('preCropCard').classList.remove('hidden');initialisePreCropPoints();$('applyPreCrop').disabled=false;paintPreCrop();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Trace le cadrage, applique-le, ou conserve l’image entière.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
+async function importCard(f){if(!f)return;cardSimulator.stop();cardSimulator.setLiveRenderer(null);livePreviewState=null;$('meshPreviewCard').classList.add('hidden');try{imageData=await readFile(f);cachedCardDepth=null;depthSource='';depthMode='ai';srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=true;$('preCropCard').classList.remove('hidden');initialisePreCropPoints();$('applyPreCrop').disabled=false;paintPreCrop();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Trace le cadrage, applique-le, ou conserve l’image entière.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
 $('file').onchange=()=>importCard($('file').files?.[0]);
 let preCropPoints=[],preCropScale=1,preCropDragging=-1;
 function initialisePreCropPoints(){
@@ -142,7 +147,7 @@ async function buildDepthViews(){
   status(depthMode==='ai'?'Relief par pixel prêt. Compare les vues 1 et 9.':'Relief simplifié prêt. Compare les vues 1 et 9, puis ajuste les curseurs de calques si besoin.','ok');
 }
 $('prepare').onclick=async()=>{const b=$('prepare');b.disabled=true;demoButton.disabled=true;$('file').disabled=true;$('analyze').disabled=true;try{if(animatedFrames.length===9)await buildViews();else await buildDepthViews();$('resultCard').classList.remove('hidden');setStep(6);$('resultCard').scrollIntoView({behavior:'smooth',block:'start'})}catch(e){status(`Relief non généré : ${e.message}`,'bad')}finally{b.disabled=false;demoButton.disabled=false;$('file').disabled=false;$('analyze').disabled=false}};
-function renderResult(){const frames=$('frames');frames.innerHTML=finalUrls.map((u,i)=>`<img src="${u}" alt="Vue ${i+1}">`).join('');drawSim(4);$('viewRange').value=4;$('viewOut').textContent='5 / 9';$('finalStatus').className='status ok';$('finalStatus').textContent=`9 vues générées. ${animatedFrames.length===9?`${animatedIds.size} élément(s) animé(s) et réinjecté(s).`:'Profondeur seule.'}`}
+function renderResult(){ $('meshPreviewCard').classList.toggle('hidden',!livePreviewState);const frames=$('frames');frames.innerHTML=finalUrls.map((u,i)=>`<img src="${u}" alt="Vue ${i+1}">`).join('');drawSim(4);$('viewRange').value=4;$('viewOut').textContent='5 / 9';$('finalStatus').className='status ok';$('finalStatus').textContent=`9 vues générées. ${animatedFrames.length===9?`${animatedIds.size} élément(s) animé(s) et réinjecté(s).`:'Profondeur seule.'}`}
 async function drawSim(i){cardSimulator.stop();await cardSimulator.show(i)}
 $('download').onclick=async()=>{if(finalBlobs.length!==9)return;const zip=new JSZip();finalBlobs.forEach((b,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,b));zip.file('manifest.json',JSON.stringify({app:'HappyHolo',type:'business-card-layered-9-views',created:new Date().toISOString(),animated_group:[...animatedIds],layers:layers.map(l=>({id:l.id,sourceType:l.sourceType,type:l.type,label:l.label,bbox:l.bbox,depth:l.depth,animated:animatedIds.has(l.id)&&animatedFrames.length===9}))},null,2));const blob=await zip.generateAsync({type:'blob',compression:'STORE'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`happyholo-carte-calques-9-vues-${Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);$('finalStatus').textContent='ZIP 9 vues téléchargé.'};
 </script></body></html>
