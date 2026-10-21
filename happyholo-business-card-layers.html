@@ -20,7 +20,7 @@ import { extractVideoFrames } from './modules/video-frame-extractor-2s.js?v=410'
 import { composeCardDepth, estimateCardDepth } from './modules/card-depth.js?v=506';
 import { renderNovelView } from './depthflow-v42-core.js';
 import { createCardSimulator } from './modules/card-simulator.js?v=507';
-let cachedCardDepth=null, depthSource='';
+let cachedCardDepth=null, depthSource='', depthMode='ai';
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
 const depthOptions=document.createElement('div');
 depthOptions.innerHTML='<label for="cardParallax">Amplitude du relief : <b id="cardParallaxOut">4 %</b></label><input id="cardParallax" type="range" min="0" max="8" step="0.5" value="4" style="width:100%"><p class="small">Profondeur calculée par pixel. Les curseurs des éléments corrigent leur position ; les textes restent sur des plans lisibles. Régénère les vues après un réglage.</p><button id="showCardDepth" class="secondary" disabled>Voir la carte de profondeur</button><canvas id="cardDepthCanvas" class="hidden" style="width:100%;margin-top:8px"></canvas>';
@@ -37,7 +37,7 @@ function clamp(v,a,b){return Math.max(a,Math.min(b,v))}
 function apiJson(url,opts){return fetch(url,opts).then(async r=>{const text=await r.text();let d={};try{d=text?JSON.parse(text):{}}catch{d={raw:text}}if(!r.ok||Number(d?.ErrCode))throw new Error(d?.error||d?.message||d?.ErrMsg||`HTTP ${r.status}`);return d})}
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function syncAnimatable(l){l.animatable=l.type!=='text';if(!l.animatable)animatedIds.delete(l.id)}
-async function importCard(f){if(!f)return;cardSimulator.stop();try{imageData=await readFile(f);srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=false;$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Lance le repérage automatique.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
+async function importCard(f){if(!f)return;cardSimulator.stop();try{imageData=await readFile(f);cachedCardDepth=null;depthSource='';depthMode='ai';srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=false;$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Lance le repérage automatique.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
 $('file').onchange=()=>importCard($('file').files?.[0]);
 const demoButton=document.createElement('button');demoButton.id='loadCardDemo';demoButton.className='secondary';demoButton.textContent='Charger la carte de démonstration MicroPlayer';$('file').after(demoButton);
 demoButton.onclick=async()=>{demoButton.disabled=true;try{const response=await fetch('./assets/microplayer-carte-demo.jpg');if(!response.ok)throw new Error('Image indisponible');await importCard(await response.blob())}catch(e){status(e.message,'bad')}finally{demoButton.disabled=false}};
@@ -56,7 +56,7 @@ function eraseRect(ctx,r,W,H){const p=Math.max(4,Math.round(Math.min(W,H)*.006))
 async function buildViews(){if(!srcImg)return;const W=srcImg.naturalWidth,H=srcImg.naturalHeight,sel=selectedAnimLayers(),animImgs=animatedFrames.length===9?await Promise.all(animatedFrames.map(loadImage)):[];finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];for(let i=0;i<9;i++){const phase=(i-4)/4,c=document.createElement('canvas');c.width=W;c.height=H;const ctx=c.getContext('2d');ctx.drawImage(srcImg,0,0,W,H);const staticMoved=layers.filter(l=>l.enabled&&l.depth!==0&&!animatedIds.has(l.id));for(const l of staticMoved)eraseRect(ctx,rectPxBbox(l.bbox,W,H),W,H);if(sel.length&&animImgs[i]&&animatedCropBbox)eraseRect(ctx,rectPxBbox(animatedCropBbox,W,H),W,H);for(const l of staticMoved){const r=rectPxBbox(l.bbox,W,H),shift=Math.round((l.depth/100)*phase*W*.012);ctx.drawImage(srcImg,r.x,r.y,r.w,r.h,r.x+shift,r.y,r.w,r.h)}if(sel.length&&animImgs[i]&&animatedCropBbox){const r=rectPxBbox(animatedCropBbox,W,H),avgDepth=sel.reduce((a,l)=>a+l.depth,0)/sel.length,shift=Math.round((avgDepth/100)*phase*W*.012);ctx.drawImage(animImgs[i],r.x+shift,r.y,r.w,r.h)}else{for(const l of sel){if(l.depth===0)continue;const r=rectPxBbox(l.bbox,W,H),shift=Math.round((l.depth/100)*phase*W*.012);eraseRect(ctx,r,W,H);ctx.drawImage(srcImg,r.x,r.y,r.w,r.h,r.x+shift,r.y,r.w,r.h)}}const blob=await new Promise(res=>c.toBlob(res,'image/png'));finalBlobs.push(blob);finalUrls.push(URL.createObjectURL(blob))}renderResult()}
 async function buildDepthViews(){
   const amplitude=Number($('cardParallax').value);
-  const layerSnapshot=layers.map(l=>({...l,bbox:[...l.bbox]}));
+  let layerSnapshot=layers.map(l=>({...l,bbox:[...l.bbox]}));
   const scale=Math.min(1,1400/srcImg.naturalWidth,1400/srcImg.naturalHeight);
   const W=Math.round(srcImg.naturalWidth*scale),H=Math.round(srcImg.naturalHeight*scale);
   const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
@@ -64,7 +64,18 @@ async function buildDepthViews(){
   const original=ctx.getImageData(0,0,W,H);
   if(depthSource!==imageData||!cachedCardDepth){
     status('Calcul de la profondeur réelle par pixel…','warn');
-    cachedCardDepth=await estimateCardDepth(canvas.toDataURL('image/png'),original.data,W,H,(stage,p)=>status(`${stage} ${p??''} %`,'warn'));
+    try{
+      cachedCardDepth=await estimateCardDepth(canvas.toDataURL('image/png'),original.data,W,H,(stage,p)=>status(`${stage} ${p??''} %`,'warn'));
+      depthMode='ai';
+    }catch(error){
+      depthMode='layers';
+      cachedCardDepth=new Uint8ClampedArray(W*H);
+      cachedCardDepth.fill(128);
+      layers=layers.map(layer=>({...layer,depth:layer.type==='text'||Number(layer.depth)!==0?(Number(layer.depth)||0):layer.type==='subject'?28:layer.type==='logo'?20:24}));
+      layerSnapshot=layers.map(layer=>({...layer,bbox:[...layer.bbox]}));
+      renderLayers();
+      status(`Le modèle IA manque de mémoire ou est indisponible (${error?.message||error}). Je termine avec un relief simplifié par calques ; tu peux régler leurs curseurs.`,'warn');
+    }
     depthSource=imageData;
   }
   const depth=composeCardDepth(cachedCardDepth,W,H,layerSnapshot);
@@ -80,8 +91,8 @@ async function buildDepthViews(){
     await new Promise(r=>setTimeout(r,0));
   }
   renderResult();
-  $('finalStatus').textContent='9 vues générées par profondeur pixel — occultations gérées, comblement local des zones découvertes. Vue 5 fidèle à l’original redimensionné.';
-  status('Relief par pixel prêt. Compare les vues 1 et 9.','ok');
+  $('finalStatus').textContent=depthMode==='ai'?'9 vues générées par profondeur pixel — occultations gérées, comblement local des zones découvertes. Vue 5 fidèle à l’original redimensionné.':'9 vues générées avec un relief simplifié par plans de calques. Le modèle IA n’a pas pu fonctionner sur cet appareil.';
+  status(depthMode==='ai'?'Relief par pixel prêt. Compare les vues 1 et 9.':'Relief simplifié prêt. Compare les vues 1 et 9, puis ajuste les curseurs de calques si besoin.','ok');
 }
 $('prepare').onclick=async()=>{const b=$('prepare');b.disabled=true;demoButton.disabled=true;$('file').disabled=true;$('analyze').disabled=true;try{if(animatedFrames.length===9)await buildViews();else await buildDepthViews();$('resultCard').classList.remove('hidden');setStep(6);$('resultCard').scrollIntoView({behavior:'smooth',block:'start'})}catch(e){status(`Relief non généré : ${e.message}`,'bad')}finally{b.disabled=false;demoButton.disabled=false;$('file').disabled=false;$('analyze').disabled=false}};
 function renderResult(){const frames=$('frames');frames.innerHTML=finalUrls.map((u,i)=>`<img src="${u}" alt="Vue ${i+1}">`).join('');drawSim(4);$('viewRange').value=4;$('viewOut').textContent='5 / 9';$('finalStatus').className='status ok';$('finalStatus').textContent=`9 vues générées. ${animatedFrames.length===9?`${animatedIds.size} élément(s) animé(s) et réinjecté(s).`:'Profondeur seule.'}`}
