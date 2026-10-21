@@ -39,7 +39,7 @@ function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&l
 function syncAnimatable(l){l.animatable=l.type!=='text';if(!l.animatable)animatedIds.delete(l.id)}
 async function importCard(f){if(!f)return;cardSimulator.stop();try{imageData=await readFile(f);cachedCardDepth=null;depthSource='';depthMode='ai';srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=true;$('preCropCard').classList.remove('hidden');preCropRect=null;$('applyPreCrop').disabled=true;paintPreCrop();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Trace le cadrage, applique-le, ou conserve l’image entière.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
 $('file').onchange=()=>importCard($('file').files?.[0]);
-let preCropRect=null,preCropScale=1,preCropDragging=false;
+let preCropRect=null,preCropScale=1,preCropDragging=false,preCropStart=null;
 function paintPreCrop(){
  const c=$('preCropCanvas');if(!srcImg)return;
  preCropScale=Math.min(1,1200/srcImg.naturalWidth,900/srcImg.naturalHeight);
@@ -49,8 +49,8 @@ function paintPreCrop(){
 }
 function cropPoint(e){const c=$('preCropCanvas'),r=c.getBoundingClientRect();return{x:clamp((e.clientX-r.left)/r.width*c.width,0,c.width),y:clamp((e.clientY-r.top)/r.height*c.height,0,c.height)}}
 const cropCanvas=$('preCropCanvas');
-cropCanvas.addEventListener('pointerdown',e=>{if(!srcImg)return;cropCanvas.setPointerCapture(e.pointerId);const p=cropPoint(e);preCropRect={x:p.x,y:p.y,w:0,h:0};preCropDragging=true;paintPreCrop()});
-cropCanvas.addEventListener('pointermove',e=>{if(!preCropDragging)return;const p=cropPoint(e),r=preCropRect;r.w=p.x-r.x;r.h=p.y-r.y;if(r.w<0){r.x=p.x;r.w=-r.w}else if(p.x<r.x){r.x=p.x;r.w=Math.abs(p.x-r.x)}if(r.h<0){r.y=p.y;r.h=-r.h}else if(p.y<r.y){r.y=p.y;r.h=Math.abs(p.y-r.y)}paintPreCrop()});
+cropCanvas.addEventListener('pointerdown',e=>{if(!srcImg)return;cropCanvas.setPointerCapture(e.pointerId);const p=cropPoint(e);preCropStart=p;preCropRect={x:p.x,y:p.y,w:0,h:0};preCropDragging=true;paintPreCrop()});
+cropCanvas.addEventListener('pointermove',e=>{if(!preCropDragging)return;const p=cropPoint(e),r=preCropRect;r.x=Math.min(preCropStart.x,p.x);r.y=Math.min(preCropStart.y,p.y);r.w=Math.abs(p.x-preCropStart.x);r.h=Math.abs(p.y-preCropStart.y);paintPreCrop()});
 cropCanvas.addEventListener('pointerup',()=>{preCropDragging=false;const r=preCropRect;$('applyPreCrop').disabled=!r||r.w<24||r.h<24});
 cropCanvas.addEventListener('pointercancel',()=>preCropDragging=false);
 $('resetPreCrop').onclick=()=>{preCropRect=null;$('applyPreCrop').disabled=true;paintPreCrop()};
