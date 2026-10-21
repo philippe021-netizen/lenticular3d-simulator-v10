@@ -103,15 +103,31 @@ export function paintMaskAt(mask,u,v,radiusPixels,mode='add'){
  return out;
 }
 export function paintMaskStroke(mask,from,to,radiusPixels,mode='add'){
- if(!mask)return mask;
+ if(!mask?.alpha)return mask;
+ if(![from.u,from.v,to.u,to.v].every(Number.isFinite))return mask;
+ const output={...mask,alpha:new Uint8Array(mask.alpha)};
+ const radius=Math.max(1,Math.round(radiusPixels));
  const distance=Math.hypot((to.u-from.u)*mask.width,(to.v-from.v)*mask.height);
- const steps=Math.max(1,Math.ceil(distance/Math.max(1,radiusPixels*.42)));
- let edited=mask;
+ const steps=Math.max(1,Math.ceil(distance/Math.max(1,radius*.42)));
+ const next=mode==='erase'?0:255;
+ let delta=0;
+ // One buffer allocation for the entire stroke, even for long fast Pencil swipes.
  for(let i=0;i<=steps;i++){
-   const t=i/steps;
-   edited=paintMaskAt(edited,from.u*(1-t)+to.u*t,from.v*(1-t)+to.v*t,radiusPixels,mode);
+   const t=i/steps,u=from.u*(1-t)+to.u*t,v=from.v*(1-t)+to.v*t;
+   if(u<0||u>1||v<0||v>1)continue;
+   const cx=Math.min(mask.width-1,Math.max(0,Math.round(u*(mask.width-1))));
+   const cy=Math.min(mask.height-1,Math.max(0,Math.round(v*(mask.height-1))));
+   for(let y=Math.max(0,cy-radius);y<=Math.min(mask.height-1,cy+radius);y++)
+   for(let x=Math.max(0,cx-radius);x<=Math.min(mask.width-1,cx+radius);x++){
+     if((x-cx)**2+(y-cy)**2>radius*radius)continue;
+     const idx=y*mask.width+x;
+     if(output.alpha[idx]!==next){delta+=next?1:-1;output.alpha[idx]=next}
+   }
  }
- return edited;
+ output.coverage=Number.isFinite(mask.coverage)
+   ?Math.max(0,Math.min(1,mask.coverage+delta/output.alpha.length))
+   :output.alpha.reduce((sum,value)=>sum+(value>0?1:0),0)/output.alpha.length;
+ return output;
 }
 export function eraseCardSelectionByMask(pixels,width,height,bbox,mask,rectFill){
  if(!mask||!mask.alpha)return rectFill;
