@@ -1,3 +1,4 @@
+import { maskAlphaAt } from './card-shape-mask.js';
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 
 // Camera projection inspired by the former V32 business-card viewer. Depth
@@ -64,7 +65,12 @@ function createWebGLScene(canvas,base,planes,width,height){
 function reconstructBackground(pixels,width,height,layers){
   const source=new Uint8ClampedArray(pixels),unknown=new Uint8Array(width*height);
   const pad=.006;
-  for(const layer of layers){const r=boxPixels(layer,width,height,pad);for(let y=r.y;y<r.y+r.h;y++)unknown.fill(1,y*width+r.x,y*width+r.x+r.w)}
+  for(const layer of layers){
+    const r=boxPixels(layer,width,height,layer.mask?.alpha?0:pad);
+    for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++){
+      if(!layer.mask?.alpha||maskAlphaAt(layer.mask,layer.bbox,x,y,width,height)>10)unknown[y*width+x]=1;
+    }
+  }
   const radius=Math.max(1,Math.round(Math.min(width,height)*.006)),seed=new Uint8Array(unknown);
   for(let y=0;y<height;y++)for(let x=0;x<width;x++){if(!seed[y*width+x])continue;for(let dy=-radius;dy<=radius;dy++){const yy=y+dy;if(yy<0||yy>=height)continue;const reach=Math.floor(Math.sqrt(radius*radius-dy*dy));for(let dx=-reach;dx<=reach;dx++){const xx=x+dx;if(xx>=0&&xx<width)unknown[yy*width+xx]=1}}}
   const output=new Uint8ClampedArray(source),left=new Int32Array(width),right=new Int32Array(width),top=new Int32Array(height),bottom=new Int32Array(height);
@@ -96,7 +102,9 @@ export function createCardFloatingPlanesPreview(pixels,width,height,layers){
       const color=Math.sqrt((pixels[k]-background[k])**2+(pixels[k+1]-background[k+1])**2+(pixels[k+2]-background[k+2])**2);
       const left=x>rect.x?k-4:k,up=y>rect.y?k-width*4:k;
       const edge=((Math.abs(pixels[k]-pixels[left])+Math.abs(pixels[k+1]-pixels[left+1])+Math.abs(pixels[k+2]-pixels[left+2]))+(Math.abs(pixels[k]-pixels[up])+Math.abs(pixels[k+1]-pixels[up+1])+Math.abs(pixels[k+2]-pixels[up+2])))/6;
-      const score=Math.max(color,edge*1.3),alpha=Math.round(clamp((score-13)/27,0,1)*255);
+      const score=Math.max(color,edge*1.3),alpha=layer.mask?.alpha
+        ?maskAlphaAt(layer.mask,layer.bbox,x,y,width,height)
+        :Math.round(clamp((score-13)/27,0,1)*255);
       if(alpha<12)continue;ownership[p]=index;rgba[k]=pixels[k];rgba[k+1]=pixels[k+1];rgba[k+2]=pixels[k+2];rgba[k+3]=alpha;active++;
     }
     if(!active)continue;
