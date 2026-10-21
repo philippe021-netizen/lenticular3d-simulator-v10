@@ -18,7 +18,7 @@ const VS = [
   '  float perspective=camera/(camera-rz);',
   '  gl_Position=vec4(rx*perspective*0.78,y*perspective*0.78,rz/5.0,1.0);',
   '}'
-].join('\\n');
+].join('\n');
 const FS = [
   'precision mediump float;',
   'uniform sampler2D uColor;',
@@ -37,7 +37,7 @@ const FS = [
   '  vec3 color=texture2D(uColor,vUv).rgb;',
   '  gl_FragColor=vec4(color*light,1.0);',
   '}'
-].join('\\n');
+].join('\n');
 function shader(gl,type,source){
   const value=gl.createShader(type);gl.shaderSource(value,source);gl.compileShader(value);
   if(!gl.getShaderParameter(value,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(value)||'Shader 3D invalide');
