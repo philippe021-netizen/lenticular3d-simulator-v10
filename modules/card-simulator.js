@@ -1,10 +1,10 @@
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-export function cardPose(index){const i=clamp(Math.round(Number(index)||0),0,8);return {index:i,angle:(i-4)*6}}
-export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/6+4),0,8)}
+export function cardPose(index){const i=clamp(Math.round(Number(index)||0),0,8);return {index:i,angle:(i-4)*12}}
+export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/12+4),0,8)}
 
 export function createCardSimulator({canvas,range,output,getUrls}){
   const stage=canvas.parentElement,controls=document.createElement('div');
-  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Play — rotation en boucle</button><p class="small">Aperçu direct recalculé quand tu modifies les profondeurs ou l’amplitude. Play lit les 9 vues exportées. Décoche pour inspecter à plat. L’angle ±24° et les profondeurs sont relatifs : la lentille, la distance de lecture et l’impression ne sont pas calibrées en centimètres.</p>';
+  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Play — rotation en boucle</button><p class="small">Aperçu direct recalculé quand tu modifies les profondeurs ou l’amplitude. Play lit les 9 vues exportées. Décoche pour inspecter à plat. L’angle ±48° et les profondeurs sont relatifs : la lentille, la distance de lecture et l’impression ne sont pas calibrées en centimètres.</p>';
   stage.before(controls);
   stage.style.background='#e9e9e5';stage.style.perspective='1400px';
   canvas.style.transformOrigin='50% 50%';canvas.style.backfaceVisibility='hidden';
@@ -34,7 +34,7 @@ export function createCardSimulator({canvas,range,output,getUrls}){
   play.onclick=()=>{
     if(running){stop();return}if(getUrls().length!==9)return;
     running=true;tilt.checked=true;play.textContent='⏸ Pause';const start=performance.now();
-    const tick=now=>{if(!running)return;const value=24*Math.sin((now-start)/10000*2*Math.PI);void show(viewAtAngle(value),value,false);animation=requestAnimationFrame(tick)};
+    const tick=now=>{if(!running)return;const value=48*Math.sin((now-start)/10000*2*Math.PI);void show(viewAtAngle(value),value,false);animation=requestAnimationFrame(tick)};
     animation=requestAnimationFrame(tick);
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
