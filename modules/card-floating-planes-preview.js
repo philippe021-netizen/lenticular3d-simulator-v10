@@ -15,6 +15,14 @@ export function projectCardPlane(depth,angle,width,height,strength=1.8){
   };
 }
 
+// Multiply column-major 4x4 matrices as required by GLSL uniformMatrix4fv.
+// A row-major multiply here causes the card to be clipped behind the camera.
+export function multiplyColumnMajor(a,b){
+  const out=new Float32Array(16);
+  for(let c=0;c<4;c++)for(let r=0;r<4;r++)for(let k=0;k<4;k++)out[c*4+r]+=a[k*4+r]*b[c*4+k];
+  return out;
+}
+
 function boxPixels(layer,width,height,padding=0){
   const [x,y,w,h]=layer.bbox||[0,0,0,0];
   const x0=clamp(Math.floor((x-padding)*width),0,width-1),y0=clamp(Math.floor((y-padding)*height),0,height-1);
@@ -36,7 +44,8 @@ function createWebGLScene(canvas,base,planes,width,height){
   const textures=new Map([[base,textureFor(base)]]);for(const plane of planes)textures.set(plane.canvas,textureFor(plane.canvas));
   const zLoc=gl.getUniformLocation(program,'z'),mvpLoc=gl.getUniformLocation(program,'mvp'),texLoc=gl.getUniformLocation(program,'tex'),cutLoc=gl.getUniformLocation(program,'alphaCut');
   gl.uniform1i(texLoc,0);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
-  const multiply=(a,b)=>{const out=new Float32Array(16);for(let r=0;r<4;r++)for(let c=0;c<4;c++)for(let k=0;k<4;k++)out[r*4+c]+=a[r*4+k]*b[k*4+c];return out};
+  // WebGL expects column-major matrices: projection * view, not view * projection.
+  const multiply=multiplyColumnMajor;
   const normalize=v=>{const n=Math.hypot(...v)||1;return v.map(x=>x/n)};
   const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
   const perspective=(fov,aspect,near,far)=>{const f=1/Math.tan(fov/2),out=new Float32Array(16);out[0]=f/aspect;out[5]=f;out[10]=(far+near)/(near-far);out[11]=-1;out[14]=2*far*near/(near-far);return out};
