@@ -10,7 +10,7 @@ const el=$('photo3dPreview'),stage=$('photo3dStage'),preview2D=$('photo3dCanvas2
       angle=$('photo3dAngle'),angleOut=$('photo3dAngleOut'),
       strength=$('photo3dStrength'),strengthOut=$('photo3dStrengthOut'),
       play=$('photo3dPlay'),refresh=$('photo3dRefresh');
-let scene=null,activeLayers=[],playing=false,raf=0,buildSerial=0,lastRender=0,fallBackReported=false,started=0;
+let scene=null,activeLayers=[],playing=false,raf=0,buildSerial=0,lastRender=0,fallBackReported=false,started=0,rebuildTimer=0;
 const ctx2D=preview2D.getContext('2d',{willReadFrequently:true});
 
 function setStatus(message,kind=''){
@@ -115,6 +115,7 @@ async function build(){
  }catch(error){
    if(serial!==buildSerial)return;
    scene=null;updateButtons(false);
+   el.classList.remove('photo3d-ready');
    setStatus('Simulation indisponible pour cette photo : '+(error?.message||error),'bad');
    console.warn('[photo3d]',error);
  }
@@ -132,14 +133,23 @@ strength.addEventListener('input',()=>{
  drawPreviewIfPresent();
 });
 refresh.addEventListener('click',build);
+$('photo3dJump')?.addEventListener('click',()=>{
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+  if(!scene)setStatus('Crée le relief 3D local pour séparer le sujet du fond avant la simulation.');
+});
 $('file')?.addEventListener('change',()=>{
  ++buildSerial;scene=null;stop();updateButtons(false);
  el.classList.remove('photo3d-ready');
  setStatus('Photo changée : reconstruis le relief avant de lancer la simulation.');
 });
 window.addEventListener('happyholo-relief-ready',()=>{void build()});
-window.addEventListener('happyholo-background-changed',()=>{if(scene)void build()});
-window.addEventListener('happyholo-subject-placement-changed',()=>{if(scene)void build()});
+function scheduleRebuild(){
+ if(!scene)return;
+ clearTimeout(rebuildTimer);
+ rebuildTimer=setTimeout(()=>{if(scene)void build()},350);
+}
+window.addEventListener('happyholo-background-changed',scheduleRebuild);
+window.addEventListener('happyholo-subject-placement-changed',scheduleRebuild);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
 window.addEventListener('pagehide',stop);
 updateButtons(false);
