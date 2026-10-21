@@ -36,14 +36,14 @@ function compile(gl,type,source){const shader=gl.createShader(type);gl.shaderSou
 function createWebGLScene(canvas,base,planes,width,height){
   const gl=canvas.getContext('webgl',{alpha:false,antialias:true,preserveDrawingBuffer:false})||canvas.getContext('experimental-webgl',{alpha:false,antialias:true});
   if(!gl)return null;
-  const vs='attribute vec2 p;uniform float z;uniform mat4 mvp;varying vec2 uv;void main(){uv=vec2(p.x,1.0-p.y);gl_Position=mvp*vec4((p.x-.5)*1.545,(p.y-.5),z,1.0);}';
+  const vs='attribute vec2 p;uniform float z;uniform mat4 mvp;uniform float planeAspect;varying vec2 uv;void main(){uv=vec2(p.x,1.0-p.y);gl_Position=mvp*vec4((p.x-.5)*planeAspect,(p.y-.5),z,1.0);}';
   const fs='precision mediump float;varying vec2 uv;uniform sampler2D tex;uniform float alphaCut;void main(){vec4 c=texture2D(tex,uv);if(c.a<alphaCut)discard;gl_FragColor=c;}';
   const program=gl.createProgram();gl.attachShader(program,compile(gl,gl.VERTEX_SHADER,vs));gl.attachShader(program,compile(gl,gl.FRAGMENT_SHADER,fs));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program)||'Scène 3D indisponible');
   const vertices=new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1]),buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,vertices,gl.STATIC_DRAW);
   gl.useProgram(program);const loc=gl.getAttribLocation(program,'p');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
   const textureFor=source=>{const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);return texture};
   const textures=new Map([[base,textureFor(base)]]);for(const plane of planes)textures.set(plane.canvas,textureFor(plane.canvas));
-  const zLoc=gl.getUniformLocation(program,'z'),mvpLoc=gl.getUniformLocation(program,'mvp'),texLoc=gl.getUniformLocation(program,'tex'),cutLoc=gl.getUniformLocation(program,'alphaCut');
+  const zLoc=gl.getUniformLocation(program,'z'),mvpLoc=gl.getUniformLocation(program,'mvp'),texLoc=gl.getUniformLocation(program,'tex'),cutLoc=gl.getUniformLocation(program,'alphaCut'),aspectLoc=gl.getUniformLocation(program,'planeAspect');
   gl.uniform1i(texLoc,0);gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
   // WebGL expects column-major matrices: projection * view, not view * projection.
   const multiply=multiplyColumnMajor;
@@ -55,7 +55,7 @@ function createWebGLScene(canvas,base,planes,width,height){
   const draw=(angle,strength,currentLayers)=>{
     const dpr=Math.min(1.5,window.devicePixelRatio||1),cw=canvas.clientWidth||800,ch=canvas.clientHeight||Math.round(cw*height/width),vw=Math.max(1,Math.round(cw*dpr)),vh=Math.max(1,Math.round(ch*dpr));if(canvas.width!==vw||canvas.height!==vh){canvas.width=vw;canvas.height=vh}
     gl.viewport(0,0,vw,vh);gl.clearColor(.94,.94,.92,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(program);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-    const yaw=clamp(Number(angle)||0,-48,48)*Math.PI/180*.75,eye=[Math.sin(yaw)*3.45,.78,Math.cos(yaw)*3.45],camera=multiply(perspective(34*Math.PI/180,vw/vh,.1,20),lookAt(eye,[0,0,.16],[0,1,0]));gl.uniformMatrix4fv(mvpLoc,false,camera);gl.uniform1i(texLoc,0);
+    const yaw=clamp(Number(angle)||0,-48,48)*Math.PI/180*.75,eye=[Math.sin(yaw)*3.45,.78,Math.cos(yaw)*3.45],camera=multiply(perspective(34*Math.PI/180,vw/vh,.1,20),lookAt(eye,[0,0,.16],[0,1,0]));gl.uniformMatrix4fv(mvpLoc,false,camera);gl.uniform1i(texLoc,0);gl.uniform1f(aspectLoc,Math.min(3,Math.max(.3,width/height)));
     const depths=new Map((currentLayers||[]).map((layer,index)=>[layer.id||String(index),clamp(Number(layer.depth)||0,-100,100)])),ordered=planes.map(plane=>({...plane,depth:depths.get(plane.id)??plane.depth})).sort((a,b)=>a.depth-b.depth),min=Math.min(0,...ordered.map(p=>p.depth)),max=Math.max(0,...ordered.map(p=>p.depth)),span=Math.max(1,max-min),relief=clamp(Number(strength)||1.8,.25,3.2);
     const renderPlane=(source,z,cut)=>{gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,textures.get(source));gl.uniform1f(zLoc,z);gl.uniform1f(cutLoc,cut);gl.drawArrays(gl.TRIANGLES,0,6)};
     gl.depthMask(true);renderPlane(base,0,0);for(const plane of ordered)renderPlane(plane.canvas,.035+((plane.depth-min)/span)*.305*relief/1.8,.025);
@@ -102,9 +102,12 @@ function reconstructBackground(pixels,width,height,layers){
   return output;
 }
 
-export function createCardFloatingPlanesPreview(pixels,width,height,layers){
+export function createCardFloatingPlanesPreview(pixels,width,height,layers,options={}){
   const cleanLayers=(layers||[]).filter(l=>Array.isArray(l.bbox)&&l.bbox.length===4&&l.enabled!==false).map(l=>({...l,bbox:[...l.bbox]}));
-  const background=reconstructBackground(pixels,width,height,cleanLayers),base=makeCanvas(width,height),baseCtx=base.getContext('2d');
+  const background=options.backgroundPixels?.length===pixels.length
+    ?new Uint8ClampedArray(options.backgroundPixels)
+    :reconstructBackground(pixels,width,height,cleanLayers);
+  const base=makeCanvas(width,height),baseCtx=base.getContext('2d');
   baseCtx.putImageData(new ImageData(background,width,height),0,0);
   const ownership=new Int16Array(width*height);ownership.fill(-1);
   const order=cleanLayers.map((layer,index)=>({layer,index,rect:boxPixels(layer,width,height)})).sort((a,b)=>a.rect.area-b.rect.area);
@@ -127,7 +130,7 @@ export function createCardFloatingPlanesPreview(pixels,width,height,layers){
   }
   const output=makeCanvas(width,height),ctx=output.getContext('2d',{willReadFrequently:true});
   let webglDraw=null;
-  try{webglDraw=createWebGLScene(document.getElementById('sim3dCanvas'),base,planes,width,height)}catch(error){console.warn('Aperçu WebGL indisponible, repli 2D :',error)}
+  try{webglDraw=createWebGLScene(options.canvas||document.getElementById('sim3dCanvas'),base,planes,width,height)}catch(error){console.warn('Aperçu WebGL indisponible, repli 2D :',error)}
   return{
     planes:planes.length,
     draw3D(angle=0,strength=1.8,currentLayers=cleanLayers){
