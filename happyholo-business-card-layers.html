@@ -3,13 +3,30 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171717;background:#f4f4f2;--green:#17652c;--yellow:#ffd60a}*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}body{margin:0}.top{position:sticky;top:0;z-index:30;background:#111;color:#fff;padding:13px 16px}.top b{font-size:18px}.top span{font-size:11px;color:#bbb}.wrap{max-width:1220px;margin:auto;padding:16px}.intro,.card{background:#fff;border:1px solid #d9d9d9;border-radius:18px;padding:15px;margin-bottom:14px}.intro{border:2px solid #111}.steps{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px}.step{padding:8px;border-radius:9px;background:#ececec;font-size:11px;font-weight:850;text-align:center}.step.on{background:#111;color:#fff}.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:14px}h2{font-size:18px;margin:0 0 7px}p,.small{font-size:12px;color:#666;line-height:1.45}label{display:block;font-size:13px;font-weight:800;margin:11px 0 5px}button,input,textarea,select{font:inherit}button{width:100%;min-height:44px;border:0;border-radius:11px;background:#111;color:#fff;font-weight:850;padding:10px;margin-top:8px}button.secondary{background:#e9e9e9;color:#111}button.pix{background:var(--green)}button:disabled{opacity:.45}input[type=file],textarea,select{width:100%}textarea,select{border:1px solid #bbb;border-radius:10px;padding:9px;background:#fff}textarea{min-height:78px}.status{padding:10px;border-radius:10px;background:#f2f2f2;font-size:12px;white-space:pre-wrap}.status.ok{background:#e7f7eb;color:#17652c}.status.bad{background:#ffe9e7;color:#8b1f17}.status.warn{background:#fff4d6;color:#765500}.canvasWrap{position:relative;background:#181818;border-radius:16px;overflow:hidden;aspect-ratio:1.5858;touch-action:none}.canvasWrap img{width:100%;height:100%;object-fit:contain;display:block}.overlay{position:absolute;inset:0;pointer-events:none}.box{position:absolute;border:2px solid #ffd60a;background:#ffd60a12;border-radius:5px;pointer-events:auto}.box.text{border-color:#38bdf8;background:#38bdf812}.box.logo{border-color:#ffd60a}.box.object,.box.subject{border-color:#39d98a;background:#39d98a12}.box.active{box-shadow:0 0 0 3px #fff8}.box.grouped{box-shadow:0 0 0 3px #39d98a88}.tag{position:absolute;left:0;top:0;transform:translateY(-100%);font-size:9px;background:#111;color:#fff;padding:2px 4px;border-radius:4px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}.layers{max-height:62dvh;overflow:auto}.layer{border:1px solid #ddd;border-radius:12px;padding:10px;margin:7px 0}.layer.active{border:2px solid #111}.layer.grouped{border-color:#17652c;background:#f2fbf4}.row{display:flex;align-items:center;gap:8px}.row b{flex:1;font-size:12px}.type{font-size:9px;border-radius:99px;padding:4px 6px;background:#eee;text-transform:uppercase}.layer input[type=range]{width:100%}.depthline{display:flex;justify-content:space-between;font-size:10px;color:#666}.animsel{display:flex;align-items:center;gap:6px;font-size:11px;margin-top:7px}.animsel input{width:auto}.kindrow{display:grid;grid-template-columns:92px 1fr;gap:7px;align-items:center;margin-top:8px}.kindrow span{font-size:10px;color:#666;font-weight:800}.kindrow select{padding:6px;font-size:11px}.animCard{border:2px solid var(--green)}.cropStage{background:#181818;border-radius:12px;overflow:hidden;touch-action:none;line-height:0}.cropStage canvas{display:block;width:100%;height:auto;max-height:58vh;object-fit:contain;touch-action:none;cursor:crosshair}.cropActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cropActions button{margin-top:8px}.crop{aspect-ratio:1.4;background:#181818;border-radius:12px;display:grid;place-items:center;overflow:hidden}.crop canvas{max-width:100%;max-height:100%}.frames{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;margin-top:8px}.frames img{width:100%;aspect-ratio:1.5858;object-fit:cover;border-radius:6px;background:#111}.sim{position:relative;aspect-ratio:1.5858;background:#111;border-radius:14px;overflow:hidden}.sim canvas{position:absolute;inset:0;width:100%;height:100%;display:block}.hidden{display:none!important}.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}.note{background:#fff5cf;border:1px solid #e5bd21;border-radius:12px;padding:9px;font-size:11px}.groupInfo{background:#e7f7eb;border:1px solid #8bc99a;border-radius:10px;padding:9px;font-size:11px;margin-top:8px}@media(max-width:900px){.grid{grid-template-columns:1fr}.layers{max-height:none}.steps{grid-template-columns:repeat(3,1fr)}}
+
+.selectionEditor{background:#f8fafc;border:1px solid #cbd5e1;border-radius:13px;padding:12px;margin:12px 0}
+.selectionEditor h3{font-size:15px;margin:0 0 6px}
+.selectionEditor p{margin:5px 0 10px}
+.selectionEditor input:not([type=checkbox]),.selectionEditor select{width:100%;min-height:40px;box-sizing:border-box}
+.selectionEditor input[type=text],.selectionEditor input[type=number],.selectionEditor select{border:1px solid #b7c2cc;border-radius:8px;background:#fff;padding:8px}
+.selectionEditor .selectionCoords{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.selectionEditor .selectionCoords label{min-width:0;font-size:11px;margin:7px 0}
+.selectionEditor .selectionCoords input{font-size:13px}
+.selectionEditor .selectionActions{display:grid;grid-template-columns:1fr;gap:4px}
+.selectionEditor .danger{background:#a12626;color:white}
+.selectionEditor .selectionWarning{color:#725022}
+.overlay.draw-mode{pointer-events:auto;touch-action:none;cursor:crosshair}
+.overlay.draw-mode .box{pointer-events:none}
+.overlay .box.active{cursor:move;touch-action:none}
+.overlay .box .resize-handle{position:absolute;right:-10px;bottom:-10px;width:24px;height:24px;border-radius:7px;border:2px solid #151515;background:#ffd60a;pointer-events:auto;touch-action:none}
+.overlay .box.drawing{border:2px dashed #ffd60a;background:#ffd60a25;pointer-events:none}
 </style></head><body>
 <div class="top"><b>HappyHolo — Carte par calques</b><div><span>Carte originale conservée · profondeur par élément · animation isolée ou groupée</span></div></div>
 <div class="wrap">
 <section class="intro"><h2>Parcours carte fidèle</h2><p>Importer → repérer textes/logo/objets → corriger le type si besoin → régler les profondeurs → sélectionner un ou plusieurs éléments à animer → réinjecter → contrôler 9 vues → ZIP.</p><div class="steps"><div class="step on">1 Import</div><div class="step">2 Repérage</div><div class="step">3 Profondeurs</div><div class="step">4 Animation</div><div class="step">5 9 vues</div><div class="step">6 ZIP</div></div></section>
 <div class="grid"><aside>
 <section class="card"><h2>1. Carte existante</h2><input id="file" type="file" accept="image/*"><div id="status" class="status" style="margin-top:9px">Charge une carte pour commencer.</div><section id="preCropCard" class="card hidden" style="padding:10px;margin:10px 0 0"><h2>Pré-cadrage avant découpe</h2><p class="small">Place ou ajuste les quatre poignées sur les coins de la carte. L’image sera redressée en perspective avant le repérage des textes et objets.</p><div class="cropStage"><canvas id="preCropCanvas"></canvas></div><div class="cropActions"><button id="applyPreCrop" disabled>Redresser avec les 4 coins</button><button id="keepFullImage" class="secondary">Garder toute l’image</button></div><button id="resetPreCrop" class="secondary">Réinitialiser les 4 coins</button></section><button id="analyze" disabled>Repérer automatiquement les éléments</button></section>
-<section id="layersCard" class="card hidden"><h2>2. Calques détectés</h2><p class="small">Si l’IA prend une partie du logo pour du texte, change simplement « Traiter comme » en Logo. Elle devient alors sélectionnable pour l’animation.</p><div class="two"><button id="allZero" class="secondary">Tout à 0</button><button id="suggested" class="secondary">Suggestions IA</button></div><div id="layers" class="layers"></div><div id="groupInfo" class="groupInfo hidden"></div><div class="note">Les vrais textes restent protégés. Un texte intégré graphiquement au logo peut être reclassé en Logo ou Objet puis inclus dans l’animation groupée.</div><button id="prepare">Préparer les 9 vues</button></section>
+<section id="layersCard" class="card hidden"><h2>2. Calques détectés</h2><p class="small">Si l’IA prend une partie du logo pour du texte, change simplement « Traiter comme » en Logo. Elle devient alors sélectionnable pour l’animation.</p><div class="two"><button id="allZero" class="secondary">Tout à 0</button><button id="suggested" class="secondary">Suggestions IA</button></div><section id="selectionEditor" class="selectionEditor"><h3>Éditer par sélection</h3><p class="small">Touche un élément sur la carte pour le sélectionner. Déplace son cadre avec le doigt ou l’Apple Pencil ; tire le carré jaune pour changer sa taille. Tu peux aussi tracer une nouvelle zone.</p><button id="startCardSelection" type="button" class="secondary">+ Tracer une zone sur la carte</button><div id="selectionFields" class="hidden"><label for="selectionName">Nom de l’élément</label><input id="selectionName" type="text" maxlength="80" placeholder="Nom de la sélection"><label for="selectionType">Traiter comme</label><select id="selectionType"><option value="text">Texte protégé</option><option value="logo">Logo</option><option value="object">Objet</option><option value="subject">Sujet</option></select><label for="selectionDepth">Profondeur : <b id="selectionDepthValue">0</b></label><input id="selectionDepth" type="range" min="-100" max="100" value="0"><div class="selectionCoords"><label>X %<input id="selectionX" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Y %<input id="selectionY" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Largeur %<input id="selectionW" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label><label>Hauteur %<input id="selectionH" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label></div><div class="selectionActions"><button id="deleteSelectionLayer" type="button" class="secondary">Retirer le calque (image conservée)</button><button id="eraseSelectionImage" type="button" class="danger">Effacer cette zone sur la carte</button></div><p class="small selectionWarning">L’effacement reconstitue approximativement le fond. Contrôle le résultat avant impression.</p></div><button id="undoSelectionErase" type="button" class="secondary" disabled>Annuler le dernier effacement</button></section><div id="layers" class="layers"></div><div id="groupInfo" class="groupInfo hidden"></div><div class="note">Les vrais textes restent protégés. Un texte intégré graphiquement au logo peut être reclassé en Logo ou Objet puis inclus dans l’animation groupée.</div><button id="prepare">Préparer les 9 vues</button></section>
 <section id="animCard" class="card animCard hidden"><h2>3. Animation isolée / groupée</h2><p class="small">Seuls les éléments cochés sont envoyés à PixVerse. La carte complète n'est jamais envoyée.</p><div class="crop"><canvas id="cropCanvas"></canvas></div><label>Action souhaitée</label><textarea id="animPrompt" placeholder="Ex. léger mouvement du logo complet, effet laser local..."></textarea><button id="runPix" class="pix">Animer la sélection dans PixVerse</button><div id="pixStatus" class="status" style="margin-top:9px">Prêt.</div></section>
 </aside><main>
 <section class="card"><h2>Carte et zones détectées</h2><div id="canvasWrap" class="canvasWrap"><img id="cardImg"><div id="overlay" class="overlay"></div></div><p class="small">Bleu = texte · jaune = logo · vert = objet/sujet · halo vert = inclus dans l’animation groupée.</p></section>
@@ -21,6 +38,7 @@ import { composeCardDepth, estimateCardDepth } from './modules/card-depth.js?v=5
 import { renderNovelView } from './depthflow-v42-core.js';
 import { createCardSimulator } from './modules/card-simulator.js?v=511';
 import { createCardFloatingPlanesPreview } from './modules/card-floating-planes-preview.js?v=1';
+import { normalizeSelectionBbox,selectionFromPoints,moveSelectionBbox,resizeSelectionBbox,fillSelectionWithBackground } from './modules/card-selection-utils.js?v=1';
 import { detectDocumentQuad, preprocessBusinessCard } from './modules/microplayer-image-preprocess-v1.js';
 let cachedCardDepth=null, depthSource='', depthMode='ai',livePreviewState=null,livePreviewPending=false,livePreviewTimer=0;
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
@@ -30,7 +48,7 @@ $('prepare').before(depthOptions);
 $('cardParallax').oninput=()=>{$('cardParallaxOut').textContent=$('cardParallax').value+' %';if(livePreviewState){livePreviewState.amplitude=Number($('cardParallax').value);scheduleLivePreview()}};
 $('showCardDepth').onclick=()=>$('cardDepthCanvas').classList.toggle('hidden');
 let imageData='',srcImg=null,layers=[],suggestedDepths=new Map(),activeId='',animatedIds=new Set(),animatedFrames=[],animatedCropBbox=null,finalBlobs=[],finalUrls=[];
-let sceneStrength=1.8;
+let sceneStrength=1.8,selectionDrawMode=false,selectionGesture=null,selectedBoxGesture=null,selectionCounter=0,selectionUndo=null;
 const cardSimulator=createCardSimulator({canvas:$('simCanvas'),range:$('viewRange'),output:$('viewOut'),getUrls:()=>finalUrls,onSceneStrength:value=>{sceneStrength=value;if(livePreviewState)scheduleLivePreview()}});
 const setStep=n=>steps.forEach((s,i)=>s.classList.toggle('on',i<n));
 function status(t,kind=''){const e=$('status');e.textContent=t;e.className='status'+(kind?' '+kind:'')}
@@ -60,7 +78,145 @@ function scheduleLivePreview(){
  if(!livePreviewState||livePreviewPending)return;livePreviewPending=true;
  requestAnimationFrame(()=>{const now=performance.now(),wait=Math.max(0,35-(now-livePreviewTimer)),run=()=>{livePreviewPending=false;livePreviewTimer=performance.now();if(livePreviewState)renderLivePreview(Number($('viewRange').value),Number($('cardLiveAngle').value))};if(wait)setTimeout(run,wait);else run()});
 }
-async function importCard(f){if(!f)return;cardSimulator.stop();cardSimulator.setLiveRenderer(null);$('sim3dCanvas').classList.add('hidden');$('simCanvas').classList.remove('hidden');livePreviewState=null;try{imageData=await readFile(f);cachedCardDepth=null;depthSource='';depthMode='ai';srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=true;$('preCropCard').classList.remove('hidden');initialisePreCropPoints();$('applyPreCrop').disabled=false;paintPreCrop();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Trace le cadrage, applique-le, ou conserve l’image entière.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
+async function importCard(f){if(!f)return;cardSimulator.stop();cardSimulator.setLiveRenderer(null);$('sim3dCanvas').classList.add('hidden');$('simCanvas').classList.remove('hidden');livePreviewState=null;try{imageData=await readFile(f);cachedCardDepth=null;depthSource='';depthMode='ai';srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=true;$('preCropCard').classList.remove('hidden');initialisePreCropPoints();$('applyPreCrop').disabled=false;paintPreCrop();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];activeId='';selectionDrawMode=false;selectionUndo=null;$('undoSelectionErase').disabled=true;syncSelectionFields();animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Trace le cadrage, applique-le, ou conserve l’image entière.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
+
+function selectedCardLayer(){return layers.find(l=>l.id===activeId)||null}
+function invalidateCardOutputs(){
+  animatedFrames=[];
+  cardSimulator.stop();cardSimulator.setLiveRenderer(null);livePreviewState=null;
+  $('sim3dCanvas').classList.add('hidden');$('simCanvas').classList.remove('hidden');
+  $('resultCard').classList.add('hidden');
+  finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];
+}
+function syncSelectionFields(){
+  const l=selectedCardLayer(),fields=$('selectionFields');
+  fields.classList.toggle('hidden',!l);
+  if(!l)return;
+  $('selectionName').value=l.label||'';
+  $('selectionType').value=l.type||'object';
+  $('selectionDepth').value=String(l.depth||0);
+  $('selectionDepthValue').textContent=(l.depth>0?'+':'')+(l.depth||0);
+  ['X','Y','W','H'].forEach((key,i)=>{$('selection'+key).value=(l.bbox[i]*100).toFixed(1)});
+}
+function updateOverlayGeometry(){
+  if(!srcImg)return;
+  const wrap=$('canvasWrap'),ov=$('overlay'),rect=wrap.getBoundingClientRect();
+  const iw=srcImg.naturalWidth,ih=srcImg.naturalHeight;
+  if(!iw||!ih||!rect.width||!rect.height)return;
+  const s=Math.min(rect.width/iw,rect.height/ih),w=iw*s,h=ih*s;
+  ov.style.left=((rect.width-w)/2)+'px';ov.style.top=((rect.height-h)/2)+'px';
+  ov.style.width=w+'px';ov.style.height=h+'px';ov.style.right='auto';ov.style.bottom='auto';
+}
+function overlayPoint(e){
+  const r=$('overlay').getBoundingClientRect();
+  return {x:clamp((e.clientX-r.left)/Math.max(1,r.width),0,1),
+    y:clamp((e.clientY-r.top)/Math.max(1,r.height),0,1)};
+}
+function setBoxStyle(box,bbox){
+  box.style.left=(bbox[0]*100)+'%';box.style.top=(bbox[1]*100)+'%';
+  box.style.width=(bbox[2]*100)+'%';box.style.height=(bbox[3]*100)+'%';
+}
+function commitSelectionChange(message){
+  invalidateCardOutputs();refreshAnimationGroup();renderBoxes();renderLayers();syncSelectionFields();
+  status(message||'Sélection modifiée. Régénère les 9 vues pour appliquer les changements.','ok');
+}
+$('selectionName').addEventListener('change',()=>{
+  const l=selectedCardLayer();if(!l)return;
+  l.label=$('selectionName').value.trim().slice(0,80)||l.label||'Sans nom';
+  renderLayers();renderBoxes();syncSelectionFields();
+});
+$('selectionType').addEventListener('change',()=>{
+  const l=selectedCardLayer();if(!l)return;l.type=$('selectionType').value;
+  syncAnimatable(l);commitSelectionChange('Type modifié. Les textes restent protégés de PixVerse.');
+});
+$('selectionDepth').addEventListener('input',()=>{
+  const l=selectedCardLayer();if(!l)return;l.depth=Number($('selectionDepth').value);
+  $('selectionDepthValue').textContent=(l.depth>0?'+':'')+l.depth;
+  invalidateCardOutputs();renderLayers();
+});
+$('selectionDepth').addEventListener('change',()=>status('Profondeur modifiée : régénère les 9 vues pour voir son effet.','ok'));
+function editCoordinates(){
+  const l=selectedCardLayer();if(!l)return;
+  const values=['X','Y','W','H'].map((k,i)=>{
+    const raw=Number($('selection'+k).value.replace(',','.'));
+    return Number.isFinite(raw)?raw/100:l.bbox[i];
+  });
+  l.bbox=normalizeSelectionBbox(values);
+  commitSelectionChange('Cadre corrigé. Vérifie les contours puis régénère les vues.');
+}
+['X','Y','W','H'].forEach(k=>$('selection'+k).addEventListener('change',editCoordinates));
+$('startCardSelection').onclick=()=>{
+  if(!srcImg||$('layersCard').classList.contains('hidden'))return;
+  selectionDrawMode=!selectionDrawMode;
+  $('startCardSelection').textContent=selectionDrawMode?'Annuler le tracé':'+ Tracer une zone sur la carte';
+  renderBoxes();
+  status(selectionDrawMode?'Glisse sur la carte pour dessiner le nouveau calque.':'Tracé annulé.',selectionDrawMode?'warn':'ok');
+};
+const editOverlay=$('overlay');
+editOverlay.addEventListener('pointerdown',e=>{
+  if(!selectionDrawMode||!srcImg||selectionGesture)return;
+  e.preventDefault();const p=overlayPoint(e);
+  const preview=document.createElement('div');preview.className='box drawing';editOverlay.appendChild(preview);
+  selectionGesture={pointerId:e.pointerId,start:p,last:p,preview};
+  setBoxStyle(preview,[p.x,p.y,.015,.015]);editOverlay.setPointerCapture(e.pointerId);
+});
+editOverlay.addEventListener('pointermove',e=>{
+  if(!selectionGesture||selectionGesture.pointerId!==e.pointerId)return;
+  const p=overlayPoint(e);selectionGesture.last=p;
+  setBoxStyle(selectionGesture.preview,selectionFromPoints(selectionGesture.start,p));
+});
+function completeSelectionGesture(e,commit){
+  const g=selectionGesture;if(!g||e.pointerId!==g.pointerId)return;
+  selectionGesture=null;if(editOverlay.hasPointerCapture(e.pointerId))editOverlay.releasePointerCapture(e.pointerId);
+  g.preview.remove();
+  if(!commit||Math.abs(g.last.x-g.start.x)<.015||Math.abs(g.last.y-g.start.y)<.015)return;
+  selectionCounter++;
+  const l={id:'manual-selection-'+Date.now()+'-'+selectionCounter,
+    label:'Sélection '+selectionCounter,type:'object',sourceType:'manual',
+    bbox:selectionFromPoints(g.start,g.last),depth:0,enabled:true};
+  syncAnimatable(l);layers.push(l);suggestedDepths.set(l.id,0);
+  activeId=l.id;selectionDrawMode=false;$('startCardSelection').textContent='+ Tracer une zone sur la carte';
+  commitSelectionChange('Nouvelle zone créée. Modifie son nom, sa taille ou sa profondeur.');
+}
+editOverlay.addEventListener('pointerup',e=>completeSelectionGesture(e,true));
+editOverlay.addEventListener('pointercancel',e=>completeSelectionGesture(e,false));
+$('deleteSelectionLayer').onclick=()=>{
+  const l=selectedCardLayer();if(!l)return;
+  layers=layers.filter(item=>item.id!==l.id);animatedIds.delete(l.id);
+  suggestedDepths.delete(l.id);activeId='';
+  commitSelectionChange('Calque retiré : son contenu reste visible sur la carte. Pour effacer les pixels, utilise « Effacer cette zone ».');
+};
+$('eraseSelectionImage').onclick=async()=>{
+  const l=selectedCardLayer();if(!l||!srcImg)return;
+  if(!confirm('Effacer les pixels de « '+(l.label||'la zone')+' » sur la copie de travail ? Le fond sera estimé ; tu pourras annuler ce dernier effacement.'))return;
+  const btn=$('eraseSelectionImage');btn.disabled=true;
+  try{
+    const undo={imageData,srcImg,layers:layers.map(item=>({...item,bbox:[...item.bbox]})),
+      activeId,animatedIds:new Set(animatedIds),suggestedDepths:new Map(suggestedDepths)};
+    const c=document.createElement('canvas');c.width=srcImg.naturalWidth;c.height=srcImg.naturalHeight;
+    const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(srcImg,0,0);
+    const image=ctx.getImageData(0,0,c.width,c.height);
+    ctx.putImageData(new ImageData(fillSelectionWithBackground(image.data,c.width,c.height,l.bbox),c.width,c.height),0,0);
+    const nextData=c.toDataURL('image/png'),nextImg=await loadImage(nextData);
+    selectionUndo=undo;imageData=nextData;srcImg=nextImg;$('cardImg').src=nextData;
+    layers=layers.filter(item=>item.id!==l.id);animatedIds.delete(l.id);suggestedDepths.delete(l.id);
+    activeId='';cachedCardDepth=null;depthSource='';
+    $('undoSelectionErase').disabled=false;
+    commitSelectionChange('Zone effacée sur la copie de travail. Vérifie le fond, sinon utilise « Annuler le dernier effacement ».');
+  }catch(error){status('Effacement impossible : '+error.message,'bad')}
+  finally{btn.disabled=false}
+};
+$('undoSelectionErase').onclick=()=>{
+  if(!selectionUndo)return;
+  ({imageData,srcImg,layers,activeId,animatedIds,suggestedDepths}=selectionUndo);
+  selectionUndo=null;$('undoSelectionErase').disabled=true;$('cardImg').src=imageData;
+  cachedCardDepth=null;depthSource='';
+  commitSelectionChange('Effacement annulé : image et calques précédents rétablis.');
+};
+$('cardImg').addEventListener('load',()=>renderBoxes());
+window.addEventListener('resize',()=>updateOverlayGeometry());
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>updateOverlayGeometry()).observe($('canvasWrap'));
+
 $('file').onchange=()=>importCard($('file').files?.[0]);
 let preCropPoints=[],preCropScale=1,preCropDragging=-1;
 function initialisePreCropPoints(){
@@ -89,14 +245,51 @@ cropCanvas.addEventListener('pointerup',()=>{preCropDragging=-1});
 cropCanvas.addEventListener('pointercancel',()=>{preCropDragging=-1});
 $('resetPreCrop').onclick=()=>{initialisePreCropPoints();paintPreCrop();$('applyPreCrop').disabled=false};
 $('keepFullImage').onclick=()=>{$('preCropCard').classList.add('hidden');$('analyze').disabled=false;status('Image complète conservée sans redressement. Lance le repérage automatique.','ok')};
-$('applyPreCrop').onclick=async()=>{if(preCropPoints.length!==4)return;const corners=preCropPoints.map(p=>({x:p.x/preCropScale,y:p.y/preCropScale}));$('applyPreCrop').disabled=true;try{const corrected=preprocessBusinessCard(srcImg,{corners,maxWidth:Math.min(1536,srcImg.naturalWidth),enhance:false,forceRatio:true,autoDetect:false});imageData=corrected.toDataURL('image/png');srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';cachedCardDepth=null;depthSource='';layers=[];$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');$('preCropCard').classList.add('hidden');$('analyze').disabled=false;status('Carte redressée à partir des quatre coins. Le repérage analysera cette image corrigée.','ok')}catch(e){status('Redressement impossible : '+e.message,'bad');$('applyPreCrop').disabled=false}};
+$('applyPreCrop').onclick=async()=>{if(preCropPoints.length!==4)return;const corners=preCropPoints.map(p=>({x:p.x/preCropScale,y:p.y/preCropScale}));$('applyPreCrop').disabled=true;try{const corrected=preprocessBusinessCard(srcImg,{corners,maxWidth:Math.min(1536,srcImg.naturalWidth),enhance:false,forceRatio:true,autoDetect:false});imageData=corrected.toDataURL('image/png');srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';cachedCardDepth=null;depthSource='';layers=[];activeId='';selectionDrawMode=false;syncSelectionFields();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');$('preCropCard').classList.add('hidden');$('analyze').disabled=false;status('Carte redressée à partir des quatre coins. Le repérage analysera cette image corrigée.','ok')}catch(e){status('Redressement impossible : '+e.message,'bad');$('applyPreCrop').disabled=false}};
 const demoButton=document.createElement('button');demoButton.id='loadCardDemo';demoButton.className='secondary';demoButton.textContent='Charger la carte de démonstration MicroPlayer';$('file').after(demoButton);
 demoButton.onclick=async()=>{demoButton.disabled=true;try{const response=await fetch('./assets/microplayer-carte-demo.jpg');if(!response.ok)throw new Error('Image indisponible');await importCard(await response.blob())}catch(e){status(e.message,'bad')}finally{demoButton.disabled=false}};
 $('prepare').addEventListener('click',()=>cardSimulator.stop());
-$('analyze').onclick=async()=>{if(!imageData)return;$('analyze').disabled=true;status('Analyse IA : textes, logos et objets…','warn');try{const d=await apiJson('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imageData})});layers=(d.layers||[]).map((x,i)=>{const l={...x,id:x.id||`layer-${i+1}`,depth:Number(x.depth)||0,enabled:true,sourceType:x.type||'object'};syncAnimatable(l);return l});suggestedDepths=new Map(layers.map(l=>[l.id,l.depth]));if(!layers.length)throw new Error('Aucun élément exploitable détecté.');$('layersCard').classList.remove('hidden');renderLayers();renderBoxes();status(`${layers.length} élément(s) détecté(s). Corrige le type si besoin puis coche les éléments à animer ensemble.`,'ok');setStep(3)}catch(e){status(`Analyse impossible : ${e.message}`,'bad')}finally{$('analyze').disabled=false}};
+$('analyze').onclick=async()=>{if(!imageData)return;$('analyze').disabled=true;status('Analyse IA : textes, logos et objets…','warn');try{const d=await apiJson('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imageData})});layers=(d.layers||[]).map((x,i)=>{const l={...x,id:x.id||`layer-${i+1}`,depth:Number(x.depth)||0,enabled:true,sourceType:x.type||'object'};syncAnimatable(l);return l});suggestedDepths=new Map(layers.map(l=>[l.id,l.depth]));if(!layers.length)throw new Error('Aucun élément exploitable détecté.');$('layersCard').classList.remove('hidden');renderLayers();renderBoxes();status(`${layers.length} élément(s) détecté(s). Corrige le type si besoin puis coche les éléments à animer ensemble.`,'ok');activeId='';selectionDrawMode=false;syncSelectionFields();setStep(3)}catch(e){status(`Analyse impossible : ${e.message}`,'bad')}finally{$('analyze').disabled=false}};
 function selectedAnimLayers(){return layers.filter(l=>l.animatable&&animatedIds.has(l.id))}
-function renderLayers(){const root=$('layers');root.innerHTML='';layers.forEach(l=>{const grouped=animatedIds.has(l.id),el=document.createElement('div');el.className='layer'+(l.id===activeId?' active':'')+(grouped?' grouped':'');el.innerHTML=`<div class="row"><span class="type">${l.type}</span><b>${esc(l.label)}</b></div><div class="kindrow"><span>Traiter comme</span><select class="kind"><option value="text" ${l.type==='text'?'selected':''}>Texte</option><option value="logo" ${l.type==='logo'?'selected':''}>Logo</option><option value="object" ${l.type==='object'?'selected':''}>Objet</option><option value="subject" ${l.type==='subject'?'selected':''}>Sujet</option></select></div><div class="depthline"><span>Arrière -100</span><span class="depthval">${l.depth>0?'+':''}${l.depth}</span><span>Avant +100</span></div><input class="depth" type="range" min="-100" max="100" value="${l.depth}"><label class="animsel">${l.animatable?`<input class="animcheck" type="checkbox" ${grouped?'checked':''}> Inclure dans l’animation`:'<span>Texte protégé — jamais envoyé à PixVerse</span>'}</label>`;el.onclick=e=>{if(!e.target.matches('input,select,option')){activeId=l.id;renderLayers();renderBoxes()}};const kind=el.querySelector('.kind');kind.onchange=()=>{l.type=kind.value;syncAnimatable(l);if(livePreviewState){const target=livePreviewState.layers.find(x=>x.id===l.id);if(target)target.type=l.type;scheduleLivePreview()}activeId=l.id;animatedFrames=[];refreshAnimationGroup();renderLayers();renderBoxes();status(l.type==='text'?`${l.label} reste protégé comme texte.`:`${l.label} est maintenant traité comme ${l.type==='logo'?'logo':l.type==='subject'?'sujet':'objet'} et peut être inclus dans l’animation.`,'ok')};const r=el.querySelector('.depth');r.oninput=()=>{l.depth=Number(r.value);el.querySelector('.depthval').textContent=(l.depth>0?'+':'')+l.depth;if(livePreviewState){const target=livePreviewState.layers.find(x=>x.id===l.id);if(target)target.depth=l.depth;scheduleLivePreview()}};const chk=el.querySelector('.animcheck');if(chk)chk.onchange=()=>{if(chk.checked)animatedIds.add(l.id);else animatedIds.delete(l.id);activeId=l.id;animatedFrames=[];refreshAnimationGroup();renderLayers();renderBoxes()};root.appendChild(el)});const sel=selectedAnimLayers(),gi=$('groupInfo');if(sel.length){gi.classList.remove('hidden');gi.textContent=sel.length===1?`1 élément sélectionné pour PixVerse : ${sel[0].label}`:`${sel.length} éléments regroupés pour PixVerse : ${sel.map(x=>x.label).join(' + ')}`}else gi.classList.add('hidden')}
-function renderBoxes(){const ov=$('overlay');ov.innerHTML='';layers.forEach(l=>{const [x,y,w,h]=l.bbox,box=document.createElement('div');box.className=`box ${l.type}${l.id===activeId?' active':''}${animatedIds.has(l.id)?' grouped':''}`;box.style.left=`${x*100}%`;box.style.top=`${y*100}%`;box.style.width=`${w*100}%`;box.style.height=`${h*100}%`;box.innerHTML=`<span class="tag">${esc(l.label)}</span>`;box.onclick=()=>{activeId=l.id;renderLayers();renderBoxes()};ov.appendChild(box)})}
+function renderLayers(){const root=$('layers');root.innerHTML='';layers.forEach(l=>{const grouped=animatedIds.has(l.id),el=document.createElement('div');el.className='layer'+(l.id===activeId?' active':'')+(grouped?' grouped':'');el.innerHTML=`<div class="row"><span class="type">${l.type}</span><b>${esc(l.label)}</b></div><div class="kindrow"><span>Traiter comme</span><select class="kind"><option value="text" ${l.type==='text'?'selected':''}>Texte</option><option value="logo" ${l.type==='logo'?'selected':''}>Logo</option><option value="object" ${l.type==='object'?'selected':''}>Objet</option><option value="subject" ${l.type==='subject'?'selected':''}>Sujet</option></select></div><div class="depthline"><span>Arrière -100</span><span class="depthval">${l.depth>0?'+':''}${l.depth}</span><span>Avant +100</span></div><input class="depth" type="range" min="-100" max="100" value="${l.depth}"><label class="animsel">${l.animatable?`<input class="animcheck" type="checkbox" ${grouped?'checked':''}> Inclure dans l’animation`:'<span>Texte protégé — jamais envoyé à PixVerse</span>'}</label>`;el.onclick=e=>{if(!e.target.matches('input,select,option')){activeId=l.id;renderLayers();renderBoxes();syncSelectionFields()}};const kind=el.querySelector('.kind');kind.onchange=()=>{l.type=kind.value;syncAnimatable(l);if(livePreviewState){const target=livePreviewState.layers.find(x=>x.id===l.id);if(target)target.type=l.type;scheduleLivePreview()}activeId=l.id;invalidateCardOutputs();refreshAnimationGroup();renderLayers();renderBoxes();syncSelectionFields();status(l.type==='text'?`${l.label} reste protégé comme texte.`:`${l.label} est maintenant traité comme ${l.type==='logo'?'logo':l.type==='subject'?'sujet':'objet'} et peut être inclus dans l’animation.`,'ok')};const r=el.querySelector('.depth');r.oninput=()=>{l.depth=Number(r.value);invalidateCardOutputs();el.querySelector('.depthval').textContent=(l.depth>0?'+':'')+l.depth;if(livePreviewState){const target=livePreviewState.layers.find(x=>x.id===l.id);if(target)target.depth=l.depth;scheduleLivePreview()}};const chk=el.querySelector('.animcheck');if(chk)chk.onchange=()=>{if(chk.checked)animatedIds.add(l.id);else animatedIds.delete(l.id);activeId=l.id;animatedFrames=[];invalidateCardOutputs();refreshAnimationGroup();renderLayers();renderBoxes();syncSelectionFields()};root.appendChild(el)});const sel=selectedAnimLayers(),gi=$('groupInfo');if(sel.length){gi.classList.remove('hidden');gi.textContent=sel.length===1?`1 élément sélectionné pour PixVerse : ${sel[0].label}`:`${sel.length} éléments regroupés pour PixVerse : ${sel.map(x=>x.label).join(' + ')}`}else gi.classList.add('hidden')}
+function renderBoxes(){
+  const ov=$('overlay');updateOverlayGeometry();ov.innerHTML='';
+  ov.classList.toggle('draw-mode',selectionDrawMode);
+  for(const l of layers){
+    const box=document.createElement('div');
+    box.className='box '+l.type+(l.id===activeId?' active':'')+(animatedIds.has(l.id)?' grouped':'');
+    setBoxStyle(box,l.bbox);
+    box.innerHTML='<span class="tag">'+esc(l.label)+'</span><span class="resize-handle" title="Redimensionner"></span>';
+    box.addEventListener('pointerdown',e=>{
+      if(selectionDrawMode)return;
+      e.preventDefault();e.stopPropagation();activeId=l.id;
+      const p=overlayPoint(e);selectedBoxGesture={id:l.id,pointerId:e.pointerId,
+        start:p,box:[...l.bbox],resize:e.target.classList.contains('resize-handle'),moved:false};
+      box.setPointerCapture(e.pointerId);
+      ov.querySelectorAll('.box').forEach(n=>n.classList.toggle('active',n===box));
+      renderLayers();syncSelectionFields();
+    });
+    box.addEventListener('pointermove',e=>{
+      const g=selectedBoxGesture;if(!g||g.id!==l.id||e.pointerId!==g.pointerId)return;
+      const p=overlayPoint(e),dx=p.x-g.start.x,dy=p.y-g.start.y;
+      if(Math.abs(dx)+Math.abs(dy)<.001)return;
+      g.moved=true;l.bbox=g.resize?resizeSelectionBbox(g.box,dx,dy):moveSelectionBbox(g.box,dx,dy);
+      setBoxStyle(box,l.bbox);syncSelectionFields();
+    });
+    box.addEventListener('pointerup',e=>{
+      const g=selectedBoxGesture;if(!g||g.id!==l.id||e.pointerId!==g.pointerId)return;
+      selectedBoxGesture=null;
+      if(box.hasPointerCapture(e.pointerId))box.releasePointerCapture(e.pointerId);
+      if(g.moved)commitSelectionChange('Zone déplacée ou redimensionnée : régénère les 9 vues.');
+      else{renderBoxes();renderLayers();syncSelectionFields()}
+    });
+    box.addEventListener('pointercancel',e=>{
+      const g=selectedBoxGesture;if(!g||g.id!==l.id||e.pointerId!==g.pointerId)return;
+      l.bbox=g.box;selectedBoxGesture=null;renderBoxes();renderLayers();syncSelectionFields();
+    });
+    ov.appendChild(box);
+  }
+}
 $('allZero').onclick=()=>{layers.forEach(l=>l.depth=0);if(livePreviewState){livePreviewState.layers.forEach(l=>l.depth=0);scheduleLivePreview()}renderLayers()};$('suggested').onclick=()=>{layers.forEach(l=>l.depth=suggestedDepths.get(l.id)||0);if(livePreviewState){livePreviewState.layers.forEach(l=>{const l0=layers.find(x=>x.id===l.id);l.depth=l0?.depth||0});scheduleLivePreview()}renderLayers()};
 function unionBbox(items,pad=.035){if(!items.length)return null;let x1=1,y1=1,x2=0,y2=0;items.forEach(l=>{const [x,y,w,h]=l.bbox;x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x+w);y2=Math.max(y2,y+h)});x1=clamp(x1-pad,0,1);y1=clamp(y1-pad,0,1);x2=clamp(x2+pad,0,1);y2=clamp(y2+pad,0,1);return[x1,y1,x2-x1,y2-y1]}
 function refreshAnimationGroup(){const sel=selectedAnimLayers();if(!sel.length){$('animCard').classList.add('hidden');animatedCropBbox=null;return}$('animCard').classList.remove('hidden');animatedCropBbox=unionBbox(sel,.035);const[x,y,w,h]=animatedCropBbox,c=$('cropCanvas'),W=Math.max(64,Math.round(srcImg.naturalWidth*w)),H=Math.max(64,Math.round(srcImg.naturalHeight*h));c.width=W;c.height=H;c.getContext('2d').drawImage(srcImg,x*srcImg.naturalWidth,y*srcImg.naturalHeight,w*srcImg.naturalWidth,h*srcImg.naturalHeight,0,0,W,H);const hints=sel.map(l=>l.animation_hint).filter(Boolean);$('animPrompt').value=sel.length===1?(hints[0]||'Caméra verrouillée, léger mouvement local uniquement, sans modifier le reste.'):`LOCKED CAMERA. Animate only these grouped elements together as one visual unit: ${sel.map(l=>l.label).join(', ')}. Keep their relative positions and proportions unchanged. Apply one subtle local motion only. No camera movement, no text creation, no morphing.`;setStep(4)}
