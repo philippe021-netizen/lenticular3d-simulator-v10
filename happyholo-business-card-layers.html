@@ -41,6 +41,15 @@
 .overlay.brush-mode .box.active .move-handle,.overlay.brush-mode .box.active .resize-handle{display:none}
 
 .overlay .box.active{z-index:4}
+.overlay .selection-focus-canvas{position:absolute;left:0;top:0;width:100%;height:100%;display:block;z-index:0;pointer-events:none;touch-action:none}
+.overlay .box{z-index:1}
+.overlay .box.active{z-index:4;border-color:#ffd60a;box-shadow:0 0 0 2px #151515,0 0 0 5px rgba(255,214,10,.75)}
+.selectionFocusInfo{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-top:10px;padding:9px;border-radius:11px;background:#ecfaff;border:1px solid #76c9d8;font-size:12px;color:#144459}
+.selectionFocusInfo .focusDot{width:12px;height:12px;display:inline-block;background:#0bd0ed;box-shadow:0 0 0 3px #ffd60a;border-radius:50%;flex-shrink:0}
+.selectionFocusInfo .focusHint{color:#375969;flex:1}
+.selectionFocusInfo button{width:auto;min-width:130px;margin:0;padding:7px 9px;min-height:37px;font-size:12px;border:1px solid #8dabb3;background:#fff;color:#20383c}
+@media(max-width:600px){.selectionFocusInfo button{width:100%}}
+
 @media(max-width:900px){.selectionPlacement .nudgeControls button{flex:1}}
 
 </style></head><body>
@@ -52,7 +61,7 @@
 <section id="layersCard" class="card hidden"><h2>2. Calques détectés</h2><p class="small">Si l’IA prend une partie du logo pour du texte, change simplement « Traiter comme » en Logo. Elle devient alors sélectionnable pour l’animation.</p><div class="two"><button id="allZero" class="secondary">Tout à 0</button><button id="suggested" class="secondary">Suggestions IA</button></div><section id="selectionEditor" class="selectionEditor"><h3>Éditer par sélection</h3><p class="small">Touche un élément sur la carte pour le sélectionner. Déplace son cadre avec le doigt ou l’Apple Pencil ; tire le carré jaune pour changer sa taille. Tu peux aussi tracer une nouvelle zone.</p><button id="startCardSelection" type="button" class="secondary">+ Tracer une zone sur la carte</button><div id="selectionFields" class="hidden"><div class="selectionPlacement"><p id="selectionPositionHint" class="positionInfo">1. Déplace la sélection sur la bonne zone.</p><button id="positionSelection" type="button" class="secondary">Déplacer / repositionner le cadre</button><div class="nudgeControls" aria-label="Déplacement fin du cadre"><button type="button" class="secondary nudge" data-x="-1" data-y="0" aria-label="Déplacer à gauche">←</button><button type="button" class="secondary nudge" data-x="0" data-y="-1" aria-label="Déplacer vers le haut">↑</button><button type="button" class="secondary nudge" data-x="0" data-y="1" aria-label="Déplacer vers le bas">↓</button><button type="button" class="secondary nudge" data-x="1" data-y="0" aria-label="Déplacer à droite">→</button></div><p class="small">Glisse le cadre sur l’image ou utilise les flèches (1 % par appui). Le carré jaune agrandit la sélection.</p><button id="confirmSelectionPosition" type="button">Valider la position et modifier</button></div><div id="selectionEditFields" class="selectionEditFields hidden"><section class="contourTools"><strong>Découpe suivant la forme</strong><p class="small">Place d’abord le cadre. Pour une boule ou un logo, choisis Objet. Pour des lettres, choisis Texte précis. Le fond doit être suffisamment contrasté.</p><div class="maskMode"><button id="contourObject" type="button" class="secondary">Suivre l’objet</button><button id="contourText" type="button" class="secondary">Texte précis</button></div><div id="contourStatus" class="small">Pas de masque : rectangle classique.</div><div id="contourAdjust" class="hidden"><div class="maskMode"><button id="brushAdd" class="secondary" type="button">+ Ajouter</button><button id="brushErase" class="secondary" type="button">− Retirer</button></div><label for="contourBrushSize">Diamètre du pinceau <b id="contourBrushValue">14</b> px</label><input id="contourBrushSize" type="range" min="3" max="45" value="14"><button id="brushStop" class="secondary" type="button">Terminer la correction</button><button id="contourReset" class="secondary" type="button">Revenir au rectangle</button></div><p class="small">La zone cyan montre les pixels retenus, pas seulement le rectangle.</p></section><label for="selectionName">Nom de l’élément</label><input id="selectionName" type="text" maxlength="80" placeholder="Nom de la sélection"><label for="selectionType">Traiter comme</label><select id="selectionType"><option value="text">Texte protégé</option><option value="logo">Logo</option><option value="object">Objet</option><option value="subject">Sujet</option></select><label for="selectionDepth">Profondeur : <b id="selectionDepthValue">0</b></label><input id="selectionDepth" type="range" min="-100" max="100" value="0"><div class="selectionCoords"><label>X %<input id="selectionX" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Y %<input id="selectionY" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Largeur %<input id="selectionW" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label><label>Hauteur %<input id="selectionH" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label></div><label for="selectionNewText">Texte à afficher à la place de la sélection</label><textarea id="selectionNewText" maxlength="200" placeholder="Écrire ici pour remplacer un texte présent sur la carte"></textarea><div class="textOptions"><label>Couleur du nouveau texte<input id="selectionTextColor" type="color" value="#161616"></label><label>Police<select id="selectionTextFont"><option value="Arial, sans-serif">Sans sérif</option><option value="Georgia, serif">Avec sérif</option><option value="monospace">Monospace</option></select></label></div><button id="replaceSelectionText" class="secondary" type="button">Remplacer le texte sélectionné</button><div class="selectionActions"><button id="deleteSelectionLayer" type="button" class="secondary">Retirer le calque (image conservée)</button><button id="eraseSelectionImage" type="button" class="danger">Effacer cette zone sur la carte</button></div><p class="small selectionWarning">L’effacement reconstitue approximativement le fond. Contrôle le résultat avant impression.</p></div></div><button id="undoSelectionErase" type="button" class="secondary" disabled>Annuler la dernière modification de l’image</button></section><div id="layers" class="layers"></div><div id="groupInfo" class="groupInfo hidden"></div><div class="note">Les vrais textes restent protégés. Un texte intégré graphiquement au logo peut être reclassé en Logo ou Objet puis inclus dans l’animation groupée.</div><button id="prepare">Préparer les 9 vues</button></section>
 <section id="animCard" class="card animCard hidden"><h2>3. Animation isolée / groupée</h2><p class="small">Seuls les éléments cochés sont envoyés à PixVerse. La carte complète n'est jamais envoyée.</p><div class="crop"><canvas id="cropCanvas"></canvas></div><label>Action souhaitée</label><textarea id="animPrompt" placeholder="Ex. léger mouvement du logo complet, effet laser local..."></textarea><button id="runPix" class="pix">Animer la sélection dans PixVerse</button><div id="pixStatus" class="status" style="margin-top:9px">Prêt.</div></section>
 </aside><main>
-<section class="card"><h2>Carte et zones détectées</h2><div id="canvasWrap" class="canvasWrap"><img id="cardImg"><div id="overlay" class="overlay"></div></div><p class="small">Bleu = texte · jaune = logo · vert = objet/sujet · halo vert = inclus dans l’animation groupée.</p></section>
+<section class="card"><h2>Carte et zones détectées</h2><div id="canvasWrap" class="canvasWrap"><img id="cardImg"><div id="overlay" class="overlay"></div></div><div id="selectionFocusInfo" class="selectionFocusInfo hidden" role="status" aria-live="polite"><span class="focusDot" aria-hidden="true"></span><strong id="selectionFocusTitle">Sélection active</strong><span id="selectionFocusHint" class="focusHint">Seule la partie éclairée sera modifiée.</span><button id="toggleSelectionHighlight" type="button" class="secondary">Masquer la mise en évidence</button></div><p class="small">Bleu = texte · jaune = logo · vert = objet/sujet · halo vert = inclus dans l’animation groupée.</p></section>
 <section id="resultCard" class="card hidden"><h2>Vues lenticulaires à imprimer</h2><p class="small">Aperçu de la carte en plans séparés : chaque texte, logo ou objet est placé à la hauteur réglée. Les 9 vues et le ZIP restent les images destinées à l’impression.</p><div class="sim"><canvas id="simCanvas"></canvas><canvas id="sim3dCanvas" class="hidden" aria-label="Simulation 3D des plans de la carte"></canvas></div><div id="scenePlaneStatus" class="status" style="margin-top:8px">Préparation des plans séparés…</div><label>Vue <b id="viewOut">5 / 9</b></label><input id="viewRange" type="range" min="0" max="8" step="1" value="4"><div id="frames" class="frames"></div><button id="download" class="pix">Télécharger ZIP 9 vues</button><div id="finalStatus" class="status" style="margin-top:9px">9 vues prêtes.</div></section>
 </main></div></div>
 <script type="module">
@@ -63,6 +72,7 @@ import { createCardSimulator } from './modules/card-simulator.js?v=511';
 import { createCardFloatingPlanesPreview } from './modules/card-floating-planes-preview.js?v=1';
 import { normalizeSelectionBbox,selectionFromPoints,moveSelectionBbox,resizeSelectionBbox,fillSelectionWithBackground } from './modules/card-selection-utils.js?v=1';
 import { segmentCardSelection,paintMaskStroke,maskAlphaAt,eraseCardSelectionByMask } from './modules/card-shape-mask.js?v=2';
+import { createSelectionFocusAssets } from './modules/card-selection-focus.js?v=1';
 import { detectDocumentQuad, preprocessBusinessCard } from './modules/microplayer-image-preprocess-v1.js';
 let cachedCardDepth=null, depthSource='', depthMode='ai',livePreviewState=null,livePreviewPending=false,livePreviewTimer=0;
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
@@ -72,7 +82,7 @@ $('prepare').before(depthOptions);
 $('cardParallax').oninput=()=>{$('cardParallaxOut').textContent=$('cardParallax').value+' %';if(livePreviewState){livePreviewState.amplitude=Number($('cardParallax').value);scheduleLivePreview()}};
 $('showCardDepth').onclick=()=>$('cardDepthCanvas').classList.toggle('hidden');
 let imageData='',srcImg=null,layers=[],suggestedDepths=new Map(),activeId='',animatedIds=new Set(),animatedFrames=[],animatedCropBbox=null,finalBlobs=[],finalUrls=[];
-let sceneStrength=1.8,selectionDrawMode=false,selectionGesture=null,selectedBoxGesture=null,selectionCounter=0,selectionUndo=null,selectionPositioning=false,previousSelectionForEditor='',maskBrushMode='',maskGesture=null;
+let sceneStrength=1.8,selectionDrawMode=false,selectionGesture=null,selectedBoxGesture=null,selectionCounter=0,selectionUndo=null,selectionPositioning=false,previousSelectionForEditor='',maskBrushMode='',maskGesture=null,selectionHighlightEnabled=true,selectionFocusFrame=0;
 const cardSimulator=createCardSimulator({canvas:$('simCanvas'),range:$('viewRange'),output:$('viewOut'),getUrls:()=>finalUrls,onSceneStrength:value=>{sceneStrength=value;if(livePreviewState)scheduleLivePreview()}});
 const setStep=n=>steps.forEach((s,i)=>s.classList.toggle('on',i<n));
 function status(t,kind=''){const e=$('status');e.textContent=t;e.className='status'+(kind?' '+kind:'')}
@@ -301,7 +311,7 @@ function brushMaskPoint(layer,p,canvas){
  const current={u,v},previous=maskGesture?.previous||current;
  layer.mask=paintMaskStroke(layer.mask,previous,current,Number($('contourBrushSize').value),maskBrushMode);
  if(maskGesture)maskGesture.previous=current;
- renderMaskPreview(canvas,layer.mask);
+ renderMaskPreview(canvas,layer.mask);scheduleRenderSelectionFocus();
 }
 
 $('deleteSelectionLayer').onclick=()=>{
@@ -374,8 +384,8 @@ $('undoSelectionErase').onclick=()=>{
   commitSelectionChange('Effacement annulé : image et calques précédents rétablis.');
 };
 $('cardImg').addEventListener('load',()=>renderBoxes());
-window.addEventListener('resize',()=>updateOverlayGeometry());
-if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>updateOverlayGeometry()).observe($('canvasWrap'));
+window.addEventListener('resize',()=>{updateOverlayGeometry();scheduleRenderSelectionFocus()});
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{updateOverlayGeometry();scheduleRenderSelectionFocus()}).observe($('canvasWrap'));
 
 $('file').onchange=()=>importCard($('file').files?.[0]);
 let preCropPoints=[],preCropScale=1,preCropDragging=-1;
@@ -412,8 +422,80 @@ $('prepare').addEventListener('click',()=>cardSimulator.stop());
 $('analyze').onclick=async()=>{if(!imageData)return;$('analyze').disabled=true;status('Analyse IA : textes, logos et objets…','warn');try{const d=await apiJson('/api/card-layer-analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imageData})});layers=(d.layers||[]).map((x,i)=>{const l={...x,id:x.id||`layer-${i+1}`,depth:Number(x.depth)||0,enabled:true,sourceType:x.type||'object'};syncAnimatable(l);return l});suggestedDepths=new Map(layers.map(l=>[l.id,l.depth]));if(!layers.length)throw new Error('Aucun élément exploitable détecté.');$('layersCard').classList.remove('hidden');renderLayers();renderBoxes();status(`${layers.length} élément(s) détecté(s). Corrige le type si besoin puis coche les éléments à animer ensemble.`,'ok');activeId='';selectionDrawMode=false;selectionPositioning=false;$('startCardSelection').textContent='+ Tracer une zone sur la carte';syncSelectionFields();$('manualEditor').disabled=false;setStep(3)}catch(e){status(`Analyse impossible : ${e.message}`,'bad')}finally{$('analyze').disabled=false}};
 function selectedAnimLayers(){return layers.filter(l=>l.animatable&&animatedIds.has(l.id))}
 function renderLayers(){const root=$('layers');root.innerHTML='';layers.forEach(l=>{const grouped=animatedIds.has(l.id),el=document.createElement('div');el.className='layer'+(l.id===activeId?' active':'')+(grouped?' grouped':'');el.innerHTML=`<div class="row"><span class="type">${l.type}</span><b>${esc(l.label)}</b></div><div class="kindrow"><span>Traiter comme</span><select class="kind"><option value="text" ${l.type==='text'?'selected':''}>Texte</option><option value="logo" ${l.type==='logo'?'selected':''}>Logo</option><option value="object" ${l.type==='object'?'selected':''}>Objet</option><option value="subject" ${l.type==='subject'?'selected':''}>Sujet</option></select></div><div class="depthline"><span>Arrière -100</span><span class="depthval">${l.depth>0?'+':''}${l.depth}</span><span>Avant +100</span></div><input class="depth" type="range" min="-100" max="100" value="${l.depth}"><label class="animsel">${l.animatable?`<input class="animcheck" type="checkbox" ${grouped?'checked':''}> Inclure dans l’animation`:'<span>Texte protégé — jamais envoyé à PixVerse</span>'}</label>`;el.onclick=e=>{if(!e.target.matches('input,select,option')){activeId=l.id;renderLayers();renderBoxes();syncSelectionFields()}};const kind=el.querySelector('.kind');kind.onchange=()=>{l.type=kind.value;syncAnimatable(l);if(livePreviewState){const target=livePreviewState.layers.find(x=>x.id===l.id);if(target)target.type=l.type;scheduleLivePreview()}activeId=l.id;invalidateCardOutputs();refreshAnimationGroup();renderLayers();renderBoxes();syncSelectionFields();status(l.type==='text'?`${l.label} reste protégé comme texte.`:`${l.label} est maintenant traité comme ${l.type==='logo'?'logo':l.type==='subject'?'sujet':'objet'} et peut être inclus dans l’animation.`,'ok')};const r=el.querySelector('.depth');r.oninput=()=>{l.depth=Number(r.value);invalidateCardOutputs();el.querySelector('.depthval').textContent=(l.depth>0?'+':'')+l.depth;syncSelectionFields()};const chk=el.querySelector('.animcheck');if(chk)chk.onchange=()=>{if(chk.checked)animatedIds.add(l.id);else animatedIds.delete(l.id);activeId=l.id;animatedFrames=[];invalidateCardOutputs();refreshAnimationGroup();renderLayers();renderBoxes();syncSelectionFields()};root.appendChild(el)});const sel=selectedAnimLayers(),gi=$('groupInfo');if(sel.length){gi.classList.remove('hidden');gi.textContent=sel.length===1?`1 élément sélectionné pour PixVerse : ${sel[0].label}`:`${sel.length} éléments regroupés pour PixVerse : ${sel.map(x=>x.label).join(' + ')}`}else gi.classList.add('hidden')}
+
+// Selection highlight is a separate UI canvas: never saved into the working
+// card image, copied into printed views, or used as a source for segmentation.
+function focusImageCanvas(bytes,width,height){
+  const c=document.createElement('canvas');c.width=width;c.height=height;
+  c.getContext('2d').putImageData(new ImageData(bytes,width,height),0,0);
+  return c;
+}
+function renderSelectionFocus(){
+  const l=selectedCardLayer(),info=$('selectionFocusInfo'),canvas=$('selectionFocusCanvas');
+  const active=!!l&&!selectionDrawMode;
+  info.classList.toggle('hidden',!active);
+  if(!active||!canvas)return;
+  $('selectionFocusTitle').textContent=(l.label||'Élément')+' — '+(l.type==='text'?'texte sélectionné':'objet sélectionné');
+  $('selectionFocusHint').textContent=l.mask?.alpha
+    ?'Zone colorée = contour exact sélectionné. Le reste est atténué.'
+    :'Zone rectangulaire provisoire : utilise « Suivre l’objet » ou « Texte précis ».';
+  $('toggleSelectionHighlight').textContent=selectionHighlightEnabled?'Masquer la mise en évidence':'Afficher la mise en évidence';
+  canvas.style.display=selectionHighlightEnabled?'block':'none';
+  if(!selectionHighlightEnabled)return;
+  const overlay=$('overlay'),rw=overlay.clientWidth,rh=overlay.clientHeight;
+  if(!rw||!rh)return;
+  const scale=Math.min(1.5,window.devicePixelRatio||1,1200/rw,850/rh);
+  const width=Math.max(1,Math.round(rw*scale)),height=Math.max(1,Math.round(rh*scale));
+  if(canvas.width!==width)canvas.width=width;
+  if(canvas.height!==height)canvas.height=height;
+  const ctx=canvas.getContext('2d'),[bx,by,bw,bh]=l.bbox;
+  const x=bx*width,y=by*height,w=bw*width,h=bh*height;
+  ctx.clearRect(0,0,width,height);
+  ctx.fillStyle='rgba(8,14,24,.49)';ctx.fillRect(0,0,width,height);
+  if(l.mask?.alpha){
+    try{
+      const assets=createSelectionFocusAssets(l.mask);
+      const cutout=focusImageCanvas(assets.cutout,assets.width,assets.height);
+      const colored=focusImageCanvas(assets.visible,assets.width,assets.height);
+      ctx.globalCompositeOperation='destination-out';
+      ctx.imageSmoothingEnabled=true;
+      ctx.drawImage(cutout,x,y,w,h);
+      ctx.globalCompositeOperation='source-over';
+      ctx.save();
+      ctx.shadowColor=l.type==='text'?'#15f6db':'#ffd60a';
+      ctx.shadowBlur=Math.max(5,7*scale);
+      ctx.drawImage(colored,x,y,w,h);
+      ctx.restore();
+    }catch(error){
+      console.warn('Surlignage du contour indisponible :',error);
+      ctx.clearRect(x,y,w,h);
+      ctx.fillStyle='rgba(10,206,234,.30)';ctx.fillRect(x,y,w,h);
+    }
+  }else{
+    ctx.clearRect(x,y,w,h);
+    ctx.fillStyle='rgba(12,206,238,.25)';ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle='#ffd60a';ctx.lineWidth=Math.max(2,3*scale);
+    ctx.setLineDash([6*scale,4*scale]);ctx.strokeRect(x,y,w,h);ctx.setLineDash([]);
+  }
+}
+function scheduleRenderSelectionFocus(){
+  if(selectionFocusFrame)return;
+  selectionFocusFrame=requestAnimationFrame(()=>{
+    selectionFocusFrame=0;
+    renderSelectionFocus();
+  });
+}
+$('toggleSelectionHighlight').onclick=()=>{
+  selectionHighlightEnabled=!selectionHighlightEnabled;
+  scheduleRenderSelectionFocus();
+};
+
 function renderBoxes(){
   const ov=$('overlay');updateOverlayGeometry();ov.innerHTML='';
+  const focusCanvas=document.createElement('canvas');
+  focusCanvas.className='selection-focus-canvas';focusCanvas.id='selectionFocusCanvas';
+  focusCanvas.setAttribute('aria-hidden','true');
+  ov.appendChild(focusCanvas);
   ov.classList.toggle('draw-mode',selectionDrawMode);
   ov.classList.toggle('brush-mode',!!maskBrushMode);
   for(const l of layers){
@@ -437,7 +519,7 @@ function renderBoxes(){
         start:p,box:[...l.bbox],resize:e.target.classList.contains('resize-handle'),moved:false};
       box.setPointerCapture(e.pointerId);
       ov.querySelectorAll('.box').forEach(n=>n.classList.toggle('active',n===box));
-      renderLayers();syncSelectionFields();
+      renderLayers();syncSelectionFields();scheduleRenderSelectionFocus();
     });
     box.addEventListener('pointermove',e=>{
       if(maskGesture?.pointerId===e.pointerId&&maskGesture.id===l.id){
@@ -448,7 +530,7 @@ function renderBoxes(){
       const p=overlayPoint(e),dx=p.x-g.start.x,dy=p.y-g.start.y;
       if(Math.abs(dx)+Math.abs(dy)<.001)return;
       g.moved=true;l.bbox=g.resize?resizeSelectionBbox(g.box,dx,dy):moveSelectionBbox(g.box,dx,dy);
-      setBoxStyle(box,l.bbox);syncSelectionFields();
+      setBoxStyle(box,l.bbox);syncSelectionFields();scheduleRenderSelectionFocus();
     });
     box.addEventListener('pointerup',e=>{
       if(maskGesture?.pointerId===e.pointerId&&maskGesture.id===l.id){
@@ -474,6 +556,7 @@ function renderBoxes(){
     });
     ov.appendChild(box);
   }
+  scheduleRenderSelectionFocus();
 }
 $('allZero').onclick=()=>{layers.forEach(l=>l.depth=0);invalidateCardOutputs();renderLayers();syncSelectionFields();status('Toutes les profondeurs à zéro. Régénère les 9 vues.','ok')};$('suggested').onclick=()=>{layers.forEach(l=>l.depth=suggestedDepths.get(l.id)||0);invalidateCardOutputs();renderLayers();syncSelectionFields();status('Profondeurs proposées rétablies. Régénère les 9 vues.','ok')};
 function unionBbox(items,pad=.035){if(!items.length)return null;let x1=1,y1=1,x2=0,y2=0;items.forEach(l=>{const [x,y,w,h]=l.bbox;x1=Math.min(x1,x);y1=Math.min(y1,y);x2=Math.max(x2,x+w);y2=Math.max(y2,y+h)});x1=clamp(x1-pad,0,1);y1=clamp(y1-pad,0,1);x2=clamp(x2+pad,0,1);y2=clamp(y2+pad,0,1);return[x1,y1,x2-x1,y2-y1]}
