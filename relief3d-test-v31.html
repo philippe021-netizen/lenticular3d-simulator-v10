@@ -35,7 +35,8 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 .photo3d-grid{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:15px;margin-top:12px;align-items:start}
 .photo3d-stage{background:#e9e9e5;position:relative;aspect-ratio:4/3;overflow:hidden;border-radius:13px;min-height:170px}
 .photo3d-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain;background:#e9e9e5;border-radius:0;aspect-ratio:auto}
-.photo3d-stage canvas[hidden],.photo3d-stage:not(.photo3d-ready) canvas{display:none!important}
+.photo3d-stage canvas[hidden],.photo3d-panel:not(.photo3d-ready) .photo3d-stage canvas{display:none!important}
+.photo3d-panel.photo3d-ready #photo3dPlaceholder{display:none!important}
 .photo3d-stage p{position:absolute;left:8%;right:8%;top:43%;margin:0;text-align:center;color:#42515b;font-size:13px;line-height:1.4}
 .photo3d-control label{margin:10px 0 5px}
 .photo3d-control button{display:block;width:100%;margin:8px 0 0;min-height:44px}
@@ -92,7 +93,7 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 <label>Force profondeur fond</label><div class="row"><span>Décor</span><b id="bgOut">0.10</b></div><input id="bgDepth" type="range" min="0.02" max="0.25" step="0.01" value="0.10">
 <label>Amplitude</label><div class="row"><span>Parallaxe</span><b id="angleOut">±7°</b></div><input id="angle" type="range" min="2" max="8" step="1" value="7">
 <label>Protection contours</label><div class="row"><span>Cheveux / détails fins</span><b id="edgeOut">84%</b></div><input id="edgeProtect" type="range" min="55" max="95" step="1" value="84">
-<button id="build">Créer le relief 3D local</button><button id="export" class="secondary" disabled>Exporter 9 vues</button><button id="download" class="secondary" disabled>Télécharger ZIP</button>
+<button id="build">Créer le relief 3D local</button><button id="photo3dJump" type="button" class="secondary">Voir la simulation 3D (essai)</button><button id="export" class="secondary" disabled>Exporter 9 vues</button><button id="download" class="secondary" disabled>Télécharger ZIP</button>
 <div id="status" class="status">Choisis une photo.</div><div class="small">Correction optimisée iPad — doigt + Apple Pencil.</div>
 </section>
 <section><canvas id="view" width="1024" height="768"></canvas><div id="frames" class="frames"></div></section>
@@ -169,6 +170,6 @@ canvas{width:100%;border-radius:14px;background:#111;display:block;aspect-ratio:
 })();
 window.addEventListener('load',()=>{const ok=!!window.HappyHoloActionPreviewEngine;console.log('[HAPPYHOLO] intégration moteur actions :',ok?'OK':'ABSENTE');if(!ok){const s=document.querySelector('#status');if(s)s.textContent='ERREUR : moteur actions OFFLINE non chargé. Vérifie action-preview-engine.js.';}});
 </script>
-<script type="module" src="./modules/photo-floating-preview.js?v=1"></script>
+<script type="module" src="./modules/photo-floating-preview.js?v=2"></script>
 </body>
 </html>
