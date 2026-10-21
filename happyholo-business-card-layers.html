@@ -62,7 +62,7 @@ import { renderNovelView } from './depthflow-v42-core.js';
 import { createCardSimulator } from './modules/card-simulator.js?v=511';
 import { createCardFloatingPlanesPreview } from './modules/card-floating-planes-preview.js?v=1';
 import { normalizeSelectionBbox,selectionFromPoints,moveSelectionBbox,resizeSelectionBbox,fillSelectionWithBackground } from './modules/card-selection-utils.js?v=1';
-import { segmentCardSelection,paintMaskAt,maskAlphaAt,eraseCardSelectionByMask } from './modules/card-shape-mask.js?v=1';
+import { segmentCardSelection,paintMaskStroke,maskAlphaAt,eraseCardSelectionByMask } from './modules/card-shape-mask.js?v=2';
 import { detectDocumentQuad, preprocessBusinessCard } from './modules/microplayer-image-preprocess-v1.js';
 let cachedCardDepth=null, depthSource='', depthMode='ai',livePreviewState=null,livePreviewPending=false,livePreviewTimer=0;
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
@@ -178,7 +178,11 @@ $('confirmSelectionPosition').onclick=()=>{
 document.querySelectorAll('.nudge').forEach(button=>{
   button.onclick=()=>{
     const l=selectedCardLayer();if(!l)return;
+    const original=l.bbox;
     l.bbox=moveSelectionBbox(l.bbox,Number(button.dataset.x)*.01,Number(button.dataset.y)*.01);
+    if(l.mask?.alpha&&original.some((v,i)=>Math.abs(v-l.bbox[i])>0.00001)){
+      delete l.mask;maskBrushMode='';
+    }
     invalidateCardOutputs();
     renderBoxes();syncSelectionFields();
     status('Cadre déplacé. Valide sa position avant de modifier.','ok');
@@ -209,8 +213,13 @@ function editCoordinates(){
     const raw=Number($('selection'+k).value.replace(',','.'));
     return Number.isFinite(raw)?raw/100:l.bbox[i];
   });
+  const original=l.bbox;
   l.bbox=normalizeSelectionBbox(values);
-  commitSelectionChange('Cadre corrigé. Vérifie les contours puis régénère les vues.');
+  const changed=original.some((v,i)=>Math.abs(v-l.bbox[i])>0.00001);
+  if(changed&&l.mask?.alpha){
+    delete l.mask;maskBrushMode='';
+    commitSelectionChange('Cadre corrigé : relance « Suivre l’objet » ou « Texte précis » pour recalculer la forme.');
+  }else commitSelectionChange('Cadre corrigé. Vérifie les contours puis régénère les vues.');
 }
 ['X','Y','W','H'].forEach(k=>$('selection'+k).addEventListener('change',editCoordinates));
 $('startCardSelection').onclick=()=>{
@@ -289,7 +298,9 @@ $('contourReset').onclick=()=>{
 function brushMaskPoint(layer,p,canvas){
  const [bx,by,bw,bh]=layer.bbox;
  const u=(p.x-bx)/bw,v=(p.y-by)/bh;
- layer.mask=paintMaskAt(layer.mask,u,v,Number($('contourBrushSize').value),maskBrushMode);
+ const current={u,v},previous=maskGesture?.previous||current;
+ layer.mask=paintMaskStroke(layer.mask,previous,current,Number($('contourBrushSize').value),maskBrushMode);
+ if(maskGesture)maskGesture.previous=current;
  renderMaskPreview(canvas,layer.mask);
 }
 
@@ -340,7 +351,7 @@ async function applyRasterSelectionEdit(replacement=null){
     selectionUndo=undo;imageData=nextData;srcImg=nextImg;$('cardImg').src=nextData;
     if(isReplacement){
       l.label=text.replace(/\s+/g,' ').slice(0,80);
-      l.type='text';l.sourceType='manual-text';syncAnimatable(l);
+      l.type='text';l.sourceType='manual-text';delete l.mask;maskBrushMode='';syncAnimatable(l);
     }else{
       layers=layers.filter(item=>item.id!==l.id);
       animatedIds.delete(l.id);suggestedDepths.delete(l.id);activeId='';
@@ -447,7 +458,13 @@ function renderBoxes(){
       const g=selectedBoxGesture;if(!g||g.id!==l.id||e.pointerId!==g.pointerId)return;
       selectedBoxGesture=null;
       if(box.hasPointerCapture(e.pointerId))box.releasePointerCapture(e.pointerId);
-      if(g.moved)commitSelectionChange('Cadre repositionné. Vérifie l’emplacement, puis valide sa position avant toute modification.');
+      if(g.moved){
+        const maskInvalidated=!!l.mask?.alpha;
+        if(maskInvalidated){delete l.mask;maskBrushMode=''}
+        commitSelectionChange(maskInvalidated
+          ?'Cadre déplacé : ancien contour annulé car il ne correspond plus à la carte. Valide, puis relance le détourage.'
+          :'Cadre repositionné. Vérifie l’emplacement, puis valide sa position avant toute modification.');
+      }
       else{renderBoxes();renderLayers();syncSelectionFields()}
     });
     box.addEventListener('pointercancel',e=>{
