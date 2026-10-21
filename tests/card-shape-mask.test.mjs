@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {segmentCardSelection,maskAlphaAt,paintMaskAt,eraseCardSelectionByMask} from '../modules/card-shape-mask.js';
+import {segmentCardSelection,maskAlphaAt,paintMaskAt,paintMaskStroke,eraseCardSelectionByMask} from '../modules/card-shape-mask.js';
 
 function image(width,height){
   const pixels=new Uint8ClampedArray(width*height*4);
@@ -43,4 +43,16 @@ test('mask can be corrected by Pencil add/remove without mutation',()=>{
 test('low-information region requests manual correction instead of an invented silhouette',()=>{
   const p=image(80,60);
   assert.throws(()=>segmentCardSelection(p,80,60,[.1,.1,.7,.7],'object'),/Détourage incertain/);
+});
+
+test('fast Pencil stroke stays continuous without modifying original mask',()=>{
+ const original={width:150,height:80,alpha:new Uint8Array(12000),coverage:0,mode:'object'};
+ const painted=paintMaskStroke(original,{u:.1,v:.5},{u:.9,v:.5},4,'add');
+ for(let x=15;x<135;x++)assert.equal(painted.alpha[40*150+x],255,'missing painted pixel '+x);
+ assert.equal(original.alpha[40*150+60],0,'source mask mutated');
+});
+test('out-of-bounds brush cannot accidentally paint selection edges',()=>{
+ const original={width:20,height:20,alpha:new Uint8Array(400),coverage:0};
+ const edited=paintMaskAt(original,-1,2,12,'add');
+ assert.equal(edited,original);
 });
