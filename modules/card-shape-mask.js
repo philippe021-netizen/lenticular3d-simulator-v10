@@ -90,6 +90,7 @@ export function paintMaskAt(mask,u,v,radiusPixels,mode='add'){
    const d=Math.hypot(x-cx,y-cy);
    if(d<=radius)out.alpha[y*mask.width+x]=mode==='erase'?0:255;
  }
+ out.coverage=out.alpha.reduce((sum,value)=>sum+(value>0?1:0),0)/out.alpha.length;
  return out;
 }
 export function eraseCardSelectionByMask(pixels,width,height,bbox,mask,rectFill){
