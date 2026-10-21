@@ -1,6 +1,6 @@
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-export function cardPose(index){const i=clamp(Math.round(Number(index)||0),0,8);return {index:i,angle:(i-4)*3}}
-export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/3+4),0,8)}
+export function cardPose(index){const i=clamp(Math.round(Number(index)||0),0,8);return {index:i,angle:(i-4)*6}}
+export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/6+4),0,8)}
 
 export function createCardSimulator({canvas,range,output,getUrls}){
   const stage=canvas.parentElement,controls=document.createElement('div');
@@ -34,7 +34,7 @@ export function createCardSimulator({canvas,range,output,getUrls}){
   play.onclick=()=>{
     if(running){stop();return}if(getUrls().length!==9)return;
     running=true;tilt.checked=true;play.textContent='⏸ Pause';const start=performance.now();
-    const tick=now=>{if(!running)return;const value=12*Math.sin((now-start)/10000*2*Math.PI);void show(viewAtAngle(value),value,false);animation=requestAnimationFrame(tick)};
+    const tick=now=>{if(!running)return;const value=24*Math.sin((now-start)/10000*2*Math.PI);void show(viewAtAngle(value),value,false);animation=requestAnimationFrame(tick)};
     animation=requestAnimationFrame(tick);
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
