@@ -82,16 +82,36 @@ export function segmentCardSelection(pixels,width,height,bbox,kind='object',maxS
 
 export function paintMaskAt(mask,u,v,radiusPixels,mode='add'){
  if(!mask||!mask.alpha)return mask;
+ if(!Number.isFinite(u)||!Number.isFinite(v)||u<0||u>1||v<0||v>1)return mask;
+ // Copy only once per operation; no full 200k-pixel coverage scan on every Pencil move.
  const out={...mask,alpha:new Uint8Array(mask.alpha)};
- const cx=Math.round(u*mask.width),cy=Math.round(v*mask.height);
+ const cx=Math.min(mask.width-1,Math.max(0,Math.round(u*(mask.width-1))));
+ const cy=Math.min(mask.height-1,Math.max(0,Math.round(v*(mask.height-1))));
  const radius=Math.max(1,Math.round(radiusPixels));
+ const next=mode==='erase'?0:255;
+ let delta=0;
  for(let y=Math.max(0,cy-radius);y<=Math.min(mask.height-1,cy+radius);y++)
  for(let x=Math.max(0,cx-radius);x<=Math.min(mask.width-1,cx+radius);x++){
-   const d=Math.hypot(x-cx,y-cy);
-   if(d<=radius)out.alpha[y*mask.width+x]=mode==='erase'?0:255;
+   if(Math.hypot(x-cx,y-cy)>radius)continue;
+   const i=y*mask.width+x;
+   if(out.alpha[i]!==next){delta+=(next>0?1:-1);out.alpha[i]=next}
  }
- out.coverage=out.alpha.reduce((sum,value)=>sum+(value>0?1:0),0)/out.alpha.length;
+ const count=out.alpha.length;
+ out.coverage=Number.isFinite(mask.coverage)?
+   Math.max(0,Math.min(1,mask.coverage+delta/count)):
+   out.alpha.reduce((sum,value)=>sum+(value>0?1:0),0)/count;
  return out;
+}
+export function paintMaskStroke(mask,from,to,radiusPixels,mode='add'){
+ if(!mask)return mask;
+ const distance=Math.hypot((to.u-from.u)*mask.width,(to.v-from.v)*mask.height);
+ const steps=Math.max(1,Math.ceil(distance/Math.max(1,radiusPixels*.42)));
+ let edited=mask;
+ for(let i=0;i<=steps;i++){
+   const t=i/steps;
+   edited=paintMaskAt(edited,from.u*(1-t)+to.u*t,from.v*(1-t)+to.v*t,radiusPixels,mode);
+ }
+ return edited;
 }
 export function eraseCardSelectionByMask(pixels,width,height,bbox,mask,rectFill){
  if(!mask||!mask.alpha)return rectFill;
