@@ -31,6 +31,15 @@
 .overlay .box.positioning{border:3px dashed #ffcc21;background:rgba(255,214,0,.19);box-shadow:0 0 0 3px #131313}
 .overlay .box .move-handle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);min-width:92px;min-height:40px;display:none;align-items:center;justify-content:center;background:#111;color:#fff;font-size:12px;font-weight:900;border-radius:9px;border:2px solid #ffd60a;touch-action:none;pointer-events:auto;white-space:nowrap}
 .overlay .box.positioning .move-handle{display:flex}
+.overlay .box .mask-preview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.selectionEditor .contourTools{margin:10px 0;padding:10px;border:1px solid #86aeb6;border-radius:11px;background:#e9f9fb}
+.selectionEditor .contourTools strong{font-size:13px}
+.selectionEditor .contourTools button{margin-top:5px}
+.selectionEditor .maskMode{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.selectionEditor .contourTools button.active{background:#167263;color:#fff}
+.overlay.brush-mode .box.active{touch-action:none;cursor:crosshair}
+.overlay.brush-mode .box.active .move-handle,.overlay.brush-mode .box.active .resize-handle{display:none}
+
 .overlay .box.active{z-index:4}
 @media(max-width:900px){.selectionPlacement .nudgeControls button{flex:1}}
 
@@ -40,7 +49,7 @@
 <section class="intro"><h2>Parcours carte fidèle</h2><p>Importer → repérer textes/logo/objets → corriger le type si besoin → régler les profondeurs → sélectionner un ou plusieurs éléments à animer → réinjecter → contrôler 9 vues → ZIP.</p><div class="steps"><div class="step on">1 Import</div><div class="step">2 Repérage</div><div class="step">3 Profondeurs</div><div class="step">4 Animation</div><div class="step">5 9 vues</div><div class="step">6 ZIP</div></div></section>
 <div class="grid"><aside>
 <section class="card"><h2>1. Carte existante</h2><input id="file" type="file" accept="image/*"><div id="status" class="status" style="margin-top:9px">Charge une carte pour commencer.</div><section id="preCropCard" class="card hidden" style="padding:10px;margin:10px 0 0"><h2>Pré-cadrage avant découpe</h2><p class="small">Place ou ajuste les quatre poignées sur les coins de la carte. L’image sera redressée en perspective avant le repérage des textes et objets.</p><div class="cropStage"><canvas id="preCropCanvas"></canvas></div><div class="cropActions"><button id="applyPreCrop" disabled>Redresser avec les 4 coins</button><button id="keepFullImage" class="secondary">Garder toute l’image</button></div><button id="resetPreCrop" class="secondary">Réinitialiser les 4 coins</button></section><button id="analyze" disabled>Repérer automatiquement les éléments</button><button id="manualEditor" class="secondary" disabled>Éditer par sélection manuelle</button></section>
-<section id="layersCard" class="card hidden"><h2>2. Calques détectés</h2><p class="small">Si l’IA prend une partie du logo pour du texte, change simplement « Traiter comme » en Logo. Elle devient alors sélectionnable pour l’animation.</p><div class="two"><button id="allZero" class="secondary">Tout à 0</button><button id="suggested" class="secondary">Suggestions IA</button></div><section id="selectionEditor" class="selectionEditor"><h3>Éditer par sélection</h3><p class="small">Touche un élément sur la carte pour le sélectionner. Déplace son cadre avec le doigt ou l’Apple Pencil ; tire le carré jaune pour changer sa taille. Tu peux aussi tracer une nouvelle zone.</p><button id="startCardSelection" type="button" class="secondary">+ Tracer une zone sur la carte</button><div id="selectionFields" class="hidden"><div class="selectionPlacement"><p id="selectionPositionHint" class="positionInfo">1. Déplace la sélection sur la bonne zone.</p><button id="positionSelection" type="button" class="secondary">Déplacer / repositionner le cadre</button><div class="nudgeControls" aria-label="Déplacement fin du cadre"><button type="button" class="secondary nudge" data-x="-1" data-y="0" aria-label="Déplacer à gauche">←</button><button type="button" class="secondary nudge" data-x="0" data-y="-1" aria-label="Déplacer vers le haut">↑</button><button type="button" class="secondary nudge" data-x="0" data-y="1" aria-label="Déplacer vers le bas">↓</button><button type="button" class="secondary nudge" data-x="1" data-y="0" aria-label="Déplacer à droite">→</button></div><p class="small">Glisse le cadre sur l’image ou utilise les flèches (1 % par appui). Le carré jaune agrandit la sélection.</p><button id="confirmSelectionPosition" type="button">Valider la position et modifier</button></div><div id="selectionEditFields" class="selectionEditFields hidden"><label for="selectionName">Nom de l’élément</label><input id="selectionName" type="text" maxlength="80" placeholder="Nom de la sélection"><label for="selectionType">Traiter comme</label><select id="selectionType"><option value="text">Texte protégé</option><option value="logo">Logo</option><option value="object">Objet</option><option value="subject">Sujet</option></select><label for="selectionDepth">Profondeur : <b id="selectionDepthValue">0</b></label><input id="selectionDepth" type="range" min="-100" max="100" value="0"><div class="selectionCoords"><label>X %<input id="selectionX" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Y %<input id="selectionY" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Largeur %<input id="selectionW" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label><label>Hauteur %<input id="selectionH" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label></div><label for="selectionNewText">Texte à afficher à la place de la sélection</label><textarea id="selectionNewText" maxlength="200" placeholder="Écrire ici pour remplacer un texte présent sur la carte"></textarea><div class="textOptions"><label>Couleur du nouveau texte<input id="selectionTextColor" type="color" value="#161616"></label><label>Police<select id="selectionTextFont"><option value="Arial, sans-serif">Sans sérif</option><option value="Georgia, serif">Avec sérif</option><option value="monospace">Monospace</option></select></label></div><button id="replaceSelectionText" class="secondary" type="button">Remplacer le texte sélectionné</button><div class="selectionActions"><button id="deleteSelectionLayer" type="button" class="secondary">Retirer le calque (image conservée)</button><button id="eraseSelectionImage" type="button" class="danger">Effacer cette zone sur la carte</button></div><p class="small selectionWarning">L’effacement reconstitue approximativement le fond. Contrôle le résultat avant impression.</p></div></div><button id="undoSelectionErase" type="button" class="secondary" disabled>Annuler la dernière modification de l’image</button></section><div id="layers" class="layers"></div><div id="groupInfo" class="groupInfo hidden"></div><div class="note">Les vrais textes restent protégés. Un texte intégré graphiquement au logo peut être reclassé en Logo ou Objet puis inclus dans l’animation groupée.</div><button id="prepare">Préparer les 9 vues</button></section>
+<section id="layersCard" class="card hidden"><h2>2. Calques détectés</h2><p class="small">Si l’IA prend une partie du logo pour du texte, change simplement « Traiter comme » en Logo. Elle devient alors sélectionnable pour l’animation.</p><div class="two"><button id="allZero" class="secondary">Tout à 0</button><button id="suggested" class="secondary">Suggestions IA</button></div><section id="selectionEditor" class="selectionEditor"><h3>Éditer par sélection</h3><p class="small">Touche un élément sur la carte pour le sélectionner. Déplace son cadre avec le doigt ou l’Apple Pencil ; tire le carré jaune pour changer sa taille. Tu peux aussi tracer une nouvelle zone.</p><button id="startCardSelection" type="button" class="secondary">+ Tracer une zone sur la carte</button><div id="selectionFields" class="hidden"><div class="selectionPlacement"><p id="selectionPositionHint" class="positionInfo">1. Déplace la sélection sur la bonne zone.</p><button id="positionSelection" type="button" class="secondary">Déplacer / repositionner le cadre</button><div class="nudgeControls" aria-label="Déplacement fin du cadre"><button type="button" class="secondary nudge" data-x="-1" data-y="0" aria-label="Déplacer à gauche">←</button><button type="button" class="secondary nudge" data-x="0" data-y="-1" aria-label="Déplacer vers le haut">↑</button><button type="button" class="secondary nudge" data-x="0" data-y="1" aria-label="Déplacer vers le bas">↓</button><button type="button" class="secondary nudge" data-x="1" data-y="0" aria-label="Déplacer à droite">→</button></div><p class="small">Glisse le cadre sur l’image ou utilise les flèches (1 % par appui). Le carré jaune agrandit la sélection.</p><button id="confirmSelectionPosition" type="button">Valider la position et modifier</button></div><div id="selectionEditFields" class="selectionEditFields hidden"><section class="contourTools"><strong>Découpe suivant la forme</strong><p class="small">Place d’abord le cadre. Pour une boule ou un logo, choisis Objet. Pour des lettres, choisis Texte précis. Le fond doit être suffisamment contrasté.</p><div class="maskMode"><button id="contourObject" type="button" class="secondary">Suivre l’objet</button><button id="contourText" type="button" class="secondary">Texte précis</button></div><div id="contourStatus" class="small">Pas de masque : rectangle classique.</div><div id="contourAdjust" class="hidden"><div class="maskMode"><button id="brushAdd" class="secondary" type="button">+ Ajouter</button><button id="brushErase" class="secondary" type="button">− Retirer</button></div><label for="contourBrushSize">Diamètre du pinceau <b id="contourBrushValue">14</b> px</label><input id="contourBrushSize" type="range" min="3" max="45" value="14"><button id="brushStop" class="secondary" type="button">Terminer la correction</button><button id="contourReset" class="secondary" type="button">Revenir au rectangle</button></div><p class="small">La zone cyan montre les pixels retenus, pas seulement le rectangle.</p></section><label for="selectionName">Nom de l’élément</label><input id="selectionName" type="text" maxlength="80" placeholder="Nom de la sélection"><label for="selectionType">Traiter comme</label><select id="selectionType"><option value="text">Texte protégé</option><option value="logo">Logo</option><option value="object">Objet</option><option value="subject">Sujet</option></select><label for="selectionDepth">Profondeur : <b id="selectionDepthValue">0</b></label><input id="selectionDepth" type="range" min="-100" max="100" value="0"><div class="selectionCoords"><label>X %<input id="selectionX" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Y %<input id="selectionY" type="number" min="0" max="100" step="0.1" inputmode="decimal"></label><label>Largeur %<input id="selectionW" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label><label>Hauteur %<input id="selectionH" type="number" min="1.5" max="100" step="0.1" inputmode="decimal"></label></div><label for="selectionNewText">Texte à afficher à la place de la sélection</label><textarea id="selectionNewText" maxlength="200" placeholder="Écrire ici pour remplacer un texte présent sur la carte"></textarea><div class="textOptions"><label>Couleur du nouveau texte<input id="selectionTextColor" type="color" value="#161616"></label><label>Police<select id="selectionTextFont"><option value="Arial, sans-serif">Sans sérif</option><option value="Georgia, serif">Avec sérif</option><option value="monospace">Monospace</option></select></label></div><button id="replaceSelectionText" class="secondary" type="button">Remplacer le texte sélectionné</button><div class="selectionActions"><button id="deleteSelectionLayer" type="button" class="secondary">Retirer le calque (image conservée)</button><button id="eraseSelectionImage" type="button" class="danger">Effacer cette zone sur la carte</button></div><p class="small selectionWarning">L’effacement reconstitue approximativement le fond. Contrôle le résultat avant impression.</p></div></div><button id="undoSelectionErase" type="button" class="secondary" disabled>Annuler la dernière modification de l’image</button></section><div id="layers" class="layers"></div><div id="groupInfo" class="groupInfo hidden"></div><div class="note">Les vrais textes restent protégés. Un texte intégré graphiquement au logo peut être reclassé en Logo ou Objet puis inclus dans l’animation groupée.</div><button id="prepare">Préparer les 9 vues</button></section>
 <section id="animCard" class="card animCard hidden"><h2>3. Animation isolée / groupée</h2><p class="small">Seuls les éléments cochés sont envoyés à PixVerse. La carte complète n'est jamais envoyée.</p><div class="crop"><canvas id="cropCanvas"></canvas></div><label>Action souhaitée</label><textarea id="animPrompt" placeholder="Ex. léger mouvement du logo complet, effet laser local..."></textarea><button id="runPix" class="pix">Animer la sélection dans PixVerse</button><div id="pixStatus" class="status" style="margin-top:9px">Prêt.</div></section>
 </aside><main>
 <section class="card"><h2>Carte et zones détectées</h2><div id="canvasWrap" class="canvasWrap"><img id="cardImg"><div id="overlay" class="overlay"></div></div><p class="small">Bleu = texte · jaune = logo · vert = objet/sujet · halo vert = inclus dans l’animation groupée.</p></section>
@@ -53,6 +62,7 @@ import { renderNovelView } from './depthflow-v42-core.js';
 import { createCardSimulator } from './modules/card-simulator.js?v=511';
 import { createCardFloatingPlanesPreview } from './modules/card-floating-planes-preview.js?v=1';
 import { normalizeSelectionBbox,selectionFromPoints,moveSelectionBbox,resizeSelectionBbox,fillSelectionWithBackground } from './modules/card-selection-utils.js?v=1';
+import { segmentCardSelection,paintMaskAt,maskAlphaAt,eraseCardSelectionByMask } from './modules/card-shape-mask.js?v=1';
 import { detectDocumentQuad, preprocessBusinessCard } from './modules/microplayer-image-preprocess-v1.js';
 let cachedCardDepth=null, depthSource='', depthMode='ai',livePreviewState=null,livePreviewPending=false,livePreviewTimer=0;
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
@@ -62,7 +72,7 @@ $('prepare').before(depthOptions);
 $('cardParallax').oninput=()=>{$('cardParallaxOut').textContent=$('cardParallax').value+' %';if(livePreviewState){livePreviewState.amplitude=Number($('cardParallax').value);scheduleLivePreview()}};
 $('showCardDepth').onclick=()=>$('cardDepthCanvas').classList.toggle('hidden');
 let imageData='',srcImg=null,layers=[],suggestedDepths=new Map(),activeId='',animatedIds=new Set(),animatedFrames=[],animatedCropBbox=null,finalBlobs=[],finalUrls=[];
-let sceneStrength=1.8,selectionDrawMode=false,selectionGesture=null,selectedBoxGesture=null,selectionCounter=0,selectionUndo=null,selectionPositioning=false,previousSelectionForEditor='';
+let sceneStrength=1.8,selectionDrawMode=false,selectionGesture=null,selectedBoxGesture=null,selectionCounter=0,selectionUndo=null,selectionPositioning=false,previousSelectionForEditor='',maskBrushMode='',maskGesture=null;
 const cardSimulator=createCardSimulator({canvas:$('simCanvas'),range:$('viewRange'),output:$('viewOut'),getUrls:()=>finalUrls,onSceneStrength:value=>{sceneStrength=value;if(livePreviewState)scheduleLivePreview()}});
 const setStep=n=>steps.forEach((s,i)=>s.classList.toggle('on',i<n));
 function status(t,kind=''){const e=$('status');e.textContent=t;e.className='status'+(kind?' '+kind:'')}
@@ -115,7 +125,7 @@ function invalidateCardOutputs(){
 function syncSelectionFields(){
   const l=selectedCardLayer(),fields=$('selectionFields');
   fields.classList.toggle('hidden',!l);
-  if(!l){previousSelectionForEditor='';$('selectionEditFields').classList.add('hidden');return}
+  if(!l){previousSelectionForEditor='';maskBrushMode='';$('selectionEditFields').classList.add('hidden');return}
   $('selectionEditFields').classList.toggle('hidden',selectionPositioning);
   $('positionSelection').textContent=selectionPositioning?'Cadre en déplacement':'Déplacer / repositionner le cadre';
   $('positionSelection').disabled=selectionPositioning;
@@ -124,10 +134,13 @@ function syncSelectionFields(){
     ?'1. Glisse la sélection sur le bon élément puis valide sa position.'
     :'2. Position validée : tu peux maintenant modifier ou supprimer.';
   if(previousSelectionForEditor!==l.id){
-    $('selectionNewText').value='';
+    maskBrushMode='';$('selectionNewText').value='';
     previousSelectionForEditor=l.id;
   }
   $('selectionName').value=l.label||'';
+  $('contourAdjust').classList.toggle('hidden',!l.mask?.alpha);
+  $('contourStatus').textContent=l.mask?.alpha?'Masque '+(l.mask.mode==='text'?'lettres':'objet')+' actif : '+Math.round(l.mask.coverage*100)+' % du cadre.':'Pas de masque : rectangle entier sélectionné.';
+  $('brushAdd').classList.toggle('active',maskBrushMode==='add');$('brushErase').classList.toggle('active',maskBrushMode==='erase');
   $('selectionType').value=l.type||'object';
   $('selectionDepth').value=String(l.depth||0);
   $('selectionDepthValue').textContent=(l.depth>0?'+':'')+(l.depth||0);
@@ -235,6 +248,48 @@ function completeSelectionGesture(e,commit){
 }
 editOverlay.addEventListener('pointerup',e=>completeSelectionGesture(e,true));
 editOverlay.addEventListener('pointercancel',e=>completeSelectionGesture(e,false));
+
+function renderMaskPreview(canvas,mask){
+ if(!canvas||!mask?.alpha)return;
+ canvas.width=mask.width;canvas.height=mask.height;
+ const ctx=canvas.getContext('2d'),img=ctx.createImageData(mask.width,mask.height);
+ for(let i=0;i<mask.alpha.length;i++){
+   img.data[i*4]=10;img.data[i*4+1]=200;img.data[i*4+2]=215;
+   img.data[i*4+3]=Math.round(mask.alpha[i]*.56);
+ }
+ ctx.putImageData(img,0,0);
+}
+async function calculateContour(kind){
+ const l=selectedCardLayer();if(!l||!srcImg||selectionPositioning)return;
+ const btn=$(kind==='text'?'contourText':'contourObject');btn.disabled=true;maskBrushMode='';
+ try{
+   const c=document.createElement('canvas');c.width=srcImg.naturalWidth;c.height=srcImg.naturalHeight;
+   const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(srcImg,0,0);
+   const img=ctx.getImageData(0,0,c.width,c.height);
+   l.mask=segmentCardSelection(img.data,c.width,c.height,l.bbox,kind);
+   invalidateCardOutputs();renderBoxes();syncSelectionFields();
+   status((kind==='text'?'Lettres':'Objet')+' détourné(e)s. Vérifie le masque cyan avant toute modification.','ok');
+ }catch(error){status('Détourage non concluant : '+error.message,'warn')}
+ finally{btn.disabled=false}
+}
+$('contourObject').onclick=()=>calculateContour('object');
+$('contourText').onclick=()=>calculateContour('text');
+$('contourBrushSize').oninput=()=>$('contourBrushValue').textContent=$('contourBrushSize').value;
+$('brushAdd').onclick=()=>{maskBrushMode='add';renderBoxes();syncSelectionFields();status('Pinceau Ajouter : peins sur le masque avec le doigt ou le Pencil.','warn')};
+$('brushErase').onclick=()=>{maskBrushMode='erase';renderBoxes();syncSelectionFields();status('Pinceau Retirer : enlève les parties du masque en trop.','warn')};
+$('brushStop').onclick=()=>{maskBrushMode='';renderBoxes();syncSelectionFields();status('Correction du masque terminée.','ok')};
+$('contourReset').onclick=()=>{
+ const l=selectedCardLayer();if(!l)return;delete l.mask;maskBrushMode='';
+ invalidateCardOutputs();renderBoxes();syncSelectionFields();
+ status('Retour à la sélection rectangulaire.','ok');
+};
+function brushMaskPoint(layer,p,canvas){
+ const [bx,by,bw,bh]=layer.bbox;
+ const u=(p.x-bx)/bw,v=(p.y-by)/bh;
+ layer.mask=paintMaskAt(layer.mask,u,v,Number($('contourBrushSize').value),maskBrushMode);
+ renderMaskPreview(canvas,layer.mask);
+}
+
 $('deleteSelectionLayer').onclick=()=>{
   const l=selectedCardLayer();if(!l||selectionPositioning)return;
   layers=layers.filter(item=>item.id!==l.id);animatedIds.delete(l.id);
@@ -251,12 +306,14 @@ async function applyRasterSelectionEdit(replacement=null){
     :'Effacer les pixels de « '+(l.label||'la zone')+' » sur la copie de travail ? Le fond sera estimé et la modification pourra être annulée.'))return;
   const button=$(isReplacement?'replaceSelectionText':'eraseSelectionImage');button.disabled=true;
   try{
-    const undo={imageData,srcImg,layers:layers.map(item=>({...item,bbox:[...item.bbox]})),
+    const undo={imageData,srcImg,layers:layers.map(item=>({...item,bbox:[...item.bbox],mask:item.mask?{...item.mask,alpha:new Uint8Array(item.mask.alpha)}:undefined})),
       activeId,animatedIds:new Set(animatedIds),suggestedDepths:new Map(suggestedDepths)};
     const c=document.createElement('canvas');c.width=srcImg.naturalWidth;c.height=srcImg.naturalHeight;
     const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(srcImg,0,0);
     const image=ctx.getImageData(0,0,c.width,c.height);
-    ctx.putImageData(new ImageData(fillSelectionWithBackground(image.data,c.width,c.height,l.bbox),c.width,c.height),0,0);
+    const rectangleFill=fillSelectionWithBackground(image.data,c.width,c.height,l.bbox);
+    const filled=l.mask?.alpha?eraseCardSelectionByMask(image.data,c.width,c.height,l.bbox,l.mask,rectangleFill):rectangleFill;
+    ctx.putImageData(new ImageData(filled,c.width,c.height),0,0);
     if(isReplacement){
       const [bx,by,bw,bh]=l.bbox,px=bx*c.width,py=by*c.height,pw=bw*c.width,ph=bh*c.height;
       const lines=text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
