@@ -267,8 +267,11 @@ async function calculateContour(kind){
    const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(srcImg,0,0);
    const img=ctx.getImageData(0,0,c.width,c.height);
    l.mask=segmentCardSelection(img.data,c.width,c.height,l.bbox,kind);
-   invalidateCardOutputs();renderBoxes();syncSelectionFields();
-   status((kind==='text'?'Lettres':'Objet')+' détourné(e)s. Vérifie le masque cyan avant toute modification.','ok');
+   if(kind==='text')l.type='text';
+   else if(l.type==='text')l.type='object';
+   syncAnimatable(l);
+   invalidateCardOutputs();refreshAnimationGroup();renderBoxes();renderLayers();syncSelectionFields();
+   status((kind==='text'?'Lettres détourées.':'Objet détouré.')+' Vérifie le masque cyan avant toute modification.','ok');
  }catch(error){status('Détourage non concluant : '+error.message,'warn')}
  finally{btn.disabled=false}
 }
