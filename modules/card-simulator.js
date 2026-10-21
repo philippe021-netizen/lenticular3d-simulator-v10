@@ -4,7 +4,7 @@ export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/3+
 
 export function createCardSimulator({canvas,range,output,getUrls}){
   const stage=canvas.parentElement,controls=document.createElement('div');
-  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Play — rotation en boucle</button><p class="small">Même image que le ZIP, parmi les 9 vues, sans fondu ni retouche. Décoche pour inspecter les images à plat. Bascule illustrative ±12° : la lentille, la distance de lecture et l’impression ne sont pas encore calibrées.</p>';
+  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Play — rotation en boucle</button><p class="small">Aperçu direct recalculé quand tu modifies les profondeurs ou l’amplitude. Play lit les 9 vues exportées. Décoche pour inspecter à plat. L’angle ±12° et les profondeurs sont relatifs : la lentille, la distance de lecture et l’impression ne sont pas calibrées en centimètres.</p>';
   stage.before(controls);
   stage.style.background='#e9e9e5';stage.style.perspective='1400px';
   canvas.style.transformOrigin='50% 50%';canvas.style.backfaceVisibility='hidden';
