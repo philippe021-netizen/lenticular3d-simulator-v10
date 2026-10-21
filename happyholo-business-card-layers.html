@@ -48,12 +48,12 @@ function prepareLivePreview(width,height,baseDepth,layerSnapshot){
 function renderLivePreview(index,angle){
  if(!livePreviewState)return;
  const s=livePreviewState,depth=composeCardDepth(s.baseDepth,s.width,s.height,s.layers);
- const rendered=renderNovelView(s.pixels,depth,s.width,s.height,clamp(angle/24,-1,1),{zero:128,relief:1,planeSeparation:1.8,parallaxPercent:s.amplitude,continuousSurface:true,projectedFill:true});
+ const rendered=renderNovelView(s.pixels,depth,s.width,s.height,clamp(angle/48,-1,1),{zero:128,relief:1,planeSeparation:1.8,parallaxPercent:s.amplitude,continuousSurface:true,projectedFill:true});
  cardSimulator.showLive(rendered.data,s.width,s.height,index,angle);
 }
 function scheduleLivePreview(){
  if(!livePreviewState||livePreviewPending)return;livePreviewPending=true;
- requestAnimationFrame(()=>{const now=performance.now(),wait=Math.max(0,35-(now-livePreviewTimer)),run=()=>{livePreviewPending=false;livePreviewTimer=performance.now();if(livePreviewState)renderLivePreview(Number($('viewRange').value),(Number($('viewRange').value)-4)*3)};if(wait)setTimeout(run,wait);else run()});
+ requestAnimationFrame(()=>{const now=performance.now(),wait=Math.max(0,35-(now-livePreviewTimer)),run=()=>{livePreviewPending=false;livePreviewTimer=performance.now();if(livePreviewState)renderLivePreview(Number($('viewRange').value),(Number($('viewRange').value)-4)*12)};if(wait)setTimeout(run,wait);else run()});
 }
 async function importCard(f){if(!f)return;cardSimulator.stop();cardSimulator.setLiveRenderer(null);livePreviewState=null;try{imageData=await readFile(f);cachedCardDepth=null;depthSource='';depthMode='ai';srcImg=await loadImage(imageData);$('cardImg').src=imageData;$('overlay').innerHTML='';$('analyze').disabled=true;$('preCropCard').classList.remove('hidden');initialisePreCropPoints();$('applyPreCrop').disabled=false;paintPreCrop();$('layersCard').classList.add('hidden');$('animCard').classList.add('hidden');$('resultCard').classList.add('hidden');layers=[];animatedIds.clear();animatedFrames=[];animatedCropBbox=null;finalUrls.forEach(u=>URL.revokeObjectURL(u));finalUrls=[];finalBlobs=[];status('Carte chargée. Trace le cadrage, applique-le, ou conserve l’image entière.','ok');setStep(1)}catch{status('Impossible de lire cette image.','bad')}}
 $('file').onchange=()=>importCard($('file').files?.[0]);
