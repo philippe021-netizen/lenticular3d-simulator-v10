@@ -4,18 +4,17 @@ export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/12
 
 export function createCardSimulator({canvas,range,output,getUrls}){
   const stage=canvas.parentElement,controls=document.createElement('div');
-  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Carte en main — bascule du support</label><button id="cardTiltPlay" type="button" class="secondary">▶ Play — rotation en boucle</button><p class="small">Aperçu direct recalculé quand tu modifies les profondeurs ou l’amplitude. Play lit les 9 vues exportées. Décoche pour inspecter à plat. L’angle ±48° et les profondeurs sont relatifs : la lentille, la distance de lecture et l’impression ne sont pas calibrées en centimètres.</p>';
+  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Activer la parallaxe calculée en direct</label><label for="cardLiveAngle">Angle du point de vue <b id="cardLiveAngleOut">0°</b></label><input id="cardLiveAngle" type="range" min="-48" max="48" step="1" value="0" style="width:100%"><button id="cardTiltPlay" type="button" class="secondary">▶ Lecture lente — relief calculé en direct</button><p class="small">La carte reste fixe. Le curseur règle l’angle au degré près et recalcule immédiatement le décalage de chaque profondeur. La lecture balaie lentement ±48° en 28 s, sans accélération élastique. Les vues du ZIP restent les 9 images imprimables ; cet aperçu continu sert à juger le relief.</p>';
   stage.before(controls);
-  stage.style.background='#e9e9e5';stage.style.perspective='1400px';
-  canvas.style.transformOrigin='50% 50%';canvas.style.backfaceVisibility='hidden';
-  const tilt=controls.querySelector('#cardPhysicalTilt'),play=controls.querySelector('#cardTiltPlay');
+  stage.style.background='#e9e9e5';
+  const tilt=controls.querySelector('#cardPhysicalTilt'),play=controls.querySelector('#cardTiltPlay'),liveAngle=controls.querySelector('#cardLiveAngle'),liveAngleOut=controls.querySelector('#cardLiveAngleOut');
   let current=4,angle=0,running=false,animation=0,request=0,lastImage=null,lastUrl='',imageCache=new Map(),liveRenderer=null;
-  function stop(){running=false;cancelAnimationFrame(animation);play.textContent='▶ Play — rotation en boucle'}
+  function stop(){running=false;cancelAnimationFrame(animation);play.textContent='▶ Lecture lente — relief calculé en direct'}
   async function show(index,physicalAngle=cardPose(index).angle,allowLive=true){
     const pose=cardPose(index);current=pose.index;angle=physicalAngle;
+    liveAngle.value=String(Math.round(angle));liveAngleOut.textContent=`${Math.round(angle)}°`;
     range.value=String(current);output.textContent=`${current+1} / 9 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'}`;
-    canvas.style.transform=tilt.checked?`scale(.91) rotateY(${angle}deg)`:'none';
-    if(allowLive&&liveRenderer){await liveRenderer(current,angle);return}
+    if(allowLive&&liveRenderer){await liveRenderer(current,tilt.checked?angle:0);return}
     const url=getUrls()[pose.index];if(!url)return;
     const token=++request;
     const urls=getUrls();for(const key of imageCache.keys())if(!urls.includes(key))imageCache.delete(key);
@@ -30,17 +29,21 @@ export function createCardSimulator({canvas,range,output,getUrls}){
     }
   }
   range.oninput=()=>{stop();void show(Number(range.value))};
-  tilt.onchange=()=>{stop();void show(current)};
+  liveAngle.oninput=()=>{stop();tilt.checked=true;const value=Number(liveAngle.value);liveAngleOut.textContent=`${value}°`;void show(viewAtAngle(value),value,true)};
+  tilt.onchange=()=>{stop();void show(current,angle,true)};
   play.onclick=()=>{
     if(running){stop();return}if(getUrls().length!==9)return;
-    running=true;tilt.checked=true;play.textContent='⏸ Pause';const start=performance.now();
-    const tick=now=>{if(!running)return;const value=48*Math.sin((now-start)/10000*2*Math.PI);void show(viewAtAngle(value),value,false);animation=requestAnimationFrame(tick)};
+    running=true;tilt.checked=true;play.textContent='⏸ Pause';const started=performance.now();
+    // Constant-speed viewpoint sweep: no elastic easing and no CSS card rotation.
+    // One full out-and-back cycle takes 28 seconds (14 seconds per direction).
+    let nextFrame=0;
+    const tick=async now=>{if(!running)return;if(now<nextFrame){animation=requestAnimationFrame(tick);return}nextFrame=now+125;const phase=((now-started)/28000)%1;const t=phase<.5?phase*2:2-phase*2;const value=-48+96*t;await show(viewAtAngle(value),value,true);if(running)animation=requestAnimationFrame(tick)};
     animation=requestAnimationFrame(tick);
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
   function showLive(pixels,width,height,index=current,physicalAngle=cardPose(index).angle){
-    current=cardPose(index).index;angle=physicalAngle;range.value=String(current);output.textContent=`${current+1} / 9 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'} · aperçu direct`;
-    canvas.style.transform=tilt.checked?`scale(.91) rotateY(${angle}deg)`:'none';stage.style.aspectRatio=`${width} / ${height}`;
+    current=cardPose(index).index;angle=physicalAngle;range.value=String(current);liveAngle.value=String(Math.round(angle));liveAngleOut.textContent=`${Math.round(angle)}°`;output.textContent=`${current+1} / 9 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'} · aperçu direct`;
+    stage.style.aspectRatio=`${width} / ${height}`;
     if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}canvas.getContext('2d').putImageData(new ImageData(pixels,width,height),0,0);lastImage=null;lastUrl='';
   }
   function setLiveRenderer(renderer){liveRenderer=typeof renderer==='function'?renderer:null;if(liveRenderer)void liveRenderer(current,angle)}

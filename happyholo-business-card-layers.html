@@ -13,15 +13,15 @@
 <section id="animCard" class="card animCard hidden"><h2>3. Animation isolée / groupée</h2><p class="small">Seuls les éléments cochés sont envoyés à PixVerse. La carte complète n'est jamais envoyée.</p><div class="crop"><canvas id="cropCanvas"></canvas></div><label>Action souhaitée</label><textarea id="animPrompt" placeholder="Ex. léger mouvement du logo complet, effet laser local..."></textarea><button id="runPix" class="pix">Animer la sélection dans PixVerse</button><div id="pixStatus" class="status" style="margin-top:9px">Prêt.</div></section>
 </aside><main>
 <section class="card"><h2>Carte et zones détectées</h2><div id="canvasWrap" class="canvasWrap"><img id="cardImg"><div id="overlay" class="overlay"></div></div><p class="small">Bleu = texte · jaune = logo · vert = objet/sujet · halo vert = inclus dans l’animation groupée.</p></section>
-<section id="resultCard" class="card hidden"><h2>4. Simulation des 9 vues</h2><div class="sim"><canvas id="simCanvas"></canvas></div><label>Vue <b id="viewOut">5 / 9</b></label><input id="viewRange" type="range" min="0" max="8" step="1" value="4"><div id="frames" class="frames"></div><button id="download" class="pix">Télécharger ZIP 9 vues</button><div id="finalStatus" class="status" style="margin-top:9px">9 vues prêtes.</div></section>
-<section id="meshPreviewCard" class="card hidden"><h2>Relief 3D par maillage</h2><p class="small">La carte est reconstruite sur un maillage déformé par la carte de profondeur. Augmente le relief pour mieux voir les écarts de hauteur, puis déplace le curseur Vue pour faire pivoter la surface. Cette amplification sert à visualiser le relief ; elle ne change pas les 9 vues ni le ZIP.</p><label>Angle continu de la vue 3D <b id="meshAngleOut">0°</b></label><input id="meshAngle" type="range" min="-70" max="70" step="1" value="0" style="width:100%"><label>Relief visuel <b id="meshReliefOut">150 %</b></label><input id="meshRelief" type="range" min="20" max="240" step="5" value="150" style="width:100%"><div class="sim"><canvas id="meshCanvas"></canvas></div><div id="meshStatus" class="status" style="margin-top:9px">Aperçu 3D prêt.</div></section>
+<section id="meshPreviewCard" class="card hidden"><h2>Aperçu 3D du relief calculé</h2><p class="small">Cette vue déforme une surface 3D selon la profondeur calculée. Garde le maillage à un angle oblique pour voir le relief ; le curseur l’exagère uniquement à l’écran. Les images du ZIP ne sont pas modifiées par ce réglage.</p><label>Angle de vue <b id="meshAngleOut">−28°</b></label><input id="meshAngle" type="range" min="-70" max="70" step="1" value="-28" style="width:100%"><label>Exagération visuelle du relief <b id="meshReliefOut">200 %</b></label><input id="meshRelief" type="range" min="20" max="320" step="5" value="200" style="width:100%"><div class="sim" style="min-height:260px"><canvas id="meshCanvas"></canvas></div><div id="meshStatus" class="status" style="margin-top:9px">Aperçu 3D prêt.</div></section>
+<section id="resultCard" class="card hidden"><h2>Vues lenticulaires à imprimer</h2><p class="small">Ces 9 images constituent le fichier d’impression. Pour examiner le relief à angle continu, utilise l’aperçu 3D ci-dessus ou la lecture lente.</p><div class="sim"><canvas id="simCanvas"></canvas></div><label>Vue <b id="viewOut">5 / 9</b></label><input id="viewRange" type="range" min="0" max="8" step="1" value="4"><div id="frames" class="frames"></div><button id="download" class="pix">Télécharger ZIP 9 vues</button><div id="finalStatus" class="status" style="margin-top:9px">9 vues prêtes.</div></section>
 </main></div></div>
 <script type="module">
 import { extractVideoFrames } from './modules/video-frame-extractor-2s.js?v=410';
-import { composeCardDepth, estimateCardDepth } from './modules/card-depth.js?v=506';
+import { composeCardDepth, estimateCardDepth } from './modules/card-depth.js?v=508';
 import { renderNovelView } from './depthflow-v42-core.js';
-import { createCardSimulator } from './modules/card-simulator.js?v=507';
-import { createCardMeshPreview } from './modules/card-mesh-preview.js?v=1';
+import { createCardSimulator } from './modules/card-simulator.js?v=508';
+import { createCardMeshPreview } from './modules/card-mesh-preview.js?v=2';
 import { detectDocumentQuad, preprocessBusinessCard } from './modules/microplayer-image-preprocess-v1.js';
 let cachedCardDepth=null, depthSource='', depthMode='ai',livePreviewState=null,livePreviewPending=false,livePreviewTimer=0;
 const $=id=>document.getElementById(id),steps=[...document.querySelectorAll('.step')];
@@ -49,6 +49,7 @@ function prepareLivePreview(width,height,baseDepth,layerSnapshot){
  for(let y=0;y<ph;y++){const sy=Math.min(height-1,Math.floor((y+.5)*height/ph));for(let x=0;x<pw;x++){const sx=Math.min(width-1,Math.floor((x+.5)*width/pw));depth[y*pw+x]=baseDepth[sy*width+sx]}}
  livePreviewState={pixels,baseDepth:depth,width:pw,height:ph,layers:layerSnapshot.map(l=>({...l,bbox:[...l.bbox]})),amplitude:Number($('cardParallax').value)};
  cardSimulator.setLiveRenderer((index,angle)=>renderLivePreview(index,angle));
+ $('meshAngle').value='-28';$('meshAngleOut').textContent='−28°';drawMeshPreview(-28);
 }
 function drawMeshPreview(angle){if(!livePreviewState||!meshPreview)return;const s=livePreviewState,depth=composeCardDepth(s.baseDepth,s.width,s.height,s.layers);try{meshPreview.draw(s.pixels,depth,s.width,s.height,angle,Number($('meshRelief').value)/100);$('meshStatus').textContent=`Angle ${Number(angle).toFixed(0)}° · relief ${$('meshRelief').value} %`; $('meshStatus').className='status ok'}catch(error){$('meshStatus').textContent=`Aperçu 3D indisponible : ${error?.message||error}`;$('meshStatus').className='status warn'}}
 function renderLivePreview(index,angle){
