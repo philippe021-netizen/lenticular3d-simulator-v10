@@ -1,3 +1,4 @@
+import { maskAlphaAt } from './card-shape-mask.js';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 // Detections adjust an estimated surface; they never copy RGB rectangles.
@@ -7,6 +8,18 @@ export function composeCardDepth(base,width,height,layers){
   const output=new Uint8ClampedArray(base);
   const sorted=layers.filter(l=>l.enabled!==false).slice().sort((a,b)=>(Number(a.type==='text')-Number(b.type==='text'))||b.bbox[2]*b.bbox[3]-a.bbox[2]*a.bbox[3]);
   for(const layer of sorted){
+    // Exact alpha masks override rectangular/safety-column depth painting.
+    if(layer.mask?.alpha){
+      const [bx,by,bw,bh]=layer.bbox,shift=clamp(Number(layer.depth)||0,-100,100)*.8;
+      const x0=clamp(Math.floor(bx*width),0,width),x1=clamp(Math.ceil((bx+bw)*width),0,width);
+      const y0=clamp(Math.floor(by*height),0,height),y1=clamp(Math.ceil((by+bh)*height),0,height);
+      for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+        const a=maskAlphaAt(layer.mask,layer.bbox,x,y,width,height)/255;if(!a)continue;
+        const i=y*width+x,desired=layer.type==='text'?128+shift:base[i]+shift;
+        output[i]=clamp(output[i]*(1-a)+desired*a,0,255);
+      }
+      continue;
+    }
     let [bx,by,bw,bh]=layer.bbox;
     if(layer.type==='text'){
       // Align protected rows in the same text column. Vision boxes sometimes
@@ -30,7 +43,7 @@ export function composeCardDepth(base,width,height,layers){
     }
   }
   // A neighbouring row's safety padding must never change a detected glyph plane.
-  for(const layer of sorted.filter(l=>l.type==='text')){
+  for(const layer of sorted.filter(l=>l.type==='text'&&!l.mask?.alpha)){
     const [x,y,w,h]=layer.bbox,value=clamp(128+(Number(layer.depth)||0)*.8,0,255);
     const x0=clamp(Math.floor(x*width),0,width),x1=clamp(Math.ceil((x+w)*width),0,width);
     for(let yy=clamp(Math.floor(y*height),0,height);yy<clamp(Math.ceil((y+h)*height),0,height);yy++) output.fill(value,yy*width+x0,yy*width+x1);
