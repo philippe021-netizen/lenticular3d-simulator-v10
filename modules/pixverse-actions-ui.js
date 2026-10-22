@@ -1,5 +1,5 @@
 import { loadActionLibrary, getActionVariant } from './action-library.js';
-import { runPixVerseAction } from './pixverse-client.js';
+import { runPixVerseAction } from './pixverse-client.js?v=upload413';
 
 function canvasToFile(canvas) {
   return new Promise((resolve, reject) => {

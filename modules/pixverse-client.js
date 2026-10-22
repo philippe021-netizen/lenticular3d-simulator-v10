@@ -1,10 +1,12 @@
 import { hardenPixVersePrompts } from './pixverse-motion-policy.js?v=12views';
+import { preparePixVerseUpload } from './pixverse-upload-image.js?v=upload413';
 export { hardenPixVersePrompts } from './pixverse-motion-policy.js?v=12views';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function readJson(r) {
   const text = await r.text();
   let data = null;
   try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+  if (r.status === 413) throw new Error('Envoi trop volumineux (413). Recharge MicroPlayer pour activer la préparation automatique des photos.');
   if (!r.ok) throw new Error(data?.error || data?.message || data?.ErrMsg || `Erreur HTTP ${r.status}`);
   if (Number(data?.ErrCode) && Number(data.ErrCode) !== 0) {
     throw new Error(data?.ErrMsg || `Erreur PixVerse ${data.ErrCode}`);
@@ -13,9 +15,10 @@ async function readJson(r) {
 }
 
 export async function uploadPixVerseImage(file) {
+  const upload = await preparePixVerseUpload(file);
   const form = new FormData();
   // PixVerse attend impérativement le champ multipart nommé "image".
-  form.append('image', file, file.name || `happyholo-${Date.now()}.png`);
+  form.append('image', upload, upload === file ? (file.name || 'happyholo.png') : 'happyholo-pixverse.jpg');
   const r = await fetch('/api/pixverse-upload', { method: 'POST', body: form });
   const data = await readJson(r);
   const imgId = data?.Resp?.img_id ?? data?.img_id ?? data?.data?.img_id;
