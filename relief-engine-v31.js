@@ -345,7 +345,7 @@ async function buildRelief(){
 
     window.HappyHoloReliefState={sourceImg,subjectImg,backgroundImg,subjectDepthCanvas,backgroundDepthCanvas,view};
     window.dispatchEvent(new CustomEvent('happyholo-relief-ready'));
-    startPreview(); exportBtn.disabled=false; setStatus('V3.29 prête — Les sélections corrigées sont appliquées à l’ExplodeView et aux 9 vues.');
+    startPreview(); exportBtn.disabled=false; setStatus('V3.29 prête — Les sélections corrigées sont appliquées à l’ExplodeView et aux 12 vues.');
   }catch(e){ console.error(e); setStatus('ERREUR : '+(e?.message||String(e))); }
   finally{ buildBtn.disabled=false; }
 }
@@ -363,23 +363,23 @@ window.HappyHoloLoadSourceBlob=async(blob,{autoBuild=true,name='happyholo-bord-r
 exportBtn.addEventListener('click',async()=>{
   if(!subjectImg||!backgroundImg) return;
   cancelAnimationFrame(anim); exported=[]; framesEl.innerHTML='';
-  const poses=[-1,-.75,-.5,-.25,0,.25,.5,.75,1];
-  for(let i=0;i<9;i++){
-    setStatus(`Export vue ${i+1}/9…`);
+  const poses=Array.from({length:12},(_,i)=>-1+2*i/11);
+  for(let i=0;i<12;i++){
+    setStatus(`Export vue ${i+1}/12…`);
     const c=document.createElement('canvas');
     const testFormat=document.getElementById('supportType')?.value==='photo-card-15x10';
     c.width=testFormat?1800:view.width;c.height=testFormat?1200:view.height;
     renderAt(poses[i],c); const b=await canvasToBlob(c); exported.push(b);
     const im=new Image(); im.src=URL.createObjectURL(b); framesEl.appendChild(im); await sleep(25);
   }
-  downloadBtn.disabled=false; startPreview(); setStatus('9 vues V3.25 prêtes.');
+  downloadBtn.disabled=false; startPreview(); setStatus('12 vues V3.25 prêtes.');
 });
 
 downloadBtn.addEventListener('click',async()=>{
-  if(exported.length!==9) return;
+  if(exported.length!==12) return;
   const zip=new JSZip(); exported.forEach((b,i)=>zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,b));
   zip.file('manifest.json',JSON.stringify({
-    generator:'HappyHolo Relief 3D V3.25 ExplodeView',localSegmentation:true,externalPaidApi:false,views:9,
+    generator:'HappyHolo Relief 3D V3.25 ExplodeView',localSegmentation:true,externalPaidApi:false,views:12,
     depthInference:'single-512-with-local-fallback',
     support:document.getElementById('supportType')?.value||null,
     printSize:document.getElementById('supportType')?.value==='photo-card-15x10'?{widthMm:150,heightMm:100,widthPx:1800,heightPx:1200}:null,
@@ -389,6 +389,6 @@ downloadBtn.addEventListener('click',async()=>{
     explodeView:window.HappyHoloExplodeView?.serialize?.()||null
   },null,2));
   const b=await zip.generateAsync({type:'blob'}); const u=URL.createObjectURL(b);
-  const a=document.createElement('a'); a.href=u; a.download='9-vues-happyholo-v325-explodeview.zip'; a.click();
+  const a=document.createElement('a'); a.href=u; a.download='12-vues-happyholo-v325-explodeview.zip'; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1500);
 });

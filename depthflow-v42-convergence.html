@@ -75,13 +75,13 @@
 <body>
 <main>
   <h1>DepthFlow V42 — multivue professionnel</h1>
-  <p class="sub">Une photo, une profondeur continue 0–255, un vrai plan zéro et neuf vues avec gestion des occultations. La vue 05 reste la photo originale stricte.</p>
+  <p class="sub">Une photo, une profondeur continue 0–255, un vrai plan zéro et douze vues avec gestion des occultations. Les vues 06 et 07 encadrent le plan zéro.</p>
 
   <section class="card">
     <div class="row">
       <label class="file">Choisir une photo<input id="file" type="file" accept="image/*"></label>
       <button id="depthBtn" disabled>1. Calculer la profondeur</button>
-      <button id="generateBtn" disabled>3. Générer les 9 vues</button>
+      <button id="generateBtn" disabled>3. Générer les 12 vues</button>
       <select id="renderSize" aria-label="Définition de rendu">
         <option value="720">iPad rapide · 720 px</option>
         <option value="900" selected>iPad qualité · 900 px</option>
@@ -124,11 +124,11 @@
           <output id="planeSeparationOut">175 %</output>
         </div>
         <div class="controls">
-          <label for="parallax">Parallaxe totale 01↔09</label>
+          <label for="parallax">Parallaxe totale 01↔12</label>
           <input id="parallax" type="range" min="0.5" max="8" step="0.1" value="5.0">
           <output id="parallaxOut">3,2 %</output>
         </div>
-        <p class="tiny">Pour bien voir le relief, comparez surtout les vues extrêmes 01 et 09 : les vues voisines 04, 05 et 06 sont volontairement proches. La séparation agit sur les plans hors de la zone stable.</p>
+        <p class="tiny">Pour bien voir le relief, comparez surtout les vues extrêmes 01 et 12 : les vues voisines 05, 06 et 07 sont volontairement proches. La séparation agit sur les plans hors de la zone stable.</p>
       </div>
     </div>
   </section>
@@ -168,11 +168,11 @@
     <div class="row">
       <h2 style="margin:0;flex:1">Simulateur lenticulaire</h2>
       <button id="autoBtn" class="secondary">▶ Aller-retour</button>
-      <button id="compareBtn" class="secondary" disabled>Comparer 01 ↔ 09</button>
+      <button id="compareBtn" class="secondary" disabled>Comparer 01 ↔ 12</button>
     </div>
     <div class="simstage"><canvas id="simCanvas"></canvas></div>
-    <input id="simRange" class="simbar" type="range" min="0" max="8" step="0.01" value="4">
-    <p class="tiny">Utilisez « Comparer 01 ↔ 09 » pour alterner les deux vues les plus éloignées. Le curseur permet aussi d'inspecter les neuf positions.</p>
+    <input id="simRange" class="simbar" type="range" min="0" max="11" step="0.01" value="4">
+    <p class="tiny">Utilisez « Comparer 01 ↔ 12 » pour alterner les deux vues les plus éloignées. Le curseur permet aussi d'inspecter les douze positions.</p>
   </section>
 
   <div id="grid" class="grid"></div>
@@ -188,7 +188,7 @@
     normalizeDepthTensor,
     refineDepthEdgeAware,
     renderNovelView
-  } from "./depthflow-v42-core.js";
+  } from "./depthflow-v42-core.js?v=12views";
 
   const byId = id => document.getElementById(id);
   const file = byId("file");
@@ -318,7 +318,7 @@
   function getDepthWorker() {
     if (!window.Worker) throw new Error("Web Worker indisponible");
     if (state.depthWorker) return state.depthWorker;
-    const worker = new Worker(new URL("./depthflow-v42-worker.js", import.meta.url), { type: "module" });
+    const worker = new Worker(new URL("./depthflow-v42-worker.js?v=12views", import.meta.url), { type: "module" });
     worker.addEventListener("message", event => {
       const message = event.data ?? {};
       if (message.requestId !== state.workerRequestId) return;
@@ -516,7 +516,7 @@
     state.anchorPicking = false;
     byId("anchorBtn").classList.remove("active");
     generateBtn.disabled = false;
-    setStatus(`Plan zéro ${byId("zero").value} validé ✓ — vous pouvez générer les 9 vues.`, "ok");
+    setStatus(`Plan zéro ${byId("zero").value} validé ✓ — vous pouvez générer les 12 vues.`, "ok");
   });
 
   byId("mapBtn").addEventListener("click", () => {
@@ -727,12 +727,12 @@
     }
     let totalHoles = 0;
     try {
-      for (let view = 0; view < 9; view += 1) {
+      for (let view = 0; view < 12; view += 1) {
         if (generation !== state.generation) return;
-        setStatus(`Génération progressive vue ${view + 1}/9…`);
+        setStatus(`Génération progressive vue ${view + 1}/12…`);
         await yieldFrame();
         if (generation !== state.generation) return;
-        const position = (view - 4) / 4;
+        const position = (view - 5.5) / 5.5;
         const rendered = renderNovelView(source, depth, targetWidth, targetHeight, position, options);
         if (generation !== state.generation) return;
         totalHoles += rendered.holesBeforeFill;
@@ -740,10 +740,10 @@
         canvas.getContext("2d").putImageData(new ImageData(rendered.data, targetWidth, targetHeight), 0, 0);
         state.frames.push(canvas);
         const wrapper = document.createElement("div");
-        wrapper.className = `view${view === 4 ? " center" : ""}`;
+        wrapper.className = `view${(view === 5 || view === 6) ? " center" : ""}`;
         const badge = document.createElement("span");
         badge.className = "badge";
-        badge.textContent = `${String(view + 1).padStart(2, "0")}${view === 4 ? " — originale" : ""}`;
+        badge.textContent = `${String(view + 1).padStart(2, "0")}${(view === 5 || view === 6) ? " — centrale" : ""}`;
         wrapper.append(canvas, badge);
         grid.append(wrapper);
         await yieldFrame();
@@ -752,13 +752,13 @@
       if (generation !== state.generation) return;
       simCanvas.width = targetWidth;
       simCanvas.height = targetHeight;
-      simRange.value = 4;
-      drawSimulator(4);
+      simRange.value = 5;
+      drawSimulator(5);
       simulator.classList.add("ready");
       byId("compareBtn").disabled = false;
       state.comparisonView = 0;
-      byId("compareBtn").textContent = "Comparer 01 ↔ 09";
-      const centerPixels = state.frames[4].getContext("2d", { willReadFrequently: true }).getImageData(0, 0, targetWidth, targetHeight).data;
+      byId("compareBtn").textContent = "Comparer 01 ↔ 12";
+      const centerPixels = renderNovelView(source, depth, targetWidth, targetHeight, 0, options).data;
       const centerCheck = comparePixels(source, centerPixels);
       const memoryMegabytes = Math.round((targetWidth * targetHeight * 4 * 12) / 1048576);
       const stablePercent = Math.round(stablePixels / depth.length * 100);
@@ -768,11 +768,11 @@
         : "";
       const relative = parallaxCheck.relativeShiftPx.toLocaleString("fr-FR");
       quality.classList.toggle("warning", parallaxCheck.weak);
-      quality.textContent = `Différence de plans estimée 01↔09 : ${relative} px sur ${targetWidth} px · profondeur P10/P90 : ${parallaxCheck.p10}/${parallaxCheck.p90} · vue 05 ${centerCheck.equal ? "identique à la photo ✓" : `modifiée (${centerCheck.different} octets)`} · zone stable ${stablePercent} % · désocclusions ${totalHoles.toLocaleString("fr-FR")} px · budget ≈ ${memoryMegabytes} Mo${workerQuality}.`;
+      quality.textContent = `Différence de plans estimée 01↔12 : ${relative} px sur ${targetWidth} px · profondeur P10/P90 : ${parallaxCheck.p10}/${parallaxCheck.p90} · contrôle au plan zéro ${centerCheck.equal ? "identique à la photo ✓" : `modifiée (${centerCheck.different} octets)`} · zone stable ${stablePercent} % · désocclusions ${totalHoles.toLocaleString("fr-FR")} px · budget ≈ ${memoryMegabytes} Mo${workerQuality}.`;
       if (parallaxCheck.weak) {
-        setStatus("Attention : les neuf images sont produites, mais la carte de profondeur ou la parallaxe ne sépare pas assez les plans. Affichez la carte, corrigez la profondeur au Pencil puis régénérez. N'imprimez pas encore ce résultat.", "error");
+        setStatus("Attention : les douze images sont produites, mais la carte de profondeur ou la parallaxe ne sépare pas assez les plans. Affichez la carte, corrigez la profondeur au Pencil puis régénérez. N'imprimez pas encore ce résultat.", "error");
       } else {
-        setStatus(`9 vues prêtes ✓ · écart réel entre plans 01↔09 ≈ ${relative} px. Cliquez sur « Comparer 01 ↔ 09 » dans le simulateur. Zéro ${options.zero} · parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
+        setStatus(`12 vues prêtes ✓ · écart réel entre plans 01↔12 ≈ ${relative} px. Cliquez sur « Comparer 01 ↔ 12 » dans le simulateur. Zéro ${options.zero} · parallaxe ±${halfParallaxPixels.toLocaleString("fr-FR")} px.`, "ok");
       }
       if (scrollToSimulator) simulator.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
@@ -788,14 +788,14 @@
     drawSimulator(Number(simRange.value));
   });
   byId("compareBtn").addEventListener("click", () => {
-    if (state.frames.length !== 9) return;
+    if (state.frames.length !== 12) return;
     stopAuto();
-    state.comparisonView = state.comparisonView === 0 ? 8 : 0;
+    state.comparisonView = state.comparisonView === 0 ? 11 : 0;
     simRange.value = String(state.comparisonView);
     drawSimulator(state.comparisonView);
     byId("compareBtn").textContent = state.comparisonView === 0
-      ? "Vue 01 affichée · voir 09"
-      : "Vue 09 affichée · voir 01";
+      ? "Vue 01 affichée · voir 12"
+      : "Vue 12 affichée · voir 01";
   });
   byId("autoBtn").addEventListener("click", () => {
     state.auto = !state.auto;
@@ -819,7 +819,7 @@
     const elapsed = Math.min(.05, (time - state.autoTime) / 1000);
     state.autoTime = time;
     let value = Number(simRange.value) + state.autoDirection * elapsed * 2.1;
-    if (value >= 8) { value = 8; state.autoDirection = -1; }
+    if (value >= 11) { value = 11; state.autoDirection = -1; }
     if (value <= 0) { value = 0; state.autoDirection = 1; }
     simRange.value = value;
     drawSimulator(value);
@@ -827,9 +827,9 @@
   }
 
   function drawSimulator(value) {
-    if (state.frames.length !== 9) return;
-    const left = Math.max(0, Math.min(8, Math.floor(value)));
-    const right = Math.min(8, left + 1);
+    if (state.frames.length !== 12) return;
+    const left = Math.max(0, Math.min(11, Math.floor(value)));
+    const right = Math.min(11, left + 1);
     const mix = value - left;
     const context = simCanvas.getContext("2d");
     context.globalAlpha = 1;

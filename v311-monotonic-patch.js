@@ -2,7 +2,7 @@
 // Objectif : un seul exporteur de production pour les modèles à venir.
 // - ne remplace plus artificiellement la vue 06 par un fondu 50/50
 // - normalise automatiquement le format selon le support choisi
-// - conserve les 9 vues générées par le moteur, sans dédoublement ajouté par le patch
+// - conserve les 12 vues générées par le moteur, sans dédoublement ajouté par le patch
 // - ajoute la taille physique dans les PNG et un manifest détaillé
 (() => {
   'use strict';
@@ -18,7 +18,7 @@
     'photo-card-15x10': {
       support:'photo-card-15x10',label:'Carte horizontale 15 × 10 cm — test',
       widthPx:1800,heightPx:1200,widthMm:150,heightMm:100,lpi:50.20,lpiCalibrated:false,
-      resizeMode:'center-cover-no-distortion',cropShape:'rect',filename:'9-vues-carte-15x10cm-lpi-a-calibrer.zip'
+      resizeMode:'center-cover-no-distortion',cropShape:'rect',filename:'12-vues-carte-15x10cm-lpi-a-calibrer.zip'
     },
     'keychain-vertical': {
       support: 'keychain-vertical',
@@ -30,7 +30,7 @@
       lpi: DEFAULT_LPI,
       resizeMode: 'center-cover-no-distortion',
       cropShape: 'rect',
-      filename: '9-vues-porte-cle-vertical-75lpi-v320.zip'
+      filename: '12-vues-porte-cle-vertical-75lpi-v320.zip'
     },
     'keychain-horizontal': {
       support: 'keychain-horizontal',
@@ -42,7 +42,7 @@
       lpi: DEFAULT_LPI,
       resizeMode: 'center-cover-no-distortion',
       cropShape: 'rect',
-      filename: '9-vues-porte-cle-horizontal-75lpi-v320.zip'
+      filename: '12-vues-porte-cle-horizontal-75lpi-v320.zip'
     },
     'medallion-round-25': {
       support: 'medallion-round-25',
@@ -55,7 +55,7 @@
       lpi: DEFAULT_LPI,
       resizeMode: 'center-cover-no-distortion',
       cropShape: 'circle',
-      filename: '9-vues-medallion-rond-25mm-75lpi-v320.zip'
+      filename: '12-vues-medallion-rond-25mm-75lpi-v320.zip'
     },
     'medallion-round': {
       support: 'medallion-round',
@@ -68,7 +68,7 @@
       lpi: DEFAULT_LPI,
       resizeMode: 'center-cover-no-distortion',
       cropShape: 'circle',
-      filename: '9-vues-medallion-rond-30mm-75lpi-v320.zip'
+      filename: '12-vues-medallion-rond-30mm-75lpi-v320.zip'
     }
   };
 
@@ -204,7 +204,7 @@
 
   async function collectFrameBlobs() {
     const imgs = Array.from(framesEl.querySelectorAll('img'));
-    if (imgs.length !== 9) throw new Error('Il faut d’abord générer les 9 vues.');
+    if (imgs.length !== 12) throw new Error('Il faut d’abord générer les 12 vues.');
     return Promise.all(
       imgs.map(async (img) => {
         const r = await fetch(img.src);
@@ -252,7 +252,7 @@
         generator: `HappyHolo Relief 3D ${VERSION} export multi-supports`,
         localSegmentation: true,
         externalPaidApi: false,
-        views: 9,
+        views: 12,
         support: profile.support,
         supportLabel: profile.label,
         widthPx: profile.widthPx,
@@ -295,18 +295,18 @@
   }, true);
 })();
 /* HappyHolo — clin d'oeil sans changement du site
-   À AJOUTER à la fin de v311-monotonic-patch.js
+   À AJOUTER à la fin de v311-monotonic-patch.js?v=12views
    - aucun changement visuel de l'interface
    - aucune nouvelle sélection ni nouvel outil
    - utilise la sélection déjà dessinée au stylet
    - agit uniquement sur les sélections action==='person_wink' ou 'cat_blink'
-   - post-traite les 9 vues générées dans #frames
+   - post-traite les 12 vues générées dans #frames
 */
 (() => {
   'use strict';
 
   const SUPPORTED = new Set(['person_wink', 'cat_blink']);
-  const WINK_SEQ = [0, 0.22, 0.45, 0.72, 1, 0.72, 0.45, 0.22, 0];
+  const WINK_SEQ = Array.from({length:12},(_,i)=>Math.sin(Math.PI*i/11));
   const $ = s => document.querySelector(s);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -343,20 +343,21 @@
   }
 
   function phaseForFrame(i, timing) {
+    i = i * 8 / 11;
     const seq = WINK_SEQ;
     if (timing === '1-3') {
       const local = [0, 0.55, 1];
-      return i >= 0 && i <= 2 ? local[i] : 0;
+      return i >= 0 && i <= 2 ? local[Math.round(i)] : 0;
     }
     if (timing === '4-6') {
       const local = [0, 0.55, 1];
-      return i >= 3 && i <= 5 ? local[i - 3] : 0;
+      return i >= 3 && i <= 5 ? local[Math.round(i - 3)] : 0;
     }
     if (timing === '7-9') {
       const local = [0, 0.55, 1];
-      return i >= 6 && i <= 8 ? local[i - 6] : 0;
+      return i >= 6 && i <= 8 ? local[Math.round(i - 6)] : 0;
     }
-    return seq[i] ?? 0;
+    return Math.sin(Math.PI*i/8);
   }
 
   function frameImgToCanvas(img) {
@@ -508,7 +509,7 @@
     const host = $('#frames');
     if (!host) return;
     const imgs = [...host.querySelectorAll('img')];
-    if (imgs.length !== 9) return;
+    if (imgs.length !== 12) return;
 
     processing = true;
     try {
@@ -528,9 +529,9 @@
         seen.add(img);
       }
       window.dispatchEvent(new CustomEvent('happyholo:wink-applied', {
-        detail: { count: selections.length, views: 9 }
+        detail: { count: selections.length, views: 12 }
       }));
-      console.log('[HAPPYHOLO] clin d\'oeil appliqué sur les 9 vues');
+      console.log('[HAPPYHOLO] clin d\'oeil appliqué sur les 12 vues');
     } catch (err) {
       console.error('[HAPPYHOLO wink patch]', err);
     } finally {
@@ -543,7 +544,7 @@
     if (!host) return false;
     const observer = new MutationObserver(() => {
       const imgs = [...host.querySelectorAll('img')];
-      if (imgs.length === 9) {
+      if (imgs.length === 12) {
         setTimeout(processFrames, 120);
       }
     });

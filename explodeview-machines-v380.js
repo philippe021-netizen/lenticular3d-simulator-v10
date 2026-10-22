@@ -21,7 +21,7 @@
         window.addEventListener('happyholo-slimsam-ready',done,{once:true});
         setTimeout(done,2500);return;
       }
-      const s=document.createElement('script');s.src='./slimsam-piece-selector-v330.js?v=331';s.async=true;s.dataset.happyholoSlimsam='1';
+      const s=document.createElement('script');s.src='./slimsam-piece-selector-v330.js?v=12views';s.async=true;s.dataset.happyholoSlimsam='1';
       s.onload=()=>window.HappyHoloSlimSAM?.open?resolve(window.HappyHoloSlimSAM):reject(new Error('API SlimSAM absente.'));
       s.onerror=()=>reject(new Error('Impossible de charger le sélecteur SlimSAM.'));
       document.head.appendChild(s);
@@ -61,7 +61,7 @@
     panel=document.getElementById('happyHoloExplodeViewControls');
     if(!panel){
       panel=document.createElement('section');panel.id='happyHoloExplodeViewControls';panel.style.cssText='background:linear-gradient(145deg,#071018,#102536);color:#fff;border:2px solid #28a8ee;border-radius:18px;padding:16px;margin:16px 0;box-shadow:0 12px 32px #00111f26';
-      panel.innerHTML='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-size:20px;font-weight:900">⚙️ ExplodeView — machines</div><div style="font-size:12px;color:#bdd0df;line-height:1.45;margin-top:4px">Moto, voiture, outil, moteur, montre, appareil ou machine industrielle. Uniquement les grands sous-ensembles : pas de vis ni de micro-pièces.</div></div><span style="background:#28a8ee;color:#00121d;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:900">9 vues progressives</span></div>';
+      panel.innerHTML='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-size:20px;font-weight:900">⚙️ ExplodeView — machines</div><div style="font-size:12px;color:#bdd0df;line-height:1.45;margin-top:4px">Moto, voiture, outil, moteur, montre, appareil ou machine industrielle. Uniquement les grands sous-ensembles : pas de vis ni de micro-pièces.</div></div><span style="background:#28a8ee;color:#00121d;padding:6px 9px;border-radius:999px;font-size:12px;font-weight:900">12 vues progressives</span></div>';
       const aiBtn=document.createElement('button');aiBtn.type='button';aiBtn.textContent='🎯 IA — toucher une pièce';aiBtn.style.cssText='width:100%;margin:13px 0 0;min-height:50px;background:#fff;color:#071018;border:0;border-radius:11px;font-weight:950;font-size:16px;padding:10px 14px';
       const aiInfo=document.createElement('div');aiInfo.textContent='Touche une roue, un phare, une selle ou un grand élément. SlimSAM calcule le masque complet. Recommence pour chaque pièce.';aiInfo.style.cssText='margin-top:7px;color:#c9dce9;font-size:11px;line-height:1.45';
       aiBtn.addEventListener('click',async()=>{const old=aiBtn.textContent;aiBtn.disabled=true;aiBtn.textContent='Chargement du sélecteur IA…';try{const api=await loadSlimSAM();aiBtn.textContent=old;await api.open();}catch(e){console.error('[SlimSAM loader]',e);alert('Sélection IA indisponible : '+(e?.message||e));}finally{aiBtn.disabled=false;aiBtn.textContent=old;}});panel.append(aiBtn,aiInfo);
@@ -111,7 +111,7 @@
     if(textDepth>=0)window.HappyHoloTextLayer?.draw?.(ctx,norm,{x:0,y:0,w:W,h:H});
   }
   const baseRender=window.renderAt;if(typeof baseRender==='function')window.renderAt=(norm,target)=>explodeRender(norm,target,baseRender);
-  function serialize(){const parts=explodeSelections();if(parts.length<2)return null;return{effect:'explodeview',mode:state.mode,direction:'assembled-to-exploded',views:9,parts:parts.map((s,i)=>({name:s.name||`Pièce ${i+1}`,order:Number(s.explodeOrder)||i+1,direction:s.explodeDirection||'auto',intensity:Number(s.intensity)||65})),notes:'Déplacement progressif des grands sous-ensembles, sans vis ni micro-pièces. La simulation est continue ; l’impression reste composée de neuf vues.'};}
+  function serialize(){const parts=explodeSelections();if(parts.length<2)return null;return{effect:'explodeview',mode:state.mode,direction:'assembled-to-exploded',views:12,parts:parts.map((s,i)=>({name:s.name||`Pièce ${i+1}`,order:Number(s.explodeOrder)||i+1,direction:s.explodeDirection||'auto',intensity:Number(s.intensity)||65})),notes:'Déplacement progressif des grands sous-ensembles, sans vis ni micro-pièces. La simulation est continue ; l’impression reste composée de neuf vues.'};}
   window.HappyHoloExplodeView={state,configureAutomatically,disable,serialize,render:explodeRender,selectWithAI:async()=>{const api=await loadSlimSAM();return api.open();}};
   window.addEventListener('happyholo:selection-plan',()=>setTimeout(ensurePanel,40));window.addEventListener('happyholo-action-plan-changed',updatePanel);window.addEventListener('happyholo-relief-ready',()=>setTimeout(ensurePanel,60));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{setupMainSelectionButton();setTimeout(ensurePanel,350);},{once:true});else{setupMainSelectionButton();setTimeout(ensurePanel,350);}

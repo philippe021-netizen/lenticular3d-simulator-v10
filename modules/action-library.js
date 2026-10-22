@@ -1,4 +1,4 @@
-import { hardenPixVersePrompts } from './pixverse-motion-policy.js';
+import { hardenPixVersePrompts } from './pixverse-motion-policy.js?v=12views';
 const DB_NAME = 'happyholo-actions';
 const DB_VERSION = 1;
 const STORE = 'library';

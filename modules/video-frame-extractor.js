@@ -421,7 +421,7 @@ export function selectFirstProgressivePass(samples, {
   };
 }
 
-export function planProgressiveFrameTimes(samples, startIndex, endIndex, count = 9) {
+export function planProgressiveFrameTimes(samples, startIndex, endIndex, count = 12) {
   const frameCount = Math.max(2, Math.round(count));
   const segment = samples.slice(startIndex, endIndex + 1);
   if (segment.length < 2) return Array.from({ length: frameCount }, () => segment[0]?.time ?? 0);
@@ -551,7 +551,7 @@ async function analyzeActionWindow(video, ctx, canvas, start, end, hint, sampleC
 }
 
 export async function extractVideoFrames(video, {
-  count = 9,
+  count = 12,
   edgePaddingSeconds = 0.05,
   progressiveOnly = true,
   type = 'image/jpeg',

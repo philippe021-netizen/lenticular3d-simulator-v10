@@ -2,7 +2,7 @@ import {
   jointBilateralUpsample,
   normalizeDepthTensor,
   refineDepthEdgeAware
-} from "./depthflow-v42-core.js";
+} from "./depthflow-v42-core.js?v=12views";
 
 let estimatorPromise = null;
 

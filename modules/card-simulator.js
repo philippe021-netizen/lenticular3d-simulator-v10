@@ -1,10 +1,10 @@
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-export function cardPose(index){const i=clamp(Math.round(Number(index)||0),0,8);return {index:i,angle:(i-4)*12}}
-export function viewAtAngle(angle){return clamp(Math.round((Number(angle)||0)/12+4),0,8)}
+export function cardPose(index){const i=clamp(Math.round(Number(index)||0),0,11);return {index:i,angle:-48+i*96/11}}
+export function viewAtAngle(angle){return clamp(Math.round(((Number(angle)||0)+48)*11/96),0,11)}
 
 export function createCardSimulator({canvas,range,output,getUrls,onSceneStrength=()=>{}}){
   const stage=canvas.parentElement,controls=document.createElement('div');
-  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Aperçu des plans à différentes hauteurs</label><label for="cardLiveAngle">Angle de caméra <b id="cardLiveAngleOut">0°</b></label><input id="cardLiveAngle" type="range" min="-48" max="48" step="1" value="0" style="width:100%"><label for="cardSceneStrength">Écart visuel entre les hauteurs <b id="cardSceneStrengthOut">1,8×</b></label><input id="cardSceneStrength" type="range" min="0.5" max="3.2" step="0.1" value="1.8" style="width:100%"><p class="small">Chaque élément détouré est affiché sur son propre plan en perspective. Réglage réservé à l’aperçu ; les 9 vues et le ZIP restent inchangés. Lecture lente et régulière sur ±48°.</p><button id="cardTiltPlay" type="button" class="secondary">▶ Lecture lente — plans en perspective</button>';
+  controls.innerHTML='<label><input id="cardPhysicalTilt" type="checkbox" checked> Aperçu des plans à différentes hauteurs</label><label for="cardLiveAngle">Angle de caméra <b id="cardLiveAngleOut">0°</b></label><input id="cardLiveAngle" type="range" min="-48" max="48" step="1" value="0" style="width:100%"><label for="cardSceneStrength">Écart visuel entre les hauteurs <b id="cardSceneStrengthOut">1,8×</b></label><input id="cardSceneStrength" type="range" min="0.5" max="3.2" step="0.1" value="1.8" style="width:100%"><p class="small">Chaque élément détouré est affiché sur son propre plan en perspective. Réglage réservé à l’aperçu ; les 12 vues et le ZIP restent inchangés. Lecture lente et régulière sur ±48°.</p><button id="cardTiltPlay" type="button" class="secondary">▶ Lecture lente — plans en perspective</button>';
   stage.before(controls);
   stage.style.background='#e9e9e5';
   const tilt=controls.querySelector('#cardPhysicalTilt'),play=controls.querySelector('#cardTiltPlay'),liveAngle=controls.querySelector('#cardLiveAngle'),liveAngleOut=controls.querySelector('#cardLiveAngleOut'),sceneStrength=controls.querySelector('#cardSceneStrength'),sceneStrengthOut=controls.querySelector('#cardSceneStrengthOut');
@@ -13,7 +13,7 @@ export function createCardSimulator({canvas,range,output,getUrls,onSceneStrength
   async function show(index,physicalAngle=cardPose(index).angle,allowLive=true){
     const pose=cardPose(index);current=pose.index;angle=physicalAngle;
     liveAngle.value=String(Math.round(angle));liveAngleOut.textContent=`${Math.round(angle)}°`;
-    range.value=String(current);output.textContent=`${current+1} / 9 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'}`;
+    range.value=String(current);output.textContent=`${current+1} / 12 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'}`;
     if(allowLive&&liveRenderer){await liveRenderer(current,tilt.checked?angle:0);return}
     const url=getUrls()[pose.index];if(!url)return;
     const token=++request;
@@ -33,7 +33,7 @@ export function createCardSimulator({canvas,range,output,getUrls,onSceneStrength
   sceneStrength.oninput=()=>{sceneStrengthOut.textContent=`${Number(sceneStrength.value).toLocaleString('fr-FR',{maximumFractionDigits:1})}×`;onSceneStrength(Number(sceneStrength.value))};
   tilt.onchange=()=>{stop();void show(current,angle,true)};
   play.onclick=()=>{
-    if(running){stop();return}if(getUrls().length!==9)return;
+    if(running){stop();return}if(getUrls().length!==12)return;
     running=true;tilt.checked=true;play.textContent='⏸ Pause';const started=performance.now();
     // Constant-speed viewpoint sweep: no elastic easing and no CSS card rotation.
     // One full out-and-back cycle takes 28 seconds (14 seconds per direction).
@@ -43,7 +43,7 @@ export function createCardSimulator({canvas,range,output,getUrls,onSceneStrength
   };
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});
   function showLive(pixels,width,height,index=current,physicalAngle=cardPose(index).angle){
-    current=cardPose(index).index;angle=physicalAngle;range.value=String(current);liveAngle.value=String(Math.round(angle));liveAngleOut.textContent=`${Math.round(angle)}°`;output.textContent=`${current+1} / 9 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'} · aperçu direct`;
+    current=cardPose(index).index;angle=physicalAngle;range.value=String(current);liveAngle.value=String(Math.round(angle));liveAngleOut.textContent=`${Math.round(angle)}°`;output.textContent=`${current+1} / 12 · ${tilt.checked?angle.toFixed(1)+'°':'à plat'} · aperçu direct`;
     stage.style.aspectRatio=`${width} / ${height}`;
     if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height}canvas.getContext('2d').putImageData(new ImageData(pixels,width,height),0,0);lastImage=null;lastUrl='';
   }

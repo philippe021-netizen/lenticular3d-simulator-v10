@@ -25,7 +25,7 @@
     <input id="pixverseSourceFile" type="file" accept="image/*" aria-label="Photo originale pour PixVerse">
     <img id="pixverseSourcePreview" alt="Photo originale envoyée à PixVerse" style="display:none;width:100%;height:auto;margin-top:16px;border-radius:12px">
     <details style="margin-top:16px"><summary>Outils locaux facultatifs — relief et sélections</summary>
-      <iframe id="hhApp" src="./relief3d-test-v31.html?v=415" title="HappyHolo"></iframe>
+      <iframe id="hhApp" src="./relief3d-test-v31.html?v=12views" title="HappyHolo"></iframe>
     </details>
   </section>
   <aside class="side">
@@ -60,17 +60,17 @@
 
     <section class="exports">
       <b>Deux extractions séparées</b>
-      <button id="downloadStatic" class="secondary">ZIP 9 vues — image statique</button>
-      <button id="downloadPixVerse" class="pixbtn" disabled>ZIP 9 vues — PixVerse</button>
+      <button id="downloadStatic" class="secondary">ZIP 12 vues — image statique</button>
+      <button id="downloadPixVerse" class="pixbtn" disabled>ZIP 12 vues — PixVerse</button>
       <div class="small">Les deux ZIP reprennent exactement le cadrage du simulateur : support, zoom et positions X/Y du recto.</div>
     </section>
 
     <section id="framesBlock" class="frames-block">
       <div class="pixverse-label">Résultat PixVerse</div>
-      <div class="frames-head"><b>9 images de la vidéo PixVerse</b><span id="framesMeta" class="small"></span></div>
+      <div class="frames-head"><b>12 images de la vidéo PixVerse</b><span id="framesMeta" class="small"></span></div>
       <div id="framesDiag" class="diag"></div>
       <div id="framesGrid" class="frames-grid"></div>
-      <div class="frames-note">Ces 9 images viennent du MP4 PixVerse. Le ZIP vert reprend le cadrage exact du support sélectionné.</div>
+      <div class="frames-note">Ces 12 images viennent du MP4 PixVerse. Le ZIP vert reprend le cadrage exact du support sélectionné.</div>
     </section>
     <video id="video" controls playsinline loop></video>
     <button id="rerun" style="display:none;background:#e8e8e8;color:#111">Relancer la même action</button>
@@ -78,11 +78,11 @@
   </aside>
 </div>
 <script type="module">
-import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=414';
-import { runPixVerseAction } from './modules/pixverse-client.js?v=414';
-import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor-2s.js?v=415';
-import { requireExportableFrames } from './modules/video-extraction-contract.js';
-import { getOriginalPixVerseFile } from './modules/pixverse-source.js';
+import { loadActionLibrary, getActionVariant } from './modules/action-library.js?v=12views';
+import { runPixVerseAction } from './modules/pixverse-client.js?v=12views';
+import { extractVideoFrames, downloadExtractedFrame } from './modules/video-frame-extractor-2s.js?v=12views';
+import { requireExportableFrames } from './modules/video-extraction-contract.js?v=12views';
+import { getOriginalPixVerseFile } from './modules/pixverse-source.js?v=12views';
 
 const iframe=document.getElementById('hhApp');
 const family=document.getElementById('family');
@@ -98,14 +98,14 @@ const video=document.getElementById('video');
 let actionBusy=false;
 function setActionBusy(value){actionBusy=value;run.disabled=value;rerun.disabled=value;recovery.querySelector('#recoverVideo').disabled=value;repairEdge.disabled=value;document.getElementById('pixverseSourceFile').disabled=value}
 const recovery=document.createElement('details');
-recovery.innerHTML='<summary>Réextraire une vidéo existante — sans génération PixVerse</summary><label for="recoverVideoUrl">Lien du MP4 déjà généré</label><input id="recoverVideoUrl" type="url" placeholder="https://…" style="width:100%"><button id="recoverVideo" type="button">Réextraire les 9 vues</button>';
+recovery.innerHTML='<summary>Réextraire une vidéo existante — sans génération PixVerse</summary><label for="recoverVideoUrl">Lien du MP4 déjà généré</label><input id="recoverVideoUrl" type="url" placeholder="https://…" style="width:100%"><button id="recoverVideo" type="button">Réextraire les 12 vues</button>';
 video.after(recovery);
 recovery.querySelector('#recoverVideo').onclick=async()=>{
   if(actionBusy)return;
   const button=recovery.querySelector('#recoverVideo'),source=recovery.querySelector('#recoverVideoUrl').value.trim()||video.currentSrc||video.src;
   if(!source){setStatus('Indique le lien du MP4 existant.',true);return}
   setActionBusy(true);
-  try{const result=await extractVideoFrames(source,{count:9,type:'image/png'});lastVideoId=null;lastActionContext={promptPolicy:'recovered-video-validated'};renderFrames(result);setStatus(result.qualityGate.passed?'Vidéo existante réextraite — 9 vues prêtes, aucune génération facturée.':'Réextraction terminée : un retour est encore détecté dans les vues.',!result.qualityGate.passed)}catch(e){setStatus(`Réextraction impossible : ${e.message}`,true)}finally{setActionBusy(false)}
+  try{const result=await extractVideoFrames(source,{count:12,type:'image/png'});lastVideoId=null;lastActionContext={promptPolicy:'recovered-video-validated'};renderFrames(result);setStatus(result.qualityGate.passed?'Vidéo existante réextraite — 12 vues prêtes, aucune génération facturée.':'Réextraction terminée : un retour est encore détecté dans les vues.',!result.qualityGate.passed)}catch(e){setStatus(`Réextraction impossible : ${e.message}`,true)}finally{setActionBusy(false)}
 };
 const rerun=document.getElementById('rerun');
 const framesBlock=document.getElementById('framesBlock');
@@ -189,13 +189,13 @@ function renderFrames(result){
   const windowInfo=result.extractionWindow;
   framesMeta.textContent=windowInfo?`${result.width}×${result.height} · ${windowInfo.start.toFixed(2)}–${windowInfo.end.toFixed(2)} s`:`${result.width}×${result.height}`;
   const distinct=result.distinctFingerprints ?? new Set(result.frames.map(f=>f.fingerprint)).size;
-  const gate=result.qualityGate||{passed:true,warning:distinct===9?null:'similar-frames'};
-  framesDiag.textContent=!gate.passed?'Extraction bloquée : un retour brutal à la pose initiale subsiste.':gate.warning==='similar-frames'?`Export autorisé : ${distinct}/9 images différentes · certaines vues sont proches, contrôle visuel conseillé.`:gate.warning==='subtle-motion'?'Export autorisé : mouvement subtil détecté · contrôle visuel conseillé.':`Contrôle extraction : ${distinct}/9 images distinctes · première action complète · aucun retour`;
+  const gate=result.qualityGate||{passed:true,warning:distinct===12?null:'similar-frames'};
+  framesDiag.textContent=!gate.passed?'Extraction bloquée : un retour brutal à la pose initiale subsiste.':gate.warning==='similar-frames'?`Export autorisé : ${distinct}/12 images différentes · certaines vues sont proches, contrôle visuel conseillé.`:gate.warning==='subtle-motion'?'Export autorisé : mouvement subtil détecté · contrôle visuel conseillé.':`Contrôle extraction : ${distinct}/12 images distinctes · première action complète · aucun retour`;
   framesDiag.className=`diag${gate.passed?'':' bad'}`;
-  framesBlock.style.display='block';downloadPixVerse.disabled=result.frames.length!==9||!gate.passed;
+  framesBlock.style.display='block';downloadPixVerse.disabled=result.frames.length!==12||!gate.passed;
   requestAnimationFrame(()=>framesBlock.scrollIntoView({behavior:'smooth',block:'start'}));
 }
-async function extractNineViews(){setStatus('5/5 — Analyse de la première action, puis calcul des 9 vues…');const result=await extractVideoFrames(video,{count:9,type:'image/png',onProgress:p=>setStatus(p.phase==='analysis'?`5/5 — Analyse du mouvement ${p.index+1}/${p.count}…`:`5/5 — Extraction vue ${p.index+1}/9…`)});renderFrames(result);return result}
+async function extractNineViews(){setStatus('5/5 — Analyse de la première action, puis calcul des 12 vues…');const result=await extractVideoFrames(video,{count:12,type:'image/png',onProgress:p=>setStatus(p.phase==='analysis'?`5/5 — Analyse du mouvement ${p.index+1}/${p.count}…`:`5/5 — Extraction vue ${p.index+1}/12…`)});renderFrames(result);return result}
 
 function currentSupportSpec(){
   const doc=iframe.contentDocument;
@@ -239,30 +239,30 @@ async function fitFrameToSupport(frameBlob,spec,placement=currentSupportPlacemen
 }
 async function downloadStaticSupportZip(){
   const doc=iframe.contentDocument;const imgs=[...(doc?.querySelectorAll('#frames img')||[])];
-  if(imgs.length!==9)throw new Error('Crée d’abord les 9 vues statiques avec « Exporter 9 vues ».');
+  if(imgs.length!==12)throw new Error('Crée d’abord les 12 vues statiques avec « Exporter 12 vues ».');
   const ZipCtor=iframe.contentWindow?.JSZip||window.JSZip;if(!ZipCtor)throw new Error('JSZip indisponible.');
   const spec=currentSupportSpec(),placement=currentSupportPlacement(),zip=new ZipCtor();
-  for(let i=0;i<9;i++){
-    setStatus(`Statique ${i+1}/9 — cadrage impression ${spec.width}×${spec.height}…`);
+  for(let i=0;i<12;i++){
+    setStatus(`Statique ${i+1}/12 — cadrage impression ${spec.width}×${spec.height}…`);
     const raw=await urlToBlob(imgs[i].src);const fitted=await fitFrameToSupport(raw,spec,placement);
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo static support print',source:'happyholo-static-9-views',views:9,support:spec.id,diameterMm:spec.diameterMm||null,widthMm:spec.widthMm||null,heightMm:spec.heightMm||null,outputWidth:spec.width,outputHeight:spec.height,placement},null,2));
-  const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`9-vues-statique-${spec.label}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo static support print',source:'happyholo-static-12-views',views:12,support:spec.id,diameterMm:spec.diameterMm||null,widthMm:spec.widthMm||null,heightMm:spec.heightMm||null,outputWidth:spec.width,outputHeight:spec.height,placement},null,2));
+  const blob=await zip.generateAsync({type:'blob'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`12-vues-statique-${spec.label}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500);
 }
 async function downloadPixVerseZip(){
-  if(!extracted?.frames||extracted.frames.length!==9)throw new Error('Les 9 vues PixVerse ne sont pas prêtes.');
+  if(!extracted?.frames||extracted.frames.length!==12)throw new Error('Les 12 vues PixVerse ne sont pas prêtes.');
   requireExportableFrames(extracted);
   const ZipCtor=iframe.contentWindow?.JSZip||window.JSZip;if(!ZipCtor)throw new Error('JSZip indisponible.');
   const spec=currentSupportSpec(),placement=currentSupportPlacement(),zip=new ZipCtor();
   for(let i=0;i<extracted.frames.length;i++){
-    setStatus(`PixVerse ${i+1}/9 — cadrage impression ${spec.width}×${spec.height}…`);
+    setStatus(`PixVerse ${i+1}/12 — cadrage impression ${spec.width}×${spec.height}…`);
     const fitted=await fitFrameToSupport(extracted.frames[i].blob,spec,placement);
     zip.file(`vue-${String(i+1).padStart(2,'0')}.png`,fitted);
   }
   const distinct=extracted.distinctFingerprints ?? new Set(extracted.frames.map(f=>f.fingerprint)).size;
-  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,customRequest:lastActionContext?.customRequest||null,promptProvider:lastActionContext?.promptProvider||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:9,distinctFrames:distinct,qualityGate:extracted.qualityGate,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,diameterMm:spec.diameterMm||null,widthMm:spec.widthMm||null,heightMm:spec.heightMm||null,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
-  const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`9-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
+  zip.file('manifest.json',JSON.stringify({generator:'HappyHolo + PixVerse V6',source:'pixverse-video',videoId:lastVideoId,actionId:lastActionContext?.actionId||null,actionLabel:lastActionContext?.actionLabel||null,variantId:lastActionContext?.variantId||null,customRequest:lastActionContext?.customRequest||null,promptProvider:lastActionContext?.promptProvider||null,promptPolicy:lastActionContext?.promptPolicy||'lenticular-one-way-v1',prompt:lastActionContext?.prompt||null,negativePrompt:lastActionContext?.negativePrompt||null,views:12,distinctFrames:distinct,qualityGate:extracted.qualityGate,sourceWidth:extracted.width,sourceHeight:extracted.height,support:spec.id,diameterMm:spec.diameterMm||null,widthMm:spec.widthMm||null,heightMm:spec.heightMm||null,outputWidth:spec.width,outputHeight:spec.height,placement,extractionWindow:extracted.extractionWindow||null,times:extracted.frames.map(f=>Number(f.time.toFixed(3)))},null,2));
+  const blob=await zip.generateAsync({type:'blob'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`12-vues-pixverse-${spec.label}-${lastVideoId||Date.now()}.zip`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)
 }
 async function launch(selectionOverride=null){
   if(actionBusy)return;
@@ -270,7 +270,7 @@ async function launch(selectionOverride=null){
   let s=selectionOverride||selection();if(!s)return;setActionBusy(true);video.style.display='none';rerun.style.display='none';clearFrames();
   try{
     if(s.customRequest&&!selectionOverride){setStatus('Création du prompt PixVerse avec les contraintes HappyHolo…');s=await prepareCustomSelection(s);renderPrompt(s)}
-    lastLaunchSelection=s;setStatus('Préparation de la photo originale, sans détourage…');const file=getOriginalPixVerseFile(iframe,document.getElementById('pixverseSourceFile').files?.[0]);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,customRequest:s.customRequest||null,promptProvider:s.promptProvider||null,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(!views.qualityGate?.passed)setStatus('Vidéo récupérée, mais export bloqué : retour brutal à la pose initiale confirmé.',true);else if(views.qualityGate?.warning)setStatus(`Vidéo #${result.videoId} prête — export autorisé avec contrôle visuel conseillé.`,false,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 9 vues calculées sur la première action, sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,qualityGate:views.qualityGate,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}
+    lastLaunchSelection=s;setStatus('Préparation de la photo originale, sans détourage…');const file=getOriginalPixVerseFile(iframe,document.getElementById('pixverseSourceFile').files?.[0]);const result=await runPixVerseAction(file,s.variant,{onStatus:x=>{const map={upload:'1/5 — Envoi image…',create:'2/5 — Génération 2 s / 540p lancée…',processing:'3/5 — Génération PixVerse en cours…',done:'4/5 — MP4 reçu.'};setStatus(map[x.step]||'Traitement…')}});lastVideoId=result.videoId;video.src=result.videoUrl;video.style.display='block';video.load();await new Promise((resolve,reject)=>{if(video.readyState>=1&&Number.isFinite(video.duration))return resolve();const ok=()=>{cleanup();resolve()};const bad=()=>{cleanup();reject(new Error('Impossible de charger le MP4 pour extraire les vues.'))};const cleanup=()=>{video.removeEventListener('loadedmetadata',ok);video.removeEventListener('error',bad)};video.addEventListener('loadedmetadata',ok,{once:true});video.addEventListener('error',bad,{once:true})});const views=await extractNineViews();lastActionContext={actionId:s.action.id,actionLabel:s.action.label,variantId:s.variant.id,customRequest:s.customRequest||null,promptProvider:s.promptProvider||null,promptPolicy:result.promptPolicy,prompt:result.promptUsed,negativePrompt:result.negativePromptUsed};rerun.style.display='block';const distinct=views.distinctFingerprints ?? new Set(views.frames.map(f=>f.fingerprint)).size;if(!views.qualityGate?.passed)setStatus('Vidéo récupérée, mais export bloqué : retour brutal à la pose initiale confirmé.',true);else if(views.qualityGate?.warning)setStatus(`Vidéo #${result.videoId} prête — export autorisé avec contrôle visuel conseillé.`,false,true);else setStatus(`Connexion validée — vidéo #${result.videoId} + 12 vues calculées sur la première action, sans retour.`,false,true);try{await video.play()}catch(_){}window.HappyHoloLastPixVerseResult={...result,...lastActionContext,extractionWindow:views.extractionWindow,qualityGate:views.qualityGate,distinctFrames:distinct,extractedViews:views.frames.map(f=>({index:f.index,time:f.time,url:f.url,width:f.width,height:f.height,fingerprint:f.fingerprint}))}
   }catch(e){setStatus(`Erreur : ${e.message}`,true)}finally{setActionBusy(false)}
 }
 
@@ -280,7 +280,7 @@ function stabilizeLocalSupport(){
   if(!style){style=doc.createElement('style');style.id='happyHoloStableSupportStyle';style.textContent='.product-object.support-playing{animation:none!important;transform:none!important}.product-object.support-playing .shell{animation:none!important}';doc.head.appendChild(style)}
 }
 function invalidatePixVerseAfterSceneEdit(){
-  if(!extracted&&!lastVideoId)return;clearFrames();video.pause();video.removeAttribute('src');video.load();video.style.display='none';rerun.style.display='none';delete window.HappyHoloLastPixVerseResult;setStatus('Le fond ou le placement a changé : l’ancien PixVerse a été retiré. Relance PixVerse pour générer les 9 vues avec cette nouvelle composition.',false,false)
+  if(!extracted&&!lastVideoId)return;clearFrames();video.pause();video.removeAttribute('src');video.load();video.style.display='none';rerun.style.display='none';delete window.HappyHoloLastPixVerseResult;setStatus('Le fond ou le placement a changé : l’ancien PixVerse a été retiré. Relance PixVerse pour générer les 12 vues avec cette nouvelle composition.',false,false)
 }
 function bindHappyHoloSceneChanges(){
   const w=iframe.contentWindow;if(!w||w.__happyHoloPixverseSceneBound)return;w.__happyHoloPixverseSceneBound=true;w.addEventListener('happyholo-background-changed',invalidatePixVerseAfterSceneEdit);w.addEventListener('happyholo-subject-placement-changed',invalidatePixVerseAfterSceneEdit)

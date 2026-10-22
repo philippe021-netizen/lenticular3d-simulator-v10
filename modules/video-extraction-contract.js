@@ -1,5 +1,5 @@
 export function requireExportableFrames(result){
-  if(result?.frames?.length!==9)throw new Error('Les 9 vues ne sont pas prêtes.');
+  if(![9,12].includes(result?.frames?.length))throw new Error('Les 12 vues ne sont pas prêtes (9 vues existantes acceptées).');
   if(!result.qualityGate||typeof result.qualityGate.passed!=='boolean')throw new Error('Contrôle extraction incomplet. Réextrais la vidéo existante, sans relancer PixVerse.');
   if(!result.qualityGate.passed){
     if(result.qualityGate.reason==='return-detected')throw new Error('Export bloqué : retour brutal à la pose initiale détecté dans les vues.');

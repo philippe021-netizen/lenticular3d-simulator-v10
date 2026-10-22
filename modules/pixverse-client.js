@@ -1,5 +1,5 @@
-import { hardenPixVersePrompts } from './pixverse-motion-policy.js';
-export { hardenPixVersePrompts } from './pixverse-motion-policy.js';
+import { hardenPixVersePrompts } from './pixverse-motion-policy.js?v=12views';
+export { hardenPixVersePrompts } from './pixverse-motion-policy.js?v=12views';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function readJson(r) {
   const text = await r.text();

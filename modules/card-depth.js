@@ -1,4 +1,4 @@
-import { maskAlphaAt } from './card-shape-mask.js';
+import { maskAlphaAt } from './card-shape-mask.js?v=12views';
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
 // Detections adjust an estimated surface; they never copy RGB rectangles.
@@ -53,7 +53,7 @@ export function composeCardDepth(base,width,height,layers){
 
 export function estimateCardDepth(imageUrl,guide,width,height,onProgress=()=>{}){
   return new Promise((resolve,reject)=>{
-    const worker=new Worker(new URL('../depthflow-v42-worker.js',import.meta.url),{type:'module'});
+    const worker=new Worker(new URL('../depthflow-v42-worker.js?v=12views',import.meta.url),{type:'module'});
     const timer=setTimeout(()=>finish(new Error('Calcul de profondeur trop long. Réessaie.')),180000);
     const finish=(error,result)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve(result)};
     worker.onerror=e=>finish(new Error(e.message||'Modèle de profondeur indisponible'));

@@ -1,4 +1,4 @@
-import { maskAlphaAt } from './card-shape-mask.js';
+import { maskAlphaAt } from './card-shape-mask.js?v=12views';
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 
 // Camera projection inspired by the former V32 business-card viewer. Depth

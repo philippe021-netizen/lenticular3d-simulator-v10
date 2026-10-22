@@ -1,7 +1,7 @@
 // Experimental 3D depth-plane viewer for tab 1 ("Photo & relief").
 // It uses the existing subject/background segmentation from relief-engine-v31.
 // It never changes the print exports or the original photograph.
-import { createCardFloatingPlanesPreview } from './card-floating-planes-preview.js';
+import { createCardFloatingPlanesPreview } from './card-floating-planes-preview.js?v=12views';
 
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
@@ -46,7 +46,7 @@ function show(angleDegrees=0){
    preview2D.width=frame.width;preview2D.height=frame.height;
  }
  ctx2D.putImageData(frame,0,0);
- if(!fallBackReported){fallBackReported=true;setStatus('Safari utilise le rendu 2D de secours. Les fichiers des 9 vues restent indépendants.','warn')}
+ if(!fallBackReported){fallBackReported=true;setStatus('Safari utilise le rendu 2D de secours. Les fichiers des 12 vues restent indépendants.','warn')}
 }
 function frame(now){
  if(!playing||!scene)return;

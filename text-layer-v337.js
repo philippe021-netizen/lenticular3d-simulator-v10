@@ -106,7 +106,7 @@
   card.style.marginTop='18px';
   card.innerHTML=`
     <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
-      <div><h2 style="margin:0 0 4px">Texte en relief / carte</h2><div class="small">Jusqu’à 4 lignes. Repris dans l’aperçu principal, le simulateur et les 9 vues.</div></div>
+      <div><h2 style="margin:0 0 4px">Texte en relief / carte</h2><div class="small">Jusqu’à 4 lignes. Repris dans l’aperçu principal, le simulateur et les 12 vues.</div></div>
       <label style="display:flex;align-items:center;gap:7px;margin:0;font-weight:800"><input id="textEnabled" type="checkbox"> Activer</label>
     </div>
     <div id="textTools" style="display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(220px,1fr);gap:16px;margin-top:14px;opacity:.48">

@@ -8,7 +8,7 @@ const moduleSource=readFileSync(new URL('../modules/photo-floating-preview.js',i
 const sharedSource=readFileSync(new URL('../modules/card-floating-planes-preview.js',import.meta.url),'utf8');
 
 test('MicroPlayer first tab loads the photo simulator without redirecting the product tabs',()=>{
- assert.match(hub,/id:'photo'.*relief3d-test-v31\.html\?embed=1&v=507/);
+ assert.match(hub,/id:'photo'.*relief3d-test-v31\.html\?embed=1&v=12views/);
  assert.match(hub,/id:'card'.*happyholo-business-card-studio/);
 });
 
@@ -17,7 +17,7 @@ test('all simulator controls and optional module are present in Photo & relief',
  'photo3dAngle','photo3dStrength','photo3dPlay','photo3dRefresh','photo3dStatus','photo3dJump']){
    assert.ok(photo.includes('id="'+id+'"'),id+' missing');
  }
- assert.ok(photo.includes('modules/photo-floating-preview.js?v=2'));
+ assert.ok(photo.includes('modules/photo-floating-preview.js?v=12views'));
  assert.match(photo,/canvas\[hidden\].*display:none!important/);
 });
 

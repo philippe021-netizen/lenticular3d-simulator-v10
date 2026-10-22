@@ -784,7 +784,7 @@
     });
 
     el('label',{
-      text:'Moment dans les 9 vues',
+      text:'Moment dans les 12 vues',
       style:{fontSize:'11px',fontWeight:'700'}
     },card);
 
