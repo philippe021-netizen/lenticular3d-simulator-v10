@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'happyholo-offline-v1.86-interlace';
+const CACHE_VERSION = 'happyholo-offline-v1.87-depthflow-zip';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 let happyHoloMode = 'connected';
@@ -6,6 +6,7 @@ const APP_SHELL = ['./index.html?v=12views','./happyholo-analysis.html?v=12views
 APP_SHELL.push('./happyholo-pixverse-actions-test.html?v=12views','./happyholo-pixverse-free.html?v=12views','./data/actions-library.json','./modules/action-library.js?v=12views','./modules/pixverse-client.js?v=12views','./modules/video-frame-extractor.js?v=12views','./modules/video-frame-extractor-2s.js?v=12views');
 APP_SHELL.push('./happyholo-business-card-layers.html?v=12views','./modules/card-depth.js?v=12views','./modules/card-simulator.js?v=12views','./modules/card-mesh-preview.js?v=12views','./modules/microplayer-image-preprocess-v1.js?v=12views','./depthflow-v42-core.js?v=12views','./depthflow-v42-worker.js?v=12views');
 APP_SHELL.push('./lenticular-print.html?v=1','./modules/lenticular-interlace.js?v=1','./modules/lenticular-print-ui.js?v=1');
+APP_SHELL.push('./depthflow-v42-convergence.html?v=12views-zip1','./modules/depthflow-export.js?v=1');
 const CACHEABLE_HOSTS=['cdn.jsdelivr.net','esm.sh','staticimgly.com','huggingface.co','www.huggingface.co','cdn-lfs.huggingface.co','cdn-lfs-us-1.huggingface.co','cdn-lfs-eu-1.huggingface.co'];
 function cacheable(url){return url.origin===self.location.origin||CACHEABLE_HOSTS.some(h=>url.hostname===h||url.hostname.endsWith(`.${h}`));}
 async function patchSupportPreview(req,response){

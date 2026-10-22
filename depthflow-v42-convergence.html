@@ -82,6 +82,7 @@
       <label class="file">Choisir une photo<input id="file" type="file" accept="image/*"></label>
       <button id="depthBtn" disabled>1. Calculer la profondeur</button>
       <button id="generateBtn" disabled>3. Générer les 12 vues</button>
+      <button id="zipBtn" disabled>Télécharger les 12 vues en ZIP</button>
       <select id="renderSize" aria-label="Définition de rendu">
         <option value="720">iPad rapide · 720 px</option>
         <option value="900" selected>iPad qualité · 900 px</option>
@@ -169,7 +170,9 @@
       <h2 style="margin:0;flex:1">Simulateur lenticulaire</h2>
       <button id="autoBtn" class="secondary">▶ Aller-retour</button>
       <button id="compareBtn" class="secondary" disabled>Comparer 01 ↔ 12</button>
+      <button id="zipSimBtn" disabled>Télécharger les 12 vues en ZIP</button>
     </div>
+    <p id="zipStatus" class="tiny"></p><p><a id="zipLink" hidden>Télécharger le ZIP préparé</a></p>
     <div class="simstage"><canvas id="simCanvas"></canvas></div>
     <input id="simRange" class="simbar" type="range" min="0" max="11" step="0.01" value="4">
     <p class="tiny">Utilisez « Comparer 01 ↔ 12 » pour alterner les deux vues les plus éloignées. Le curseur permet aussi d'inspecter les douze positions.</p>
@@ -178,7 +181,9 @@
   <div id="grid" class="grid"></div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script type="module">
+  import { packageDepthflowViews } from './modules/depthflow-export.js?v=1';
   import {
     analyzeParallaxPotential,
     comparePixels,
@@ -202,6 +207,24 @@
   const simulator = byId("simulator");
   const simCanvas = byId("simCanvas");
   const simRange = byId("simRange");
+  const zipButtons=[byId('zipBtn'),byId('zipSimBtn')];
+  let zipBusy=false,zipUrl='';
+  function resetZip(){zipButtons.forEach(b=>b.disabled=true);byId('zipLink').hidden=true;byId('zipStatus').textContent='';if(zipUrl){URL.revokeObjectURL(zipUrl);zipUrl='';}}
+  async function exportZip(){
+    if(zipBusy||state.frames.length!==12)return;
+    zipBusy=true;zipButtons.forEach(b=>b.disabled=true);
+    const frames=state.frames.slice(),generation=state.generation;
+    const settings={width:frames[0].width,height:frames[0].height,zero:Number(byId('zero').value),stabilityBand:Number(byId('stabilityBand').value),relief:Number(byId('relief').value)/100,planeSeparation:Number(byId('planeSeparation').value)/100,parallaxPercent:Number(byId('parallax').value)};
+    try{
+      const blobs=[];for(let i=0;i<12;i++){byId('zipStatus').textContent=`Préparation du ZIP : vue ${i+1}/12…`;blobs.push(await new Promise((resolve,reject)=>frames[i].toBlob(b=>b?resolve(b):reject(new Error('Export PNG impossible.')),'image/png')));}
+      const blob=await packageDepthflowViews(blobs,window.JSZip,settings);
+      if(generation!==state.generation){byId('zipStatus').textContent='Les vues ont changé. Téléchargez la nouvelle série après génération.';return;}
+      if(zipUrl)URL.revokeObjectURL(zipUrl);zipUrl=URL.createObjectURL(blob);const a=byId('zipLink');a.href=zipUrl;a.download='MicroPlayer-DepthFlow-12-vues.zip';a.hidden=false;a.click();
+      byId('zipStatus').textContent=`ZIP prêt : 12 PNG de ${settings.width} × ${settings.height} pixels. Importez ce ZIP dans Produits → Entrelacement & impression. Si le téléchargement ne démarre pas, cliquez sur le lien.`;
+    }catch(e){byId('zipStatus').textContent=`Export impossible : ${e.message}`;}
+    finally{zipBusy=false;zipButtons.forEach(b=>b.disabled=state.frames.length!==12);}
+  }
+  zipButtons.forEach(b=>b.onclick=exportZip);
 
   const state = {
     imageUrl: null,
@@ -288,6 +311,7 @@
     state.anchorConfirmed = false;
     state.frames = [];
     state.showMap = false;
+    resetZip();
     grid.innerHTML = "";
     simulator.classList.remove("ready");
     quality.textContent = "";
@@ -694,6 +718,7 @@
     }
     stopAuto();
     const generation = ++state.generation;
+    resetZip();
     generateBtn.disabled = true;
     const targetWidth = Math.min(photoCanvas.width, Number(byId("renderSize").value));
     const targetHeight = Math.max(1, Math.round(photoCanvas.height * targetWidth / photoCanvas.width));
@@ -779,7 +804,7 @@
       console.error(error);
       setStatus(`Erreur génération : ${error?.message ?? error}`, "error");
     } finally {
-      if (generation === state.generation) generateBtn.disabled = !state.anchorConfirmed;
+      if (generation === state.generation) {generateBtn.disabled = !state.anchorConfirmed;zipButtons.forEach(b=>b.disabled=zipBusy||state.frames.length!==12);}
     }
   }
 
