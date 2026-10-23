@@ -13,7 +13,7 @@ MAX=24*1024*1024
 class Handler(BaseHTTPRequestHandler):
  def origin(self):
   o=self.headers.get('Origin','')
-  return o if o in ORIGINS else ''
+  return o if o in ORIGINS or o.startswith('https://lenticular3d-simulator-v5-') and o.endswith('-6yvtsjx7yt-4119s-projects.vercel.app') or o=='http://127.0.0.1:8765' else ''
  def cors(self):
   self.send_header('Access-Control-Allow-Origin',self.origin() or 'null')
   self.send_header('Vary','Origin')
@@ -29,6 +29,9 @@ class Handler(BaseHTTPRequestHandler):
  def authorized(self):
   return self.origin() and secrets.compare_digest(self.headers.get('X-MicroPlayer-Token',''),TOKEN)
  def do_GET(self):
+  if self.path in ('/','/pictureit-studio.html'):
+   data=(ROOT/'pictureit-studio.html').read_bytes()
+   self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
   if self.path!='/health':return self.reply(404,{'error':'Not found'})
   return self.reply(200,{'ok':True,'requires_token':True,'pictureit':'local Windows only'})
  def do_POST(self):
@@ -46,7 +49,12 @@ class Handler(BaseHTTPRequestHandler):
     stamp=datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
     target=OUTPUT/('import_'+stamp)
     subjects=module.process_zip(base64.b64decode(payload['source'],validate=True),base64.b64decode(payload['zip'],validate=True),target)
-    return self.reply(200,{'ok':True,'folder':str(target),'subjects':subjects,'pictureit':'Source copy and PNG layers ready on PC PHIL; native editor actions are not automatic.'})
+    editor=Path(r'C:\Program Files (x86)\Microsoft Digital Image 10\pi.exe')
+    opened=False
+    if editor.is_file():
+     subprocess.Popen([str(editor),str(target/'PHOTO_ORIGINALE_COPIE.png')],cwd=str(target))
+     opened=True
+    return self.reply(200,{'ok':True,'folder':str(target),'subjects':subjects,'opened_pictureit':opened,'pictureit':'Source copy opened in Picture It. The transparent subject PNGs are prepared in the same folder; no automated layer creation.'})
 
    if self.path=='/render':
     if not payload.get('confirmed'):raise ValueError('Visual approval required')
