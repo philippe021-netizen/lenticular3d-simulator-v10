@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MicroPlayer — Picture It!</title>
+<style>body{background:#0b1520;color:#edf4fa;font:16px system-ui;margin:0;padding:22px}main{max-width:960px;margin:auto}h1{font-size:26px}p{line-height:1.5}.panel{background:#152638;border:1px solid #344a5d;border-radius:16px;padding:18px;margin:14px 0}label{display:block;margin:14px 0}input[type=file]{display:block;max-width:100%;margin:8px 0;padding:9px;background:#233749;color:white;border-radius:9px}button{background:#ffd60a;border:0;border-radius:9px;padding:12px 16px;font-weight:800;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}canvas{width:100%;height:auto;max-height:55vh;object-fit:contain;background:#253645;border-radius:8px}small,.muted{color:#bfd0de}.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.step{padding:12px;border-radius:10px;background:#233749}.status{white-space:pre-wrap}</style></head>
+<body><main><h1>Picture It! — chaîne MicroPlayer</h1>
+<p>Préparer et vérifier les masques sur le site, puis traiter les calques et l'effacement dans Microsoft Photo Pro 10 sur le PC PHIL. Aucune modification de l'image d'origine.</p>
+<div class="panel"><h2>1. Contrôle du détourage</h2>
+<label>Photo originale<input id="source" type="file" accept="image/*"></label>
+<label>Masque Franck + guitare (PNG alpha)<input id="franck" type="file" accept="image/png"></label>
+<label>Masque Kathy (PNG alpha)<input id="kathy" type="file" accept="image/png"></label>
+<button id="check">Contrôler la superposition</button>
+<p id="status" class="status" aria-live="polite">Aucun fichier chargé.</p>
+<canvas id="preview" width="960" height="640"></canvas>
+</div>
+<div class="panel"><h2>2. Étapes Picture It! sur Windows</h2><div class="steps">
+<div class="step">Créer une copie de la photo source.</div><div class="step">Tracer les contours IA recalés et créer deux calques.</div><div class="step">Revenir au fond original sous les calques.</div><div class="step">Effacer Franck + guitare, puis Kathy séparément.</div><div class="step">Comparer les raccords avec LaMa.</div><div class="step">Exporter les sujets, le fond et 9 vues de contrôle.</div></div>
+<p class="muted">Picture It! est un logiciel Windows : ce module web ne déclenche pas lui-même ses commandes. Sur PHIL, utiliser DEMARRER_PICTUREIT_AUTO.bat dans lenticular_gen. L'effacement natif et le montage imprimable restent soumis aux contrôles visuels.</p>
+<button id="manifest" disabled>Télécharger le rapport de contrôle</button></div>
+</main><script>
+const $=id=>document.getElementById(id), c=$('preview'),ctx=c.getContext('2d');let report=null;
+async function load(id){const f=$(id).files[0];if(!f)throw Error('Fichier manquant : '+id);const url=URL.createObjectURL(f);try{const im=new Image();im.src=url;await im.decode();return im}finally{URL.revokeObjectURL(url)}}
+$('check').onclick=async()=>{try{const [source,franck,kathy]=await Promise.all(['source','franck','kathy'].map(load));const size=[source.naturalWidth,source.naturalHeight];if(size.some((v,i)=>v!==[franck.naturalWidth,franck.naturalHeight][i]||v!==[kathy.naturalWidth,kathy.naturalHeight][i]))throw Error('Masques et photo de dimensions différentes. Recaler avant toute suppression.');c.width=size[0];c.height=size[1];ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(source,0,0);ctx.globalAlpha=.38;ctx.drawImage(franck,0,0);ctx.drawImage(kathy,0,0);ctx.globalAlpha=1;report={checked_at:new Date().toISOString(),size,source:$('source').files[0].name,franck:$('franck').files[0].name,kathy:$('kathy').files[0].name,warning:'Superposition dimensionnelle vérifiée; conformité visuelle et reconstruction non approuvées automatiquement.'};$('status').textContent='Dimensions concordantes : '+size.join(' × ')+'. Vérifier visuellement tous les contours avant Remplir.';$('manifest').disabled=false}catch(e){report=null;$('manifest').disabled=true;$('status').textContent='ERREUR : '+e.message}};
+$('manifest').onclick=()=>{if(!report)return;const b=new Blob([JSON.stringify(report,null,2)],{type:'application/json'});const url=URL.createObjectURL(b);const a=document.createElement('a');a.href=url;a.download='pictureit-controle.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+</script></body></html>
