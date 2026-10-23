@@ -27,13 +27,18 @@ class Handler(BaseHTTPRequestHandler):
   if not self.origin():return self.reply(403,{'error':'Origin not allowed'})
   self.send_response(204);self.cors();self.end_headers()
  def authorized(self):
-  return self.origin() and secrets.compare_digest(self.headers.get('X-MicroPlayer-Token',''),TOKEN)
+  # No pasted token for same-origin requests served by the loopback bridge.
+  # Remote websites still require the secret token.
+  origin=self.headers.get('Origin','')
+  if origin=='http://127.0.0.1:8765' and self.headers.get('Sec-Fetch-Site')=='same-origin' and self.headers.get('Host')=='127.0.0.1:8765':
+   return True
+  return bool(self.origin()) and secrets.compare_digest(self.headers.get('X-MicroPlayer-Token',''),TOKEN)
  def do_GET(self):
   if self.path.split('?',1)[0] in ('/','/pictureit-studio.html'):
    data=(ROOT/'pictureit-studio.html').read_bytes()
    self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
   if self.path!='/health':return self.reply(404,{'error':'Not found'})
-  return self.reply(200,{'ok':True,'requires_token':True,'pictureit':'local Windows only'})
+  return self.reply(200,{'ok':True,'requires_token':False,'pictureit':'local Windows only'})
  def do_POST(self):
   if self.path not in ('/prepare','/render','/import-zip'):return self.reply(404,{'error':'Not found'})
   if not self.authorized():return self.reply(403,{'error':'Origin or token rejected'})
