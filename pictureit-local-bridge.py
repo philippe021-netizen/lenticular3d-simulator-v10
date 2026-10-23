@@ -32,13 +32,34 @@ class Handler(BaseHTTPRequestHandler):
   if self.path!='/health':return self.reply(404,{'error':'Not found'})
   return self.reply(200,{'ok':True,'requires_token':True,'pictureit':'local Windows only'})
  def do_POST(self):
-  if self.path!='/prepare':return self.reply(404,{'error':'Not found'})
+  if self.path not in ('/prepare','/render'):return self.reply(404,{'error':'Not found'})
   if not self.authorized():return self.reply(403,{'error':'Origin or token rejected'})
   try:
    n=int(self.headers.get('Content-Length','0'))
    if not 0<n<MAX:raise ValueError('Upload size not allowed')
    payload=json.loads(self.rfile.read(n))
    if payload.get('confirmed') is not True:raise ValueError('Overlay validation required')
+   if self.path=='/render':
+    if not payload.get('confirmed'):raise ValueError('Visual approval required')
+    key=payload.get('session','')
+    if not isinstance(key,str) or not key.startswith('web_') or not key.replace('_','').isalnum():raise ValueError('Invalid session')
+    folder=(OUTPUT/key).resolve()
+    if folder.parent!=OUTPUT.resolve() or not folder.is_dir():raise ValueError('Session not found')
+    from PIL import Image
+    from io import BytesIO
+    bg_data=base64.b64decode(payload.get('background',''),validate=True)
+    if len(bg_data)>8*1024*1024:raise ValueError('Background too large')
+    bg=Image.open(BytesIO(bg_data));bg.verify()
+    bg_path=folder/'background.png';bg_path.write_bytes(bg_data)
+    from PIL import Image
+    if Image.open(bg_path).size!=Image.open(folder/'source.png').size:raise ValueError('Background dimensions mismatch')
+    outputs=folder/'output'
+    args=[str(ENGINE/'.venv/Scripts/python.exe'),str(ROOT/'pictureit-nine-views.py'),'--source',str(folder/'source.png'),'--franck',str(outputs/'franck_guitare.png'),'--kathy',str(outputs/'kathy.png'),'--background',str(bg_path),'--output',str(folder/'views')]
+    result=subprocess.run(args,capture_output=True,text=True,timeout=60)
+    (folder/'render.log').write_text(result.stdout+'\n'+result.stderr,encoding='utf8')
+    if result.returncode:raise RuntimeError(result.stderr[-500:])
+    return self.reply(200,{'ok':True,'folder':str(folder/'views'),'views':9,'warning':'Preview only; not print-calibrated'})
+
    stamp=datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
    out=OUTPUT/('web_'+stamp);out.mkdir(parents=True,exist_ok=False)
    for key in ('source','franck','kathy'):
@@ -57,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
    result=subprocess.run(args,cwd=ENGINE,capture_output=True,text=True,timeout=90)
    (out/'process.log').write_text(result.stdout+'\n'+result.stderr,encoding='utf8')
    if result.returncode:raise RuntimeError(result.stderr[-600:])
-   return self.reply(200,{'ok':True,'folder':str(out/'output'),'message':'Two RGBA subjects exported. Picture It native erasure still requires separate confirmation.'})
+   return self.reply(200,{'ok':True,'session':out.name,'folder':str(out/'output'),'message':'Two RGBA subjects exported. Picture It native erasure still requires separate confirmation.'})
   except Exception as exc:return self.reply(400,{'error':str(exc)})
  def log_message(self,fmt,*args):print(fmt%args)
 if __name__=='__main__':
