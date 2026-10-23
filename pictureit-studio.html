@@ -39,6 +39,15 @@ input[type=text]{background:#0c1d2d;color:#fff;border:1px solid #557084;border-r
 <p class="muted">Les exports comprennent les PNG détourés avec transparence et leurs masques. Ils ne sont pas régénérés par une IA générative.</p>
 </section>
 <section class="panel">
+<h2>Importer le ZIP dans Picture It! sur PHIL</h2>
+<p>Choisir la photo source et le ZIP des détourages. Le pont Windows prépare une copie et tous les calques PNG séparément.</p>
+<label>Photo source <input id="bridgeSource" type="file" accept="image/*"></label>
+<label>ZIP des détourages <input id="bridgeZip" type="file" accept=".zip,application/zip"></label>
+<label>Jeton du pont Windows <input id="bridgeToken" type="password" autocomplete="off" placeholder="Jeton affiché par DEMARRER_PONT_PICTUREIT.bat"></label>
+<div class="controls"><button id="bridgeImport">Envoyer à Picture It! sur PHIL</button></div>
+<p id="bridgeResult" aria-live="polite" class="muted">Lancer d'abord DEMARRER_PONT_PICTUREIT.bat sur le PC.</p>
+</section>
+<section class="panel">
 <h2>3. Picture It! et reconstruction du fond</h2>
 <p>Une fois les éléments détourés, le PC PHIL peut ouvrir une copie de l'image dans Picture It!, créer un calque par sujet puis reconstruire le fond élément par élément. Le résultat doit être vérifié avant toute impression lenticulaire.</p>
 <p class="notice">Sur iPad, Picture It! ne s’exécute pas directement : c’est un logiciel Windows. Les PNG peuvent être transférés vers PHIL. Le service local actuel n’est accessible que depuis le navigateur du PC lui-même.</p>
@@ -121,5 +130,7 @@ $('downloadAll').onclick=async()=>{try{say('Préparation des PNG et du ZIP…');
  zip.file('INFO.txt','Exports MicroPlayer. Détourages issus de la photo originale. Contrôler les contours. Le fond n’est pas reconstruit.\\n');
  const file=await zip.generateAsync({type:'blob'});download(file,filename+'_detourages.zip');say(subjects.length+' éléments exportés dans le ZIP.');
  }catch(e){say('ZIP indisponible : '+e.message+'. Téléchargez les PNG séparément.')}}
+async function b64(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(file)})}
+$('bridgeImport').onclick=async()=>{const status=$('bridgeResult'),src=$('bridgeSource').files[0],zip=$('bridgeZip').files[0],token=$('bridgeToken').value.trim();if(!src||!zip||!token){status.textContent='Choisissez la photo, le ZIP et saisissez le jeton du PC PHIL.';return}const btn=$('bridgeImport');btn.disabled=true;status.textContent='Transfert en cours…';try{const [source,archive]=await Promise.all([b64(src),b64(zip)]);const res=await fetch('http://127.0.0.1:8765/import-zip',{method:'POST',headers:{'Content-Type':'application/json','X-MicroPlayer-Token':token},body:JSON.stringify({source,zip:archive,confirmed:true})});const obj=await res.json();if(!res.ok)throw Error(obj.error||'Erreur de transfert');status.textContent=obj.subjects.length+' éléments préparés sur PHIL : '+obj.folder+'. Ouvrez PHOTO_ORIGINALE_COPIE.png dans Picture It!. Les PNG détourés sont à côté.'}catch(e){status.textContent='Échec : '+e.message+'. Le site de test Vercel peut refuser les connexions localhost. Dans ce cas, ouvrez le programme sur le PC PHIL.'}finally{btn.disabled=false}};
 render();
 </script></body></html>

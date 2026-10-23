@@ -32,13 +32,22 @@ class Handler(BaseHTTPRequestHandler):
   if self.path!='/health':return self.reply(404,{'error':'Not found'})
   return self.reply(200,{'ok':True,'requires_token':True,'pictureit':'local Windows only'})
  def do_POST(self):
-  if self.path not in ('/prepare','/render'):return self.reply(404,{'error':'Not found'})
+  if self.path not in ('/prepare','/render','/import-zip'):return self.reply(404,{'error':'Not found'})
   if not self.authorized():return self.reply(403,{'error':'Origin or token rejected'})
   try:
    n=int(self.headers.get('Content-Length','0'))
    if not 0<n<MAX:raise ValueError('Upload size not allowed')
    payload=json.loads(self.rfile.read(n))
    if payload.get('confirmed') is not True:raise ValueError('Overlay validation required')
+   if self.path=='/import-zip':
+    import importlib.util
+    spec=importlib.util.spec_from_file_location('zip_import',str(ROOT/'pictureit-import-zip.py'))
+    module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    stamp=datetime.datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    target=OUTPUT/('import_'+stamp)
+    subjects=module.process_zip(base64.b64decode(payload['source'],validate=True),base64.b64decode(payload['zip'],validate=True),target)
+    return self.reply(200,{'ok':True,'folder':str(target),'subjects':subjects,'pictureit':'Source copy and PNG layers ready on PC PHIL; native editor actions are not automatic.'})
+
    if self.path=='/render':
     if not payload.get('confirmed'):raise ValueError('Visual approval required')
     key=payload.get('session','')
