@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MicroPlayer — détourage universel</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#07121c;color:#edf5fc}
+*{box-sizing:border-box}body{margin:0;padding:16px}main{max-width:1050px;margin:auto}
+h1{font-size:clamp(23px,4vw,34px);margin:8px 0}p{line-height:1.5}h2{font-size:18px;margin:8px 0 14px}
+.panel{background:#132536;border:1px solid #345066;border-radius:15px;padding:16px;margin:12px 0}
+button,.file-button{display:inline-flex;align-items:center;justify-content:center;padding:12px 15px;border:1px solid #4d687b;border-radius:10px;font-size:15px;font-weight:700;background:#28435b;color:#fff;cursor:pointer;min-height:46px}
+button.primary,.file-button.primary{background:#ffd60a;color:#141c23;border-color:#ffd60a}
+button:disabled{opacity:.4;cursor:not-allowed}.controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+#photo{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.stage{position:relative;touch-action:none;overflow:hidden;background:#23394b;border:1px solid #688397;border-radius:12px;min-height:180px}
+#display{display:block;width:100%;height:auto;touch-action:none}
+.muted{color:#afc3d1;font-size:14px}.notice{color:#ffd779}#status{white-space:pre-wrap;color:#b9e4ff}
+input[type=text]{background:#0c1d2d;color:#fff;border:1px solid #557084;border-radius:9px;padding:10px;font-size:16px;max-width:100%}
+#subjectList{display:flex;flex-direction:column;gap:7px} .subject{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px;background:#233e52;border-radius:10px;flex-wrap:wrap}
+.subject button{min-height:36px;padding:7px 11px} .pill{font-size:12px;background:#183d51;border:1px solid #477d9b;border-radius:20px;padding:5px 9px}
+#spinner[hidden]{display:none}@media(max-width:580px){body{padding:8px}.panel{padding:12px}}
+</style></head><body><main>
+<h1>MicroPlayer — détourage universel</h1>
+<p>Une seule photo suffit pour commencer. Touchez un personnage, animal ou objet pour proposer son détourage par IA. Vous pouvez aussi tracer son contour au doigt ou au stylet.</p>
+<section class="panel">
+<h2>1. Charger votre image</h2>
+<div class="controls"><label for="photo" class="file-button primary">Choisir une photo</label><input id="photo" type="file" accept="image/*">
+<span id="dimensions" class="pill">Aucune photo chargée</span></div>
+<div class="controls"><button id="aiMode" class="primary" disabled>IA : toucher un élément</button><button id="manualMode" disabled>Contour au stylet</button><button id="finishShape" disabled>Fermer le contour</button><button id="reset" disabled>Annuler la sélection</button></div>
+<div class="stage"><canvas id="display" width="900" height="560" aria-label="Photo et détourage interactif"></canvas></div>
+<p id="status" aria-live="polite">Sélectionnez une photo. Aucun masque technique n'est à importer.</p>
+<p class="muted">L’IA MagicTouch se charge lors de la première sélection et demande une connexion Internet. Si elle ne convient pas à un sujet, utilisez le contour manuel. Les visages restent ceux de votre photo originale.</p>
+</section>
+<section class="panel">
+<h2>2. Valider les éléments sélectionnés</h2>
+<div class="controls"><input id="subjectName" type="text" placeholder="Nom de l'élément (facultatif)" maxlength="70">
+<button id="add" class="primary" disabled>Ajouter cet élément</button></div>
+<div id="subjectList"><p class="muted">Aucun élément sélectionné.</p></div>
+<div class="controls"><button id="downloadAll" disabled>Télécharger les éléments en ZIP</button></div>
+<p class="muted">Les exports comprennent les PNG détourés avec transparence et leurs masques. Ils ne sont pas régénérés par une IA générative.</p>
+</section>
+<section class="panel">
+<h2>3. Picture It! et reconstruction du fond</h2>
+<p>Une fois les éléments détourés, le PC PHIL peut ouvrir une copie de l'image dans Picture It!, créer un calque par sujet puis reconstruire le fond élément par élément. Le résultat doit être vérifié avant toute impression lenticulaire.</p>
+<p class="notice">Sur iPad, Picture It! ne s’exécute pas directement : c’est un logiciel Windows. Les PNG peuvent être transférés vers PHIL. Le service local actuel n’est accessible que depuis le navigateur du PC lui-même.</p>
+</section></main>
+<script type="module">
+const $=id=>document.getElementById(id);
+const stage=$('display'),ctx=stage.getContext('2d',{willReadFrequently:true});
+const source=document.createElement('canvas'),sx=source.getContext('2d',{willReadFrequently:true});
+const work=document.createElement('canvas'),wx=work.getContext('2d',{willReadFrequently:true});
+let original=null,mode='ai',model=null,loading=null,candidate=null,strokes=[],drawing=false,subjects=[],filename='image',busy=false;
+const say=t=>$('status').textContent=t;
+function updateControls(){let ready=!!original;['aiMode','manualMode','reset'].forEach(id=>$(id).disabled=!ready);$('finishShape').disabled=!ready||mode!=='manual'||strokes.length<3;$('add').disabled=!candidate;$('downloadAll').disabled=!subjects.length;$('aiMode').classList.toggle('primary',mode==='ai');$('manualMode').classList.toggle('primary',mode==='manual')}
+function point(ev){const b=stage.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(ev.clientX-b.left)/b.width)),y:Math.max(0,Math.min(1,(ev.clientY-b.top)/b.height))}}
+function canvasFromMask(alpha,w,h){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');let data=x.createImageData(w,h);for(let i=0;i<w*h;i++){let o=i*4;data.data[o]=255;data.data[o+1]=255;data.data[o+2]=255;data.data[o+3]=alpha[i]}x.putImageData(data,0,0);return c}
+function render(){
+ if(!original){ctx.clearRect(0,0,stage.width,stage.height);ctx.fillStyle='#c8d9e9';ctx.font='24px system-ui';ctx.fillText('Choisissez une photo',30,60);return}
+ ctx.clearRect(0,0,stage.width,stage.height);ctx.drawImage(source,0,0);
+ for(const s of subjects)drawTint(s.mask,'#54d7ed',.22);
+ if(candidate)drawTint(candidate,'#ffd60a',.46);
+ if(strokes.length){ctx.save();ctx.strokeStyle='#ffdb59';ctx.lineWidth=Math.max(2,stage.width/300);ctx.beginPath();strokes.forEach((p,i)=>i?ctx.lineTo(p.x*stage.width,p.y*stage.height):ctx.moveTo(p.x*stage.width,p.y*stage.height));ctx.stroke();ctx.restore()}
+}
+function drawTint(mask,color,opacity){const t=document.createElement('canvas');t.width=stage.width;t.height=stage.height;const x=t.getContext('2d');x.drawImage(mask,0,0,t.width,t.height);x.globalCompositeOperation='source-in';x.fillStyle=color;x.fillRect(0,0,t.width,t.height);ctx.save();ctx.globalAlpha=opacity;ctx.drawImage(t,0,0);ctx.restore()}
+$('photo').onchange=async()=>{
+ const file=$('photo').files[0];if(!file)return;try{
+  const url=URL.createObjectURL(file),img=new Image();img.src=url;await img.decode();URL.revokeObjectURL(url);
+  if(!img.naturalWidth||!img.naturalHeight)throw Error('Image non reconnue par Safari');
+  original=img;filename=(file.name||'photo').replace(/\.[^.]+$/,'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,50);
+  let scale=Math.min(1,1800/Math.max(img.naturalWidth,img.naturalHeight));
+  source.width=stage.width=work.width=Math.max(1,Math.round(img.naturalWidth*scale));
+  source.height=stage.height=work.height=Math.max(1,Math.round(img.naturalHeight*scale));
+  sx.clearRect(0,0,source.width,source.height);sx.drawImage(img,0,0,source.width,source.height);wx.drawImage(source,0,0);
+  subjects=[];candidate=null;strokes=[];
+  $('dimensions').textContent=img.naturalWidth+' × '+img.naturalHeight;
+  updateControls();render();showList();say('Photo chargée. Touchez un élément dans l’image pour le sélectionner par IA.');
+ }catch(e){say('Impossible de lire cette image : '+e.message)}
+};
+$('aiMode').onclick=()=>{mode='ai';strokes=[];candidate=null;updateControls();render();say('Touchez un objet, une personne ou un animal pour le sélectionner.')};
+$('manualMode').onclick=()=>{mode='manual';strokes=[];candidate=null;updateControls();render();say('Dessinez un contour fermé autour de l’élément au stylet ou au doigt.')};
+$('reset').onclick=()=>{candidate=null;strokes=[];updateControls();render();say('Sélection annulée.')}
+async function getSegmenter(){if(model)return model;if(loading)return loading;loading=(async()=>{
+ const api=await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/+esm');
+ const files=await api.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm');
+ return api.InteractiveSegmenter.createFromOptions(files,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/1/interactive_segmentation.task',delegate:'CPU'}});
+ })();try{model=await loading;return model}catch(e){loading=null;throw e}}
+function resizeConfidence(m){
+ const v=m.getAsFloat32Array(),w=m.width,h=m.height;const pixels=new Uint8ClampedArray(w*h);
+ for(let i=0;i<pixels.length;i++){const n=v[i]||0;pixels[i]=n>.24?Math.round(255*Math.min(1,Math.max(0,(n-.24)/.76))):0}
+ const tmp=canvasFromMask(pixels,w,h),dst=document.createElement('canvas');dst.width=stage.width;dst.height=stage.height;dst.getContext('2d').drawImage(tmp,0,0,dst.width,dst.height);return dst
+}
+async function segmentAI(p){
+ busy=true;say('Analyse IA de l’élément sélectionné…');try{
+  const seg=await getSegmenter();seg.setImage(source);
+  const mask=seg.segment([{brushMode:1,point:[p],isCompleted:true}]);
+  const output=mask?.confidenceMasks?.[0]||mask?.categoryMask||mask;
+  if(!output?.getAsFloat32Array)throw Error('Le modèle n’a pas renvoyé de masque');
+  candidate=resizeConfidence(output);strokes=[];render();updateControls();say('Contour proposé. Vérifiez les bords, puis touchez « Ajouter cet élément ». Sinon, utilisez le contour manuel.');
+ }catch(e){say('IA indisponible sur cet appareil : '+e.message+'. Utilisez « Contour au stylet » pour continuer.')}finally{busy=false}
+}
+stage.addEventListener('pointerdown',ev=>{if(!original||busy)return;ev.preventDefault();const p=point(ev);
+ if(mode==='ai'){segmentAI(p);return}
+ drawing=true;strokes=[p];stage.setPointerCapture?.(ev.pointerId);render();updateControls()
+});
+stage.addEventListener('pointermove',ev=>{if(!drawing)return;ev.preventDefault();const p=point(ev),last=strokes[strokes.length-1];if(!last||Math.hypot(p.x-last.x,p.y-last.y)>.003){strokes.push(p);render()}});
+stage.addEventListener('pointerup',ev=>{if(!drawing)return;drawing=false;try{stage.releasePointerCapture(ev.pointerId)}catch{}updateControls()});
+$('finishShape').onclick=()=>{if(strokes.length<3)return;const c=document.createElement('canvas');c.width=stage.width;c.height=stage.height;const g=c.getContext('2d');g.fillStyle='#fff';g.beginPath();strokes.forEach((p,i)=>i?g.lineTo(p.x*c.width,p.y*c.height):g.moveTo(p.x*c.width,p.y*c.height));g.closePath();g.fill();candidate=c;strokes=[];updateControls();render();say('Contour manuel créé. Vérifiez-le puis ajoutez cet élément.')};
+$('add').onclick=()=>{if(!candidate)return;const name=($('subjectName').value.trim()||('Element '+(subjects.length+1))).slice(0,70);
+ subjects.push({name,mask:candidate});candidate=null;strokes=[];$('subjectName').value='';updateControls();render();showList();say(name+' ajouté. Sélectionnez un autre élément si nécessaire.')};
+function showList(){const wrap=$('subjectList');wrap.replaceChildren();if(!subjects.length){const p=document.createElement('p');p.className='muted';p.textContent='Aucun élément sélectionné.';wrap.append(p);return}
+ subjects.forEach((s,i)=>{const row=document.createElement('div');row.className='subject';const name=document.createElement('span');name.textContent=(i+1)+'. '+s.name;const actions=document.createElement('span');actions.className='controls';const save=document.createElement('button');save.textContent='PNG transparent';save.onclick=()=>downloadSubject(s,i);const rm=document.createElement('button');rm.textContent='Supprimer';rm.onclick=()=>{subjects.splice(i,1);updateControls();render();showList()};actions.append(save,rm);row.append(name,actions);wrap.append(row)})}
+function cutoutCanvas(s){let c=document.createElement('canvas');c.width=original.naturalWidth;c.height=original.naturalHeight;const g=c.getContext('2d');g.drawImage(original,0,0);g.globalCompositeOperation='destination-in';g.drawImage(s.mask,0,0,c.width,c.height);g.globalCompositeOperation='source-over';return c}
+function safeName(name){return name.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').slice(0,40)}
+function blobFrom(c){return new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(Error('PNG indisponible')),'image/png'))}
+function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+async function downloadSubject(s,i){try{const c=cutoutCanvas(s);download(await blobFrom(c),filename+'_'+(i+1)+'_'+safeName(s.name)+'.png');say('PNG du sujet exporté avec transparence.')}catch(e){say('Export impossible : '+e.message)}}
+$('downloadAll').onclick=async()=>{try{say('Préparation des PNG et du ZIP…');const {default:JSZip}=await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');const zip=new JSZip();
+ for(let i=0;i<subjects.length;i++){const s=subjects[i],base=String(i+1).padStart(2,'0')+'_'+safeName(s.name);
+ zip.file(base+'_detoure.png',await blobFrom(cutoutCanvas(s)));
+ const mc=document.createElement('canvas');mc.width=original.naturalWidth;mc.height=original.naturalHeight;const mctx=mc.getContext('2d');mctx.drawImage(s.mask,0,0,mc.width,mc.height);zip.file(base+'_masque.png',await blobFrom(mc));
+ }
+ zip.file('INFO.txt','Exports MicroPlayer. Détourages issus de la photo originale. Contrôler les contours. Le fond n’est pas reconstruit.\\n');
+ const file=await zip.generateAsync({type:'blob'});download(file,filename+'_detourages.zip');say(subjects.length+' éléments exportés dans le ZIP.');
+ }catch(e){say('ZIP indisponible : '+e.message+'. Téléchargez les PNG séparément.')}}
+render();
+</script></body></html>
