@@ -29,7 +29,7 @@ class Handler(BaseHTTPRequestHandler):
  def authorized(self):
   return self.origin() and secrets.compare_digest(self.headers.get('X-MicroPlayer-Token',''),TOKEN)
  def do_GET(self):
-  if self.path in ('/','/pictureit-studio.html'):
+  if self.path.split('?',1)[0] in ('/','/pictureit-studio.html'):
    data=(ROOT/'pictureit-studio.html').read_bytes()
    self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data);return
   if self.path!='/health':return self.reply(404,{'error':'Not found'})
